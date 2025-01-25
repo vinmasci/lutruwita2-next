@@ -1,7 +1,7 @@
 import path from 'path';
 
 export const SERVER_CONFIG = {
-  port: process.env.PORT || 3000,
+    port: process.env.PORT || 3001, 
   uploadsDir: path.join(__dirname, '../../../uploads'),
   maxFileSize: 50 * 1024 * 1024, // 50MB
   allowedFileTypes: ['.gpx'],

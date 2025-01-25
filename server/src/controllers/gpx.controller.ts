@@ -13,6 +13,8 @@ export class GPXController {
       return res.status(400).json({ error: 'No file provided' });
     }
 
+    console.log('File received:', req.file.originalname);
+
     // Set up SSE
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
