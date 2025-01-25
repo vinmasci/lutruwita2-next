@@ -1,6 +1,6 @@
-import { parse as parseGPX } from '@xmldom/xmldom';
-import { ProcessedRoute } from '../../../types';
-import type { MapboxMatchResult, SurfaceAnalysis } from '../types/gpx.types';
+import { DOMParser } from '@xmldom/xmldom';
+import { ProcessedRoute } from '../../../shared/types/gpx.types';
+import type { MapboxMatchResult, SurfaceAnalysis } from '../../../shared/types/gpx.types';
 
 interface ProcessingOptions {
   onProgress?: (progress: number) => void;
@@ -21,7 +21,7 @@ export class GPXProcessingService {
     
     try {
       // Parse GPX file
-      const gpxDoc = parseGPX(fileContent);
+      const gpxDoc = new DOMParser().parseFromString(fileContent, 'text/xml');
       onProgress?.(20);
 
       // Extract track points
@@ -38,7 +38,7 @@ export class GPXProcessingService {
 
       // Prepare final result
       const result: ProcessedRoute = {
-        id: crypto.randomUUID(),
+        id: `temp-id-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         name: this.extractTrackName(gpxDoc) || 'Unnamed Track',
         geojson: mapboxMatch.geojson,
         surface: surfaceAnalysis,
@@ -53,7 +53,14 @@ export class GPXProcessingService {
       return result;
     } catch (error) {
       console.error('GPX processing failed:', error);
-      throw new Error(`GPX processing failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const stack = error instanceof Error ? error.stack : '';
+      console.error(`GPX Processing Failure Details:
+        Error: ${errorMessage}
+        Stack: ${stack}
+        Mapbox Token: ${this.mapboxToken ? 'Present' : 'Missing'}
+      `);
+      throw new Error(`GPX processing failed: ${errorMessage}`);
     }
   }
 
