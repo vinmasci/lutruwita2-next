@@ -6,6 +6,7 @@ ARCHITECTURE.md
 DIR.md  
 index.html  
 MIGRATION_LOG.md  
+MIGRATIONPLAN.md  
 package-lock.json  
 package.json  
 tailwind.config.js  
@@ -30,14 +31,25 @@ uploads/
 ### server/src/
 server.ts  
 config/  
+controllers/  
 middlewares/  
 routes/  
 services/  
 utils/
 
+#### server/src/config/
+server.config.ts
+
+#### server/src/controllers/
+gpx.controller.ts
+
 #### server/src/middlewares/
 auth.ts  
-error-handling.ts
+error-handling.ts  
+upload.middleware.ts
+
+#### server/src/routes/
+gpx.routes.ts
 
 #### server/src/services/
 gpx/  
