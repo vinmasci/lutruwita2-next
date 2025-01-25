@@ -1,6 +1,6 @@
 import { DOMParser } from '@xmldom/xmldom';
-import { ProcessedRoute } from '../../../shared/types/gpx.types';
-import type { MapboxMatchResult, SurfaceAnalysis } from '../../../shared/types/gpx.types';
+import { ProcessedRoute } from '@shared/types/gpx.types';
+import type { MapboxMatchResult, SurfaceAnalysis } from '@shared/types/gpx.types';
 
 interface ProcessingOptions {
   onProgress?: (progress: number) => void;
@@ -85,15 +85,22 @@ export class GPXProcessingService {
     points: Array<[number, number]>
   ): Promise<MapboxMatchResult> {
     const coordinates = points
-      .map(([lon, lat]) => `${lon},${lat}`)
+      .map(([lon, lat]) => `${lon},${lat}`) // Proper coordinate format
       .join(';');
 
     const response = await fetch(
-      `https://api.mapbox.com/matching/v5/mapbox/cycling/${coordinates}?access_token=${this.mapboxToken}&geometries=geojson&radiuses=25;25&steps=true`
+      `https://api.mapbox.com/matching/v5/mapbox/cycling/${coordinates}?access_token=${this.mapboxToken}&geometries=geojson&radiuses=50;50&steps=true` // TODO: Implement dynamic radius calculation based on point density
     );
 
     if (!response.ok) {
-      throw new Error('Mapbox matching failed');
+      const errorBody = await response.text();
+      console.error('Mapbox API Failure:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        errorBody
+      });
+      throw new Error(`Mapbox matching failed: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();

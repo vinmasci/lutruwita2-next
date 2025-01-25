@@ -1,8 +1,21 @@
 import fs from 'fs/promises';
 import { UploadStatus } from '../types/gpx.types';
+import { GPXProcessingService } from '../../../services/gpx/gpx.processing';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export class GPXService {
   private uploadStatuses: Map<string, UploadStatus> = new Map();
+  private gpxProcessor: GPXProcessingService;
+
+  constructor() {
+    const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+    if (!mapboxToken) {
+      throw new Error('MAPBOX_ACCESS_TOKEN environment variable is required');
+    }
+    this.gpxProcessor = new GPXProcessingService(mapboxToken);
+  }
 
   async processGPXFile(filePath: string): Promise<string> {
     try {
@@ -19,9 +32,17 @@ export class GPXService {
         message: 'Starting GPX processing'
       });
 
-      // TODO: Implement actual GPX processing
-      // For now, just read the file to verify it's accessible
-      await fs.readFile(filePath);
+      // Read and process GPX file
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      const result = await this.gpxProcessor.processGPXFile(fileContent, {
+        onProgress: (progress) => {
+          this.uploadStatuses.set(uploadId, {
+            status: 'processing',
+            progress,
+            message: 'Processing GPX file'
+          });
+        }
+      });
 
       // Update status to complete
       this.uploadStatuses.set(uploadId, {

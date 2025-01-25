@@ -13,63 +13,45 @@ export const useGpxProcessingApi = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    return new Promise<ProcessedRoute>((resolve, reject) => {
-      const eventSource = new EventSource(API_ENDPOINT);
-      let finalResult: ProcessedRoute | null = null;
-
-      eventSource.addEventListener('progress', (event) => {
-        const data = JSON.parse(event.data);
-        if (onProgress) {
-          onProgress(data.progress);
+    try {
+      console.log('Starting GPX file upload...');
+      
+      const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Debug-Mode': 'true'
         }
       });
 
-      eventSource.addEventListener('complete', (event) => {
-        const processedData: ProcessedRoute & {
-          mapboxMatch: MapboxMatchResult;
-          surface: SurfaceAnalysis;
-        } = JSON.parse(event.data);
-        
-        finalResult = {
-          ...processedData,
-          geojson: processedData.mapboxMatch.geojson
-        };
-      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Upload failed:', errorData);
+        throw new Error(errorData.message || 'GPX processing failed');
+      }
 
-      eventSource.addEventListener('error', (event) => {
-        eventSource.close();
-        if (!finalResult) {
-          reject(new Error('GPX processing failed'));
-        }
-      });
+      console.log('File upload successful, waiting for processing...');
+      
+      const result = await response.json();
+      
+      if (!result) {
+        throw new Error('No result received from server');
+      }
 
-      eventSource.addEventListener('open', async () => {
-        // Once connection is established, send the file
-        const uploadResponse = await fetch(API_ENDPOINT, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Debug-Mode': 'true'
-          }
-        });
-
-        if (!uploadResponse.ok) {
-          eventSource.close();
-          const error = await uploadResponse.json();
-          reject(new Error(error.message || 'GPX processing failed'));
-        }
-      });
-
-      // Cleanup when complete
-      eventSource.addEventListener('complete', () => {
-        eventSource.close();
-        if (finalResult) {
-          resolve(finalResult);
-        } else {
-          reject(new Error('No result received from server'));
-        }
-      });
-    });
+      console.log('Processing completed successfully');
+      
+      return {
+        ...result,
+        geojson: result.mapboxMatch?.geojson,
+        id: crypto.randomUUID(),
+        name: file.name.replace('.gpx', ''),
+        color: '#3b82f6',
+        isVisible: true
+      };
+    } catch (error) {
+      console.error('GPX processing error:', error);
+      throw error;
+    }
   };
 
   return { processGpxFile };
