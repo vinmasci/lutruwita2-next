@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "emitDeclarationOnly": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@server/*": ["./src/server/*"]
+    },
+    "esModuleInterop": true,
+    "target": "ES2022"
+  },
+  "include": ["vite.config.ts", "src/server/**/*"]
+}

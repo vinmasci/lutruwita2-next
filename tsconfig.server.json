@@ -1,0 +1,37 @@
+
+
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ESNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noEmit": false,
+    "isolatedModules": true,
+    "incremental": true,
+    "rootDir": "./src",
+    "outDir": "./dist/server",
+    "types": ["node", "express", "express-openid-connect", "geojson", "ol"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@middlewares/*": ["./src/features/server/middlewares/*"],
+      "@/types/*": ["./src/types/*"]
+    }
+  },
+  "include": [
+    "src/server.ts",
+    "src/types/**/*",
+    "src/server/**/*",
+    "src/features/**/routes/**/*",
+    "src/features/**/services/**/*",
+    "src/features/**/types/**/*"
+  ],
+  "exclude": ["src/client/**/*"]
+}
