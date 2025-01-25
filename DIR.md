@@ -25,28 +25,42 @@ favicon.ico
 package-lock.json  
 package.json  
 tsconfig.json  
+logs/  
 src/  
 uploads/
 
 ### server/src/
 server.ts  
-config/  
 controllers/  
-middlewares/  
+features/  
 routes/  
 services/  
+shared/  
 utils/
-
-#### server/src/config/
-server.config.ts
 
 #### server/src/controllers/
 gpx.controller.ts
 
-#### server/src/middlewares/
-auth.ts  
-error-handling.ts  
-upload.middleware.ts
+#### server/src/features/
+gpx/  
+server/  
+surface/
+
+##### server/src/features/gpx/
+controllers/  
+middleware/  
+routes/  
+services/  
+types/
+
+##### server/src/features/server/
+config/  
+middlewares/
+
+##### server/src/features/surface/
+controllers/  
+routes/  
+services/
 
 #### server/src/routes/
 gpx.routes.ts
@@ -54,6 +68,25 @@ gpx.routes.ts
 #### server/src/services/
 gpx/  
 surface/
+
+##### server/src/services/gpx/
+gpx.processing.ts
+
+#### server/src/shared/
+config/  
+middlewares/  
+types/  
+utils/
+
+##### server/src/shared/config/
+server.config.ts
+
+##### server/src/shared/middlewares/
+error-handling.ts  
+upload.middleware.ts
+
+##### server/src/shared/types/
+gpx.types.ts
 
 ## src/
 App.tsx  
