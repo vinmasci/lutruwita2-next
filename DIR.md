@@ -17,6 +17,11 @@ tsconfig.json
 tsconfig.node.json  
 tsconfig.server.json  
 tsconfig.tsbuildinfo  
+logs/  
+logs/error.log  
+logs/exceptions.log  
+logs/rejections.log  
+logs/server.log
 
 ## public/
 favicon.ico
