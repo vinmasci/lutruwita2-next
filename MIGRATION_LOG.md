@@ -1,5 +1,55 @@
 # Migration Log
 
+## AI Assistant Notes (2025-01-25)
+Analyzing migration from lutruwita2 to lutruwita2-next:
+
+Key Components to Migrate:
+1. GPX Processing System
+   - Current: Monolithic structure in src/services
+   - Target: Feature-based module under features/gpx/
+   - Addition: Mapbox Map Matching API integration
+
+2. Surface Detection
+   - Current: Basic surface type assignment
+   - Target: Enhanced with Mapbox data
+   - Integration: Map Matching API for accurate surface detection
+
+3. Server Architecture
+   - Current: Next.js routes
+   - Target: Separate Express server for processing
+   - Purpose: Handle heavy GPX operations
+
+Migration Plan:
+1. Phase 1: Server Setup (Current)
+   - Express server infrastructure
+   - Basic endpoints
+   - File upload handling
+
+2. Phase 2: GPX Processing
+   - Port existing processor
+   - Integrate Map Matching API
+   - Implement SSE progress updates
+
+3. Phase 3: Surface Detection
+   - Port current logic
+   - Enhance with Mapbox data
+   - Improve accuracy
+
+4. Phase 4: Frontend Integration
+   - Next.js routes for API
+   - React components
+   - State management
+
+## 2025-01-25
+- Server Architecture Changes:
+  - Split into separate Express and Next.js servers
+  - Express backend on port 3001 for GPX/surfaces processing
+  - Next.js frontend on port 3000
+  - Improved separation of concerns
+
+
+# Migration Log
+
 ## 2025-01-25
 - Fixed TypeScript module resolution issues:
   - Updated tsconfig.server.json with proper module resolution settings

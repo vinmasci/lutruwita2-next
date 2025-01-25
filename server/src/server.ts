@@ -1,25 +1,27 @@
 import express from 'express';
 import cors from 'cors';
-import { errorHandler } from './middlewares/error-handling.ts';
-import { authenticate } from './middlewares/auth.ts';
-import gpxRoutes from '../gpx/routes/gpx.ts';
+import { SERVER_CONFIG } from './shared/config/server.config';
+import { gpxRoutes } from './features/gpx/routes/gpx.routes';
+import { errorHandler } from './shared/middlewares/error-handling';
 
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors(SERVER_CONFIG.cors));
 app.use(express.json());
-app.use(authenticate);
 
-// Routes
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Feature Routes
 app.use('/api/gpx', gpxRoutes);
 
 // Error handling
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Start server
+app.listen(SERVER_CONFIG.port, () => {
+  console.log(`Server running on port ${SERVER_CONFIG.port}`);
 });
-
-export default app;
