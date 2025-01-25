@@ -35,6 +35,17 @@
 - No proper error handling for Mapbox API failures
 - No token validation on server startup
 - No input validation for track points
+- Endpoint mismatch between client and server:
+  - Client attempts POST to `/api/gpx/process`
+  - Server implements:
+    - POST /api/gpx/upload
+    - GET /api/gpx/progress/:uploadId
+    - GET /api/gpx/status/:uploadId
+  - Route mounting configuration needs verification
+  - Error chain:
+    - 404 Not Found on /api/gpx/process
+    - SyntaxError when parsing response as JSON
+    - Response may be empty or contain HTML error page
 
 ### 4. Frontend Integration Issues (ACTIVE ISSUES)
 - Incomplete EventSource error handling
