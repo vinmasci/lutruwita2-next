@@ -53,17 +53,12 @@
 - Debug mode permanently enabled in API calls
 - No specific error types/messages
 - Limited error feedback to user
-- Endpoint mismatch: 
-  - Client attempts to POST to `/api/gpx/process`
-  - Server only implements:
-    - POST /api/gpx/upload
-    - GET /api/gpx/progress/:uploadId
-    - GET /api/gpx/status/:uploadId
-  - Additional issue: Route mounting configuration may be incorrect
-  - Error chain:
-    - 404 Not Found on /api/gpx/process
-    - SyntaxError when parsing response as JSON
-    - Response may be empty or contain HTML error page
+- [x] Endpoint mismatch (FIXED): 
+  - Changed client endpoint from `/api/gpx/process` to `/api/gpx/upload`
+  - Updated client to handle two-step process:
+    1. Upload file to get uploadId
+    2. Create EventSource with uploadId for progress tracking
+  - Fixed CORS configuration to allow requests from port 3000
 
 ### 5. Network/Configuration Problems (ACTIVE ISSUES)
 - Mapbox API authentication failures due to invalid token
