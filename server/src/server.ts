@@ -59,30 +59,37 @@ logger.on('error', (error) => {
   console.error('Logger error:', error);
 });
 
-// Create logs directory if it doesn't exist
+// Create required directories
 import fs from 'fs';
-const logDir = path.join(__dirname, '../../logs');
-logger.info('Attempting to create logs directory at:', logDir);
-try {
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-    // Set permissions to allow read/write for all users
-    fs.chmodSync(logDir, 0o777);
-    logger.info('Successfully created logs directory');
-  } else {
-    // Verify directory permissions
-    const stats = fs.statSync(logDir);
-    if (!stats.isDirectory()) {
-      throw new Error('Logs path exists but is not a directory');
+
+const createDirectory = (dir: string, name: string) => {
+  logger.info(`Attempting to create ${name} directory at:`, dir);
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.chmodSync(dir, 0o777);
+      logger.info(`Successfully created ${name} directory`);
+    } else {
+      const stats = fs.statSync(dir);
+      if (!stats.isDirectory()) {
+        throw new Error(`${name} path exists but is not a directory`);
+      }
+      fs.chmodSync(dir, 0o777);
+      logger.info(`${name} directory already exists and has correct permissions`);
     }
-    // Ensure write permissions
-    fs.chmodSync(logDir, 0o777);
-    logger.info('Logs directory already exists and has correct permissions');
+  } catch (err) {
+    logger.error(`Failed to create or verify ${name} directory:`, err);
+    process.exit(1);
   }
-} catch (err) {
-  logger.error('Failed to create or verify logs directory:', err);
-  process.exit(1);
-}
+};
+
+// Create logs directory
+const logDir = path.join(__dirname, '../../logs');
+createDirectory(logDir, 'logs');
+
+// Create uploads directory
+const uploadsDir = path.join(__dirname, '../../uploads');
+createDirectory(uploadsDir, 'uploads');
 
 const app = express();
 

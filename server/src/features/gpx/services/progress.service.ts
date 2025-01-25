@@ -5,6 +5,7 @@ interface UploadProgress {
   progress: number;
   currentTask: string;
   errors?: string[];
+  result?: any; // Add result property
 }
 
 class ProgressTracker extends EventEmitter {

@@ -4,7 +4,7 @@ import type { MapboxMatchResult, SurfaceAnalysis } from '../types/gpx.types';
 type ProcessingProgressCallback = (progress: number) => void;
 
 export const useGpxProcessingApi = () => {
-  const API_ENDPOINT = '/api/gpx/upload';
+  const API_ENDPOINT = 'http://localhost:3001/api/gpx/upload';
 
   const processGpxFile = async (
     file: File,
@@ -32,7 +32,7 @@ export const useGpxProcessingApi = () => {
           }
 
           // Now create EventSource with the uploadId
-          const eventSource = new EventSource(`/api/gpx/progress/${data.uploadId}`);
+          const eventSource = new EventSource(`http://localhost:3001/api/gpx/progress/${data.uploadId}`);
           
           eventSource.onmessage = (event) => {
           const data = JSON.parse(event.data);
