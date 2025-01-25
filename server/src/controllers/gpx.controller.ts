@@ -33,9 +33,10 @@ export class GPXController {
 
       // Send complete event
       res.write(`event: complete\ndata: ${JSON.stringify(result)}\n\n`);
+      res.end();
     } catch (error) {
-      res.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
-    } finally {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.write(`event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
   }

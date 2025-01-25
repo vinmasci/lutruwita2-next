@@ -16,38 +16,51 @@ export const useGpxProcessingApi = () => {
     try {
       console.log('Starting GPX file upload...');
       
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Debug-Mode': 'true'
-        }
+      const eventSource = new EventSource(`/api/gpx/progress?file=${file.name}`);
+      
+      return new Promise<ProcessedRoute>((resolve, reject) => {
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          
+          if (data.progress) {
+            onProgress?.(data.progress);
+            return;
+          }
+
+          if (data.error) {
+            eventSource.close();
+            reject(new Error(data.error));
+            return;
+          }
+
+          eventSource.close();
+          resolve({
+            ...data,
+            geojson: data.mapboxMatch?.geojson,
+            id: crypto.randomUUID(),
+            name: file.name.replace('.gpx', ''),
+            color: '#3b82f6',
+            isVisible: true
+          });
+        };
+
+        eventSource.onerror = (error) => {
+          eventSource.close();
+          reject(new Error('Connection to server failed'));
+        };
+
+        // Send the file data
+        fetch(API_ENDPOINT, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Debug-Mode': 'true'
+          }
+        }).catch(error => {
+          eventSource.close();
+          reject(error);
+        });
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Upload failed:', errorData);
-        throw new Error(errorData.message || 'GPX processing failed');
-      }
-
-      console.log('File upload successful, waiting for processing...');
-      
-      const result = await response.json();
-      
-      if (!result) {
-        throw new Error('No result received from server');
-      }
-
-      console.log('Processing completed successfully');
-      
-      return {
-        ...result,
-        geojson: result.mapboxMatch?.geojson,
-        id: crypto.randomUUID(),
-        name: file.name.replace('.gpx', ''),
-        color: '#3b82f6',
-        isVisible: true
-      };
     } catch (error) {
       console.error('GPX processing error:', error);
       throw error;
