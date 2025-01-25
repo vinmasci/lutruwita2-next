@@ -5,8 +5,8 @@ import { gpxController } from '../controllers/gpx.controller';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/process', upload.single('file'), (req, res) => 
-  gpxController.processGPX(req, res)
-);
+// Update to match client expectations
+router.post('/upload', upload.single('gpxFile'), gpxController.uploadGPX);
+router.get('/progress/:uploadId', gpxController.trackProgress);
 
 export default router;

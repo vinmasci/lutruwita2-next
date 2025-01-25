@@ -4,7 +4,7 @@ import type { MapboxMatchResult, SurfaceAnalysis } from '../types/gpx.types';
 type ProcessingProgressCallback = (progress: number) => void;
 
 export const useGpxProcessingApi = () => {
-  const API_ENDPOINT = 'http://localhost:3001/api/gpx/upload';
+  const API_BASE = 'http://localhost:3001/api/gpx';
 
   const processGpxFile = async (
     file: File,
@@ -18,12 +18,9 @@ export const useGpxProcessingApi = () => {
       
       return new Promise<ProcessedRoute>((resolve, reject) => {
         // Send the file data first to get uploadId
-        fetch(API_ENDPOINT, {
+        fetch(`${API_BASE}/upload`, {
           method: 'POST',
-          body: formData,
-          headers: {
-            'Debug-Mode': 'true'
-          }
+          body: formData
         })
         .then(response => response.json())
         .then(data => {
@@ -32,37 +29,38 @@ export const useGpxProcessingApi = () => {
           }
 
           // Now create EventSource with the uploadId
-          const eventSource = new EventSource(`http://localhost:3001/api/gpx/progress/${data.uploadId}`);
+          const eventSource = new EventSource(`${API_BASE}/progress/${data.uploadId}`);
           
           eventSource.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          
-          if (data.progress) {
-            onProgress?.(data.progress);
-            return;
-          }
+            const data = JSON.parse(event.data);
+            
+            if (data.progress) {
+              onProgress?.(data.progress);
+              return;
+            }
 
-          if (data.error) {
+            if (data.error) {
+              eventSource.close();
+              reject(new Error(data.error));
+              return;
+            }
+
+            if (data.geojson) {
+              eventSource.close();
+              resolve({
+                ...data,
+                id: crypto.randomUUID(),
+                name: file.name.replace('.gpx', ''),
+                color: '#3b82f6',
+                isVisible: true
+              });
+            }
+          };
+
+          eventSource.onerror = (error) => {
             eventSource.close();
-            reject(new Error(data.error));
-            return;
-          }
-
-          eventSource.close();
-          resolve({
-            ...data,
-            geojson: data.mapboxMatch?.geojson,
-            id: crypto.randomUUID(),
-            name: file.name.replace('.gpx', ''),
-            color: '#3b82f6',
-            isVisible: true
-          });
-        };
-
-        eventSource.onerror = (error) => {
-          eventSource.close();
-          reject(new Error('Connection to server failed'));
-        };
+            reject(new Error('SSE connection failed'));
+          };
 
         })
         .catch(error => {
