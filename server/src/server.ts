@@ -3,6 +3,7 @@ import cors from 'cors';
 import { SERVER_CONFIG } from './shared/config/server.config';
 import { gpxRoutes } from './features/gpx/routes/gpx.routes';
 import { errorHandler } from './shared/middlewares/error-handling';
+import 'dotenv/config';
 
 const app = express();
 
