@@ -1,4 +1,4 @@
-import { ProcessedRoute } from '../../types/gpx.types';
+import { ProcessedRoute, GPXProcessingError } from '../../types/gpx.types';
 
 export interface GpxUploaderProps {
   onUploadComplete: (result: ProcessedRoute) => void;
@@ -7,6 +7,6 @@ export interface GpxUploaderProps {
 export interface UploaderUIProps {
   file: File | null;
   isLoading: boolean;
-  error: string | null;
+  error: GPXProcessingError | null;
   onFileChange: (file: File) => void;
 }

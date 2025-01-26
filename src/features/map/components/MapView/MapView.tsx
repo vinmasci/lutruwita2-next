@@ -5,6 +5,7 @@ import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { Feature, LineString } from 'geojson';
+import { UnpavedSection, detectUnpavedSections } from '../../../gpx/services/surfaceService';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -18,8 +19,73 @@ export default function MapView() {
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
+  const [unpavedLayers, setUnpavedLayers] = useState<string[]>([]);
 
   const { processGpx, isLoading } = useClientGpxProcessing();
+
+  const clearUnpavedLayers = () => {
+    if (!mapInstance.current) return;
+    
+    unpavedLayers.forEach(layerId => {
+      if (mapInstance.current?.getLayer(layerId)) {
+        mapInstance.current.removeLayer(layerId);
+      }
+      if (mapInstance.current?.getSource(layerId)) {
+        mapInstance.current.removeSource(layerId);
+      }
+    });
+    
+    setUnpavedLayers([]);
+  };
+
+  const addUnpavedSections = async (coordinates: [number, number][]) => {
+    if (!mapInstance.current) return;
+    
+    try {
+      const sections = await detectUnpavedSections(coordinates);
+      const map = mapInstance.current;
+      
+      // Clear existing unpaved layers
+      clearUnpavedLayers();
+      
+      // Add new unpaved sections
+      const newLayers: string[] = [];
+      
+      sections.forEach((section, index) => {
+        const layerId = `unpaved-${index}-${Date.now()}`;
+        newLayers.push(layerId);
+        
+        // Add source
+        map.addSource(layerId, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: section.coordinates
+            }
+          }
+        });
+        
+        // Add layer
+        map.addLayer({
+          id: layerId,
+          type: 'line',
+          source: layerId,
+          paint: {
+            'line-color': '#f9ca24', // Yellow
+            'line-width': 4,
+            'line-opacity': 0.8
+          }
+        });
+      });
+      
+      setUnpavedLayers(newLayers);
+    } catch (error) {
+      console.error('Error adding unpaved sections:', error);
+    }
+  };
 
   const handleUploadGpx = async (file?: File) => {
     if (!file) {
@@ -75,9 +141,15 @@ export default function MapView() {
           }
         });
 
+        // Get coordinates from the GeoJSON
+        const feature = result.geojson.features[0] as Feature<LineString>;
+        const coordinates = feature.geometry.coordinates as [number, number][];
+
+        // Add unpaved sections
+        await addUnpavedSections(coordinates);
+
         // Fit bounds to show the route
         const bounds = new mapboxgl.LngLatBounds();
-        const feature = result.geojson.features[0] as Feature<LineString>;
         feature.geometry.coordinates.forEach((coord) => {
           if (coord.length >= 2) {
             bounds.extend([coord[0], coord[1]]);
@@ -171,7 +243,7 @@ export default function MapView() {
 
       setStreetsLayersLoaded(true);
       setIsMapReady(true);
-      setMapReady(true); // This was missing
+      setMapReady(true);
     });
 
     // Add controls
@@ -252,21 +324,19 @@ export default function MapView() {
           </Box>
         )}
 
-          <Sidebar
-            onUploadGpx={handleUploadGpx}
-            onSaveMap={handleSaveMap}
-            onLoadMap={handleLoadMap}
-            onAddPhotos={handleAddPhotos}
-            onAddPOI={handleAddPOI}
-            mapReady={mapReady}
-            onItemClick={() => {}}
-            onToggleRoute={() => {}}
-            onToggleGradient={() => {}}
-            onToggleSurface={() => {}}
-            onPlacePOI={() => {}}
-          />
-          
-        {/* SurfaceLegend will be added later when the component is available */}
+        <Sidebar
+          onUploadGpx={handleUploadGpx}
+          onSaveMap={handleSaveMap}
+          onLoadMap={handleLoadMap}
+          onAddPhotos={handleAddPhotos}
+          onAddPOI={handleAddPOI}
+          mapReady={mapReady}
+          onItemClick={() => {}}
+          onToggleRoute={() => {}}
+          onToggleGradient={() => {}}
+          onToggleSurface={() => {}}
+          onPlacePOI={() => {}}
+        />
       </div>
     </MapProvider>
   );

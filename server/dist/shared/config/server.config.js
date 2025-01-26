@@ -6,14 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SERVER_CONFIG = void 0;
 const path_1 = __importDefault(require("path"));
 exports.SERVER_CONFIG = {
-    port: process.env.PORT || 3000,
-    uploadsDir: path_1.default.join(__dirname, '../../../uploads'),
+    port: process.env.PORT || 8080,
+    uploadsDir: path_1.default.join(__dirname, '../../../../uploads'),
     maxFileSize: 50 * 1024 * 1024, // 50MB
     allowedFileTypes: ['.gpx'],
     cors: {
         origin: process.env.NODE_ENV === 'production'
             ? 'https://your-production-domain.com'
-            : 'http://localhost:5173',
+            : ['http://localhost:3000'],
         credentials: true
     }
 };

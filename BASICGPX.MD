@@ -105,202 +105,253 @@ export const matchTrackToRoads = async (
 ## Phase 3: 🚀 Surface Detection Implementation (IN PROGRESS)
 
 ### Overview
-Using the matched coordinates from Phase 2 to:
-1. Find unpaved sections of the route
-2. Overlay these sections in yellow
-3. Keep the existing red route underneath
+Reactivating our existing server implementation to:
+1. Use existing `server/src/services/gpx/gpx.processing.ts` for surface detection
+2. Leverage server-side caching and error handling
+3. Display unpaved sections in yellow overlay
+4. Keep existing red route underneath
 
 ### Implementation Steps
 
-#### 1. Create Surface Detection Service
-- [x] Create `src/features/gpx/services/surfaceService.ts`
-- [x] Use matched coordinates from map matching
-- [x] Query Mapbox for unpaved surfaces only
-- [x] Process surface responses
-- [x] Fix Mapbox token environment variable issue
-- [ ] Implement proper surface type detection
-- [ ] Add caching for surface queries
-- [ ] Handle API rate limits
->>>>>>> REPLACE>
-
-# GPX Implementation Status
-
-## Important Context
-We have an existing server implementation that:
-- Lives in the `server/` directory
-- Handles complex GPX processing
-- Includes surface detection
-- Uses Express server on port 3001
-- Has map matching capabilities
-
-We're currently bypassing this server temporarily to:
-1. Get basic GPX functionality working
-2. Simplify the implementation
-3. Test core features
-4. Keep the server code for later use
-
-The server code remains in place but unused while we implement client-side processing first.
-
-## ⚠️ CURRENT UPLOAD BOX LOCATION
-The file upload box in the sidebar is controlled by these files:
-
-1. Main Sidebar Component:
-```
-src/features/map/components/Sidebar/Sidebar.tsx
+#### 1. Start Using Existing Server ✅
+- [x] Start server with existing surface detection:
+```bash
+cd server
+npm install
+npm start   # Now running on port 8080 (changed from 3001)
 ```
 
-2. Upload Box Implementation:
-```
-src/features/map/components/Sidebar/SidebarListItems.tsx  <-- Contains the Upload box item
-```
-
-3. Actual Upload Logic:
-```
-src/features/gpx/components/Uploader/Uploader.tsx  <-- Now uses client-side processing
-src/features/gpx/hooks/useClientGpxProcessing.ts  <-- Handles client-side file processing
-src/features/gpx/utils/gpxParser.ts              <-- Converts GPX to GeoJSON
-```
-
-## Phase 1: ✅ Client-Side Implementation (COMPLETED)
-Successfully implemented:
-- Client-side GPX to GeoJSON conversion
-- Direct map display
-- Removed server dependency
-- Functional upload box in sidebar
-- All validation points passed
-- All error handling in place
-
-## Phase 2: ✅ Map Matching Implementation (COMPLETED)
-
-### Current Implementation Status
-
-#### ✅ Completed
-- Added Mapbox access token from environment
-- Created `src/features/gpx/services/mapMatchingService.ts`
-- Implemented point batching (100 points per request)
-- Modified `gpxParser.ts` to handle matched tracks
-- Implemented automatic map matching without UI controls
-- Added error handling for failed matches
-- Fixed route display and point skipping issues
-- Implemented clean route visualization
-
-#### 🎯 Improvements Made
-1. Route Display:
-   - Simplified to a single route layer
-   - Added white border (8px) for better visibility
-   - Implemented red line (#ee5253, 6px) for main route
-   - Removed individual point markers
-   - Removed duplicate route display
-
-2. Map Matching Optimization:
-   - Switched to 'driving' profile for better road matching
-   - Lowered confidence threshold (0.6) to accept more matches
-   - Increased radius multiplier (3) for better parallel road handling
-   - Improved point interpolation (5 points, 20m threshold)
-   - Added overview=full parameter for complete route coverage
-
-### Map Matching Service Implementation
+- [x] Configure server port and proxy:
 ```typescript
-// src/features/gpx/services/mapMatchingService.ts
-interface MatchingOptions {
-  confidenceThreshold?: number;
-  radiusMultiplier?: number;
-  maxGapDistance?: number;
-  interpolationPoints?: number;
+// server/src/shared/config/server.config.ts
+export const SERVER_CONFIG = {
+    port: process.env.PORT || 8080,
+    // ... other config
+};
+
+// vite.config.ts
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  }
+});
+```
+
+- [x] Added surface detection endpoints:
+```typescript
+// server/src/routes/gpx.routes.ts
+router.get('/surface', gpxController.getSurfaceType);
+router.post('/surface/batch', gpxController.batchGetSurfaceTypes);
+```
+
+- [x] Implemented surface detection controller with caching:
+```typescript
+// server/src/controllers/gpx.controller.ts
+private surfaceCache: Map<string, string> = new Map();
+
+async getSurfaceType(req: Request, res: Response) {
+  // Handles single point surface detection
 }
 
-export const matchTrackToRoads = async (
-  points: [number, number][],
-  options: MatchingOptions = {}
-) => {
-  const {
-    confidenceThreshold = 0.6,
-    radiusMultiplier = 3,
-    maxGapDistance = 0.0002,
-    interpolationPoints = 5
-  } = options;
-  
-  // Get coordinates from Mapbox API
-  const matchedCoordinates = await getMatchedCoordinates(points);
-  
-  return matchedCoordinates;
-};
+async batchGetSurfaceTypes(req: Request, res: Response) {
+  // Handles batch surface detection
+}
 ```
 
-## Phase 3: 🚀 Surface Detection Implementation (IN PROGRESS)
-
-### Overview
-Using the matched coordinates from Phase 2 to:
-1. Find unpaved sections of the route
-2. Overlay these sections in yellow
-3. Keep the existing red route underneath
-
-### Implementation Steps
-
-#### 1. Create Surface Detection Service
-- [ ] Create `src/features/gpx/services/surfaceService.ts`
-- [ ] Use matched coordinates from map matching
-- [ ] Query Mapbox for unpaved surfaces only
-- [ ] Process surface responses
-
+#### 2. Connect to Existing Surface Detection Service
 ```typescript
 // src/features/gpx/services/surfaceService.ts
-interface UnpavedSection {
+export interface UnpavedSection {
   startIndex: number;
   endIndex: number;
   coordinates: [number, number][];
   surfaceType: 'unpaved' | 'dirt' | 'gravel' | 'fine_gravel';
 }
 
+// Complement server-side caching
+const surfaceCache = new Map<string, string>();
+
+const querySurfaceType = async (lng: number, lat: number): Promise<string | undefined> => {
+  const cacheKey = `${lng},${lat}`;
+  if (surfaceCache.has(cacheKey)) {
+    return surfaceCache.get(cacheKey);
+  }
+
+  try {
+    // Use existing server's GPXProcessingService
+    const response = await fetch(`/api/gpx/surface?lng=${lng}&lat=${lat}`);
+    
+    if (!response.ok) {
+      throw new Error(`Surface query failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const surface = data.surface;
+    
+    if (surface) {
+      surfaceCache.set(cacheKey, surface);
+    }
+    
+    return surface;
+  } catch (error) {
+    console.error('Surface query error:', error);
+    return undefined;
+  }
+};
+
+// Match server's surface types from gpx.processing.ts
+const isUnpavedSurface = (surface?: string): boolean => {
+  const unpavedTypes = [
+    'unpaved', 'dirt', 'gravel', 'fine_gravel', 
+    'path', 'track', 'service', 'unknown'
+  ];
+  return unpavedTypes.includes(surface || '');
+};
+
 export const detectUnpavedSections = async (
   matchedCoordinates: [number, number][]
 ): Promise<UnpavedSection[]> => {
-  const sections: UnpavedSection[] = [];
-  let currentSection: UnpavedSection | null = null;
+  try {
+    // Use server's batch processing first (from GPXProcessingService)
+    const response = await fetch('/api/gpx/surface/batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ coordinates: matchedCoordinates })
+    });
 
-  // Query each coordinate from matched route
-  for (let i = 0; i < matchedCoordinates.length; i++) {
-    const [lng, lat] = matchedCoordinates[i];
-    const surfaceType = await querySurfaceType(lng, lat);
-    
-    // Only process unpaved surfaces
-    if (isUnpavedSurface(surfaceType)) {
-      if (!currentSection) {
-        currentSection = {
-          startIndex: i,
-          endIndex: i,
-          coordinates: [matchedCoordinates[i]],
-          surfaceType: surfaceType
-        };
-      } else {
-        currentSection.endIndex = i;
-        currentSection.coordinates.push(matchedCoordinates[i]);
-      }
-    } else if (currentSection) {
-      sections.push(currentSection);
-      currentSection = null;
+    if (response.ok) {
+      return await response.json();
     }
+
+    // Fallback to point-by-point if batch fails
+    const sections: UnpavedSection[] = [];
+    let currentSection: UnpavedSection | null = null;
+
+    for (let i = 0; i < matchedCoordinates.length; i++) {
+      const [lng, lat] = matchedCoordinates[i];
+      const surfaceType = await querySurfaceType(lng, lat);
+      
+      if (isUnpavedSurface(surfaceType)) {
+        if (!currentSection) {
+          currentSection = {
+            startIndex: i,
+            endIndex: i,
+            coordinates: [matchedCoordinates[i]],
+            surfaceType: 'unpaved'
+          };
+        } else {
+          currentSection.endIndex = i;
+          currentSection.coordinates.push(matchedCoordinates[i]);
+        }
+      } else if (currentSection) {
+        sections.push(currentSection);
+        currentSection = null;
+      }
+    }
+
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+
+    return sections;
+  } catch (error) {
+    console.error('Failed to detect unpaved sections:', error);
+    return [];
   }
-
-  if (currentSection) {
-    sections.push(currentSection);
-  }
-
-  return sections;
-};
-
-// Helper to check for unpaved surfaces
-const isUnpavedSurface = (surface?: string): boolean => {
-  const unpavedTypes = ['unpaved', 'dirt', 'gravel', 'fine_gravel'];
-  return unpavedTypes.includes(surface || '');
 };
 ```
 
-#### 2. Add Map Overlays
-- [ ] Keep existing red route display
-- [ ] Add yellow overlay for unpaved sections
-- [ ] Ensure proper layer ordering
+#### 3. Update Processing Hook to Use Server Results
+```typescript
+// src/features/gpx/hooks/useClientGpxProcessing.ts
+import { detectUnpavedSections } from '../services/surfaceService';
+import { ProcessedRoute } from '../types/gpx.types';
 
+// Add server's surface detection results to route
+interface ProcessedRoute {
+  // ... existing properties ...
+  unpavedSections?: UnpavedSection[];
+}
+
+export const useClientGpxProcessing = () => {
+  const processGpx = async (file: File): Promise<ProcessedRoute | null> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const rawGpx = await file.text();
+      
+      // Get matched route first
+      const parsedFeature = await parseAndMatchGpx(file);
+
+      // Use server's surface detection
+      const unpavedSections = await detectUnpavedSections(
+        parsedFeature.matched.coordinates
+      );
+
+      const geometry = parsedFeature.matched || parsedFeature.geometry;
+      
+      const geojson: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          properties: parsedFeature.properties,
+          geometry
+        }]
+      };
+
+      const processedRoute: ProcessedRoute = {
+        id: uuidv4(),
+        name: parsedFeature.properties?.name || file.name,
+        color: '#FF0000',
+        isVisible: true,
+        gpxData: rawGpx,
+        rawGpx: rawGpx,
+        geojson,
+        unpavedSections, // Add server's surface detection results
+        statistics: {
+          totalDistance: 0,
+          elevationGain: 0,
+          elevationLoss: 0,
+          maxElevation: 0,
+          minElevation: 0,
+          averageSpeed: 0,
+          movingTime: 0,
+          totalTime: 0
+        },
+        status: {
+          processingState: 'completed',
+          progress: 100
+        }
+      };
+
+      return processedRoute;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to process GPX file';
+      setError(message);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    processGpx,
+    isLoading,
+    error
+  };
+};
+```
+
+#### 4. Keep Map Display Implementation
 ```typescript
 // In MapView.tsx
 const displayUnpavedSections = (
@@ -334,545 +385,33 @@ const displayUnpavedSections = (
 };
 ```
 
-#### 3. Integration
-- [ ] Update processing pipeline
-- [ ] Add surface detection after map matching
-- [ ] Update map display with both layers
-
-```typescript
-// In useClientGpxProcessing.ts
-const processGpx = async (file: File) => {
-  // Existing map matching
-  const matchedTrack = await parseAndMatchGpx(file);
-  
-  // Add surface detection
-  const unpavedSections = await detectUnpavedSections(
-    matchedTrack.matched.coordinates
-  );
-  
-  // Display both layers
-  displayMatchedTrack(map, matchedTrack);
-  displayUnpavedSections(map, unpavedSections);
-};
-```
+### Server Integration Points
+1. Using existing `GPXProcessingService` from `server/src/services/gpx/gpx.processing.ts`
+2. Leveraging server's batch processing capabilities
+3. Using server's surface type detection logic
+4. Benefiting from server-side caching
+5. Utilizing server's error handling
 
 ### Validation Points
-- [ ] Map matching coordinates being used correctly
-- [ ] Unpaved surfaces detected accurately
-- [ ] Yellow overlay appears properly
-- [ ] Overlay stays on top of red route
-- [ ] Performance is acceptable
+- [ ] Server starts successfully
+- [ ] Server's surface detection responds
+- [ ] Batch processing works for large routes
+- [ ] Surface types match server definitions
+- [ ] Client properly displays results
+- [ ] Yellow overlay appears correctly
+- [ ] Performance is acceptable with server
 
 ### Known Issues to Handle
-1. Surface data might be missing
-2. API rate limits (not yet implemented)
-3. Surface type detection consistency (needs improvement)
-4. Loading states during detection (not implemented)
-5. Caching for surface queries (partially implemented)
->>>>>>> REPLACE>
-
-# GPX Implementation Status
-
-## Important Context
-We have an existing server implementation that:
-- Lives in the `server/` directory
-- Handles complex GPX processing
-- Includes surface detection
-- Uses Express server on port 3001
-- Has map matching capabilities
-
-We're currently bypassing this server temporarily to:
-1. Get basic GPX functionality working
-2. Simplify the implementation
-3. Test core features
-4. Keep the server code for later use
-
-The server code remains in place but unused while we implement client-side processing first.
-
-## ⚠️ CURRENT UPLOAD BOX LOCATION
-The file upload box in the sidebar is controlled by these files:
-
-1. Main Sidebar Component:
-```
-src/features/map/components/Sidebar/Sidebar.tsx
-```
-
-2. Upload Box Implementation:
-```
-src/features/map/components/Sidebar/SidebarListItems.tsx  <-- Contains the Upload box item
-```
-
-3. Actual Upload Logic:
-```
-src/features/gpx/components/Uploader/Uploader.tsx  <-- Now uses client-side processing
-src/features/gpx/hooks/useClientGpxProcessing.ts  <-- Handles client-side file processing
-src/features/gpx/utils/gpxParser.ts              <-- Converts GPX to GeoJSON
-```
-
-## Phase 1: ✅ Client-Side Implementation (COMPLETED)
-Successfully implemented:
-- Client-side GPX to GeoJSON conversion
-- Direct map display
-- Removed server dependency
-- Functional upload box in sidebar
-- All validation points passed
-- All error handling in place
-
-## Phase 2: ✅ Map Matching Implementation (COMPLETED)
-
-### Current Implementation Status
-
-#### ✅ Completed
-- Added Mapbox access token from environment
-- Created `src/features/gpx/services/mapMatchingService.ts`
-- Implemented point batching (100 points per request)
-- Modified `gpxParser.ts` to handle matched tracks
-- Implemented automatic map matching without UI controls
-- Added error handling for failed matches
-- Fixed route display and point skipping issues
-- Implemented clean route visualization
-
-#### 🎯 Improvements Made
-1. Route Display:
-   - Simplified to a single route layer
-   - Added white border (8px) for better visibility
-   - Implemented red line (#ee5253, 6px) for main route
-   - Removed individual point markers
-   - Removed duplicate route display
-
-2. Map Matching Optimization:
-   - Switched to 'driving' profile for better road matching
-   - Lowered confidence threshold (0.6) to accept more matches
-   - Increased radius multiplier (3) for better parallel road handling
-   - Improved point interpolation (5 points, 20m threshold)
-   - Added overview=full parameter for complete route coverage
-
-### Map Matching Service Implementation
-```typescript
-// src/features/gpx/services/mapMatchingService.ts
-interface MatchingOptions {
-  confidenceThreshold?: number;
-  radiusMultiplier?: number;
-  maxGapDistance?: number;
-  interpolationPoints?: number;
-}
-
-export const matchTrackToRoads = async (
-  points: [number, number][],
-  options: MatchingOptions = {}
-) => {
-  const {
-    confidenceThreshold = 0.6,
-    radiusMultiplier = 3,
-    maxGapDistance = 0.0002,
-    interpolationPoints = 5
-  } = options;
-  
-  // Get coordinates from Mapbox API
-  const matchedCoordinates = await getMatchedCoordinates(points);
-  
-  return matchedCoordinates;
-};
-```
-
-## Phase 3: 🚀 Surface Detection Implementation (IN PROGRESS)
-
-### Overview
-Using the matched coordinates from Phase 2 to:
-1. Find unpaved sections of the route
-2. Overlay these sections in yellow
-3. Keep the existing red route underneath
-
-### Implementation Steps
-
-#### 1. Create Surface Detection Service
-- [ ] Create `src/features/gpx/services/surfaceService.ts`
-- [ ] Use matched coordinates from map matching
-- [ ] Query Mapbox for unpaved surfaces only
-- [ ] Process surface responses
-
-```typescript
-// src/features/gpx/services/surfaceService.ts
-interface UnpavedSection {
-  startIndex: number;
-  endIndex: number;
-  coordinates: [number, number][];
-  surfaceType: 'unpaved' | 'dirt' | 'gravel' | 'fine_gravel';
-}
-
-export const detectUnpavedSections = async (
-  matchedCoordinates: [number, number][]
-): Promise<UnpavedSection[]> => {
-  const sections: UnpavedSection[] = [];
-  let currentSection: UnpavedSection | null = null;
-
-  // Query each coordinate from matched route
-  for (let i = 0; i < matchedCoordinates.length; i++) {
-    const [lng, lat] = matchedCoordinates[i];
-    const surfaceType = await querySurfaceType(lng, lat);
-    
-    // Only process unpaved surfaces
-    if (isUnpavedSurface(surfaceType)) {
-      if (!currentSection) {
-        currentSection = {
-          startIndex: i,
-          endIndex: i,
-          coordinates: [matchedCoordinates[i]],
-          surfaceType: surfaceType
-        };
-      } else {
-        currentSection.endIndex = i;
-        currentSection.coordinates.push(matchedCoordinates[i]);
-      }
-    } else if (currentSection) {
-      sections.push(currentSection);
-      currentSection = null;
-    }
-  }
-
-  if (currentSection) {
-    sections.push(currentSection);
-  }
-
-  return sections;
-};
-
-// Helper to check for unpaved surfaces
-const isUnpavedSurface = (surface?: string): boolean => {
-  const unpavedTypes = ['unpaved', 'dirt', 'gravel', 'fine_gravel'];
-  return unpavedTypes.includes(surface || '');
-};
-```
-
-#### 2. Add Map Overlays
-- [ ] Keep existing red route display
-- [ ] Add yellow overlay for unpaved sections
-- [ ] Ensure proper layer ordering
-
-```typescript
-// In MapView.tsx
-const displayUnpavedSections = (
-  map: mapboxgl.Map,
-  sections: UnpavedSection[]
-) => {
-  sections.forEach((section, index) => {
-    map.addSource(`unpaved-${index}`, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: section.coordinates
-        }
-      }
-    });
-
-    map.addLayer({
-      id: `unpaved-${index}`,
-      type: 'line',
-      source: `unpaved-${index}`,
-      paint: {
-        'line-color': '#f9ca24', // Yellow
-        'line-width': 4,
-        'line-opacity': 0.8
-      }
-    });
-  });
-};
-```
-
-#### 3. Integration
-- [ ] Update processing pipeline
-- [ ] Add surface detection after map matching
-- [ ] Update map display with both layers
-
-```typescript
-// In useClientGpxProcessing.ts
-const processGpx = async (file: File) => {
-  // Existing map matching
-  const matchedTrack = await parseAndMatchGpx(file);
-  
-  // Add surface detection
-  const unpavedSections = await detectUnpavedSections(
-    matchedTrack.matched.coordinates
-  );
-  
-  // Display both layers
-  displayMatchedTrack(map, matchedTrack);
-  displayUnpavedSections(map, unpavedSections);
-};
-```
-
-### Validation Points
-- [ ] Map matching coordinates being used correctly
-- [ ] Unpaved surfaces detected accurately
-- [ ] Yellow overlay appears properly
-- [ ] Overlay stays on top of red route
-- [ ] Performance is acceptable
-
-### Known Issues to Handle
-1. Surface data might be missing
-2. API rate limits
-3. Surface type detection consistency
-4. Loading states during detection
+1. Server connection errors
+2. Server API response failures
+3. Batch processing timeouts
+4. Surface detection accuracy
+5. Loading states during server processing
 
 ### Next Steps
-1. Improve surface type detection accuracy
-2. Implement proper API rate limiting
-3. Add loading states during detection
-4. Complete caching implementation
-5. Test with sample GPX files
-6. Add error handling
-7. Optimize performance
-# GPX Implementation Status
-
-## Important Context
-We have an existing server implementation that:
-- Lives in the `server/` directory
-- Handles complex GPX processing
-- Includes surface detection
-- Uses Express server on port 3001
-- Has map matching capabilities
-
-We're currently bypassing this server temporarily to:
-1. Get basic GPX functionality working
-2. Simplify the implementation
-3. Test core features
-4. Keep the server code for later use
-
-The server code remains in place but unused while we implement client-side processing first.
-
-## ⚠️ CURRENT UPLOAD BOX LOCATION
-The file upload box in the sidebar is controlled by these files:
-
-1. Main Sidebar Component:
-```
-src/features/map/components/Sidebar/Sidebar.tsx
-```
-
-2. Upload Box Implementation:
-```
-src/features/map/components/Sidebar/SidebarListItems.tsx  <-- Contains the Upload box item
-```
-
-3. Actual Upload Logic:
-```
-src/features/gpx/components/Uploader/Uploader.tsx  <-- Now uses client-side processing
-src/features/gpx/hooks/useClientGpxProcessing.ts  <-- Handles client-side file processing
-src/features/gpx/utils/gpxParser.ts              <-- Converts GPX to GeoJSON
-```
-
-## Phase 1: ✅ Client-Side Implementation (COMPLETED)
-Successfully implemented:
-- Client-side GPX to GeoJSON conversion
-- Direct map display
-- Removed server dependency
-- Functional upload box in sidebar
-- All validation points passed
-- All error handling in place
-
-## Phase 2: ✅ Map Matching Implementation (COMPLETED)
-
-### Current Implementation Status
-
-#### ✅ Completed
-- Added Mapbox access token from environment
-- Created `src/features/gpx/services/mapMatchingService.ts`
-- Implemented point batching (100 points per request)
-- Modified `gpxParser.ts` to handle matched tracks
-- Implemented automatic map matching without UI controls
-- Added error handling for failed matches
-- Fixed route display and point skipping issues
-- Implemented clean route visualization
-
-#### 🎯 Improvements Made
-1. Route Display:
-   - Simplified to a single route layer
-   - Added white border (8px) for better visibility
-   - Implemented red line (#ee5253, 6px) for main route
-   - Removed individual point markers
-   - Removed duplicate route display
-
-2. Map Matching Optimization:
-   - Switched to 'driving' profile for better road matching
-   - Lowered confidence threshold (0.6) to accept more matches
-   - Increased radius multiplier (3) for better parallel road handling
-   - Improved point interpolation (5 points, 20m threshold)
-   - Added overview=full parameter for complete route coverage
-
-### Map Matching Service Implementation
-```typescript
-// src/features/gpx/services/mapMatchingService.ts
-interface MatchingOptions {
-  confidenceThreshold?: number;
-  radiusMultiplier?: number;
-  maxGapDistance?: number;
-  interpolationPoints?: number;
-}
-
-export const matchTrackToRoads = async (
-  points: [number, number][],
-  options: MatchingOptions = {}
-) => {
-  const {
-    confidenceThreshold = 0.6,
-    radiusMultiplier = 3,
-    maxGapDistance = 0.0002,
-    interpolationPoints = 5
-  } = options;
-  
-  // Get coordinates from Mapbox API
-  const matchedCoordinates = await getMatchedCoordinates(points);
-  
-  return matchedCoordinates;
-};
-```
-
-## Phase 3: 🚀 Surface Detection Implementation (IN PROGRESS)
-
-### Overview
-Using the matched coordinates from Phase 2 to:
-1. Find unpaved sections of the route
-2. Overlay these sections in yellow
-3. Keep the existing red route underneath
-
-### Implementation Steps
-
-#### 1. Create Surface Detection Service
-- [ ] Create `src/features/gpx/services/surfaceService.ts`
-- [ ] Use matched coordinates from map matching
-- [ ] Query Mapbox for unpaved surfaces only
-- [ ] Process surface responses
-
-```typescript
-// src/features/gpx/services/surfaceService.ts
-interface UnpavedSection {
-  startIndex: number;
-  endIndex: number;
-  coordinates: [number, number][];
-  surfaceType: 'unpaved' | 'dirt' | 'gravel' | 'fine_gravel';
-}
-
-export const detectUnpavedSections = async (
-  matchedCoordinates: [number, number][]
-): Promise<UnpavedSection[]> => {
-  const sections: UnpavedSection[] = [];
-  let currentSection: UnpavedSection | null = null;
-
-  // Query each coordinate from matched route
-  for (let i = 0; i < matchedCoordinates.length; i++) {
-    const [lng, lat] = matchedCoordinates[i];
-    const surfaceType = await querySurfaceType(lng, lat);
-    
-    // Only process unpaved surfaces
-    if (isUnpavedSurface(surfaceType)) {
-      if (!currentSection) {
-        currentSection = {
-          startIndex: i,
-          endIndex: i,
-          coordinates: [matchedCoordinates[i]],
-          surfaceType: surfaceType
-        };
-      } else {
-        currentSection.endIndex = i;
-        currentSection.coordinates.push(matchedCoordinates[i]);
-      }
-    } else if (currentSection) {
-      sections.push(currentSection);
-      currentSection = null;
-    }
-  }
-
-  if (currentSection) {
-    sections.push(currentSection);
-  }
-
-  return sections;
-};
-
-// Helper to check for unpaved surfaces
-const isUnpavedSurface = (surface?: string): boolean => {
-  const unpavedTypes = ['unpaved', 'dirt', 'gravel', 'fine_gravel'];
-  return unpavedTypes.includes(surface || '');
-};
-```
-
-#### 2. Add Map Overlays
-- [ ] Keep existing red route display
-- [ ] Add yellow overlay for unpaved sections
-- [ ] Ensure proper layer ordering
-
-```typescript
-// In MapView.tsx
-const displayUnpavedSections = (
-  map: mapboxgl.Map,
-  sections: UnpavedSection[]
-) => {
-  sections.forEach((section, index) => {
-    map.addSource(`unpaved-${index}`, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: section.coordinates
-        }
-      }
-    });
-
-    map.addLayer({
-      id: `unpaved-${index}`,
-      type: 'line',
-      source: `unpaved-${index}`,
-      paint: {
-        'line-color': '#f9ca24', // Yellow
-        'line-width': 4,
-        'line-opacity': 0.8
-      }
-    });
-  });
-};
-```
-
-#### 3. Integration
-- [ ] Update processing pipeline
-- [ ] Add surface detection after map matching
-- [ ] Update map display with both layers
-
-```typescript
-// In useClientGpxProcessing.ts
-const processGpx = async (file: File) => {
-  // Existing map matching
-  const matchedTrack = await parseAndMatchGpx(file);
-  
-  // Add surface detection
-  const unpavedSections = await detectUnpavedSections(
-    matchedTrack.matched.coordinates
-  );
-  
-  // Display both layers
-  displayMatchedTrack(map, matchedTrack);
-  displayUnpavedSections(map, unpavedSections);
-};
-```
-
-### Validation Points
-- [ ] Map matching coordinates being used correctly
-- [ ] Unpaved surfaces detected accurately
-- [ ] Yellow overlay appears properly
-- [ ] Overlay stays on top of red route
-- [ ] Performance is acceptable
-
-### Known Issues to Handle
-1. Surface data might be missing
-2. API rate limits
-3. Surface type detection consistency
-4. Loading states during detection
-
-### Next Steps
-1. Implement basic surface detection
-2. Test with sample GPX files
-3. Add error handling
-4. Optimize if needed
+1. Test server endpoints
+2. Verify surface detection accuracy
+3. Add proper error handling
+4. Implement loading states
+5. Test with sample routes
+6. Optimize if needed

@@ -13,9 +13,128 @@ interface ProcessingJob {
 export class GPXController {
   private gpxService: GPXProcessingService;
   private processingJobs: Map<string, ProcessingJob> = new Map();
+  private surfaceCache: Map<string, string> = new Map();
 
   constructor() {
     this.gpxService = new GPXProcessingService(process.env.MAPBOX_TOKEN || '');
+  }
+
+  async getSurfaceType(req: Request, res: Response): Promise<void> {
+    const { lng, lat } = req.query;
+
+    if (!lng || !lat) {
+      res.status(400).json({ error: 'Missing longitude or latitude' });
+      return;
+    }
+
+    try {
+      const longitude = parseFloat(lng as string);
+      const latitude = parseFloat(lat as string);
+
+      // Check cache first
+      const cacheKey = `${longitude},${latitude}`;
+      if (this.surfaceCache.has(cacheKey)) {
+        res.json({ surface: this.surfaceCache.get(cacheKey) });
+        return;
+      }
+
+      // Use analyzeSurfaces to get surface type
+      const result = await this.gpxService.analyzeSurfaces({
+        geojson: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: [[longitude, latitude]]
+            }
+          }]
+        }
+      });
+
+      const surfaceType = result.surfaceTypes[0] || 'unknown';
+      this.surfaceCache.set(cacheKey, surfaceType);
+
+      res.json({ surface: surfaceType });
+    } catch (error) {
+      logger.error('Surface detection error:', error);
+      res.status(500).json({ 
+        error: 'Surface detection failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  async batchGetSurfaceTypes(req: Request, res: Response): Promise<void> {
+    const { coordinates } = req.body;
+
+    if (!Array.isArray(coordinates)) {
+      res.status(400).json({ error: 'Invalid coordinates array' });
+      return;
+    }
+
+    try {
+      // Use analyzeSurfaces for the entire batch
+      const result = await this.gpxService.analyzeSurfaces({
+        geojson: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates
+            }
+          }]
+        }
+      });
+
+      // Process results into sections
+      interface Section {
+        startIndex: number;
+        endIndex: number;
+        coordinates: [number, number][];
+        surfaceType: string;
+      }
+
+      const sections: Section[] = [];
+      let currentSection: Section | null = null;
+      
+      coordinates.forEach((coord, index) => {
+        const surfaceType = result.surfaceTypes[0] || 'unknown';
+        const isUnpaved = ['unpaved', 'dirt', 'gravel', 'fine_gravel', 'path', 'track', 'service', 'unknown'].includes(surfaceType);
+        
+        if (isUnpaved) {
+          if (!currentSection) {
+            currentSection = {
+              startIndex: index,
+              endIndex: index,
+              coordinates: [coord],
+              surfaceType
+            };
+          } else {
+            currentSection.endIndex = index;
+            currentSection.coordinates.push(coord);
+          }
+        } else if (currentSection) {
+          sections.push(currentSection);
+          currentSection = null;
+        }
+      });
+
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+
+      res.json(sections);
+    } catch (error) {
+      logger.error('Batch surface detection error:', error);
+      res.status(500).json({ 
+        error: 'Batch surface detection failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 
   async uploadGPX(req: Request, res: Response): Promise<void> {

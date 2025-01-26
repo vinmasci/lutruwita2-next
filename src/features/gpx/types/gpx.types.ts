@@ -1,3 +1,5 @@
+import { UnpavedSection } from '../services/surfaceService';
+
 export interface MapboxMatchResult {
   geojson: GeoJSON.FeatureCollection;
   confidence: number;
@@ -38,6 +40,7 @@ export interface ProcessedRoute {
   geojson: GeoJSON.FeatureCollection;
   surface?: SurfaceAnalysis;
   mapboxMatch?: MapboxMatchResult;
+  unpavedSections?: UnpavedSection[];
   statistics: {
     totalDistance: number;
     elevationGain: number;

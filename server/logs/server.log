@@ -16,3 +16,21 @@
 2025-01-26 18:16:35 [[32minfo[39m]: Server running on port 3002
 2025-01-26 18:16:59 [[32minfo[39m]: Incoming Request:
 2025-01-26 18:16:59 [[32minfo[39m]: ::1 - - [26/Jan/2025:07:16:59 +0000] "GET / HTTP/1.1" 404 139 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15"
+2025-01-26 21:01:29 [[32minfo[39m]: ::1 - - [26/Jan/2025:10:01:29 +0000] "GET /api/health HTTP/1.1" 200 15 "-" "curl/8.4.0"
+2025-01-26 21:01:59 [[32minfo[39m]: Incoming Request:
+2025-01-26 21:01:59 [[32minfo[39m]: ::1 - - [26/Jan/2025:10:01:59 +0000] "GET /api/gpx/surface?lng=147.387&lat=-41.313 HTTP/1.1" 404 154 "-" "curl/8.4.0"
+2025-01-26 21:12:16 [[32minfo[39m]: Attempting to create logs directory at:
+2025-01-26 21:12:16 [[32minfo[39m]: logs directory already exists and has correct permissions
+2025-01-26 21:12:16 [[32minfo[39m]: Attempting to create uploads directory at:
+2025-01-26 21:12:16 [[32minfo[39m]: uploads directory already exists and has correct permissions
+2025-01-26 21:12:16 [[32minfo[39m]: Server running on port 8080
+2025-01-26 21:15:42 [[32minfo[39m]: ::1 - - [26/Jan/2025:10:15:42 +0000] "GET /api/health HTTP/1.1" 200 15 "-" "curl/8.4.0"
+2025-01-26 21:22:48 [[32minfo[39m]: Incoming Request:
+2025-01-26 21:22:48 [[32minfo[39m]: ::1 - - [26/Jan/2025:10:22:48 +0000] "GET /api/gpx/surface?lng=147.387&lat=-41.313 HTTP/1.1" 404 154 "-" "curl/8.4.0"
+2025-01-26 22:28:24 [[32minfo[39m]: Attempting to create logs directory at:
+2025-01-26 22:28:24 [[32minfo[39m]: logs directory already exists and has correct permissions
+2025-01-26 22:28:24 [[32minfo[39m]: Attempting to create uploads directory at:
+2025-01-26 22:28:24 [[32minfo[39m]: uploads directory already exists and has correct permissions
+2025-01-26 22:28:24 [[32minfo[39m]: Server running on port 8080
+2025-01-26 22:30:57 [[32minfo[39m]: Incoming Request:
+2025-01-26 22:30:57 [[32minfo[39m]: ::1 - - [26/Jan/2025:11:30:57 +0000] "GET /api/gpx/surface?lng=147.387&lat=-41.313 HTTP/1.1" 404 154 "-" "curl/8.4.0"

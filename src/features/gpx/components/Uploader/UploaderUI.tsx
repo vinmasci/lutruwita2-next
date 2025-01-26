@@ -1,32 +1,61 @@
-import { ChangeEvent } from 'react';
+import React from 'react';
 import { UploaderUIProps } from './Uploader.types';
+import { Alert, Box, CircularProgress, Typography } from '@mui/material';
+import { useDropzone, FileWithPath } from 'react-dropzone';
 
-const UploaderUI = ({ 
-  file, 
-  isLoading, 
-  error, 
-  onFileChange 
-}: UploaderUIProps) => {
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onFileChange(e.target.files[0]);
-    }
-  };
+const UploaderUI: React.FC<UploaderUIProps> = ({
+  file,
+  isLoading,
+  error,
+  onFileChange,
+}) => {
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'application/gpx+xml': ['.gpx'],
+      'text/xml': ['.gpx'],
+    },
+    maxFiles: 1,
+    onDrop: (acceptedFiles: FileWithPath[]) => {
+      if (acceptedFiles.length > 0) {
+        onFileChange(acceptedFiles[0]);
+      }
+    },
+  });
 
   return (
-    <div className="gpx-uploader">
-      <input 
-        type="file"
-        accept=".gpx"
-        onChange={handleChange}
-        disabled={isLoading}
-      />
-      {isLoading && <div>Processing GPX file...</div>}
-      {error && <div className="error">{error}</div>}
-      {file && !isLoading && !error && (
-        <div>Selected file: {file.name}</div>
+    <Box sx={{ width: '100%', p: 2 }}>
+      <div
+        {...getRootProps()}
+        style={{
+          border: '2px dashed #ccc',
+          borderRadius: '4px',
+          padding: '20px',
+          textAlign: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <input {...getInputProps()} />
+        {isLoading ? (
+          <CircularProgress size={24} />
+        ) : isDragActive ? (
+          <Typography>Drop the GPX file here...</Typography>
+        ) : (
+          <Typography>
+            {file ? file.name : 'Drag & drop a GPX file here, or click to select'}
+          </Typography>
+        )}
+      </div>
+      {error && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error.message}
+          {error.details && (
+            <Typography variant="caption" display="block">
+              {error.details}
+            </Typography>
+          )}
+        </Alert>
       )}
-    </div>
+    </Box>
   );
 };
 
