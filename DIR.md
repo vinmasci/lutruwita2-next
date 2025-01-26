@@ -51,6 +51,7 @@
 │   │   │       └── gpx.processing.ts
 │   │   ├── shared/
 │   │   │   ├── config/
+│   │   │   │   ├── logger.config.ts
 │   │   │   │   └── server.config.ts
 │   │   │   ├── middlewares/
 │   │   │   │   ├── error-handling.ts
@@ -78,13 +79,17 @@
 │   │   │   │   │   ├── Uploader.types.ts
 │   │   │   │   │   └── UploaderUI.tsx
 │   │   │   ├── hooks/
+│   │   │   │   ├── useClientGpxProcessing.ts
 │   │   │   │   └── useGpxProcessing.ts
 │   │   │   ├── routes/
 │   │   │   │   └── gpx.ts
 │   │   │   ├── services/
-│   │   │   │   └── gpxService.ts
-│   │   │   └── types/
-│   │   │       └── gpx.types.ts
+│   │   │   │   ├── gpxService.ts
+│   │   │   │   └── mapMatchingService.ts
+│   │   │   ├── types/
+│   │   │   │   └── gpx.types.ts
+│   │   │   └── utils/
+│   │   │       └── gpxParser.ts
 │   │   ├── map/
 │   │   │   ├── components/
 │   │   │   │   ├── MapControls/
@@ -122,4 +127,7 @@
 │       └── gpx/
 │           └── parsing.ts
 └── uploads/
-    └── gpxFile-1737847751475-711406356.gpx
+    ├── gpxFile-1737847751475-711406356.gpx
+    ├── gpxFile-1737848325568-730555290.gpx
+    ├── gpxFile-1737848962479-903313031.gpx
+    └── gpxFile-1737849896489-247297375.gpx
