@@ -3,6 +3,8 @@ import { LngLat } from 'mapbox-gl';
 interface MatchingOptions {
   confidenceThreshold?: number;
   radiusMultiplier?: number;
+  maxGapDistance?: number; // Maximum allowed gap between points before interpolation
+  interpolationPoints?: number; // Number of points to interpolate between gaps
 }
 
 interface MatchingResponse {
@@ -32,11 +34,16 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 /**
  * Matches a single batch of points to roads using Mapbox Map Matching API
  */
+interface MatchResult {
+  coordinates: [number, number][];
+  matchedIndices: number[]; // Indices of points that were successfully matched
+}
+
 const matchBatch = async (
   points: [number, number][],
   confidenceThreshold: number,
   radiusMultiplier: number
-): Promise<[number, number][]> => {
+): Promise<MatchResult> => {
   const coordinates = points.map(([lng, lat]) => `${lng},${lat}`).join(';');
   const radiuses = points.map(() => 25 * radiusMultiplier).join(';'); // Default 25m radius * multiplier
 
@@ -53,27 +60,94 @@ const matchBatch = async (
     // Check if we got any matches
     if (!data.matchings?.length) {
       console.warn('No matches found for batch');
-      return points; // Return original points if no matches
+      return {
+        coordinates: points,
+        matchedIndices: [] // No points were matched
+      };
     }
 
     // Use the first match if available
     if (data.matchings && data.matchings.length > 0) {
-      return data.matchings[0].geometry.coordinates;
+      const matched = data.matchings[0];
+      if (matched.confidence >= confidenceThreshold) {
+        return {
+          coordinates: matched.geometry.coordinates,
+          matchedIndices: Array.from({length: matched.geometry.coordinates.length}, (_, i) => i)
+        };
+      }
     }
     
     console.warn('No matches found for batch');
-    return points;
+    return {
+      coordinates: points,
+      matchedIndices: [] // No points were matched
+    };
   } catch (error) {
     console.error('Error in map matching:', error);
-    return points; // Return original points on error
+    return {
+      coordinates: points,
+      matchedIndices: [] // No points were matched
+    };
   }
 };
 
 /**
  * Combines matched batches into a single track
  */
-const combineBatches = (batches: [number, number][][]): [number, number][] => {
-  return batches.flat();
+/**
+ * Interpolates between points that are too far apart
+ */
+const interpolatePoints = (
+  points: [number, number][],
+  maxGapDistance: number,
+  interpolationPoints: number
+): [number, number][] => {
+  const interpolated: [number, number][] = [];
+  
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[i + 1];
+    
+    // Calculate distance between points
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    interpolated.push(points[i]);
+    
+    if (distance > maxGapDistance) {
+      // Add interpolated points
+      for (let j = 1; j <= interpolationPoints; j++) {
+        const t = j / (interpolationPoints + 1);
+        interpolated.push([
+          x1 + dx * t,
+          y1 + dy * t
+        ]);
+      }
+    }
+  }
+  
+  interpolated.push(points[points.length - 1]);
+  return interpolated;
+};
+
+const combineBatches = (
+  batches: MatchResult[],
+  options: MatchingOptions
+): [number, number][] => {
+  // Combine coordinates
+  const combined = batches.flatMap(b => b.coordinates);
+  
+  // Interpolate large gaps if needed
+  if (options.maxGapDistance && options.interpolationPoints) {
+    return interpolatePoints(
+      combined,
+      options.maxGapDistance,
+      options.interpolationPoints
+    );
+  }
+  
+  return combined;
 };
 
 /**
@@ -83,7 +157,12 @@ export const matchTrackToRoads = async (
   points: [number, number][],
   options: MatchingOptions = {}
 ): Promise<[number, number][]> => {
-  const { confidenceThreshold = 0.8, radiusMultiplier = 2 } = options;
+  const {
+    confidenceThreshold = 0.8,
+    radiusMultiplier = 1.5, // Reduced from 2 to 1.5 for tighter matching
+    maxGapDistance = 0.0005, // ~50 meters in degrees
+    interpolationPoints = 3
+  } = options;
 
   // Split points into batches
   const batches = chunkArray(points, BATCH_SIZE);
@@ -93,8 +172,11 @@ export const matchTrackToRoads = async (
     batches.map(batch => matchBatch(batch, confidenceThreshold, radiusMultiplier))
   );
 
-  // Combine results
-  return combineBatches(matchedBatches);
+  // Combine results with interpolation
+  return combineBatches(matchedBatches, {
+    maxGapDistance,
+    interpolationPoints
+  });
 };
 
 /**

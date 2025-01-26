@@ -29,6 +29,7 @@ export interface SurfaceAnalysis {
 
 export interface ProcessedRoute {
   id: string;
+  matchedIndices: number[];
   name: string;
   color: string;
   isVisible: boolean;

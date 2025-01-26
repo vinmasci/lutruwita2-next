@@ -45,9 +45,9 @@ export default function MapView() {
           data: result.geojson
         });
 
-        // Add the route layer
+        // Add the matched route layer
         map.addLayer({
-          id: `${routeId}-line`,
+          id: `${routeId}-matched-line`,
           type: 'line',
           source: routeId,
           layout: {
@@ -55,8 +55,62 @@ export default function MapView() {
             'line-cap': 'round'
           },
           paint: {
-            'line-color': result.color || '#3b82f6',
-            'line-width': 4
+            'line-color': '#3b82f6', // Blue for matched segments
+            'line-width': 4,
+            'line-opacity': [
+              'case',
+              ['in', ['get', 'matched'], ['literal', result.matchedIndices]],
+              1, // Fully opaque for matched points
+              0 // Transparent for unmatched points
+            ]
+          }
+        });
+
+        // Add the unmatched route layer
+        map.addLayer({
+          id: `${routeId}-unmatched-line`,
+          type: 'line',
+          source: routeId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#ff0000', // Red for unmatched segments
+            'line-width': 2,
+            'line-dasharray': [2, 2],
+            'line-opacity': [
+              'case',
+              ['in', ['get', 'matched'], ['literal', result.matchedIndices]],
+              0, // Transparent for matched points
+              0.5 // Semi-transparent for unmatched points
+            ]
+          }
+        });
+
+        // Add confidence indicators
+        map.addLayer({
+          id: `${routeId}-confidence`,
+          type: 'circle',
+          source: routeId,
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['get', 'confidence'],
+              0.5, 2,
+              1, 6
+            ],
+            'circle-color': [
+              'interpolate',
+              ['linear'],
+              ['get', 'confidence'],
+              0.5, '#ff0000',
+              1, '#00ff00'
+            ],
+            'circle-opacity': 0.8,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#ffffff'
           }
         });
 

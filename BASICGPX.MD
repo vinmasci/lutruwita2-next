@@ -68,6 +68,11 @@ Successfully implemented:
    - Need to update to only show matched route
    - Remove original route display to avoid confusion
 
+3. Matched Points Visibility:
+   - Currently showing all individual matched points on the map
+   - Should only display the complete matched route line
+   - Need to hide individual point markers for cleaner visualization
+
 #### 🔄 Next Steps
 1. Fix point skipping issues:
    - Investigate optimal batch sizes

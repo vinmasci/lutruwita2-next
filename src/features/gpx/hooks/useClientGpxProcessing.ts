@@ -39,6 +39,7 @@ export const useClientGpxProcessing = () => {
 
       const processedRoute: ProcessedRoute = {
         id: uuidv4(),
+        matchedIndices: [],
         name: parsedFeature.properties?.name || file.name,
         color: '#FF0000', // Default red color
         isVisible: true,
