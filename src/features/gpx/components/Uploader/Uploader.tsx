@@ -1,20 +1,18 @@
 import { useState } from 'react';
-import { useGpxProcessing } from '../../hooks/useGpxProcessing';
+import { useClientGpxProcessing } from '../../hooks/useClientGpxProcessing';
 import { GpxUploaderProps } from './Uploader.types';
 import UploaderUI from './UploaderUI';
 
 const Uploader = ({ onUploadComplete }: GpxUploaderProps) => {
-  const { processGpx, isLoading, error } = useGpxProcessing();
+  const { processGpx, isLoading, error } = useClientGpxProcessing();
   const [file, setFile] = useState<File | null>(null);
 
-  const handleFileChange = (file: File) => {
+  const handleFileChange = async (file: File) => {
     setFile(file);
-    processGpx(file)
-      .then((result) => {
-        if (result) {
-          onUploadComplete(result);
-        }
-      });
+    const result = await processGpx(file);
+    if (result) {
+      onUploadComplete(result);
+    }
   };
 
   return (

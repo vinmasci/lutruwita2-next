@@ -1,13 +1,12 @@
 import { ChangeEvent } from 'react';
+import { UploaderUIProps } from './Uploader.types';
 
-interface UploaderUIProps {
-  file: globalThis.File | null;
-  isLoading: boolean;
-  error: string | null;
-  onFileChange: (file: globalThis.File) => void;
-}
-
-const UploaderUI = ({ file, isLoading, error, onFileChange }: UploaderUIProps) => {
+const UploaderUI = ({ 
+  file, 
+  isLoading, 
+  error, 
+  onFileChange 
+}: UploaderUIProps) => {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       onFileChange(e.target.files[0]);

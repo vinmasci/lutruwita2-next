@@ -4,7 +4,7 @@ import type { MapboxMatchResult, SurfaceAnalysis } from '../types/gpx.types';
 type ProcessingProgressCallback = (progress: number) => void;
 
 export const useGpxProcessingApi = () => {
-  const API_BASE = 'http://localhost:3001/api/gpx';
+  const API_BASE = 'http://localhost:3002/api/gpx';
 
   const processGpxFile = async (
     file: File,

@@ -8,11 +8,22 @@ export class GPXController {
 
   constructor() {
     this.gpxService = new GPXService();
+    console.log('GPXController initialized');
   }
 
   uploadGPX = async (req: Request, res: Response): Promise<void> => {
     try {
+      console.log('GPX upload request received', {
+        headers: req.headers,
+        file: req.file ? {
+          originalname: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype
+        } : null
+      });
+
       if (!req.file) {
+        console.warn('No file provided in upload request');
         res.status(400).json({ 
           error: 'Upload Error',
           message: 'No file uploaded',
@@ -23,8 +34,14 @@ export class GPXController {
 
       // Verify file exists on disk
       try {
+        console.log('Verifying file exists on disk', { path: req.file.path });
         await fs.access(req.file.path);
+        console.log('File verified successfully');
       } catch (err) {
+        console.error('File verification failed', { 
+          error: err,
+          path: req.file.path 
+        });
         res.status(500).json({ 
           error: 'Upload Error',
           message: 'File not saved correctly',
@@ -34,9 +51,11 @@ export class GPXController {
       }
 
       // Process the file and get upload ID
+      console.log('Starting GPX file processing', { path: req.file.path });
       const uploadId = await this.gpxService.processGPXFile(req.file.path);
       
       if (!uploadId) {
+        console.error('Failed to generate upload ID');
         res.status(500).json({ 
           error: 'Processing Error',
           message: 'No upload ID generated',
@@ -44,6 +63,8 @@ export class GPXController {
         });
         return;
       }
+
+      console.log('GPX file processing started successfully', { uploadId });
 
       res.json({ 
         uploadId,

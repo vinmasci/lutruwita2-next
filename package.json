@@ -61,6 +61,7 @@
     "supercluster": "^8.0.1",
     "tailwind-merge": "^2.6.0",
     "timers-browserify": "^2.0.12",
+    "uuid": "^11.0.5",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

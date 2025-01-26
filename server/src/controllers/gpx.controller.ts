@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { GPXProcessingService } from '../services/gpx/gpx.processing';
 import crypto from 'crypto';
+import { logger } from '../shared/config/logger.config';
 
 interface ProcessingJob {
   status: 'pending' | 'processing' | 'completed' | 'error';
@@ -18,30 +19,85 @@ export class GPXController {
   }
 
   async uploadGPX(req: Request, res: Response): Promise<void> {
+    logger.debug('Starting GPX file upload process');
+    
+    // Log memory usage before processing
+    const startMemory = process.memoryUsage();
+    logger.debug(`Initial memory usage: 
+      RSS: ${startMemory.rss / 1024 / 1024} MB
+      Heap Used: ${startMemory.heapUsed / 1024 / 1024} MB
+      Heap Total: ${startMemory.heapTotal / 1024 / 1024} MB`);
+    
     if (!req.file) {
+      logger.error('No file provided in upload request');
       res.status(400).json({ error: 'No file provided' });
       return;
     }
 
     try {
+      logger.debug(`Received file: ${req.file.originalname} (${req.file.size} bytes)`);
+      logger.debug(`File mimetype: ${req.file.mimetype}`);
+      logger.debug(`File encoding: ${req.file.encoding}`);
+      logger.debug(`File buffer length: ${req.file.buffer.length} bytes`);
+      
+      // Log memory usage after receiving file
+      const fileMemory = process.memoryUsage();
+      logger.debug(`Memory usage after file received: 
+        RSS: ${fileMemory.rss / 1024 / 1024} MB
+        Heap Used: ${fileMemory.heapUsed / 1024 / 1024} MB
+        Heap Total: ${fileMemory.heapTotal / 1024 / 1024} MB`);
+      
       // Generate upload ID
       const uploadId = crypto.randomUUID();
+      logger.debug(`Generated upload ID: ${uploadId}`);
 
       // Store initial job state
       this.processingJobs.set(uploadId, {
         status: 'pending',
         progress: 0
       });
+      logger.debug(`Created processing job for upload ID: ${uploadId}`);
+      
+      // Log memory usage after creating job
+      const jobMemory = process.memoryUsage();
+      logger.debug(`Memory usage after job creation: 
+        RSS: ${jobMemory.rss / 1024 / 1024} MB
+        Heap Used: ${jobMemory.heapUsed / 1024 / 1024} MB
+        Heap Total: ${jobMemory.heapTotal / 1024 / 1024} MB`);
 
       // Start processing in background
-      this.processInBackground(uploadId, req.file.buffer.toString('utf-8'));
+      logger.debug('Starting background processing');
+      const startTime = Date.now();
+      
+      // Convert buffer to string with error handling
+      try {
+        const fileContent = req.file.buffer.toString('utf-8');
+        logger.debug(`File content length: ${fileContent.length} characters`);
+        logger.debug(`First 100 chars: ${fileContent.substring(0, 100)}`);
+        
+        // Log memory usage after string conversion
+        const stringMemory = process.memoryUsage();
+        logger.debug(`Memory usage after string conversion: 
+          RSS: ${stringMemory.rss / 1024 / 1024} MB
+          Heap Used: ${stringMemory.heapUsed / 1024 / 1024} MB
+          Heap Total: ${stringMemory.heapTotal / 1024 / 1024} MB`);
+          
+        this.processInBackground(uploadId, fileContent);
+      } catch (err) {
+        logger.error('Failed to convert file buffer to string:', err);
+        throw new Error('Failed to process file content');
+      }
+      
+      const endTime = Date.now();
+      logger.debug(`Background processing started in ${endTime - startTime}ms`);
 
       // Return upload ID immediately
+      logger.debug(`Returning upload ID to client: ${uploadId}`);
       res.status(200).json({ uploadId });
       return;
 
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       res.status(500).json({ 
         error: 'Upload failed',
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -102,11 +158,15 @@ export class GPXController {
   }
 
   private async processInBackground(uploadId: string, fileContent: string) {
+    logger.debug(`Starting background processing for upload ID: ${uploadId}`);
+    
     try {
+      logger.debug('Calling GPX processing service');
       const result = await this.gpxService.processGPXFile(
         fileContent,
         {
           onProgress: (progress) => {
+            logger.debug(`Processing progress for ${uploadId}: ${progress}`);
             const job = this.processingJobs.get(uploadId);
             if (job) {
               job.progress = progress;
@@ -117,19 +177,25 @@ export class GPXController {
       );
 
       // Store completion
+      logger.debug(`Processing completed for upload ID: ${uploadId}`);
       this.processingJobs.set(uploadId, {
         status: 'completed',
         progress: 1,
         result
       });
+      logger.debug('Processing job successfully stored');
 
     } catch (error) {
-      console.error('Processing error:', error);
+      logger.error('Processing error:', error);
+      logger.error(`Error details: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
+      
       this.processingJobs.set(uploadId, {
         status: 'error',
         progress: 0,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      
+      logger.error(`Error state stored for upload ID: ${uploadId}`);
     }
   }
 }

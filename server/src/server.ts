@@ -8,56 +8,7 @@ import { gpxRoutes } from './features/gpx/routes/gpx.routes';
 import { errorHandler } from './shared/middlewares/error-handling';
 import 'dotenv/config';
 
-// Configure Winston logger
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ 
-      filename: path.join(__dirname, '../../logs/server.log'),
-      maxsize: 5 * 1024 * 1024, // 5MB
-      maxFiles: 5,
-      handleExceptions: true,
-      handleRejections: true
-    }),
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/error.log'),
-      level: 'error',
-      handleExceptions: true,
-      handleRejections: true
-    }),
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ],
-  exceptionHandlers: [
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/exceptions.log')
-    })
-  ],
-  rejectionHandlers: [
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/rejections.log')
-    })
-  ]
-});
-
-// Add transport error handling
-logger.transports.forEach(transport => {
-  if (transport instanceof winston.transports.File) {
-    transport.on('error', (error) => {
-      console.error('File transport error:', error);
-    });
-  }
-});
-
-// Handle Winston transport errors
-logger.on('error', (error) => {
-  console.error('Logger error:', error);
-});
+import { logger } from './shared/config/logger.config';
 
 // Create required directories
 import fs from 'fs';
@@ -101,6 +52,18 @@ app.use(morgan('combined', { stream: { write: (message) => logger.info(message.t
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Add request logging middleware
+app.use((req, res, next) => {
+  logger.info('Incoming Request:', {
+    method: req.method,
+    url: req.originalUrl,
+    headers: req.headers,
+    body: req.body,
+    files: req.files
+  });
+  next();
 });
 
 // Feature Routes

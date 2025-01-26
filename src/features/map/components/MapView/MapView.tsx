@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import { MapProvider } from '../../context/MapContext';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
-import { useGpxProcessing } from '../../../gpx/hooks/useGpxProcessing';
+import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { Feature, LineString } from 'geojson';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -19,7 +19,7 @@ export default function MapView() {
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
 
-  const { processGpxFile, isProcessing, debugLog } = useGpxProcessing();
+  const { processGpx, isLoading } = useClientGpxProcessing();
 
   const handleUploadGpx = async (file?: File) => {
     if (!file) {
@@ -33,7 +33,7 @@ export default function MapView() {
     }
 
     try {
-      const result = await processGpxFile(file);
+      const result = await processGpx(file);
       if (result) {
         // Add the route to the map
         const map = mapInstance.current;

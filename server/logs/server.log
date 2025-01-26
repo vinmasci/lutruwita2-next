@@ -1,0 +1,11 @@
+2025-01-26 11:02:12 [[32minfo[39m]: Attempting to create logs directory at:
+2025-01-26 11:02:12 [[32minfo[39m]: logs directory already exists and has correct permissions
+2025-01-26 11:02:12 [[32minfo[39m]: Attempting to create uploads directory at:
+2025-01-26 11:02:12 [[32minfo[39m]: uploads directory already exists and has correct permissions
+2025-01-26 11:02:12 [[32minfo[39m]: Server running on port 3002
+2025-01-26 11:02:20 [[32minfo[39m]: Incoming Request:
+2025-01-26 11:02:20 [[32minfo[39m]: ::1 - - [26/Jan/2025:00:02:20 +0000] "GET / HTTP/1.1" 404 139 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15"
+2025-01-26 11:02:23 [[32minfo[39m]: Incoming Request:
+2025-01-26 11:02:23 [[32minfo[39m]: ::1 - - [26/Jan/2025:00:02:23 +0000] "GET / HTTP/1.1" 404 139 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15"
+2025-01-26 11:04:56 [[32minfo[39m]: Incoming Request:
+2025-01-26 11:04:56 [[32minfo[39m]: ::1 - - [26/Jan/2025:00:04:56 +0000] "POST /api/gpx/upload HTTP/1.1" 500 155 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15"
