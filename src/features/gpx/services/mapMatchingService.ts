@@ -47,7 +47,7 @@ const matchBatch = async (
   const coordinates = points.map(([lng, lat]) => `${lng},${lat}`).join(';');
   const radiuses = points.map(() => 25 * radiusMultiplier).join(';'); // Default 25m radius * multiplier
 
-  const url = `https://api.mapbox.com/matching/v5/mapbox/walking/${coordinates}?access_token=${MAPBOX_TOKEN}&radiuses=${radiuses}&tidy=true&geometries=geojson`;
+  const url = `https://api.mapbox.com/matching/v5/mapbox/driving/${coordinates}?access_token=${MAPBOX_TOKEN}&radiuses=${radiuses}&tidy=true&geometries=geojson&overview=full`;
 
   try {
     const response = await fetch(url);
@@ -158,10 +158,10 @@ export const matchTrackToRoads = async (
   options: MatchingOptions = {}
 ): Promise<[number, number][]> => {
   const {
-    confidenceThreshold = 0.8,
-    radiusMultiplier = 1.5, // Reduced from 2 to 1.5 for tighter matching
-    maxGapDistance = 0.0005, // ~50 meters in degrees
-    interpolationPoints = 3
+    confidenceThreshold = 0.6, // Lowered threshold to accept more matches
+    radiusMultiplier = 3, // Increased for better matching in areas with parallel roads
+    maxGapDistance = 0.0002, // ~20 meters in degrees for tighter interpolation
+    interpolationPoints = 5 // More interpolation points for smoother lines
   } = options;
 
   // Split points into batches

@@ -17,29 +17,20 @@ export const useClientGpxProcessing = () => {
       // Always use map matching
       const parsedFeature = await parseAndMatchGpx(file);
 
-      // Create feature collections for both original and matched tracks
-      const features: GeoJSON.Feature[] = [parsedFeature];
+      // Only use the matched track if available, otherwise use original
+      const geometry = parsedFeature.matched || parsedFeature.geometry;
       
-      // Add matched track as a separate feature if available
-      if (parsedFeature.matched) {
-        features.push({
-          type: 'Feature',
-          properties: {
-            ...parsedFeature.properties,
-            isMatched: true
-          },
-          geometry: parsedFeature.matched
-        });
-      }
-
       const geojson: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
-        features
+        features: [{
+          type: 'Feature',
+          properties: parsedFeature.properties,
+          geometry
+        }]
       };
 
       const processedRoute: ProcessedRoute = {
         id: uuidv4(),
-        matchedIndices: [],
         name: parsedFeature.properties?.name || file.name,
         color: '#FF0000', // Default red color
         isVisible: true,
