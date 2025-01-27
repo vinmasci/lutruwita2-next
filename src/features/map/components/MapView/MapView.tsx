@@ -1,5 +1,54 @@
 import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
+
+// Debug function for road layer
+const debugRoadLayer = (map: mapboxgl.Map) => {
+  console.log('[DEBUG] Checking road layer...');
+  
+  // Log all available layers
+  const style = map.getStyle();
+  const allLayers = style?.layers || [];
+  console.log('[DEBUG] All layers:', allLayers.map(l => ({
+    id: l.id,
+    type: l.type,
+    source: l['source'],
+    'source-layer': l['source-layer']
+  })));
+
+  // Check our specific layer
+  const roadLayer = map.getLayer('custom-roads');
+  console.log('[DEBUG] Road layer:', roadLayer);
+
+  // Try to get some features
+  if (map.isStyleLoaded()) {
+    const bounds = map.getBounds();
+    if (!bounds) {
+      console.log('[DEBUG] No bounds available');
+      return;
+    }
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    
+    const features = map.queryRenderedFeatures(
+      [
+        map.project(sw),
+        map.project(ne)
+      ],
+      {
+        layers: ['custom-roads']
+      }
+    );
+    
+    console.log('[DEBUG] Found features:', features.length);
+    if (features.length > 0) {
+      console.log('[DEBUG] Sample feature:', {
+        properties: features[0].properties,
+        geometry: features[0].geometry
+      });
+    }
+  }
+};
+
 import { MapProvider } from '../../context/MapContext';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
@@ -23,6 +72,8 @@ export default function MapView() {
   const { processGpx, isLoading } = useClientGpxProcessing();
 
   const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
+    console.log('[MapView] Starting upload at:', new Date().toISOString());
+    
     if (!file && !processedRoute) {
       setIsGpxDrawerOpen(true);
       return;
@@ -35,10 +86,12 @@ export default function MapView() {
 
     try {
       const result = processedRoute || (file ? await processGpx(file) : null);
+      console.log('[MapView] Got result at:', new Date().toISOString());
       if (result) {
         // Add the route to the map
         const map = mapInstance.current;
         const routeId = `route-${Date.now()}`;
+        console.log('[MapView] Adding route layers...');
 
         // Add the source
         map.addSource(routeId, {
@@ -80,17 +133,31 @@ export default function MapView() {
         const feature = result.geojson.features[0] as Feature<LineString>;
         const coordinates = feature.geometry.coordinates as [number, number][];
 
-        // Add surface detection overlay
-        await addSurfaceOverlay(map, feature);
+        // Wait briefly for layers to be ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Try surface detection
+        console.log('[MapView] Starting surface detection at:', new Date().toISOString());
+        try {
+          await addSurfaceOverlay(map, feature);
+        } catch (error) {
+          console.error('[MapView] Surface detection error:', error);
+        }
 
-        // Fit bounds to show the route
+        // Fit bounds to show the route with zoom constraints
         const bounds = new mapboxgl.LngLatBounds();
         feature.geometry.coordinates.forEach((coord) => {
           if (coord.length >= 2) {
             bounds.extend([coord[0], coord[1]]);
           }
         });
-        map.fitBounds(bounds, { padding: 50 });
+        
+        // Fit bounds and force zoom level 13
+        map.fitBounds(bounds, { 
+          padding: 50,
+          maxZoom: 13,
+          minZoom: 13  // Force zoom level 13
+        });
 
         setIsGpxDrawerOpen(false);
       }
@@ -174,6 +241,11 @@ export default function MapView() {
           ],
           'line-width': 2
         }
+      });
+
+      // Add debug call after layer is added
+      map.once('idle', () => {
+        debugRoadLayer(map);
       });
 
       setStreetsLayersLoaded(true);

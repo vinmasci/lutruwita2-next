@@ -199,11 +199,23 @@ We've pivoted from using our own server implementation to using MapTiler for sur
 ```
 
 ### Current Issues
-1. Surface Detection Not Loading:
-   - GPX route loads successfully but surfaces are not displaying
-   - Error: "Roads layer not found or style not fully loaded"
-   - Need to investigate timing of MapTiler layer initialization
-   - May need to add additional checks for layer readiness
+1. Surface Detection Investigation (27/01/2025 Update):
+   - Identified and fixed several surface detection issues:
+     * Added proper waiting for vector tile loading using source.loaded() checks
+     * Implemented robust map movement and zoom handling
+     * Added 10-pixel radius for feature querying to better catch nearby roads
+     * Fixed TypeScript issues with proper Point objects for bbox queries
+   - Current debugging shows:
+     * Map and terrain are loading correctly
+     * Roads source and layer are present
+     * Vector tiles are reporting as loaded
+     * Initial zoom level is too low (6.09)
+     * Even after forcing zoom to 13, no features are found
+   - Next steps for investigation:
+     * Verify if the source-layer name 'lutruwita' is correct
+     * Consider increasing the query radius beyond 10 pixels
+     * Verify vector tile data is actually available at zoom level 13
+     * Add more detailed logging of tile loading states
 
 2. Multiple Hook Initialization:
    - Hook initializes multiple times during development
@@ -219,10 +231,18 @@ This error occurs because we were trying to call useMapContext() inside the proc
 
 ### Next Steps
 1. Fix surface detection loading:
-   - Add checks for MapTiler layer initialization
-   - Implement retry mechanism for surface detection
-   - Add better error handling for layer not found
-   - Consider deferring surface detection until layer is ready
+   - Verify MapTiler vector tile data:
+     * Check if tiles are actually loading at zoom 13
+     * Verify source-layer name 'lutruwita' in vector tiles
+     * Test with different zoom levels (12-14 range)
+   - Improve feature detection:
+     * Try larger query radius (20-30 pixels)
+     * Add debug visualization of query areas
+     * Test with known road coordinates
+   - Add more robust error handling:
+     * Better logging of tile loading states
+     * Visual feedback when features aren't found
+     * Fallback options for failed queries
 
 2. Fix map initialization:
    - Ensure map is fully loaded before allowing GPX processing
@@ -235,3 +255,41 @@ This error occurs because we were trying to call useMapContext() inside the proc
    - Verify surface detection accuracy
    - Check performance with large routes
    - Validate error handling
+
+### Latest Surface Detection Debug Logs (27/01/2025)
+```
+[Log] [MapView] Starting surface detection at: "2025-01-27T06:09:12.005Z"
+[Log] [surfaceService] Starting surface detection...
+[Log] [surfaceService] Map loaded: true
+[Log] [surfaceService] Terrain loaded: {source: "mapbox-dem", exaggeration: 1.5}
+[Log] [surfaceService] Roads source: tt {id: "australia-roads", dispatcher: zy, type: "vector", ...}
+[Log] [surfaceService] Roads layer: {id: "custom-roads", type: "line", source: "australia-roads", ...}
+[Log] [surfaceService] Route feature: {type: "Feature", coordinates: 10254, bbox: undefined, ...}
+[Log] [surfaceService] Vector tiles loaded
+[Log] [surfaceService] Adjusting zoom level from 6.097050510596247 to 13
+[Log] [surfaceService] Test point query: {point: [147.138725, -41.443981], features: 0, properties: undefined}
+```
+
+Analysis of these logs shows:
+1. Initial State:
+   - Map and terrain are properly loaded
+   - Roads source and layer exist with correct IDs
+   - Route has 10,254 coordinates to process
+
+2. Loading Sequence:
+   - Vector tiles report as loaded
+   - Initial zoom is 6.09 (too far out)
+   - Zoom is adjusted to 13
+   - Test point query finds 0 features
+
+3. Key Insights:
+   - All components appear correctly configured
+   - Vector tiles report as loaded but may not have data
+   - Zoom adjustment happens but might need more time to load new tiles
+   - Feature query might need larger radius or different approach
+
+This suggests our next debugging steps should focus on:
+1. Verifying actual tile data at zoom 13
+2. Adding delay after zoom change
+3. Testing with larger query radius
+4. Adding visual debug overlays
