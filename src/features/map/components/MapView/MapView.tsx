@@ -124,7 +124,7 @@ export default function MapView() {
             'line-cap': 'round'
           },
           paint: {
-            'line-color': '#ff4d4d',
+            'line-color': '#e17055',
             'line-width': 5
           }
         });

@@ -1,4 +1,30 @@
-import { UnpavedSection } from '../services/surfaceService';
+export interface RoadConfidence {
+  points: number;        // Number of points confirming road segment
+  bearing: number;       // Alignment with road direction
+  distance: number;      // Proximity to road
+  continuity: number;    // Consecutive point matches
+}
+
+export interface RoadSegment {
+  points: [number, number][];
+  matchingPoints: number;
+  totalPoints: number;
+  bearingMatch: boolean;
+  consistentDistance: boolean;
+  consecutiveMatches: number;
+  road: {
+    id: string;
+    surface: string;
+    bearing: number;
+  };
+}
+
+export interface UnpavedSection {
+  startIndex: number;
+  endIndex: number;
+  coordinates: [number, number][];
+  surfaceType: string | 'unpaved'; // Default to 'unpaved' if no specific type
+}
 
 export interface MapboxMatchResult {
   geojson: GeoJSON.FeatureCollection;

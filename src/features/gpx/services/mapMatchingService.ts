@@ -47,7 +47,7 @@ const matchBatch = async (
   const coordinates = points.map(([lng, lat]) => `${lng},${lat}`).join(';');
   const radiuses = points.map(() => 25 * radiusMultiplier).join(';'); // Default 25m radius * multiplier
 
-  const url = `https://api.mapbox.com/matching/v5/mapbox/driving/${coordinates}?access_token=${MAPBOX_TOKEN}&radiuses=${radiuses}&tidy=true&geometries=geojson&overview=full`;
+  const url = `https://api.mapbox.com/matching/v5/mapbox/walking/${coordinates}?access_token=${MAPBOX_TOKEN}&radiuses=${radiuses}&tidy=true&geometries=geojson&overview=full`;
 
   try {
     const response = await fetch(url);

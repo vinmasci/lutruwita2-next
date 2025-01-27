@@ -1,16 +1,76 @@
 import mapboxgl from 'mapbox-gl';
-import { Feature, LineString } from 'geojson';
+import { Feature, LineString, MultiLineString, Geometry } from 'geojson';
+import { RoadConfidence, RoadSegment, UnpavedSection } from '../types/gpx.types';
+import { getBearing, getDistanceToRoad, getVariance, getConsecutiveMatches } from '../utils/roadUtils';
 
-// Constants from your MapView
+// Constants
 const ROAD_LAYER_ID = 'custom-roads';
 const SOURCE_LAYER = 'lutruwita';
+const PAVED_SURFACES = ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar', 'chipseal'];
+const UNPAVED_SURFACES = ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth', 'ground', 'sand', 'grass'];
+const UNPAVED_HIGHWAYS = ['track', 'trail', 'path'];
 
-export interface UnpavedSection {
-  startIndex: number;
-  endIndex: number;
-  coordinates: [number, number][];
-  surfaceType: string;
+// Constants for road detection
+const VERIFICATION_WINDOW = 3;
+const BEARING_TOLERANCE = 30; // Increased for better matching
+const VARIANCE_THRESHOLD = 8; // Increased for more flexibility
+const TURN_ANGLE_THRESHOLD = 45; // Increased for sharper turns
+const MIN_SEGMENT_LENGTH = 3; // Reduced for shorter segments
+const DEFAULT_QUERY_BOX = 20; // Increased default query box
+const JUNCTION_QUERY_BOX = 40; // Increased junction query box
+const RETRY_DELAY = 50; // Reduced delay between retries for faster processing
+const MAX_RETRIES = 5; // Reduced retries - will use previous point's surface if failed
+const BATCH_SIZE = 10; // Process points in batches
+
+// Helper to convert [lon, lat] array to LngLatLike object with validation
+const toLngLat = (coord: [number, number]): { lng: number; lat: number } | null => {
+  if (!coord || coord.length !== 2 || !isFinite(coord[0]) || !isFinite(coord[1])) {
+    return null;
+  }
+  return {
+    lng: coord[0],
+    lat: coord[1]
+  };
+};
+
+interface Point {
+  lat: number;
+  lon: number;
+  surface?: 'paved' | 'unpaved';
 }
+
+type Coordinate = [number, number];
+type LineStringCoords = Array<Coordinate>;
+type MultiLineStringCoords = Array<LineStringCoords>;
+
+interface RoadFeature {
+  type: 'Feature';
+  geometry: {
+    type: 'LineString';
+    coordinates: LineStringCoords;
+  } | {
+    type: 'MultiLineString';
+    coordinates: MultiLineStringCoords;
+  };
+  properties: {
+    surface?: string;
+    highway?: string;
+    name?: string;
+    ref?: string;
+  };
+}
+
+// Helper to validate coordinates
+const isValidCoordArray = (coords: any): coords is LineStringCoords => {
+  return Array.isArray(coords) && coords.length > 0 && 
+         coords.every(coord => Array.isArray(coord) && coord.length === 2 &&
+                              typeof coord[0] === 'number' && typeof coord[1] === 'number');
+};
+
+const isValidMultiLineStringCoords = (coords: any): coords is MultiLineStringCoords => {
+  return Array.isArray(coords) && coords.length > 0 && 
+         coords.every(line => isValidCoordArray(line));
+};
 
 // Wait for map style and vector tiles to load
 const waitForMapResources = (map: mapboxgl.Map): Promise<void> => {
@@ -22,22 +82,12 @@ const waitForMapResources = (map: mapboxgl.Map): Promise<void> => {
         return false;
       }
 
-      // Check if source is loaded and has tiles
-      try {
-        const bounds = map.getBounds();
-        const zoom = Math.min(Math.max(map.getZoom(), 12), 14); // Constrain zoom
-        
-        // Check if source is loaded
-        if (source.loaded()) {
-          console.log('[surfaceService] Vector tiles loaded');
-          return true;
-        }
-        console.log('[surfaceService] Waiting for tiles to load...');
-        return false;
-      } catch (e) {
-        console.log('[surfaceService] Error checking source loaded state:', e);
-        return false;
+      if (source.loaded()) {
+        console.log('[surfaceService] Vector tiles loaded');
+        return true;
       }
+      console.log('[surfaceService] Waiting for tiles to load...');
+      return false;
     };
 
     if (checkResources()) {
@@ -50,7 +100,6 @@ const waitForMapResources = (map: mapboxgl.Map): Promise<void> => {
         }
       }, 100);
 
-      // Set a timeout to avoid infinite waiting
       setTimeout(() => {
         clearInterval(checkInterval);
         console.warn('[surfaceService] Timeout waiting for resources');
@@ -60,15 +109,336 @@ const waitForMapResources = (map: mapboxgl.Map): Promise<void> => {
   });
 };
 
-// Check if roads layer exists
-const checkRoadsLayer = (map: mapboxgl.Map): boolean => {
-  return !!map.getLayer(ROAD_LAYER_ID);
+// Find nearest road with sophisticated detection
+const findNearestRoad = (map: mapboxgl.Map, point: [number, number]): RoadFeature | null => {
+  const lngLat = toLngLat(point);
+  if (!lngLat) {
+    console.warn('[findNearestRoad] Invalid coordinates:', point);
+    return null;
+  }
+  
+  const projectedPoint = map.project(lngLat);
+  
+  // First, do a wide scan to detect junction areas
+  const wideAreaFeatures = map.queryRenderedFeatures(
+    [
+      [projectedPoint.x - 50, projectedPoint.y - 50],
+      [projectedPoint.x + 50, projectedPoint.y + 50]
+    ],
+    {
+      layers: [ROAD_LAYER_ID],
+      filter: ['in', 'highway', 'trunk', 'primary', 'secondary', 'residential']
+    }
+  );
+
+  // Analyze junction complexity
+  const isComplexJunction = wideAreaFeatures.length > 1;
+  let queryBox = DEFAULT_QUERY_BOX;
+
+  if (isComplexJunction) {
+    // Count unique road names/refs and analyze road types
+    const uniqueRoads = new Set(
+      wideAreaFeatures
+        .map(f => f.properties?.name || f.properties?.ref)
+        .filter(Boolean)
+    );
+    
+    const hasMainRoads = wideAreaFeatures.some(f => 
+      ['trunk', 'primary', 'secondary'].includes(f.properties?.highway || '')
+    );
+    
+    queryBox = uniqueRoads.size > 1 ? JUNCTION_QUERY_BOX : // Major junction
+              hasMainRoads ? JUNCTION_QUERY_BOX * 0.75 : // Main road junction
+              wideAreaFeatures.length > 2 ? JUNCTION_QUERY_BOX * 0.5 : // Minor junction
+              DEFAULT_QUERY_BOX;
+  }
+
+  // Initial box query
+  let features: mapboxgl.MapboxGeoJSONFeature[] = map.queryRenderedFeatures(
+    [
+      [projectedPoint.x - queryBox, projectedPoint.y - queryBox],
+      [projectedPoint.x + queryBox, projectedPoint.y + queryBox]
+    ],
+    { layers: [ROAD_LAYER_ID] }
+  );
+
+  // If no features found at junction, try circular pattern
+  if (isComplexJunction && features.length === 0) {
+    for (let angle = 0; angle < 360; angle += 45) {
+      const radian = (angle * Math.PI) / 180;
+      const offsetX = Math.cos(radian) * 40;
+      const offsetY = Math.sin(radian) * 40;
+      
+      const radialFeatures: mapboxgl.MapboxGeoJSONFeature[] = map.queryRenderedFeatures(
+        [
+          [projectedPoint.x + offsetX - 10, projectedPoint.y + offsetY - 10],
+          [projectedPoint.x + offsetX + 10, projectedPoint.y + offsetY + 10]
+        ],
+        { layers: [ROAD_LAYER_ID] }
+      );
+      
+      if (radialFeatures.length > 0) {
+        features = features.concat(radialFeatures);
+        break;
+      }
+    }
+  }
+
+  // Convert MapboxGeoJSONFeatures to RoadFeatures and prioritize
+  if (features.length > 0) {
+    // Convert features to RoadFeatures
+    const validFeatures = features.filter(f => 
+      f.geometry?.type === 'LineString' || f.geometry?.type === 'MultiLineString'
+    );
+
+    const roadFeatures = validFeatures
+      .map(f => {
+        if (!f.geometry) return null;
+        
+        const isLineString = f.geometry.type === 'LineString';
+        const geometry = f.geometry as LineString | MultiLineString;
+        
+        let coordinates: LineStringCoords;
+        
+        if (isLineString && isValidCoordArray(geometry.coordinates)) {
+          coordinates = geometry.coordinates;
+        } else if (!isLineString && Array.isArray(geometry.coordinates) && 
+                   geometry.coordinates[0] && isValidCoordArray(geometry.coordinates[0])) {
+          coordinates = geometry.coordinates[0];
+        } else {
+          return null;
+        }
+
+        return {
+          type: 'Feature' as const,
+          geometry: isLineString 
+            ? {
+                type: 'LineString' as const,
+                coordinates: coordinates.map(coord => [coord[0], coord[1]] as [number, number])
+              }
+            : {
+                type: 'MultiLineString' as const,
+                coordinates: [coordinates.map(coord => [coord[0], coord[1]] as [number, number])]
+              },
+          properties: {
+            surface: f.properties?.surface,
+            highway: f.properties?.highway,
+            name: f.properties?.name,
+            ref: f.properties?.ref
+          }
+        } as RoadFeature;
+      })
+      .filter((f): f is RoadFeature => f !== null);
+
+    return roadFeatures.reduce<RoadFeature | null>((best, current) => {
+      if (!best) return current;
+      
+      // Prioritize main roads
+      const bestIsMain = ['trunk', 'primary', 'secondary'].includes(best.properties?.highway || '');
+      const currentIsMain = ['trunk', 'primary', 'secondary'].includes(current.properties?.highway || '');
+      
+      if (bestIsMain && !currentIsMain) return best;
+      if (!bestIsMain && currentIsMain) return current;
+      
+      // If same road type, use the closest one
+      let bestCoord: Coordinate | null = null;
+      let currentCoord: Coordinate | null = null;
+
+      if (best.geometry.type === 'LineString') {
+        bestCoord = best.geometry.coordinates[0];
+      } else {
+        const coords = best.geometry.coordinates[0];
+        if (coords && coords.length > 0) bestCoord = coords[0];
+      }
+
+      if (current.geometry.type === 'LineString') {
+        currentCoord = current.geometry.coordinates[0];
+      } else {
+        const coords = current.geometry.coordinates[0];
+        if (coords && coords.length > 0) currentCoord = coords[0];
+      }
+
+      if (!bestCoord || !currentCoord) {
+        return best;
+      }
+      
+      const bestLngLat = toLngLat(bestCoord as [number, number]);
+      const currentLngLat = toLngLat(currentCoord as [number, number]);
+      
+      if (!bestLngLat || !currentLngLat) {
+        return best;
+      }
+      
+      const bestDist = map.project(bestLngLat).dist(projectedPoint);
+      const currentDist = map.project(currentLngLat).dist(projectedPoint);
+      
+      return currentDist < bestDist ? current : best;
+    }, null);
+  }
+
+  return null;
 };
 
-// Check if surface is unpaved
-const isUnpavedSurface = (surface?: string): boolean => {
-  const unpavedTypes = ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'];
-  return unpavedTypes.includes(surface || '');
+// Core surface detection function that processes points one at a time
+export const assignSurfacesViaNearest = async (
+  map: mapboxgl.Map,
+  coords: Point[],
+  onProgress?: (progress: number, total: number) => void
+): Promise<Point[]> => {
+  console.log('[assignSurfacesViaNearest] Starting surface detection...');
+
+  if (!map) {
+    console.log('[assignSurfacesViaNearest] No map provided, returning coords unmodified');
+    return coords;
+  }
+
+  const results: Point[] = [];
+  let cachedRoads: RoadFeature[] | null = null;
+
+  // Process one point at a time
+  for (let i = 0; i < coords.length; i++) {
+    const pt = coords[i];
+
+    // Update progress
+    if (onProgress) {
+      onProgress(i + 1, coords.length);
+    }
+
+    // Create bounding box around point (~100m in each direction)
+    const bbox = [
+      pt.lon - 0.001,
+      pt.lat - 0.001,
+      pt.lon + 0.001,
+      pt.lat + 0.001
+    ];
+
+    // Set map view for this point
+    map.fitBounds(
+      [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+      {
+        padding: 50,
+        duration: 0,
+        maxZoom: 14,
+        minZoom: 12
+      }
+    );
+
+    // Process points in batches to allow tiles to load
+    if (i % BATCH_SIZE === 0) {
+      // Wait for map to stabilize and tiles to load
+      await new Promise<void>((resolve) => {
+        let attempts = 0;
+        
+        const checkTiles = async () => {
+          // Try to find roads for the next batch of points
+          const batchStart = i;
+          const batchEnd = Math.min(i + BATCH_SIZE, coords.length);
+          let foundAnyRoads = false;
+          
+          for (let j = batchStart; j < batchEnd; j++) {
+            const road = findNearestRoad(map, [coords[j].lon, coords[j].lat]);
+            if (road) {
+              foundAnyRoads = true;
+              break;
+            }
+          }
+
+          if (foundAnyRoads) {
+            resolve();
+            return;
+          }
+
+          attempts++;
+          if (attempts >= MAX_RETRIES) {
+            console.warn(`[assignSurfacesViaNearest] No roads found for batch ${batchStart}-${batchEnd-1} after ${MAX_RETRIES} attempts`);
+            resolve();
+            return;
+          }
+
+          setTimeout(checkTiles, RETRY_DELAY);
+        };
+
+        checkTiles();
+      });
+    }
+
+    // Find nearest road for current point
+    const road = findNearestRoad(map, [pt.lon, pt.lat]);
+    cachedRoads = road ? [road] : null;
+
+    // Process the point
+    let bestSurface: 'paved' | 'unpaved' = 'unpaved';
+    let minDist = Infinity;
+
+    if (i % 100 === 0) {
+      console.log(
+        `[assignSurfacesViaNearest] Processing point #${i}, coords=(${pt.lat}, ${pt.lon})`
+      );
+    }
+
+    // If no roads found, use previous point's surface type if available
+    if (!cachedRoads || cachedRoads.length === 0) {
+      const previousPoint = results[results.length - 1];
+      results.push({ 
+        ...pt, 
+        surface: previousPoint ? previousPoint.surface : 'unpaved' 
+      });
+    } else {
+      // Evaluate each road
+      for (const road of cachedRoads) {
+        if (
+          road.geometry.type !== 'LineString' &&
+          road.geometry.type !== 'MultiLineString'
+        ) {
+          continue;
+        }
+
+        // Get coordinates based on geometry type
+        let lineCoords: LineStringCoords;
+        
+        try {
+          if (road.geometry.type === 'LineString' && isValidCoordArray(road.geometry.coordinates)) {
+            lineCoords = road.geometry.coordinates;
+          } else if (road.geometry.type === 'MultiLineString' && 
+                     isValidMultiLineStringCoords(road.geometry.coordinates)) {
+            lineCoords = road.geometry.coordinates[0];
+          } else {
+            continue;
+          }
+        } catch (error) {
+          console.warn('[assignSurfacesViaNearest] Invalid coordinates:', error);
+          continue;
+        }
+
+        const dist = getDistanceToRoad([pt.lon, pt.lat], lineCoords);
+
+        // Add a small threshold to prefer staying on main roads
+        const DISTANCE_THRESHOLD = 0.001; // 1 meter buffer
+
+        if (dist < minDist - DISTANCE_THRESHOLD ||
+          (road.properties?.highway === 'trunk' && dist < minDist + DISTANCE_THRESHOLD)) {
+          minDist = dist;
+          const surfaceRaw = (road.properties?.surface || '').toLowerCase();
+          const highwayType = (road.properties?.highway || '').toLowerCase();
+          
+          if (PAVED_SURFACES.includes(surfaceRaw)) {
+            bestSurface = 'paved';
+          } else if (UNPAVED_SURFACES.includes(surfaceRaw) || UNPAVED_HIGHWAYS.includes(highwayType)) {
+            bestSurface = 'unpaved';
+          } else {
+            bestSurface = 'unpaved'; // fallback
+          }
+        }
+      }
+      results.push({ ...pt, surface: bestSurface });
+    }
+
+    // Clear roads cache after each point
+    cachedRoads = null;
+  }
+
+  console.log('[assignSurfacesViaNearest] => Finished processing. Returning coords...');
+  return results;
 };
 
 // Add surface detection overlay
@@ -79,217 +449,35 @@ export const addSurfaceOverlay = async (
   console.log('[surfaceService] Starting surface detection...');
 
   try {
-    // 1. First verify map state
-    console.log('[surfaceService] Map loaded:', map.isStyleLoaded());
-    console.log('[surfaceService] Terrain loaded:', map.getTerrain());
-    console.log('[surfaceService] Roads source:', map.getSource('australia-roads'));
-    console.log('[surfaceService] Roads layer:', map.getLayer('custom-roads'));
-
-    // 2. Check route feature
-    console.log('[surfaceService] Route feature:', {
-      type: routeFeature.type,
-      coordinates: routeFeature.geometry.coordinates.length,
-      bbox: routeFeature.bbox,
-      properties: routeFeature.properties
-    });
-
     // Wait for resources and ensure proper zoom
     await waitForMapResources(map);
-    
-    // Check for roads layer
-    if (!checkRoadsLayer(map)) {
-      console.error('[surfaceService] Roads layer not available');
-      return;
-    }
 
-    // Center on first coordinate and set zoom
-    const testPoint = routeFeature.geometry.coordinates[0] as [number, number];
-    console.log('[surfaceService] Centering on test point:', testPoint);
-    
-    map.setCenter(testPoint);
-    const currentZoom = map.getZoom();
-    if (currentZoom !== 13) {
-      console.log('[surfaceService] Adjusting zoom level from', currentZoom, 'to 13');
-      map.setZoom(13);
-    }
+    // Convert route coordinates to points
+    const points: Point[] = routeFeature.geometry.coordinates.map(coord => ({
+      lon: coord[0],
+      lat: coord[1]
+    }));
 
-    // Wait for map movements to finish and new tiles to load
-    console.log('[surfaceService] Waiting for map to settle...');
-    await new Promise<void>((resolve) => {
-      const checkComplete = () => {
-        // Check if map movement is complete
-        if (!map.isMoving() && !map.isZooming()) {
-          // Wait a bit more for tiles to render
-          setTimeout(resolve, 500);
-        } else {
-          setTimeout(checkComplete, 100);
-        }
-      };
-      
-      // Start checking after initial movement
-      map.once('moveend', () => {
-        console.log('[surfaceService] Move ended, checking tile loading...');
-        checkComplete();
-      });
-    });
+    // Process points with surface detection
+    const processedPoints = await assignSurfacesViaNearest(map, points);
 
-    // Additional wait for source data
-    await new Promise<void>((resolve) => {
-      const source = map.getSource('australia-roads') as mapboxgl.VectorTileSource;
-      if (source.loaded()) {
-        console.log('[surfaceService] Source already loaded');
-        resolve();
-      } else {
-        console.log('[surfaceService] Waiting for source data...');
-        map.once('sourcedata', () => {
-          console.log('[surfaceService] Source data loaded');
-          resolve();
-        });
-      }
-    });
-
-    // Log viewport state
-    try {
-      const bounds = map.getBounds();
-      const center = map.getCenter();
-      if (bounds) {
-        console.log('[surfaceService] Viewport state:', {
-          zoom: map.getZoom(),
-          center: [center.lng, center.lat],
-          bounds: [
-            [bounds.getWest(), bounds.getSouth()],
-            [bounds.getEast(), bounds.getNorth()]
-          ]
-        });
-      } else {
-        console.log('[surfaceService] Viewport state:', {
-          zoom: map.getZoom(),
-          center: [center.lng, center.lat],
-          bounds: 'Not available'
-        });
-      }
-    } catch (e) {
-      console.error('[surfaceService] Error getting viewport state:', e);
-    }
-
-    // Add debug overlay for query area
-    const debugSourceId = 'debug-query-area';
-    const debugLayerId = 'debug-query-layer';
-    
-    // Remove existing debug overlay
-    if (map.getSource(debugSourceId)) {
-      map.removeLayer(debugLayerId);
-      map.removeSource(debugSourceId);
-    }
-
-    // Try querying features with a larger radius
-    const point = map.project(testPoint);
-    console.log('[surfaceService] Projected point:', point);
-    
-    // Create a box around the point (30 pixel radius)
-    const QUERY_RADIUS = 30;
-    const bbox: [mapboxgl.Point, mapboxgl.Point] = [
-      new mapboxgl.Point(point.x - QUERY_RADIUS, point.y - QUERY_RADIUS),
-      new mapboxgl.Point(point.x + QUERY_RADIUS, point.y + QUERY_RADIUS)
-    ];
-    
-    // Add visual debug overlay
-    const debugBox = [
-      map.unproject([point.x - QUERY_RADIUS, point.y - QUERY_RADIUS]),
-      map.unproject([point.x + QUERY_RADIUS, point.y - QUERY_RADIUS]),
-      map.unproject([point.x + QUERY_RADIUS, point.y + QUERY_RADIUS]),
-      map.unproject([point.x - QUERY_RADIUS, point.y + QUERY_RADIUS]),
-      map.unproject([point.x - QUERY_RADIUS, point.y - QUERY_RADIUS])
-    ];
-    
-    map.addSource(debugSourceId, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Polygon',
-          coordinates: [debugBox.map(p => [p.lng, p.lat])]
-        }
-      }
-    });
-    
-    map.addLayer({
-      id: debugLayerId,
-      type: 'fill',
-      source: debugSourceId,
-      paint: {
-        'fill-color': '#FF0000',
-        'fill-opacity': 0.2
-      }
-    });
-    
-    // Listen for source data events
-    const onSourceData = () => {
-      console.log('[surfaceService] Source data updated:', {
-        zoom: map.getZoom(),
-        center: map.getCenter(),
-        moving: map.isMoving(),
-        zooming: map.isZooming()
-      });
-    };
-    map.on('sourcedata', onSourceData);
-    
-    // Query features
-    const testFeatures = map.queryRenderedFeatures(bbox, {
-      layers: ['custom-roads']
-    });
-    
-    console.log('[surfaceService] Test point query:', {
-      point: testPoint,
-      projected: point,
-      queryRadius: QUERY_RADIUS,
-      features: testFeatures.length,
-      properties: testFeatures[0]?.properties
-    });
-    
-    // Clean up event listener
-    map.off('sourcedata', onSourceData);
-
-    // 4. Process each coordinate
-    const coordinates = routeFeature.geometry.coordinates;
-    console.log('[surfaceService] Processing coordinates:', coordinates.length);
+    // Create sections based on surface changes
     const sections: UnpavedSection[] = [];
     let currentSection: UnpavedSection | null = null;
 
-    console.log('[surfaceService] Starting coordinate processing...');
-    for (let i = 0; i < coordinates.length; i++) {
-      const [lng, lat] = coordinates[i];
-      
-      // Query the road surface at this point with a small radius
-      const projectedPoint = map.project([lng, lat]);
-      const bbox: [mapboxgl.Point, mapboxgl.Point] = [
-        new mapboxgl.Point(projectedPoint.x - 10, projectedPoint.y - 10),
-        new mapboxgl.Point(projectedPoint.x + 10, projectedPoint.y + 10)
-      ];
-      const features = map.queryRenderedFeatures(bbox, {
-        layers: [ROAD_LAYER_ID]
-      });
-
-      const surfaceType = features[0]?.properties?.surface;
-      
-      if (i % 1000 === 0 || i === coordinates.length - 1) {
-        console.log(`[surfaceService] Processing point ${i}/${coordinates.length}, surface: ${surfaceType || 'unknown'}`);
-      }
-
-      // Handle unpaved sections
-      if (isUnpavedSurface(surfaceType)) {
-        console.log(`[surfaceService] Found unpaved surface at point ${i}: ${surfaceType}`);
+    for (let i = 0; i < processedPoints.length; i++) {
+      const point = processedPoints[i];
+      if (point.surface === 'unpaved') {
         if (!currentSection) {
           currentSection = {
             startIndex: i,
             endIndex: i,
-            coordinates: [coordinates[i] as [number, number]],
-            surfaceType
+            coordinates: [[point.lon, point.lat]],
+            surfaceType: 'unpaved'
           };
         } else {
           currentSection.endIndex = i;
-          currentSection.coordinates.push(coordinates[i] as [number, number]);
+          currentSection.coordinates.push([point.lon, point.lat]);
         }
       } else if (currentSection) {
         sections.push(currentSection);
@@ -302,36 +490,10 @@ export const addSurfaceOverlay = async (
       sections.push(currentSection);
     }
 
-    // 5. Add sections to map
-    console.log('[surfaceService] Adding sections:', sections.length);
-    console.log('[surfaceService] Section details:', sections.map(s => ({
-      startIndex: s.startIndex,
-      endIndex: s.endIndex,
-      length: s.coordinates.length,
-      surfaceType: s.surfaceType
-    })));
-    
+    // Add sections to map
     sections.forEach((section, index) => {
-      // Add debug logging
-      console.log(`[DEBUG] Adding section ${index} details:`, {
-        coordinates: section.coordinates,
-        startLat: section.coordinates[0][1],
-        startLng: section.coordinates[0][0],
-        numPoints: section.coordinates.length
-      });
-
-      // Try querying features at this point
-      const testPoint = section.coordinates[0];
-      const projectedPoint = map.project(testPoint);
-      const bbox: [mapboxgl.Point, mapboxgl.Point] = [
-        new mapboxgl.Point(projectedPoint.x - 10, projectedPoint.y - 10),
-        new mapboxgl.Point(projectedPoint.x + 10, projectedPoint.y + 10)
-      ];
-      const features = map.queryRenderedFeatures(bbox, { layers: ['custom-roads'] });
-      console.log(`[DEBUG] Features at section ${index} start:`, features);
-
-      const sourceId = `unpaved-${index}`;
-      const layerId = `unpaved-layer-${index}`;
+      const sourceId = `unpaved-section-${index}`;
+      const layerId = `unpaved-section-layer-${index}`;
 
       // Clean up existing
       if (map.getSource(sourceId)) {
@@ -339,67 +501,41 @@ export const addSurfaceOverlay = async (
         map.removeSource(sourceId);
       }
 
-      // Add source
+      // Add source with surface property
       map.addSource(sourceId, {
         type: 'geojson',
         data: {
           type: 'Feature',
-          properties: {},
+          properties: {
+            surface: 'unpaved' // Add surface property
+          },
           geometry: {
             type: 'LineString',
-            coordinates: section.coordinates
+            coordinates: section.coordinates as [number, number][]
           }
         }
       });
 
-// Add layer
-map.addLayer({
-  id: layerId,
-  type: 'line',
-  source: sourceId,
-  layout: {
-    'line-cap': 'round',
-    'line-join': 'round',
-    'visibility': 'visible'
-  },
-  paint: {
-    'line-color': '#D35400', // Orange
-    'line-width': 20,        // Much wider than current 4
-    'line-opacity': 1,       // Full opacity
-    'line-blur': 0.5        // Slight blur for softer edges
-  }
-});
-
-      // Add debug circle at the start point
-      const debugSourceId = `debug-source-${index}`;
-      const debugLayerId = `debug-layer-${index}`;
-
-      map.addSource(debugSourceId, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'Point',
-            coordinates: section.coordinates[0]
-          }
-        }
-      });
-
+      // Add simple white dashed line for unpaved segments
       map.addLayer({
-        id: debugLayerId,
-        type: 'circle',
-        source: debugSourceId,
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
         paint: {
-          'circle-radius': 10,
-          'circle-color': '#FF0000',
-          'circle-opacity': 0.8
+          'line-color': '#ffffff',
+          'line-width': 3,
+          'line-dasharray': [1, 3]
         }
       });
-      
-      console.log(`[surfaceService] Added layer ${layerId} with ${section.coordinates.length} points`);
     });
+
+    console.log('[surfaceService] Surface detection complete');
   } catch (error) {
-    console.error('Error in surface detection:', error);
+    console.error('[surfaceService] Error in surface detection:', error);
+    throw error;
   }
 };
