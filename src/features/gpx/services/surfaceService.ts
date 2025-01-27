@@ -352,17 +352,23 @@ export const addSurfaceOverlay = async (
         }
       });
 
-      // Add layer
-      map.addLayer({
-        id: layerId,
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': '#D35400', // Match your existing unpaved color
-          'line-width': 4,
-          'line-opacity': 0.8
-        }
-      });
+// Add layer
+map.addLayer({
+  id: layerId,
+  type: 'line',
+  source: sourceId,
+  layout: {
+    'line-cap': 'round',
+    'line-join': 'round',
+    'visibility': 'visible'
+  },
+  paint: {
+    'line-color': '#D35400', // Orange
+    'line-width': 20,        // Much wider than current 4
+    'line-opacity': 1,       // Full opacity
+    'line-blur': 0.5        // Slight blur for softer edges
+  }
+});
 
       // Add debug circle at the start point
       const debugSourceId = `debug-source-${index}`;
