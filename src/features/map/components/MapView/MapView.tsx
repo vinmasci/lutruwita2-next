@@ -6,7 +6,7 @@ import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { Feature, LineString } from 'geojson';
 import { ProcessedRoute } from '../../../gpx/types/gpx.types';
-import { UnpavedSection, detectUnpavedSections } from '../../../gpx/services/surfaceService';
+import { addSurfaceOverlay } from '../../../gpx/services/surfaceService';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -20,73 +20,7 @@ export default function MapView() {
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
-  const [unpavedLayers, setUnpavedLayers] = useState<string[]>([]);
-
   const { processGpx, isLoading } = useClientGpxProcessing();
-
-  const clearUnpavedLayers = () => {
-    if (!mapInstance.current) return;
-    
-    unpavedLayers.forEach(layerId => {
-      if (mapInstance.current?.getLayer(layerId)) {
-        mapInstance.current.removeLayer(layerId);
-      }
-      if (mapInstance.current?.getSource(layerId)) {
-        mapInstance.current.removeSource(layerId);
-      }
-    });
-    
-    setUnpavedLayers([]);
-  };
-
-  const addUnpavedSections = async (coordinates: [number, number][]) => {
-    if (!mapInstance.current) return;
-    
-    try {
-      const map = mapInstance.current;
-      const sections = await detectUnpavedSections(coordinates, map);
-      
-      // Clear existing unpaved layers
-      clearUnpavedLayers();
-      
-      // Add new unpaved sections
-      const newLayers: string[] = [];
-      
-      sections.forEach((section, index) => {
-        const layerId = `unpaved-${index}-${Date.now()}`;
-        newLayers.push(layerId);
-        
-        // Add source
-        map.addSource(layerId, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              type: 'LineString',
-              coordinates: section.coordinates
-            }
-          }
-        });
-        
-        // Add layer
-        map.addLayer({
-          id: layerId,
-          type: 'line',
-          source: layerId,
-          paint: {
-            'line-color': '#f9ca24', // Yellow
-            'line-width': 4,
-            'line-opacity': 0.8
-          }
-        });
-      });
-      
-      setUnpavedLayers(newLayers);
-    } catch (error) {
-      console.error('Error adding unpaved sections:', error);
-    }
-  };
 
   const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
     if (!file && !processedRoute) {
@@ -146,8 +80,8 @@ export default function MapView() {
         const feature = result.geojson.features[0] as Feature<LineString>;
         const coordinates = feature.geometry.coordinates as [number, number][];
 
-        // Add unpaved sections
-        await addUnpavedSections(coordinates);
+        // Add surface detection overlay
+        await addSurfaceOverlay(map, feature);
 
         // Fit bounds to show the route
         const bounds = new mapboxgl.LngLatBounds();

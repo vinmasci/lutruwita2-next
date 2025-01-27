@@ -3,14 +3,14 @@ import { useMapContext } from '../../map/context/MapContext';
 import mapboxgl from 'mapbox-gl';
 import { parseGpx, GpxParseResult } from '../utils/gpxParser';
 import { matchTrackToRoads } from '../services/mapMatchingService';
-import { detectUnpavedSections, UnpavedSection } from '../services/surfaceService';
+import { UnpavedSection } from '../services/surfaceService';
 import { ProcessedRoute, GPXProcessingError } from '../types/gpx.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { FeatureCollection, Feature, LineString } from 'geojson';
 
 export const useClientGpxProcessing = () => {
   console.log('[useClientGpxProcessing] Hook initializing');
-  const { map, isMapReady } = useMapContext();
+  const {} = useMapContext(); // Keep the hook for future use
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<GPXProcessingError | null>(null);
 
@@ -35,12 +35,6 @@ export const useClientGpxProcessing = () => {
         maxGapDistance: 0.0002,
         interpolationPoints: 5
       });
-
-      console.log('[useClientGpxProcessing] Checking map initialization', { isMapReady });
-      if (!map || !isMapReady) {
-        throw new Error('Map is not ready for processing. Please wait for map initialization to complete.');
-      }
-      const unpavedSections = await detectUnpavedSections(matched, map as mapboxgl.Map);
 
       console.log('[useClientGpxProcessing] Creating GeoJSON');
       const geojson: FeatureCollection<LineString> = {
@@ -75,7 +69,6 @@ export const useClientGpxProcessing = () => {
         gpxData: JSON.stringify(parsed),
         rawGpx,
         geojson,
-        unpavedSections, // Add unpaved sections to the processed route
         statistics,
         status: {
           processingState: 'completed',

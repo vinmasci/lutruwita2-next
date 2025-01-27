@@ -1,123 +1,133 @@
 import mapboxgl from 'mapbox-gl';
+import { Feature, LineString } from 'geojson';
+
+// Constants from your MapView
+const ROAD_LAYER_ID = 'custom-roads';
+const SOURCE_LAYER = 'lutruwita';
 
 export interface UnpavedSection {
   startIndex: number;
   endIndex: number;
   coordinates: [number, number][];
-  surfaceType: 'unpaved' | 'dirt' | 'gravel' | 'fine_gravel';
+  surfaceType: string;
 }
 
-const PAVED_SURFACES = [
-  'paved', 'asphalt', 'concrete', 'compacted',
-  'sealed', 'bitumen', 'tar'
-];
-
-const UNPAVED_SURFACES = [
-  'unpaved', 'gravel', 'fine', 'fine_gravel', 
-  'dirt', 'earth', 'path', 'track', 'service'
-];
-
-// Cache for surface query results
-const surfaceCache = new Map<string, string>();
-
-const querySurfaceType = async (
-  lng: number,
-  lat: number,
-  map: mapboxgl.Map
-): Promise<string | undefined> => {
-  const cacheKey = `${lng},${lat}`;
-  if (surfaceCache.has(cacheKey)) {
-    return surfaceCache.get(cacheKey);
-  }
-
-  try {
-    // Check if we're within the zoom range where surface data is available
-    const zoom = map.getZoom();
-    if (zoom < 12 || zoom > 14) {
-      return undefined;
+// Wait for map style to load
+const waitForMapStyle = (map: mapboxgl.Map): Promise<void> => {
+  return new Promise((resolve) => {
+    if (map.isStyleLoaded()) {
+      resolve();
+    } else {
+      map.once('styledata', () => resolve());
     }
-
-    const features = map.queryRenderedFeatures(
-      map.project([lng, lat]),
-      { layers: ['custom-roads'] }
-    );
-
-    if (!features.length) return undefined;
-
-    // Get surface type from feature properties
-    const surface = features[0].properties?.surface?.toLowerCase();
-
-    // Only return surface if it's one we care about
-    if (surface && (UNPAVED_SURFACES.includes(surface) || PAVED_SURFACES.includes(surface))) {
-      surfaceCache.set(cacheKey, surface);
-      return surface;
-    }
-    
-    return undefined;
-  } catch (error) {
-    console.error('Surface query error:', error);
-    return undefined;
-  }
+  });
 };
 
+// Check if roads layer exists
+const checkRoadsLayer = (map: mapboxgl.Map): boolean => {
+  return !!map.getLayer(ROAD_LAYER_ID);
+};
+
+// Check if surface is unpaved
 const isUnpavedSurface = (surface?: string): boolean => {
-  return UNPAVED_SURFACES.includes(surface || '');
+  const unpavedTypes = ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'];
+  return unpavedTypes.includes(surface || '');
 };
 
-export const detectUnpavedSections = async (
-  matchedCoordinates: [number, number][],
-  map: mapboxgl.Map
-): Promise<UnpavedSection[]> => {
-  // Wait for the custom-roads layer to be loaded
-  if (!map.getLayer('custom-roads') || !map.isStyleLoaded()) {
-    console.error('Roads layer not found or style not fully loaded');
-    return [];
-  }
-
-  // Ensure we're at a zoom level where surface data is available
-  const currentZoom = map.getZoom();
-  if (currentZoom < 12 || currentZoom > 14) {
-    map.setZoom(13); // Set to middle of valid zoom range
-    // Wait for zoom to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-
-  const sections: UnpavedSection[] = [];
-  let currentSection: UnpavedSection | null = null;
-
-  // Process coordinates in batches to avoid rate limiting
-  const batchSize = 50;
-  
-  for (let i = 0; i < matchedCoordinates.length; i++) {
-    // Add delay between batches
-    if (i > 0 && i % batchSize === 0) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
-    const [lng, lat] = matchedCoordinates[i];
-    const surfaceType = await querySurfaceType(lng, lat, map);
+// Add surface detection overlay
+export const addSurfaceOverlay = async (
+  map: mapboxgl.Map,
+  routeFeature: Feature<LineString>
+): Promise<void> => {
+  try {
+    // 1. Wait for map style
+    await waitForMapStyle(map);
     
-    if (isUnpavedSurface(surfaceType)) {
-      if (!currentSection) {
-        currentSection = {
-          startIndex: i,
-          endIndex: i,
-          coordinates: [matchedCoordinates[i]],
-          surfaceType: 'unpaved'
-        };
-      } else {
-        currentSection.endIndex = i;
-        currentSection.coordinates.push(matchedCoordinates[i]);
-      }
-    } else if (currentSection) {
-      sections.push(currentSection);
-      currentSection = null;
+    // 2. Check for roads layer
+    if (!checkRoadsLayer(map)) {
+      console.error('Roads layer not available');
+      return;
     }
-  }
 
-  if (currentSection) {
-    sections.push(currentSection);
-  }
+    // 3. Process each coordinate
+    const coordinates = routeFeature.geometry.coordinates;
+    const sections: UnpavedSection[] = [];
+    let currentSection: UnpavedSection | null = null;
 
-  return sections;
+    for (let i = 0; i < coordinates.length; i++) {
+      const [lng, lat] = coordinates[i];
+      
+      // Query the road surface at this point
+      const features = map.queryRenderedFeatures(
+        map.project([lng, lat]),
+        { 
+          layers: [ROAD_LAYER_ID]
+        }
+      );
+
+      const surfaceType = features[0]?.properties?.surface;
+
+      // Handle unpaved sections
+      if (isUnpavedSurface(surfaceType)) {
+        if (!currentSection) {
+          currentSection = {
+            startIndex: i,
+            endIndex: i,
+            coordinates: [coordinates[i] as [number, number]],
+            surfaceType
+          };
+        } else {
+          currentSection.endIndex = i;
+          currentSection.coordinates.push(coordinates[i] as [number, number]);
+        }
+      } else if (currentSection) {
+        sections.push(currentSection);
+        currentSection = null;
+      }
+    }
+
+    // Add final section if exists
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+
+    // 4. Add sections to map
+    sections.forEach((section, index) => {
+      const sourceId = `unpaved-${index}`;
+      const layerId = `unpaved-layer-${index}`;
+
+      // Clean up existing
+      if (map.getSource(sourceId)) {
+        map.removeLayer(layerId);
+        map.removeSource(sourceId);
+      }
+
+      // Add source
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: section.coordinates
+          }
+        }
+      });
+
+      // Add layer
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': '#D35400', // Match your existing unpaved color
+          'line-width': 4,
+          'line-opacity': 0.8
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error in surface detection:', error);
+  }
 };
