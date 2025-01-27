@@ -312,6 +312,24 @@ export const addSurfaceOverlay = async (
     })));
     
     sections.forEach((section, index) => {
+      // Add debug logging
+      console.log(`[DEBUG] Adding section ${index} details:`, {
+        coordinates: section.coordinates,
+        startLat: section.coordinates[0][1],
+        startLng: section.coordinates[0][0],
+        numPoints: section.coordinates.length
+      });
+
+      // Try querying features at this point
+      const testPoint = section.coordinates[0];
+      const projectedPoint = map.project(testPoint);
+      const bbox: [mapboxgl.Point, mapboxgl.Point] = [
+        new mapboxgl.Point(projectedPoint.x - 10, projectedPoint.y - 10),
+        new mapboxgl.Point(projectedPoint.x + 10, projectedPoint.y + 10)
+      ];
+      const features = map.queryRenderedFeatures(bbox, { layers: ['custom-roads'] });
+      console.log(`[DEBUG] Features at section ${index} start:`, features);
+
       const sourceId = `unpaved-${index}`;
       const layerId = `unpaved-layer-${index}`;
 
@@ -343,6 +361,33 @@ export const addSurfaceOverlay = async (
           'line-color': '#D35400', // Match your existing unpaved color
           'line-width': 4,
           'line-opacity': 0.8
+        }
+      });
+
+      // Add debug circle at the start point
+      const debugSourceId = `debug-source-${index}`;
+      const debugLayerId = `debug-layer-${index}`;
+
+      map.addSource(debugSourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: section.coordinates[0]
+          }
+        }
+      });
+
+      map.addLayer({
+        id: debugLayerId,
+        type: 'circle',
+        source: debugSourceId,
+        paint: {
+          'circle-radius': 10,
+          'circle-color': '#FF0000',
+          'circle-opacity': 0.8
         }
       });
       
