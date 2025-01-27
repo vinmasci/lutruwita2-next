@@ -1,5 +1,7 @@
 # GPX Implementation Status
 
+## USE MAPTILER FOR SURFACE DATA
+
 ## Important Context
 We have an existing server implementation that:
 - Lives in the `server/` directory
@@ -16,25 +18,27 @@ We're currently bypassing this server temporarily to:
 
 The server code remains in place but unused while we implement client-side processing first.
 
-## ⚠️ CURRENT UPLOAD BOX LOCATION
-The file upload box in the sidebar is controlled by these files:
+## 📦 CURRENT UPLOAD BOX LOCATION
+The file upload box uses lazy loading for better performance:
 
 1. Main Sidebar Component:
 ```
-src/features/map/components/Sidebar/Sidebar.tsx
+src/features/map/components/Sidebar/Sidebar.tsx  <-- Uses React.lazy() for Uploader
 ```
 
-2. Upload Box Implementation:
+2. Upload Button Implementation:
 ```
-src/features/map/components/Sidebar/SidebarListItems.tsx  <-- Contains the Upload box item
+src/features/map/components/Sidebar/SidebarListItems.tsx  <-- Contains the Upload button
 ```
 
-3. Actual Upload Logic:
+3. Lazy-Loaded Upload Logic:
 ```
-src/features/gpx/components/Uploader/Uploader.tsx  <-- Now uses client-side processing
-src/features/gpx/hooks/useClientGpxProcessing.ts  <-- Handles client-side file processing
-src/features/gpx/utils/gpxParser.ts              <-- Converts GPX to GeoJSON
+src/features/gpx/components/Uploader/Uploader.tsx       <-- Lazy-loaded component
+src/features/gpx/hooks/useClientGpxProcessing.ts       <-- Only initializes when needed
+src/features/gpx/utils/gpxParser.ts                    <-- Converts GPX to GeoJSON
 ```
+
+The Uploader component and its dependencies (including the useClientGpxProcessing hook) are now only loaded when the user clicks the upload button, improving initial load performance and preventing premature hook initialization.
 
 ## Phase 1: ✅ Client-Side Implementation (COMPLETED)
 Successfully implemented:
@@ -102,316 +106,132 @@ export const matchTrackToRoads = async (
 };
 ```
 
-## Phase 3: 🚀 Surface Detection Implementation (IN PROGRESS)
+## Phase 3: 🚀 Surface Detection Implementation (IN PROGRESS - PIVOTED TO MAPTILER)
 
-### Overview
-Reactivating our existing server implementation to:
-1. Use existing `server/src/services/gpx/gpx.processing.ts` for surface detection
-2. Leverage server-side caching and error handling
-3. Display unpaved sections in yellow overlay
-4. Keep existing red route underneath
+### Pivot to MapTiler Implementation
+We've pivoted from using our own server implementation to using MapTiler for surface detection due to:
+1. Better data coverage for Tasmania
+2. More reliable surface data
+3. Simplified architecture without needing to maintain our own database
 
-### Implementation Steps
+### Current Implementation Status
+- [x] Added MapTiler source to map initialization
+- [x] Created new surface detection service using MapTiler vector tiles
+- [x] Implemented surface type querying logic
+- [x] Added road layer visualization
 
-#### 1. Start Using Existing Server ✅
-- [x] Start server with existing surface detection:
-```bash
-cd server
-npm install
-npm start   # Now running on port 8080 (changed from 3001)
+### Recent Changes (27/01/2025)
+1. Fixed map matching issues:
+   - Lowered confidence threshold from 0.6 to 0.3 to accept more matches
+   - Increased search radius multiplier from 3 to 5 for better rural area matching
+   - Increased max gap distance to 50 meters for rural tracks
+   - Added fallback to use original points when no matches found
+   - Improved best match selection logic
+
+2. Fixed type conversion issues:
+   - Switched from OpenLayers to Mapbox GL JS types
+   - Updated surface detection to properly work with MapTiler data
+   - Added proper zoom level handling for MapTiler data (12-14)
+
+3. Fixed GPX Upload Flow:
+   - Updated MapView to handle both File and ProcessedRoute:
+     ```typescript
+     handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
+       const result = processedRoute || (file ? await processGpx(file) : null);
+       // ... display logic
+     }
+     ```
+   - Fixed Sidebar to properly pass processed routes:
+     ```typescript
+     handleUploadComplete = async (result: ProcessedRoute) => {
+       await props.onUploadGpx(undefined, result);
+     };
+     ```
+   - Updated type definitions to support the new flow
+   - Fixed component communication chain
+
+4. Multiple Hook Initialization Issue:
+   - Seeing multiple "[useClientGpxProcessing] Hook initializing" logs at startup
+   - This is expected behavior in development due to React's Strict Mode
+   - Strict Mode intentionally double-mounts components to help detect side effects
+   - Not an issue in production builds where double-mounting doesn't occur
+   - Added proper cleanup in useEffect to handle multiple mounts gracefully
+
+### Console Output During GPX Upload
+```
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [Uploader] Component initializing (Uploader.tsx, line 24)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [Uploader] Component initializing (Uploader.tsx, line 24)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [Uploader] Component mounted (Uploader.tsx, line 29)
+[Log] [Uploader] Component mounted (Uploader.tsx, line 29)
+[Log] [Uploader] File change triggered – {fileName: "Test.gpx"} (Uploader.tsx, line 32)
+[Log] [useClientGpxProcessing] Starting GPX processing – {fileName: "Test.gpx"} (useClientGpxProcessing.ts, line 13)
+[Log] [useClientGpxProcessing] Parsing GPX file (useClientGpxProcessing.ts, line 17)
+[Log] [Uploader] Component initializing (Uploader.tsx, line 24)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [Uploader] Component initializing (Uploader.tsx, line 24)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [useClientGpxProcessing] Matching track to roads (useClientGpxProcessing.ts, line 23)
+[Log] [useClientGpxProcessing] Checking map initialization – {isMapReady: true} (useClientGpxProcessing.ts, line 30)
+[Log] [useClientGpxProcessing] Creating GeoJSON (useClientGpxProcessing.ts, line 35)
+[Log] [useClientGpxProcessing] Processing complete – {routeId: "9c21ba0b-baba-495d-8328-c12499bd444b"} (useClientGpxProcessing.ts, line 75)
+[Error] Roads layer not found or style not fully loaded
+	(anonymous function) (surfaceService.ts:53)
+	detectUnpavedSections (surfaceService.ts:51)
+	(anonymous function) (MapView.tsx:55)
+	addUnpavedSections (MapView.tsx:51)
+	(anonymous function) (MapView.tsx:135)
+	handleUploadGpx (MapView.tsx:89)
+	(anonymous function) (Sidebar.tsx:51)
+	handleUploadComplete (Sidebar.tsx:50)
+	(anonymous function) (Uploader.tsx:40)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [Uploader] Component initializing (Uploader.tsx, line 24)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
+[Log] [Uploader] Component initializing (Uploader.tsx, line 24)
+[Log] [useClientGpxProcessing] Hook initializing (useClientGpxProcessing.ts, line 8)
 ```
 
-- [x] Configure server port and proxy:
-```typescript
-// server/src/shared/config/server.config.ts
-export const SERVER_CONFIG = {
-    port: process.env.PORT || 8080,
-    // ... other config
-};
+### Current Issues
+1. Surface Detection Not Loading:
+   - GPX route loads successfully but surfaces are not displaying
+   - Error: "Roads layer not found or style not fully loaded"
+   - Need to investigate timing of MapTiler layer initialization
+   - May need to add additional checks for layer readiness
 
-// vite.config.ts
-export default defineConfig({
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false
-      }
-    }
-  }
-});
+2. Multiple Hook Initialization:
+   - Hook initializes multiple times during development
+   - Caused by React's Strict Mode double-mounting
+   - Not a functional issue, just development behavior
+   - Can be verified by running production build
+
+3. React Hook Error:
 ```
-
-- [x] Added surface detection endpoints:
-```typescript
-// server/src/routes/gpx.routes.ts
-router.get('/surface', gpxController.getSurfaceType);
-router.post('/surface/batch', gpxController.batchGetSurfaceTypes);
+[Error] GPX processing error: – {code: "PARSING_ERROR", message: "Invalid hook call. Hooks can only be called inside…for tips about how to debug and fix this problem.", details: "throwInvalidHookError'http://localhost:3000/node_m…eatures/gpx/hooks/useClientGpxProcessing.ts:26:54"}
 ```
-
-- [x] Implemented surface detection controller with caching:
-```typescript
-// server/src/controllers/gpx.controller.ts
-private surfaceCache: Map<string, string> = new Map();
-
-async getSurfaceType(req: Request, res: Response) {
-  // Handles single point surface detection
-}
-
-async batchGetSurfaceTypes(req: Request, res: Response) {
-  // Handles batch surface detection
-}
-```
-
-#### 2. Connect to Existing Surface Detection Service
-```typescript
-// src/features/gpx/services/surfaceService.ts
-export interface UnpavedSection {
-  startIndex: number;
-  endIndex: number;
-  coordinates: [number, number][];
-  surfaceType: 'unpaved' | 'dirt' | 'gravel' | 'fine_gravel';
-}
-
-// Complement server-side caching
-const surfaceCache = new Map<string, string>();
-
-const querySurfaceType = async (lng: number, lat: number): Promise<string | undefined> => {
-  const cacheKey = `${lng},${lat}`;
-  if (surfaceCache.has(cacheKey)) {
-    return surfaceCache.get(cacheKey);
-  }
-
-  try {
-    // Use existing server's GPXProcessingService
-    const response = await fetch(`/api/gpx/surface?lng=${lng}&lat=${lat}`);
-    
-    if (!response.ok) {
-      throw new Error(`Surface query failed: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    const surface = data.surface;
-    
-    if (surface) {
-      surfaceCache.set(cacheKey, surface);
-    }
-    
-    return surface;
-  } catch (error) {
-    console.error('Surface query error:', error);
-    return undefined;
-  }
-};
-
-// Match server's surface types from gpx.processing.ts
-const isUnpavedSurface = (surface?: string): boolean => {
-  const unpavedTypes = [
-    'unpaved', 'dirt', 'gravel', 'fine_gravel', 
-    'path', 'track', 'service', 'unknown'
-  ];
-  return unpavedTypes.includes(surface || '');
-};
-
-export const detectUnpavedSections = async (
-  matchedCoordinates: [number, number][]
-): Promise<UnpavedSection[]> => {
-  try {
-    // Use server's batch processing first (from GPXProcessingService)
-    const response = await fetch('/api/gpx/surface/batch', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ coordinates: matchedCoordinates })
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
-
-    // Fallback to point-by-point if batch fails
-    const sections: UnpavedSection[] = [];
-    let currentSection: UnpavedSection | null = null;
-
-    for (let i = 0; i < matchedCoordinates.length; i++) {
-      const [lng, lat] = matchedCoordinates[i];
-      const surfaceType = await querySurfaceType(lng, lat);
-      
-      if (isUnpavedSurface(surfaceType)) {
-        if (!currentSection) {
-          currentSection = {
-            startIndex: i,
-            endIndex: i,
-            coordinates: [matchedCoordinates[i]],
-            surfaceType: 'unpaved'
-          };
-        } else {
-          currentSection.endIndex = i;
-          currentSection.coordinates.push(matchedCoordinates[i]);
-        }
-      } else if (currentSection) {
-        sections.push(currentSection);
-        currentSection = null;
-      }
-    }
-
-    if (currentSection) {
-      sections.push(currentSection);
-    }
-
-    return sections;
-  } catch (error) {
-    console.error('Failed to detect unpaved sections:', error);
-    return [];
-  }
-};
-```
-
-#### 3. Update Processing Hook to Use Server Results
-```typescript
-// src/features/gpx/hooks/useClientGpxProcessing.ts
-import { detectUnpavedSections } from '../services/surfaceService';
-import { ProcessedRoute } from '../types/gpx.types';
-
-// Add server's surface detection results to route
-interface ProcessedRoute {
-  // ... existing properties ...
-  unpavedSections?: UnpavedSection[];
-}
-
-export const useClientGpxProcessing = () => {
-  const processGpx = async (file: File): Promise<ProcessedRoute | null> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const rawGpx = await file.text();
-      
-      // Get matched route first
-      const parsedFeature = await parseAndMatchGpx(file);
-
-      // Use server's surface detection
-      const unpavedSections = await detectUnpavedSections(
-        parsedFeature.matched.coordinates
-      );
-
-      const geometry = parsedFeature.matched || parsedFeature.geometry;
-      
-      const geojson: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features: [{
-          type: 'Feature',
-          properties: parsedFeature.properties,
-          geometry
-        }]
-      };
-
-      const processedRoute: ProcessedRoute = {
-        id: uuidv4(),
-        name: parsedFeature.properties?.name || file.name,
-        color: '#FF0000',
-        isVisible: true,
-        gpxData: rawGpx,
-        rawGpx: rawGpx,
-        geojson,
-        unpavedSections, // Add server's surface detection results
-        statistics: {
-          totalDistance: 0,
-          elevationGain: 0,
-          elevationLoss: 0,
-          maxElevation: 0,
-          minElevation: 0,
-          averageSpeed: 0,
-          movingTime: 0,
-          totalTime: 0
-        },
-        status: {
-          processingState: 'completed',
-          progress: 100
-        }
-      };
-
-      return processedRoute;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to process GPX file';
-      setError(message);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return {
-    processGpx,
-    isLoading,
-    error
-  };
-};
-```
-
-#### 4. Keep Map Display Implementation
-```typescript
-// In MapView.tsx
-const displayUnpavedSections = (
-  map: mapboxgl.Map,
-  sections: UnpavedSection[]
-) => {
-  sections.forEach((section, index) => {
-    map.addSource(`unpaved-${index}`, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: section.coordinates
-        }
-      }
-    });
-
-    map.addLayer({
-      id: `unpaved-${index}`,
-      type: 'line',
-      source: `unpaved-${index}`,
-      paint: {
-        'line-color': '#f9ca24', // Yellow
-        'line-width': 4,
-        'line-opacity': 0.8
-      }
-    });
-  });
-};
-```
-
-### Server Integration Points
-1. Using existing `GPXProcessingService` from `server/src/services/gpx/gpx.processing.ts`
-2. Leveraging server's batch processing capabilities
-3. Using server's surface type detection logic
-4. Benefiting from server-side caching
-5. Utilizing server's error handling
-
-### Validation Points
-- [ ] Server starts successfully
-- [ ] Server's surface detection responds
-- [ ] Batch processing works for large routes
-- [ ] Surface types match server definitions
-- [ ] Client properly displays results
-- [ ] Yellow overlay appears correctly
-- [ ] Performance is acceptable with server
-
-### Known Issues to Handle
-1. Server connection errors
-2. Server API response failures
-3. Batch processing timeouts
-4. Surface detection accuracy
-5. Loading states during server processing
+This error occurs because we were trying to call useMapContext() inside the processGpx function, which is not allowed by React's rules of hooks. We've fixed this by moving the hook call to the top level of the custom hook, but there might be remaining issues with map initialization timing.
 
 ### Next Steps
-1. Test server endpoints
-2. Verify surface detection accuracy
-3. Add proper error handling
-4. Implement loading states
-5. Test with sample routes
-6. Optimize if needed
+1. Fix surface detection loading:
+   - Add checks for MapTiler layer initialization
+   - Implement retry mechanism for surface detection
+   - Add better error handling for layer not found
+   - Consider deferring surface detection until layer is ready
+
+2. Fix map initialization:
+   - Ensure map is fully loaded before allowing GPX processing
+   - Add proper state management for map readiness
+   - Improve error messaging for initialization issues
+   - Add loading states during initialization
+
+3. Test with sample routes to verify fixes:
+   - Test various GPX file sizes
+   - Verify surface detection accuracy
+   - Check performance with large routes
+   - Validate error handling

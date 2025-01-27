@@ -1,7 +1,4 @@
-import { Map as OlMap } from 'ol';
-import { fromLonLat } from 'ol/proj';
-import VectorTileLayer from 'ol/layer/VectorTile';
-import { FeatureLike } from 'ol/Feature';
+import mapboxgl from 'mapbox-gl';
 
 export interface UnpavedSection {
   startIndex: number;
@@ -26,8 +23,7 @@ const surfaceCache = new Map<string, string>();
 const querySurfaceType = async (
   lng: number,
   lat: number,
-  map: OlMap,
-  vectorLayer: VectorTileLayer
+  map: mapboxgl.Map
 ): Promise<string | undefined> => {
   const cacheKey = `${lng},${lat}`;
   if (surfaceCache.has(cacheKey)) {
@@ -35,30 +31,29 @@ const querySurfaceType = async (
   }
 
   try {
-    // Convert to OpenLayers coordinate system
-    const coordinate = fromLonLat([lng, lat]);
-    
-    // Get pixel coordinates
-    const pixel = map.getPixelFromCoordinate(coordinate);
-    if (!pixel) return undefined;
+    // Check if we're within the zoom range where surface data is available
+    const zoom = map.getZoom();
+    if (zoom < 12 || zoom > 14) {
+      return undefined;
+    }
 
-    // Query features at pixel
-    const features = map.getFeaturesAtPixel(pixel, {
-      layerFilter: (layer) => layer === vectorLayer,
-      hitTolerance: 10
-    }) as FeatureLike[];
+    const features = map.queryRenderedFeatures(
+      map.project([lng, lat]),
+      { layers: ['custom-roads'] }
+    );
 
     if (!features.length) return undefined;
 
     // Get surface type from feature properties
-    const feature = features[0];
-    const properties = feature.getProperties();
-    const surface = (properties.surface || properties.class)?.toLowerCase();
+    const surface = features[0].properties?.surface?.toLowerCase();
+
+    // Only return surface if it's one we care about
+    if (surface && (UNPAVED_SURFACES.includes(surface) || PAVED_SURFACES.includes(surface))) {
+      surfaceCache.set(cacheKey, surface);
+      return surface;
+    }
     
-    // Cache the result
-    surfaceCache.set(cacheKey, surface);
-    
-    return surface;
+    return undefined;
   } catch (error) {
     console.error('Surface query error:', error);
     return undefined;
@@ -71,9 +66,22 @@ const isUnpavedSurface = (surface?: string): boolean => {
 
 export const detectUnpavedSections = async (
   matchedCoordinates: [number, number][],
-  map: OlMap,
-  vectorLayer: VectorTileLayer
+  map: mapboxgl.Map
 ): Promise<UnpavedSection[]> => {
+  // Wait for the custom-roads layer to be loaded
+  if (!map.getLayer('custom-roads') || !map.isStyleLoaded()) {
+    console.error('Roads layer not found or style not fully loaded');
+    return [];
+  }
+
+  // Ensure we're at a zoom level where surface data is available
+  const currentZoom = map.getZoom();
+  if (currentZoom < 12 || currentZoom > 14) {
+    map.setZoom(13); // Set to middle of valid zoom range
+    // Wait for zoom to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
   const sections: UnpavedSection[] = [];
   let currentSection: UnpavedSection | null = null;
 
@@ -87,7 +95,7 @@ export const detectUnpavedSections = async (
     }
 
     const [lng, lat] = matchedCoordinates[i];
-    const surfaceType = await querySurfaceType(lng, lat, map, vectorLayer);
+    const surfaceType = await querySurfaceType(lng, lat, map);
     
     if (isUnpavedSurface(surfaceType)) {
       if (!currentSection) {

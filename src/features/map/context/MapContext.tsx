@@ -3,10 +3,12 @@ import mapboxgl from 'mapbox-gl';
 
 type MapContextType = {
   map: mapboxgl.Map | null;
+  isMapReady: boolean;
 };
 
 const MapContext = createContext<MapContextType>({
-  map: null
+  map: null,
+  isMapReady: false
 });
 
 export const MapProvider = MapContext.Provider;

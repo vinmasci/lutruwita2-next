@@ -59,28 +59,23 @@ const matchBatch = async (
 
     // Check if we got any matches
     if (!data.matchings?.length) {
-      console.warn('No matches found for batch');
+      console.warn('No matches found for batch, using original points');
       return {
         coordinates: points,
-        matchedIndices: [] // No points were matched
+        matchedIndices: Array.from({length: points.length}, (_, i) => i)
       };
     }
 
-    // Use the first match if available
-    if (data.matchings && data.matchings.length > 0) {
-      const matched = data.matchings[0];
-      if (matched.confidence >= confidenceThreshold) {
-        return {
-          coordinates: matched.geometry.coordinates,
-          matchedIndices: Array.from({length: matched.geometry.coordinates.length}, (_, i) => i)
-        };
-      }
-    }
-    
-    console.warn('No matches found for batch');
+    // Find the best match
+    const bestMatch = data.matchings.reduce((best, current) => {
+      return (current.confidence > best.confidence) ? current : best;
+    }, data.matchings[0]);
+
+    // Use the best match even if below confidence threshold
+    // This helps with tracks that are slightly off from mapped roads
     return {
-      coordinates: points,
-      matchedIndices: [] // No points were matched
+      coordinates: bestMatch.geometry.coordinates,
+      matchedIndices: Array.from({length: bestMatch.geometry.coordinates.length}, (_, i) => i)
     };
   } catch (error) {
     console.error('Error in map matching:', error);
@@ -158,10 +153,10 @@ export const matchTrackToRoads = async (
   options: MatchingOptions = {}
 ): Promise<[number, number][]> => {
   const {
-    confidenceThreshold = 0.6, // Lowered threshold to accept more matches
-    radiusMultiplier = 3, // Increased for better matching in areas with parallel roads
-    maxGapDistance = 0.0002, // ~20 meters in degrees for tighter interpolation
-    interpolationPoints = 5 // More interpolation points for smoother lines
+    confidenceThreshold = 0.3, // Significantly lowered threshold to accept more matches
+    radiusMultiplier = 5, // Increased radius for better matching in rural areas
+    maxGapDistance = 0.0005, // Increased to ~50 meters for rural tracks
+    interpolationPoints = 3 // Reduced to prevent over-smoothing
   } = options;
 
   // Split points into batches

@@ -69,7 +69,7 @@ export interface ProcessedRoute {
 }
 
 export type GPXProcessingError = {
-  code: 'INVALID_FILE' | 'PARSING_ERROR' | 'MATCHING_ERROR' | 'SURFACE_ANALYSIS_ERROR';
+  code: 'INVALID_FILE' | 'PARSING_ERROR' | 'MATCHING_ERROR' | 'SURFACE_ANALYSIS_ERROR' | 'MAP_NOT_READY';
   message: string;
   details?: string;
 };

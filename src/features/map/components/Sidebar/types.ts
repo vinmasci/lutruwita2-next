@@ -1,5 +1,7 @@
+import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+
 export interface SidebarProps {
-  onUploadGpx: (file?: File) => Promise<void>;
+  onUploadGpx: (file?: File, processedRoute?: ProcessedRoute) => Promise<void>;
   onSaveMap: () => void;
   onLoadMap: () => void;
   onAddPhotos: () => void;

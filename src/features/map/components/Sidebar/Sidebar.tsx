@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, lazy, Suspense } from 'react';
+import { ProcessedRoute } from '../../../gpx/types/gpx.types';
 import { NestedDrawer, StyledDrawer } from './Sidebar.styles';
 import { SidebarListItems } from './SidebarListItems';
 import { SidebarProps } from './types';
@@ -30,87 +31,31 @@ const StyledUploadBox = styled(Paper)(({ theme }) => ({
   }
 }));
 
-const GPXUploader = ({ onUpload, isLoading, error }: { onUpload: (file: File) => void, isLoading?: boolean, error?: string }) => {
-  return (
-    <Box sx={{ p: 2 }}>
-      <StyledUploadBox
-        className="upload-box"
-        elevation={0}
-        onDragOver={(e) => {
-          e.preventDefault();
-          (e.currentTarget as HTMLElement).classList.add('dragover');
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          (e.currentTarget as HTMLElement).classList.remove('dragover');
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          (e.currentTarget as HTMLElement).classList.remove('dragover');
-          const file = e.dataTransfer.files[0];
-          if (file && file.name.endsWith('.gpx')) {
-            onUpload(file);
-          }
-        }}
-        onClick={() => {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.gpx';
-          input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-              onUpload(file);
-            }
-          };
-          input.click();
-        }}
-      >
-        {isLoading ? (
-          <>
-            <CircularProgress size={40} sx={{ mb: 2 }} />
-            <Typography variant="body1" sx={{ color: '#fff', fontWeight: 500 }}>
-              Processing GPX File...
-            </Typography>
-          </>
-        ) : error ? (
-          <>
-            <ErrorOutlineIcon sx={{ fontSize: 40, color: '#ff4444', mb: 2 }} />
-            <Typography variant="body1" sx={{ color: '#ff4444', fontWeight: 500 }}>
-              Upload Failed
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#ff4444', mt: 1 }}>
-              {error}
-            </Typography>
-          </>
-        ) : (
-          <>
-            <UploadIcon sx={{ fontSize: 40, color: '#fff', mb: 2 }} />
-            <Typography variant="body1" sx={{ color: '#fff', fontWeight: 500 }}>
-              Upload GPX File
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#999', mt: 1 }}>
-              Click or drag to add route
-            </Typography>
-          </>
-        )}
-      </StyledUploadBox>
-    </Box>
-  );
-};
+// Lazy load the Uploader component
+const LazyUploader = lazy(() => import('../../../gpx/components/Uploader/Uploader'));
 
 export const Sidebar = (props: SidebarProps) => {
   const { isDrawerOpen, activeDrawer, handleUploadGpx, isProcessing, error } = useSidebar(props);
 
+  const handleUploadComplete = async (result: ProcessedRoute) => {
+    // Pass the processed route to MapView
+    await props.onUploadGpx(undefined, result);
+  };
+
   const activeDrawerContent = useMemo(() => {
     if (activeDrawer === 'gpx') {
-      return <GPXUploader 
-        onUpload={props.onUploadGpx} 
-        isLoading={isProcessing} 
-        error={error || undefined} 
-      />;
+      return (
+        <Suspense fallback={
+          <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+          </Box>
+        }>
+          <LazyUploader onUploadComplete={handleUploadComplete} />
+        </Suspense>
+      );
     }
     return null;
-  }, [activeDrawer, props.onUploadGpx, isProcessing, error]);
+  }, [activeDrawer, handleUploadComplete]);
 
   return (
     <>

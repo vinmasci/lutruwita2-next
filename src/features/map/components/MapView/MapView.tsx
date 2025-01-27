@@ -5,6 +5,7 @@ import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { Feature, LineString } from 'geojson';
+import { ProcessedRoute } from '../../../gpx/types/gpx.types';
 import { UnpavedSection, detectUnpavedSections } from '../../../gpx/services/surfaceService';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -42,8 +43,8 @@ export default function MapView() {
     if (!mapInstance.current) return;
     
     try {
-      const sections = await detectUnpavedSections(coordinates);
       const map = mapInstance.current;
+      const sections = await detectUnpavedSections(coordinates, map);
       
       // Clear existing unpaved layers
       clearUnpavedLayers();
@@ -87,8 +88,8 @@ export default function MapView() {
     }
   };
 
-  const handleUploadGpx = async (file?: File) => {
-    if (!file) {
+  const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
+    if (!file && !processedRoute) {
       setIsGpxDrawerOpen(true);
       return;
     }
@@ -99,7 +100,7 @@ export default function MapView() {
     }
 
     try {
-      const result = await processGpx(file);
+      const result = processedRoute || (file ? await processGpx(file) : null);
       if (result) {
         // Add the route to the map
         const map = mapInstance.current;
@@ -295,7 +296,7 @@ export default function MapView() {
   }, []);
 
   return (
-    <MapProvider value={{ map: mapInstance.current }}>
+    <MapProvider value={{ map: mapInstance.current, isMapReady }}>
       <div className="w-full h-full relative">
         <div 
           ref={mapRef}

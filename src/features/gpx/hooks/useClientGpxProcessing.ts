@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useMapContext } from '../../map/context/MapContext';
+import mapboxgl from 'mapbox-gl';
 import { parseGpx, GpxParseResult } from '../utils/gpxParser';
 import { matchTrackToRoads } from '../services/mapMatchingService';
 import { detectUnpavedSections, UnpavedSection } from '../services/surfaceService';
@@ -7,15 +9,18 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FeatureCollection, Feature, LineString } from 'geojson';
 
 export const useClientGpxProcessing = () => {
+  console.log('[useClientGpxProcessing] Hook initializing');
+  const { map, isMapReady } = useMapContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<GPXProcessingError | null>(null);
 
   const processGpx = async (file: File): Promise<ProcessedRoute | null> => {
+    console.log('[useClientGpxProcessing] Starting GPX processing', { fileName: file.name });
     setIsLoading(true);
     setError(null);
 
     try {
-      // Parse GPX file
+      console.log('[useClientGpxProcessing] Parsing GPX file');
       const parsed = await parseGpx(file);
       const rawGpx = await file.text();
       
@@ -23,7 +28,7 @@ export const useClientGpxProcessing = () => {
         throw new Error('No valid track points found in GPX file');
       }
 
-      // Match to roads
+      console.log('[useClientGpxProcessing] Matching track to roads');
       const matched = await matchTrackToRoads(parsed.geometry.coordinates, {
         confidenceThreshold: 0.6,
         radiusMultiplier: 3,
@@ -31,10 +36,13 @@ export const useClientGpxProcessing = () => {
         interpolationPoints: 5
       });
 
-      // Detect unpaved sections using server's surface detection
-      const unpavedSections = await detectUnpavedSections(matched);
+      console.log('[useClientGpxProcessing] Checking map initialization', { isMapReady });
+      if (!map || !isMapReady) {
+        throw new Error('Map is not ready for processing. Please wait for map initialization to complete.');
+      }
+      const unpavedSections = await detectUnpavedSections(matched, map as mapboxgl.Map);
 
-      // Create GeoJSON
+      console.log('[useClientGpxProcessing] Creating GeoJSON');
       const geojson: FeatureCollection<LineString> = {
         type: 'FeatureCollection',
         features: [{
@@ -75,15 +83,16 @@ export const useClientGpxProcessing = () => {
         }
       };
 
+      console.log('[useClientGpxProcessing] Processing complete', { routeId: processedRoute.id });
       return processedRoute;
     } catch (err) {
       const gpxError: GPXProcessingError = {
-        code: 'PARSING_ERROR',
+        code: err instanceof Error && err.message.includes('Map is not ready') ? 'MAP_NOT_READY' : 'PARSING_ERROR',
         message: err instanceof Error ? err.message : 'Failed to process GPX file',
         details: err instanceof Error ? err.stack : undefined
       };
       setError(gpxError);
-      console.error('GPX processing error:', gpxError);
+      console.error('[useClientGpxProcessing] Processing error:', gpxError);
       return null;
     } finally {
       setIsLoading(false);
