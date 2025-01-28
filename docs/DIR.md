@@ -85,7 +85,14 @@ The GPX processing feature (`src/features/gpx/`) handles the upload, parsing, an
   - File renaming capability
   - File deletion
   - Visual feedback during processing
-- Elevation visualization (`ElevationProfile`)
+- Elevation visualization (`ElevationProfile`):
+  - Interactive elevation profile display
+  - Category climb coloring:
+    - CAT 4: #05c46b (Green)
+    - CAT 3: #ffc048 (Light Orange)
+    - CAT 2: #ffa801 (Orange)
+    - CAT 1: #ff3f34 (Red)
+    - HORS: #b33939 (Dark Red)
 - GPX data processing services
 
 ### Map Visualization
