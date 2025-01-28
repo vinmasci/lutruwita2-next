@@ -3,6 +3,7 @@ import { matchTrackToRoads } from '../services/mapMatchingService';
 
 export interface GpxPoint {
   coordinates: [number, number];
+  elevation?: number;
   time?: string;
 }
 
@@ -11,6 +12,9 @@ export interface GpxParseResult {
   properties: {
     name?: string;
     time?: string;
+    coordinateProperties?: {
+      elevation: number[];
+    };
   };
   geometry: {
     type: 'LineString';
@@ -26,11 +30,13 @@ const extractPoints = (gpx: ReturnType<DOMParser['parseFromString']>): GpxPoint[
   return Array.from(gpx.getElementsByTagName('trkpt')).map(point => {
     const trkpt = point as unknown as Element;
     const timeElement = trkpt.getElementsByTagName('time')[0];
+    const eleElement = trkpt.getElementsByTagName('ele')[0];
     return {
       coordinates: [
         parseFloat(trkpt.getAttribute('lon') || '0'),
         parseFloat(trkpt.getAttribute('lat') || '0')
       ] as [number, number],
+      elevation: eleElement ? parseFloat(eleElement.textContent || '0') : undefined,
       time: timeElement?.textContent || undefined
     };
   });
@@ -85,11 +91,23 @@ export const parseGpx = async (file: File): Promise<GpxParseResult> => {
       throw new Error('No track points found in GPX file');
     }
 
+    // Debug elevation data
+    const elevations = points.map(p => p.elevation).filter(e => e !== undefined);
+    console.log('[gpxParser] Elevation data:', {
+      count: elevations.length,
+      min: Math.min(...elevations),
+      max: Math.max(...elevations),
+      sample: elevations.slice(0, 5)
+    });
+
     return {
       type: 'Feature',
       properties: {
         name,
-        time
+        time,
+        coordinateProperties: {
+          elevation: points.map(p => p.elevation).filter(e => e !== undefined)
+        }
       },
       geometry: {
         type: 'LineString',

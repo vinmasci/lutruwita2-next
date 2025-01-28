@@ -3,7 +3,6 @@ import { useMapContext } from '../../map/context/MapContext';
 import mapboxgl from 'mapbox-gl';
 import { parseGpx, GpxParseResult } from '../utils/gpxParser';
 import { matchTrackToRoads } from '../services/mapMatchingService';
-import { UnpavedSection } from '../services/surfaceService';
 import { ProcessedRoute, GPXProcessingError } from '../types/gpx.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { FeatureCollection, Feature, LineString } from 'geojson';
@@ -36,12 +35,20 @@ export const useClientGpxProcessing = () => {
         interpolationPoints: 5
       });
 
-      console.log('[useClientGpxProcessing] Creating GeoJSON');
+      console.log('[useClientGpxProcessing] Creating GeoJSON', {
+        parsedElevations: parsed.properties.coordinateProperties?.elevation?.length || 0,
+        elevationSample: parsed.properties.coordinateProperties?.elevation?.slice(0, 5)
+      });
       const geojson: FeatureCollection<LineString> = {
         type: 'FeatureCollection',
         features: [{
           type: 'Feature',
-          properties: {},
+          properties: {
+            ...parsed.properties,
+            coordinateProperties: {
+              elevation: parsed.properties.coordinateProperties?.elevation || []
+            }
+          },
           geometry: {
             type: 'LineString',
             coordinates: matched
@@ -50,15 +57,50 @@ export const useClientGpxProcessing = () => {
       };
 
       // Calculate basic statistics
+      const elevations = parsed.properties.coordinateProperties?.elevation || [];
+      console.log('[useClientGpxProcessing] Processing elevation statistics:', {
+        elevationCount: elevations.length,
+        hasElevations: elevations.length > 0,
+        minElevation: elevations.length ? Math.min(...elevations) : 'N/A',
+        maxElevation: elevations.length ? Math.max(...elevations) : 'N/A'
+      });
+      // Calculate total distance from original coordinates since map matching might fail
+      const totalDistance = parsed.geometry.coordinates.reduce((acc, coord, i) => {
+        if (i === 0) return 0;
+        const [lon1, lat1] = parsed.geometry.coordinates[i - 1];
+        const [lon2, lat2] = coord;
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return acc + (R * c);
+      }, 0);
+
+      let elevationGain = 0;
+      let elevationLoss = 0;
+      let maxElevation = elevations.length ? Math.max(...elevations) : 0;
+      let minElevation = elevations.length ? Math.min(...elevations) : 0;
+
+      for (let i = 1; i < elevations.length; i++) {
+        const diff = elevations[i] - elevations[i - 1];
+        if (diff > 0) elevationGain += diff;
+        else elevationLoss += Math.abs(diff);
+      }
+
       const statistics = {
-        totalDistance: 0, // TODO: Calculate from matched points
-        elevationGain: 0,
-        elevationLoss: 0,
-        maxElevation: 0,
-        minElevation: 0,
-        averageSpeed: 0,
-        movingTime: 0,
-        totalTime: 0
+        totalDistance,
+        elevationGain,
+        elevationLoss,
+        maxElevation,
+        minElevation,
+        averageSpeed: 0, // TODO: Calculate if time data is available
+        movingTime: 0,   // TODO: Calculate if time data is available
+        totalTime: 0     // TODO: Calculate if time data is available
       };
 
       const processedRoute: ProcessedRoute = {

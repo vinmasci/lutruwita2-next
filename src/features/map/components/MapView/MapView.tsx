@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 
 // Debug function for road layer
 const debugRoadLayer = (map: mapboxgl.Map) => {
@@ -69,6 +70,7 @@ export default function MapView() {
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState<ProcessedRoute | null>(null);
   const { processGpx, isLoading } = useClientGpxProcessing();
 
   const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
@@ -88,6 +90,7 @@ export default function MapView() {
       const result = processedRoute || (file ? await processGpx(file) : null);
       console.log('[MapView] Got result at:', new Date().toISOString());
       if (result) {
+        setCurrentRoute(result);
         // Add the route to the map
         const map = mapInstance.current;
         const routeId = `route-${Date.now()}`;
@@ -344,6 +347,11 @@ export default function MapView() {
           onToggleSurface={() => {}}
           onPlacePOI={() => {}}
         />
+        {currentRoute && (
+          <ElevationProfilePanel
+            route={currentRoute}
+          />
+        )}
       </div>
     </MapProvider>
   );

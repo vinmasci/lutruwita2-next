@@ -2,197 +2,93 @@
 
 ## Implementation Checklist
 
-- [ ] 1. Create ElevationProfile.styles.ts
-  - [ ] Create ElevationPanel styled component
-  - [ ] Create ElevationHeader styled component
-  - [ ] Create ElevationContent styled component
+- [x] 1. Create ElevationProfile.styles.ts
+  - [x] Create ElevationPanel styled component
+  - [x] Create ElevationHeader styled component
+  - [x] Create ElevationContent styled component
 
-- [ ] 2. Create ElevationProfilePanel.tsx
-  - [ ] Define component props interface
-  - [ ] Create basic component structure
-  - [ ] Add collapse/expand functionality
-  - [ ] Implement header with toggle button
+- [x] 2. Create ElevationProfilePanel.tsx
+  - [x] Define component props interface
+  - [x] Create basic component structure
+  - [x] ~~Add collapse/expand functionality~~ (Removed for cleaner UI)
+  - [x] Implement header with statistics
+  - [x] Add statistics display (distance, elevation gain/loss)
 
-- [ ] 3. Update theme.ts
-  - [ ] Add MuiBox style overrides
-  - [ ] Configure theme colors for dark mode
-  - [ ] Set up transitions and spacing
+- [x] 3. Update theme.ts
+  - [x] ~~Add MuiBox style overrides~~ (Moved styles to component level)
+  - [x] Configure theme colors for dark mode
+  - [x] Set up transitions and spacing
 
-- [ ] 4. Update MapView.tsx
-  - [ ] Import ElevationProfilePanel
-  - [ ] Add state for panel collapse
-  - [ ] Add panel toggle handler
-  - [ ] Integrate with current route data
+- [x] 4. Update MapView.tsx
+  - [x] Import ElevationProfilePanel
+  - [x] ~~Add state for panel collapse~~ (Removed)
+  - [x] ~~Add panel toggle handler~~ (Removed)
+  - [x] Integrate with current route data
+  - [x] Position panel correctly relative to sidebar
 
-- [ ] 5. Update ElevationProfile.tsx
-  - [ ] Adjust styling for dark theme
-  - [ ] Configure chart colors and typography
-  - [ ] Optimize for panel container
+- [x] 5. Update ElevationProfile.tsx
+  - [x] Adjust styling for dark theme
+  - [x] Configure chart colors and typography
+  - [x] Optimize for panel container
+  - [x] Fix scaling to show full route distance
+  - [x] Adjust font sizes and margins
+  - [x] Update to Roboto font family
+  - [x] Optimize chart margins for axis visibility
 
-- [ ] 6. Testing
-  - [ ] Test with sample GPX file
-  - [ ] Verify collapse/expand
-  - [ ] Check responsive behavior
-  - [ ] Validate elevation data display
+- [x] 6. Testing & Debugging
+  - [x] Test with sample GPX file
+  - [x] ~~Verify collapse/expand~~ (Feature removed)
+  - [x] Check responsive behavior
+  - [x] Debug elevation data display
+    - [x] Fixed elevation data extraction in gpxParser.ts
+    - [x] Fixed distance calculation in useClientGpxProcessing.ts
+    - [x] Added detailed logging for debugging
+    - [x] Fixed chart scaling issues
+
+## Current Status
+The elevation profile implementation is complete with all core functionality working:
+1. Panel correctly positioned below sidebar (56px offset)
+2. Full route distance displayed in chart
+3. Statistics showing:
+   - Total distance in kilometers
+   - Total elevation gain in meters
+   - Total elevation loss in meters
+4. Proper font sizes and spacing for all elements
+5. Clean, minimalist design without collapse functionality
+
+## Recent Changes
+1. Removed collapse/expand functionality for cleaner UI
+2. Combined title and statistics into single header line
+3. Updated all text to use Roboto font family
+4. Optimized chart margins:
+   - Reduced gap between y-axis label and chart
+   - Increased bottom margin for x-axis visibility
+   - Adjusted label positions for better alignment
+5. Fine-tuned component height and spacing
+6. Streamlined header layout with right-aligned statistics
 
 ## Overview
-The elevation profile component will display elevation data from GPX files in a sticky panel at the bottom of the screen. It visualizes the route's elevation changes over distance using an area chart.
+The elevation profile component displays elevation data from GPX files in a sticky panel at the bottom of the screen. It visualizes the route's elevation changes over distance using an area chart and provides key statistics about the route.
 
 ## Current Implementation
-The existing `ElevationProfile` component (`src/features/gpx/components/ElevationProfile/ElevationProfile.tsx`):
+The existing `ElevationProfile` component:
 - Uses recharts for visualization
 - Displays elevation data as an area chart
 - Shows distance (km) on X-axis and elevation (m) on Y-axis
 - Includes tooltips for precise measurements
 - Handles loading states and errors
 - Processes elevation data from GPX file properties
+- Shows route statistics in header
+- Uses Roboto font throughout
 
-## Requirements for Sticky Bottom Panel
-
-### Layout
-- Position: Fixed to bottom of screen
-- Width: 100% of viewport width
-- Height: Fixed height (e.g., 200px)
+## Layout
+- Position: Fixed to bottom of screen, offset by sidebar width
+- Width: Full viewport width minus sidebar
+- Height: 220px total with optimized internal spacing
 - Z-index: Above map but below sidebar
 - Background: Semi-transparent dark background
 - Border: Subtle top border for visual separation
-
-### Behavior
-- Always visible when GPX file is loaded
-- Collapses/hides when no GPX data is present
-- Optional collapse/expand toggle
-- Maintains position during map interaction
-- Responsive to window resizing
-
-### Data Flow
-1. GPX file is uploaded through the Uploader component
-2. ProcessedRoute data is passed to MapView
-3. MapView passes elevation data to ElevationProfile component
-4. ElevationProfile renders the chart with the provided data
-
-## Implementation Steps
-
-1. Create a wrapper component for the sticky panel:
-```tsx
-// src/features/gpx/components/ElevationProfile/ElevationProfilePanel.tsx
-interface ElevationProfilePanelProps {
-  route?: ProcessedRoute;
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
-}
-```
-
-2. Create styled components using Material UI:
-```tsx
-// src/features/gpx/components/ElevationProfile/ElevationProfile.styles.ts
-import { styled } from '@mui/material/styles';
-import Box from '@mui/material/Box';
-
-export const ElevationPanel = styled(Box)(({ theme }) => ({
-  position: 'fixed',
-  bottom: 0,
-  left: 0,
-  right: 0,
-  backgroundColor: 'rgba(26, 26, 26, 0.9)',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-  transition: theme.transitions.create('transform', {
-    duration: theme.transitions.duration.standard,
-    easing: theme.transitions.easing.easeInOut,
-  }),
-  zIndex: 90,
-  '&.collapsed': {
-    transform: 'translateY(100%)'
-  }
-}));
-
-export const ElevationHeader = styled(Box)(({ theme }) => ({
-  padding: theme.spacing(1),
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-}));
-
-export const ElevationContent = styled(Box)(({ theme }) => ({
-  height: 200,
-  padding: theme.spacing(2)
-}));
-```
-
-3. Update MapView component to render the elevation panel:
-```tsx
-import { ElevationProfilePanel } from '../gpx/components/ElevationProfile/ElevationProfilePanel';
-import { IconButton, Typography } from '@mui/material';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-
-// Inside MapView component:
-<ElevationProfilePanel 
-  route={currentRoute}
-  isCollapsed={!currentRoute}
-  header={
-    <ElevationHeader>
-      <Typography variant="subtitle2" color="white">
-        Elevation Profile
-      </Typography>
-      <IconButton 
-        size="small" 
-        onClick={handleToggleCollapse}
-        sx={{ color: 'white' }}
-      >
-        {isCollapsed ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-      </IconButton>
-    </ElevationHeader>
-  }
-/>
-```
-
-4. Add collapse/expand functionality:
-- Toggle button in panel header
-- Smooth transition animation
-- Persist state in local storage
-
-## Styling Considerations
-
-### Material UI Integration
-
-#### Theme Configuration
-```tsx
-// Add to theme.ts
-const theme = createTheme({
-  components: {
-    MuiBox: {
-      styleOverrides: {
-        root: {
-          '&.elevation-panel': {
-            backgroundColor: 'rgba(26, 26, 26, 0.9)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-          }
-        }
-      }
-    }
-  }
-});
-```
-
-#### Panel Design
-- Use MUI's Box component with custom styled variants
-- Leverage theme.spacing for consistent padding
-- Apply theme.transitions for smooth animations
-- Use theme.palette for consistent colors
-- Utilize theme.shadows for elevation effects
-
-#### Chart Styling with MUI Theme
-- Sync chart colors with MUI palette
-- Use theme typography for labels
-- Apply theme spacing for margins/padding
-- Match theme transitions for animations
-
-### Responsive Behavior
-- Adjust height on different screen sizes
-- Maintain readability of axis labels
-- Handle touch interactions for mobile
-- Consider landscape/portrait orientations
+- Typography: Roboto font family with consistent sizing
 
 ## Future Enhancements
 
@@ -203,8 +99,7 @@ const theme = createTheme({
 - Show markers for points of interest
 
 2. Additional Data
-- Display grade percentage
-- Show cumulative elevation gain/loss
+- Show grade percentage
 - Mark significant peaks and valleys
 - Surface type indicators
 
@@ -223,7 +118,6 @@ const theme = createTheme({
 - Optimize re-renders with React.memo
 
 ### Accessibility
-- Keyboard controls for panel collapse
 - Screen reader support for chart data
 - High contrast mode support
 - Focus management for interactive elements
