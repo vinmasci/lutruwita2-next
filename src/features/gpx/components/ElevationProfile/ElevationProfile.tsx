@@ -3,6 +3,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { ProcessedRoute } from '../../types/gpx.types';
 import { ElevationContent } from './ElevationProfile.styles';
 import { Box, Typography } from '@mui/material';
+import { detectClimbs } from '../../utils/climbUtils';
 
 interface ElevationProfileProps {
   route: ProcessedRoute;
@@ -85,6 +86,11 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
       });
 
       setData(elevationData);
+      
+      // Detect climbs
+      const climbs = detectClimbs(elevationData);
+      console.log('[ElevationProfile] Detected climbs:', climbs);
+      
       console.log('[ElevationProfile] Processed data:', {
         count: elevationData.length,
         sample: elevationData.slice(0, 5),
@@ -172,15 +178,56 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
             tickSize={3}
           />
           <Tooltip 
-            formatter={(value: number) => [`${value.toFixed(1)} m`, 'Elevation']}
+            formatter={(value: number, name: string, props: any) => {
+              const currentIndex = data.findIndex(d => d.distance === props.payload.distance);
+              if (currentIndex > 0) {
+                const currentPoint = data[currentIndex];
+                const prevPoint = data[currentIndex - 1];
+                const elevationChange = currentPoint.elevation - prevPoint.elevation;
+                const distanceChange = (currentPoint.distance - prevPoint.distance) / 1000; // Convert to km
+                const gradient = ((elevationChange / (distanceChange * 1000)) * 100).toFixed(1);
+                return [
+                  <div key="tooltip">
+                    <div style={{ 
+                      fontFamily: 'Futura',
+                      color: 'white',
+                      display: 'flex',
+                      gap: '4px'
+                    }}>
+                      <span>el:</span>
+                      <span>{value.toFixed(1)} m</span>
+                    </div>
+                    <div style={{ 
+                      color: 'white', 
+                      fontSize: '0.75rem', 
+                      marginTop: '4px',
+                      fontFamily: 'Futura',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {parseFloat(gradient) > 0 ? '↗' : '↘'} {Math.abs(parseFloat(gradient))}%
+                    </div>
+                  </div>
+                ];
+              }
+              return [`${value.toFixed(1)} m`, ''];
+            }}
             labelFormatter={(label) => `${(label / 1000).toFixed(2)} km`}
+            contentStyle={{ background: 'none', border: 'none' }}
+            wrapperStyle={{ outline: 'none' }}
           />
+          <defs>
+            <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#ee5253" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#ee5253" stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
           <Area
             type="monotone"
             dataKey="elevation"
             stroke="#ee5253"
-            fill="#ee5253"
-            fillOpacity={0.2}
+            fill="url(#elevationGradient)"
             strokeWidth={2}
           />
         </AreaChart>
