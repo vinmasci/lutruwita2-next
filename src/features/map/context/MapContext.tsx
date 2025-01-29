@@ -4,11 +4,15 @@ import mapboxgl from 'mapbox-gl';
 type MapContextType = {
   map: mapboxgl.Map | null;
   isMapReady: boolean;
+  hoverCoordinates: [number, number] | null;
+  setHoverCoordinates: (coords: [number, number] | null) => void;
 };
 
 const MapContext = createContext<MapContextType>({
   map: null,
-  isMapReady: false
+  isMapReady: false,
+  hoverCoordinates: null,
+  setHoverCoordinates: () => {}
 });
 
 export const MapProvider = MapContext.Provider;

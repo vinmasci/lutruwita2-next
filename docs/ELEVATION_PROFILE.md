@@ -121,3 +121,39 @@ The existing `ElevationProfile` component:
 - Screen reader support for chart data
 - High contrast mode support
 - Focus management for interactive elements
+
+
+interface ClimbSegment 
+The log shows that our climb detection algorithm has found 4 significant climbs in the route:
+
+First climb (4.5km - 6.9km):
+
+Length: 2.4km
+Elevation gain: 124m
+Average gradient: 5.2%
+Second climb (13.0km - 14.9km):
+
+Second climb (13.0km - 14.9km):
+
+Length: 1.9km
+Elevation gain: 71m
+Average gradient: 3.8%
+Third climb (25.8km - 29.8km):
+
+Third climb (25.8km - 29.8km):
+
+Length: 3.9km
+Elevation gain: 311m
+Average gradient: 7.9%
+Fourth climb (31.1km - 38.9km):
+
+Fourth climb (31.1km - 38.9km):
+
+Length: 7.7km
+Elevation gain: 504m
+Average gradient: 6.5%
+
+The algorithm is working as intended, finding sustained climbs where the gradient stays above 3% for at least 1km. The most significant climbs are:
+
+The third climb with the steepest gradient (7.9%)
+The fourth climb with the longest distance (7.7km) and most elevation gain (504m)

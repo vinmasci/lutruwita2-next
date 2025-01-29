@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import { ProcessedRoute } from '../../types/gpx.types';
 import { ElevationContent } from './ElevationProfile.styles';
 import { Box, Typography } from '@mui/material';
+import { useMapContext } from '../../../map/context/MapContext';
 import { detectClimbs } from '../../utils/climbUtils';
+import type { Climb } from '../../utils/climbUtils';
 
 interface ElevationProfileProps {
   route: ProcessedRoute;
@@ -12,7 +14,9 @@ interface ElevationProfileProps {
 }
 
 export const ElevationProfile = ({ route, isLoading, error }: ElevationProfileProps) => {
+  const { setHoverCoordinates } = useMapContext();
   const [data, setData] = useState<{distance: number; elevation: number}[]>([]);
+  const [climbs, setClimbs] = useState<Climb[]>([]);
   const [stats, setStats] = useState<{
     elevationGained: number;
     elevationLost: number;
@@ -87,9 +91,10 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
 
       setData(elevationData);
       
-      // Detect climbs
-      const climbs = detectClimbs(elevationData);
-      console.log('[ElevationProfile] Detected climbs:', climbs);
+      // Detect climbs and store them
+      const detectedClimbs = detectClimbs(elevationData);
+      setClimbs(detectedClimbs);
+      console.log('[ElevationProfile] Detected climbs:', detectedClimbs);
       
       console.log('[ElevationProfile] Processed data:', {
         count: elevationData.length,
@@ -130,7 +135,7 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
     <ElevationContent>
       <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <Typography variant="subtitle2" color="white" sx={{ fontSize: '0.8rem', fontWeight: 500, mr: 3, fontFamily: 'Futura' }}>
-          Elevation Profile
+          Elevation Profile: {route.name}
         </Typography>
         <Box sx={{ display: 'flex', gap: 3, ml: 'auto' }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', fontFamily: 'Futura' }}>
@@ -142,12 +147,36 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', fontFamily: 'Futura' }}>
             ↓ {stats.elevationLost.toFixed(0)} m
           </Typography>
+          <Box sx={{ display: 'flex', gap: 2, borderLeft: '1px solid rgba(255, 255, 255, 0.1)', pl: 2, ml: 2 }}>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#8B0000' }}>HC</Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#FF0000' }}>CAT1</Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#fa8231' }}>CAT2</Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#f7b731' }}>CAT3</Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#228B22' }}>CAT4</Typography>
+          </Box>
         </Box>
       </Box>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart 
           data={data}
-          margin={{ top: 10, right: 15, left: 5, bottom: 55 }}
+          margin={{ top: 30, right: 15, left: 5, bottom: 55 }}
+          onMouseMove={(e) => {
+            if (e?.activePayload?.[0]?.payload) {
+              const point = e.activePayload[0].payload;
+              const feature = route.geojson.features[0];
+              if (feature.geometry.type === 'LineString') {
+                // Find the closest point in the route
+                const coordinates = feature.geometry.coordinates;
+                const index = Math.floor((point.distance / stats.totalDistance) * (coordinates.length - 1));
+                if (coordinates[index]) {
+                  setHoverCoordinates([coordinates[index][0], coordinates[index][1]]);
+                }
+              }
+            }
+          }}
+          onMouseLeave={() => {
+            setHoverCoordinates(null);
+          }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
@@ -158,7 +187,7 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
               dy: -10,
               style: { fontSize: '0.7rem', fontFamily: 'Futura' }
             }}
-            tickFormatter={(value) => `${(value / 1000).toFixed(1)}`}
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}`}
             domain={[0, 'dataMax']}
             type="number"
             scale="linear"
@@ -185,31 +214,59 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
                 const prevPoint = data[currentIndex - 1];
                 const elevationChange = currentPoint.elevation - prevPoint.elevation;
                 const distanceChange = (currentPoint.distance - prevPoint.distance) / 1000; // Convert to km
-                const gradient = ((elevationChange / (distanceChange * 1000)) * 100).toFixed(1);
-                return [
-                  <div key="tooltip">
-                    <div style={{ 
-                      fontFamily: 'Futura',
-                      color: 'white',
-                      display: 'flex',
-                      gap: '4px'
-                    }}>
-                      <span>el:</span>
-                      <span>{value.toFixed(1)} m</span>
-                    </div>
-                    <div style={{ 
-                      color: 'white', 
-                      fontSize: '0.75rem', 
-                      marginTop: '4px',
-                      fontFamily: 'Futura',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      {parseFloat(gradient) > 0 ? '↗' : '↘'} {Math.abs(parseFloat(gradient))}%
+              const gradient = ((elevationChange / (distanceChange * 1000)) * 100);
+              const gradientDisplay = gradient.toFixed(1);
+              
+              // Calculate gradient from previous point
+              let prevGradient = '';
+              if (currentIndex > 1) {
+                const prevPrevPoint = data[currentIndex - 2];
+                const elevChange = prevPoint.elevation - prevPrevPoint.elevation;
+                const distChange = (prevPoint.distance - prevPrevPoint.distance) / 1000;
+                const prevGradientValue = ((elevChange / (distChange * 1000)) * 100);
+                prevGradient = prevGradientValue.toFixed(1);
+              }
+
+              // Calculate average gradient over last 500m if we have enough points
+              let avgGradient = '';
+              const lookbackDist = 500; // meters
+              let lookbackIdx = currentIndex - 1;
+              while (lookbackIdx > 0 && prevPoint.distance - data[lookbackIdx].distance < lookbackDist) {
+                lookbackIdx--;
+              }
+              if (prevPoint.distance - data[lookbackIdx].distance >= lookbackDist) {
+                const avgElevChange = prevPoint.elevation - data[lookbackIdx].elevation;
+                const avgDistChange = (prevPoint.distance - data[lookbackIdx].distance) / 1000;
+                const avgGradientValue = ((avgElevChange / (avgDistChange * 1000)) * 100);
+                avgGradient = avgGradientValue.toFixed(1);
+              }
+
+              return [
+                <div key="tooltip">
+                  <div style={{ 
+                    fontFamily: 'Futura',
+                    color: 'white',
+                    display: 'flex',
+                    gap: '4px'
+                  }}>
+                    <span>el:</span>
+                    <span>{value.toFixed(1)} m</span>
+                  </div>
+                  <div style={{ 
+                    color: 'white', 
+                    fontSize: '0.75rem', 
+                    marginTop: '4px',
+                    fontFamily: 'Futura',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'rgba(255,255,255,0.7)' }}>
+                      {gradient > 0 ? '↗' : '↘'} {Math.abs(gradient).toFixed(1)}%
                     </div>
                   </div>
-                ];
+                </div>
+              ];
               }
               return [`${value.toFixed(1)} m`, ''];
             }}
@@ -217,17 +274,65 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
             contentStyle={{ background: 'none', border: 'none' }}
             wrapperStyle={{ outline: 'none' }}
           />
-          <defs>
-            <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ee5253" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#ee5253" stopOpacity={0.1} />
-            </linearGradient>
-          </defs>
+          {/* Climb markers */}
+          {climbs.map((climb, index) => (
+            <React.Fragment key={index}>
+              {/* Start marker */}
+              <ReferenceLine
+                x={climb.startPoint.distance}
+                stroke={climb.color}
+                strokeWidth={2}
+                label={({ viewBox }) => {
+                  const text = `${(climb.totalDistance/1000).toFixed(1)}km @ ${(climb.averageGradient).toFixed(1)}%`;
+                  const textWidth = text.length * 5.5; // Approximate width based on font size
+                  
+                  // Check if climb is in the last quarter of the route
+                  const isNearEnd = climb.startPoint.distance > (data[data.length - 1].distance * 0.75);
+                  const xOffset = isNearEnd ? -(textWidth + 15) : 5; // Align left if near end
+                  return (
+                    <g>
+                      <filter id={`shadow-${index}`} x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.3"/>
+                      </filter>
+                      <rect
+                        x={viewBox.x + xOffset}
+                        y={viewBox.y - 25}
+                        width={textWidth + 10}
+                        height="16"
+                        rx="2"
+                        fill={climb.color}
+                        fillOpacity={0.9}
+                        filter={`url(#shadow-${index})`}
+                      />
+                      <text
+                        x={viewBox.x + xOffset + 5}
+                        y={viewBox.y - 13}
+                        fill="#fff"
+                        fontSize={10}
+                        fontFamily="Futura"
+                      >
+                        {text}
+                      </text>
+                    </g>
+                  );
+                }}
+                isFront={true}
+              />
+              {/* End marker */}
+              <ReferenceLine
+                x={climb.endPoint.distance}
+                stroke={climb.color}
+                strokeWidth={2}
+                strokeDasharray="4 2"
+                isFront={true}
+              />
+            </React.Fragment>
+          ))}
           <Area
             type="monotone"
             dataKey="elevation"
             stroke="#ee5253"
-            fill="url(#elevationGradient)"
+            fill="rgba(238, 82, 83, 0.2)"
             strokeWidth={2}
           />
         </AreaChart>

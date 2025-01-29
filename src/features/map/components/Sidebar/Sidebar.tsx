@@ -50,7 +50,9 @@ export const Sidebar = (props: SidebarProps) => {
             <CircularProgress />
           </Box>
         }>
-          <LazyUploader onUploadComplete={handleUploadComplete} />
+          <LazyUploader 
+            onUploadComplete={handleUploadComplete}
+          />
         </Suspense>
       );
     }

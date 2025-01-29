@@ -527,7 +527,7 @@ export const addSurfaceOverlay = async (
         },
         paint: {
           'line-color': '#ffffff',
-          'line-width': 3,
+          'line-width': 2,
           'line-dasharray': [1, 3]
         }
       });

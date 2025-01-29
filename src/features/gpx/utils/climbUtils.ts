@@ -1,132 +1,207 @@
-interface ClimbPoint {
+export interface ClimbPoint {
   distance: number;  // Distance from start in meters
   elevation: number; // Elevation in meters
   gradient: number;  // Gradient as percentage
 }
 
-interface Climb {
+export type ClimbCategory = 'HC' | 'CAT1' | 'CAT2' | 'CAT3' | 'CAT4';
+
+export interface Climb {
   startPoint: ClimbPoint;
   endPoint: ClimbPoint;
   totalDistance: number;    // Distance in meters
   averageGradient: number;  // Average gradient as percentage
   elevationGain: number;    // Total elevation gain in meters
+  fietsScore: number;       // FIETS score for climb difficulty
+  category: ClimbCategory;  // Climb category based on FIETS score
+  color: string;           // Color code for the category
 }
 
-/**
- * Detects climbs in a GPX route based on the following criteria:
- * - A climb starts when we find a 1km section with average gradient >= 3%
- * - The climb continues until we find a 1km section with average gradient < 3%
- * - The climb can be any length (3km, 4km, 20km etc) as long as it maintains the gradient
- */
-export const detectClimbs = (data: { distance: number; elevation: number }[]): Climb[] => {
-  console.log('[ClimbUtils] Starting climb detection with data points:', data.length);
-  const climbs: Climb[] = [];
-  let currentIndex = 0;
-  let inClimb = false;
-  let climbStartIndex = 0;
+// Configuration for climb detection
+const CLIMB_CONFIG = {
+  MIN_GRADIENT: 2.5,           // Minimum gradient to consider as climbing (percent)
+  MIN_LENGTH: 1000,         // Minimum length for a climb segment (meters)
+  SMOOTHING_WINDOW: 6,      // Number of points to use for smoothing elevation data
+  PEAK_THRESHOLD: 50,       // Minimum elevation difference to consider as a peak (meters)
+  VALLEY_MERGE_DIST: 2000,  // Maximum distance between valleys to merge climbs (meters)
+};
 
-  while (currentIndex < data.length) {
-    const gradient = calculateRollingGradient(data, currentIndex);
-    
-    if (gradient === null) {
-      break; // Not enough distance left for a 1km window
-    }
-
-    if (!inClimb && gradient >= 3) {
-      // Start of a new climb
-      inClimb = true;
-      climbStartIndex = currentIndex;
-      console.log(`[ClimbUtils] Potential climb start at ${(data[currentIndex].distance/1000).toFixed(1)}km with ${gradient.toFixed(1)}%`);
-    } else if (inClimb && gradient < 3) {
-      // Potential end of climb
-      // Create climb object
-      const climb: Climb = {
-        startPoint: {
-          distance: data[climbStartIndex].distance,
-          elevation: data[climbStartIndex].elevation,
-          gradient: gradient
-        },
-        endPoint: {
-          distance: data[currentIndex].distance,
-          elevation: data[currentIndex].elevation,
-          gradient: gradient
-        },
-        totalDistance: data[currentIndex].distance - data[climbStartIndex].distance,
-        elevationGain: data[currentIndex].elevation - data[climbStartIndex].elevation,
-        averageGradient: ((data[currentIndex].elevation - data[climbStartIndex].elevation) / 
-                         (data[currentIndex].distance - data[climbStartIndex].distance)) * 100
-      };
-
-      // Only add if it's at least 1km long
-      if (climb.totalDistance >= 1000) {
-        console.log(`[ClimbUtils] Found climb: ${(climb.totalDistance/1000).toFixed(1)}km at ${climb.averageGradient.toFixed(1)}%`);
-        climbs.push(climb);
-      }
-
-      inClimb = false;
-    }
-
-    currentIndex++;
-  }
-
-  // Handle case where we're still in a climb at the end
-  if (inClimb) {
-    const climb: Climb = {
-      startPoint: {
-        distance: data[climbStartIndex].distance,
-        elevation: data[climbStartIndex].elevation,
-        gradient: 0
-      },
-      endPoint: {
-        distance: data[data.length - 1].distance,
-        elevation: data[data.length - 1].elevation,
-        gradient: 0
-      },
-      totalDistance: data[data.length - 1].distance - data[climbStartIndex].distance,
-      elevationGain: data[data.length - 1].elevation - data[climbStartIndex].elevation,
-      averageGradient: ((data[data.length - 1].elevation - data[climbStartIndex].elevation) / 
-                       (data[data.length - 1].distance - data[climbStartIndex].distance)) * 100
-    };
-
-    if (climb.totalDistance >= 1000) {
-      console.log(`[ClimbUtils] Found climb at end: ${(climb.totalDistance/1000).toFixed(1)}km at ${climb.averageGradient.toFixed(1)}%`);
-      climbs.push(climb);
-    }
-  }
-
-  return climbs;
+// Category configuration
+const CATEGORY_CONFIG = {
+  HC: { minFiets: 8.0, color: '#8B0000' },   // Dark Red
+  CAT1: { minFiets: 6.0, color: '#FF0000' }, // Red
+  CAT2: { minFiets: 4.5, color: '#fa8231' }, // Orange
+  CAT3: { minFiets: 3.0, color: '#f7b731' }, // Yellow
+  CAT4: { minFiets: 2.0, color: '#228B22' }, // Forest Green
 };
 
 /**
- * Calculates a rolling average gradient over a 1km window
- * Used to determine if we're in a climb or if a climb has ended
+ * Calculates FIETS score for a climb
+ * FIETS = (Δh/1000) × (Δh/(distance in km × 10))²
  */
-const calculateRollingGradient = (
-  data: { distance: number; elevation: number }[],
-  startIndex: number
-): number | null => {
-  // Look ahead 1km from the start index
-  const targetDistance = data[startIndex].distance + 1000; // 1km = 1000m
-  let endIndex = startIndex;
-  
-  // Find the point that's approximately 1km ahead
-  while (endIndex < data.length - 1 && data[endIndex].distance < targetDistance) {
-    endIndex++;
+const calculateFietsScore = (elevationGain: number, distanceKm: number): number => {
+  const h = elevationGain; // Δh in meters
+  return (h / 1000) * Math.pow(h / (distanceKm * 10), 2);
+};
+
+/**
+ * Determines climb category based on FIETS score
+ */
+const determineCategory = (fietsScore: number): { category: ClimbCategory; color: string } => {
+  if (fietsScore >= CATEGORY_CONFIG.HC.minFiets) {
+    return { category: 'HC', color: CATEGORY_CONFIG.HC.color };
+  } else if (fietsScore >= CATEGORY_CONFIG.CAT1.minFiets) {
+    return { category: 'CAT1', color: CATEGORY_CONFIG.CAT1.color };
+  } else if (fietsScore >= CATEGORY_CONFIG.CAT2.minFiets) {
+    return { category: 'CAT2', color: CATEGORY_CONFIG.CAT2.color };
+  } else if (fietsScore >= CATEGORY_CONFIG.CAT3.minFiets) {
+    return { category: 'CAT3', color: CATEGORY_CONFIG.CAT3.color };
+  } else {
+    return { category: 'CAT4', color: CATEGORY_CONFIG.CAT4.color };
   }
+};
 
-  // If we don't have enough distance for 1km, return null
-  if (endIndex === startIndex || data[endIndex].distance - data[startIndex].distance < 900) {
-    return null;
-  }
+/**
+ * Smooths elevation data using a moving average to reduce noise
+ */
+const smoothElevationData = (data: { distance: number; elevation: number }[], windowSize: number) => {
+  return data.map((point, index) => {
+    const start = Math.max(0, index - Math.floor(windowSize / 2));
+    const end = Math.min(data.length, index + Math.floor(windowSize / 2) + 1);
+    const window = data.slice(start, end);
+    const avgElevation = window.reduce((sum, p) => sum + p.elevation, 0) / window.length;
+    return {
+      distance: point.distance,
+      elevation: avgElevation
+    };
+  });
+};
 
-  // Calculate total elevation gain and distance
-  const elevationChange = data[endIndex].elevation - data[startIndex].elevation;
-  const distanceChange = data[endIndex].distance - data[startIndex].distance;
+/**
+ * Calculates gradient between two points
+ */
+const calculateGradient = (point1: { distance: number; elevation: number }, 
+                         point2: { distance: number; elevation: number }): number => {
+  const elevationChange = point2.elevation - point1.elevation;
+  const distance = point2.distance - point1.distance;
+  return (elevationChange / distance) * 100;
+};
 
-  // Calculate gradient as a percentage
-  const gradient = (elevationChange / distanceChange) * 100;
-
-  console.log(`[ClimbUtils] Rolling gradient from ${startIndex} to ${endIndex}: ${gradient.toFixed(1)}% (${(distanceChange/1000).toFixed(1)}km)`);
+/**
+ * Detects climbs by identifying significant elevation gains between valleys
+ */
+export const detectClimbs = (data: { distance: number; elevation: number }[]): Climb[] => {
+  if (data.length < 2) return [];
   
-  return gradient;
+  console.log('[ClimbUtils] Starting climb detection with data points:', data.length);
+  
+  // Smooth the elevation data to reduce noise
+  const smoothedData = smoothElevationData(data, CLIMB_CONFIG.SMOOTHING_WINDOW);
+  
+  // Find valleys (potential climb start/end points)
+  const valleys: number[] = [0]; // Always include start point
+  const peaks: number[] = [];
+  
+  for (let i = 1; i < smoothedData.length - 1; i++) {
+    const prev = smoothedData[i - 1].elevation;
+    const curr = smoothedData[i].elevation;
+    const next = smoothedData[i + 1].elevation;
+    
+    // Identify local minimums (valleys)
+    if (prev > curr && curr <= next) {
+      valleys.push(i);
+    }
+    
+    // Identify local maximums (peaks)
+    if (prev < curr && curr >= next) {
+      peaks.push(i);
+    }
+  }
+  
+  valleys.push(smoothedData.length - 1); // Always include end point
+  
+  // Process valleys to identify climbs
+  const climbs: Climb[] = [];
+  
+  for (let i = 0; i < valleys.length - 1; i++) {
+    const startIdx = valleys[i];
+    const endIdx = valleys[i + 1];
+    const segment = smoothedData.slice(startIdx, endIdx + 1);
+    
+    // Find highest point in segment
+    let maxElevation = -Infinity;
+    let maxElevationIdx = startIdx;
+    
+    for (let j = 0; j < segment.length; j++) {
+      if (segment[j].elevation > maxElevation) {
+        maxElevation = segment[j].elevation;
+        maxElevationIdx = startIdx + j;
+      }
+    }
+    
+    // Calculate climb characteristics
+    const elevationGain = maxElevation - smoothedData[startIdx].elevation;
+    const totalDistance = smoothedData[maxElevationIdx].distance - smoothedData[startIdx].distance;
+    const averageGradient = (elevationGain / totalDistance) * 100;
+    
+    // Check if this segment qualifies as a climb
+    if (elevationGain >= CLIMB_CONFIG.PEAK_THRESHOLD && 
+        totalDistance >= CLIMB_CONFIG.MIN_LENGTH && 
+        averageGradient >= CLIMB_CONFIG.MIN_GRADIENT) {
+      
+      // Calculate FIETS score and determine category
+      const distanceKm = totalDistance / 1000;
+      const fietsScore = calculateFietsScore(elevationGain, distanceKm);
+      const { category, color } = determineCategory(fietsScore);
+      
+      // Create climb object
+      const climb: Climb = {
+        startPoint: {
+          distance: data[startIdx].distance,
+          elevation: data[startIdx].elevation,
+          gradient: averageGradient
+        },
+        endPoint: {
+          distance: data[maxElevationIdx].distance,
+          elevation: data[maxElevationIdx].elevation,
+          gradient: averageGradient
+        },
+        totalDistance,
+        elevationGain,
+        averageGradient,
+        fietsScore,
+        category,
+        color
+      };
+      
+      // Check if we should merge with previous climb
+      if (climbs.length > 0) {
+        const prevClimb = climbs[climbs.length - 1];
+        const distanceBetweenClimbs = climb.startPoint.distance - prevClimb.endPoint.distance;
+        
+        if (distanceBetweenClimbs <= CLIMB_CONFIG.VALLEY_MERGE_DIST) {
+          // Merge climbs by updating end point of previous climb
+          prevClimb.endPoint = climb.endPoint;
+          prevClimb.totalDistance = prevClimb.endPoint.distance - prevClimb.startPoint.distance;
+          prevClimb.elevationGain = prevClimb.endPoint.elevation - prevClimb.startPoint.elevation;
+          prevClimb.averageGradient = (prevClimb.elevationGain / prevClimb.totalDistance) * 100;
+          
+          // Recalculate FIETS score and category for merged climb
+          const mergedDistanceKm = prevClimb.totalDistance / 1000;
+          prevClimb.fietsScore = calculateFietsScore(prevClimb.elevationGain, mergedDistanceKm);
+          const { category, color } = determineCategory(prevClimb.fietsScore);
+          prevClimb.category = category;
+          prevClimb.color = color;
+          
+          console.log(`[ClimbUtils] Merged climb with previous: ${mergedDistanceKm.toFixed(1)}km at ${prevClimb.averageGradient.toFixed(1)}% (${prevClimb.category})`);
+          continue;
+        }
+      }
+      
+      console.log(`[ClimbUtils] Found climb: ${(totalDistance/1000).toFixed(1)}km at ${averageGradient.toFixed(1)}% (${category})`);
+      climbs.push(climb);
+    }
+  }
+  
+  return climbs;
 };

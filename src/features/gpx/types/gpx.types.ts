@@ -56,7 +56,8 @@ export interface SurfaceAnalysis {
 }
 
 export interface ProcessedRoute {
-  id: string;
+  id: string;  // File ID used to generate route ID
+  routeId?: string;  // MapView's route ID (route-{id})
   matchedIndices?: number[]; // Made optional since we're not using it anymore
   name: string;
   color: string;

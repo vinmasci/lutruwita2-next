@@ -1,6 +1,16 @@
 import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
+import { MapProvider } from '../../context/MapContext';
+import { RouteProvider, useRouteContext } from '../../context/RouteContext';
+import { Sidebar } from '../Sidebar';
+import { CircularProgress, Box, Typography } from '@mui/material';
+import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
+import { Feature, LineString } from 'geojson';
+import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+import { addSurfaceOverlay } from '../../../gpx/services/surfaceService';
+
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 // Debug function for road layer
 const debugRoadLayer = (map: mapboxgl.Map) => {
@@ -50,17 +60,7 @@ const debugRoadLayer = (map: mapboxgl.Map) => {
   }
 };
 
-import { MapProvider } from '../../context/MapContext';
-import { Sidebar } from '../Sidebar';
-import { CircularProgress, Box, Typography } from '@mui/material';
-import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
-import { Feature, LineString } from 'geojson';
-import { ProcessedRoute } from '../../../gpx/types/gpx.types';
-import { addSurfaceOverlay } from '../../../gpx/services/surfaceService';
-
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-
-export default function MapView() {
+function MapViewContent() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -70,8 +70,37 @@ export default function MapView() {
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState<ProcessedRoute | null>(null);
+  const currentRouteId = useRef<string | null>(null);
+  const [hoverCoordinates, setHoverCoordinates] = useState<[number, number] | null>(null);
+  const hoverMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const { processGpx, isLoading } = useClientGpxProcessing();
+  const { addRoute, deleteRoute, setCurrentRoute, currentRoute } = useRouteContext();
+
+  // Update hover marker when coordinates change
+  useEffect(() => {
+    if (!mapInstance.current) return;
+
+    // Remove existing marker
+    if (hoverMarkerRef.current) {
+      hoverMarkerRef.current.remove();
+      hoverMarkerRef.current = null;
+    }
+
+    // Add new marker if we have coordinates
+    if (hoverCoordinates) {
+      const el = document.createElement('div');
+      el.className = 'hover-marker';
+      el.style.width = '6px';
+      el.style.height = '6px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#ee5253';
+      el.style.border = '2px solid white';
+
+      hoverMarkerRef.current = new mapboxgl.Marker(el)
+        .setLngLat(hoverCoordinates)
+        .addTo(mapInstance.current);
+    }
+  }, [hoverCoordinates]);
 
   const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
     console.log('[MapView] Starting upload at:', new Date().toISOString());
@@ -90,10 +119,13 @@ export default function MapView() {
       const result = processedRoute || (file ? await processGpx(file) : null);
       console.log('[MapView] Got result at:', new Date().toISOString());
       if (result) {
+        addRoute(result);
         setCurrentRoute(result);
+        
         // Add the route to the map
         const map = mapInstance.current;
-        const routeId = `route-${Date.now()}`;
+        currentRouteId.current = result.routeId || `route-${result.id}`;
+        const routeId = currentRouteId.current;
         console.log('[MapView] Adding route layers...');
 
         // Add the source
@@ -113,7 +145,7 @@ export default function MapView() {
           },
           paint: {
             'line-color': '#ffffff',
-            'line-width': 7
+            'line-width': 5
           }
         });
 
@@ -127,8 +159,8 @@ export default function MapView() {
             'line-cap': 'round'
           },
           paint: {
-            'line-color': '#e17055',
-            'line-width': 5
+            'line-color': '#ee5253',
+            'line-width': 3
           }
         });
 
@@ -188,6 +220,36 @@ export default function MapView() {
 
   const handleAddPOI = () => {
     // TODO: Implement POI adding
+  };
+
+  const handleDeleteRoute = (routeId: string) => {
+    if (!mapInstance.current) return;
+    
+    const map = mapInstance.current;
+
+    // Remove map layers
+    if (map.getLayer(`${routeId}-border`)) {
+      map.removeLayer(`${routeId}-border`);
+    }
+    if (map.getLayer(`${routeId}-line`)) {
+      map.removeLayer(`${routeId}-line`);
+    }
+    if (map.getLayer(`${routeId}-surface`)) {
+      map.removeLayer(`${routeId}-surface`);
+    }
+
+    // Remove map source
+    if (map.getSource(routeId)) {
+      map.removeSource(routeId);
+    }
+
+    // Delete from context (this will also clear current route if needed)
+    deleteRoute(routeId);
+    
+    // Clear local reference
+    if (currentRouteId.current === routeId) {
+      currentRouteId.current = null;
+    }
   };
 
   // Initialize map
@@ -305,54 +367,68 @@ export default function MapView() {
   }, []);
 
   return (
-    <MapProvider value={{ map: mapInstance.current, isMapReady }}>
-      <div className="w-full h-full relative">
-        <div 
-          ref={mapRef}
-          style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 }}
-        />
-        
-        {!isMapReady && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}
-          >
-            <CircularProgress size={60} sx={{ mb: 2 }} />
-            <Typography variant="h6" color="white">
-              Loading map...
-            </Typography>
-          </Box>
-        )}
+    <MapProvider value={{ 
+      map: mapInstance.current, 
+      isMapReady,
+      hoverCoordinates,
+      setHoverCoordinates
+    }}>
+    <div className="w-full h-full relative">
+      <div 
+        ref={mapRef}
+        style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 }}
+      />
+      
+      {!isMapReady && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6" color="white">
+            Loading map...
+          </Typography>
+        </Box>
+      )}
 
-        <Sidebar
-          onUploadGpx={handleUploadGpx}
-          onSaveMap={handleSaveMap}
-          onLoadMap={handleLoadMap}
-          onAddPhotos={handleAddPhotos}
-          onAddPOI={handleAddPOI}
-          mapReady={mapReady}
-          onItemClick={() => {}}
-          onToggleRoute={() => {}}
-          onToggleGradient={() => {}}
-          onToggleSurface={() => {}}
-          onPlacePOI={() => {}}
+      <Sidebar
+        onUploadGpx={handleUploadGpx}
+        onSaveMap={handleSaveMap}
+        onLoadMap={handleLoadMap}
+        onAddPhotos={handleAddPhotos}
+        onAddPOI={handleAddPOI}
+        mapReady={mapReady}
+        onItemClick={() => {}}
+        onToggleRoute={() => {}}
+        onToggleGradient={() => {}}
+        onToggleSurface={() => {}}
+        onPlacePOI={() => {}}
+        onDeleteRoute={handleDeleteRoute}
+      />
+      {currentRoute && (
+        <ElevationProfilePanel
+          route={currentRoute}
         />
-        {currentRoute && (
-          <ElevationProfilePanel
-            route={currentRoute}
-          />
-        )}
-      </div>
+      )}
+    </div>
     </MapProvider>
+  );
+}
+
+export default function MapView() {
+  return (
+    <RouteProvider>
+      <MapViewContent />
+    </RouteProvider>
   );
 }

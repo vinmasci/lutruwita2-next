@@ -103,8 +103,10 @@ export const useClientGpxProcessing = () => {
         totalTime: 0     // TODO: Calculate if time data is available
       };
 
+      const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const processedRoute: ProcessedRoute = {
-        id: uuidv4(),
+        id: fileId,
+        routeId: `route-${fileId}`,
         name: parsed.properties.name || file.name.replace(/\.gpx$/i, ''),
         color: '#ff4d4d', // Default red color
         isVisible: true,

@@ -12,6 +12,7 @@ export interface SidebarProps {
   onToggleGradient: () => void;
   onToggleSurface: () => void;
   onPlacePOI: () => void;
+  onDeleteRoute: (routeId: string) => void;
 }
 
 export interface SidebarHookReturn {
