@@ -16,7 +16,12 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentRoute, setCurrentRoute] = useState<ProcessedRoute | null>(null);
 
   const addRoute = useCallback((route: ProcessedRoute) => {
-    setRoutes(prev => [...prev, route]);
+    setRoutes(prev => {
+      // Remove any existing route with the same ID
+      const filtered = prev.filter(r => r.id !== route.id);
+      // Add the new/updated route
+      return [...filtered, route];
+    });
   }, []);
 
   const deleteRoute = useCallback((routeId: string) => {

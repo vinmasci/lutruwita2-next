@@ -174,7 +174,15 @@ function MapViewContent() {
         // Try surface detection
         console.log('[MapView] Starting surface detection at:', new Date().toISOString());
         try {
-          await addSurfaceOverlay(map, feature);
+          // Add routeId to feature properties for unique unpaved section IDs
+          const featureWithRouteId = {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              routeId: routeId
+            }
+          };
+          await addSurfaceOverlay(map, featureWithRouteId);
         } catch (error) {
           console.error('[MapView] Surface detection error:', error);
         }
@@ -227,7 +235,7 @@ function MapViewContent() {
     
     const map = mapInstance.current;
 
-    // Remove map layers
+    // Remove main route layers
     if (map.getLayer(`${routeId}-border`)) {
       map.removeLayer(`${routeId}-border`);
     }
@@ -238,10 +246,28 @@ function MapViewContent() {
       map.removeLayer(`${routeId}-surface`);
     }
 
-    // Remove map source
+    // Remove main route source
     if (map.getSource(routeId)) {
       map.removeSource(routeId);
     }
+
+    // Clean up unpaved section layers and sources
+    const style = map.getStyle();
+    if (!style || !style.layers) return;
+    
+    const layerIds = style.layers.map(layer => layer.id);
+    
+    // Find and remove all unpaved section layers and sources for this route
+    layerIds.forEach(layerId => {
+      if (layerId.startsWith(`unpaved-section-layer-${routeId}-`)) {
+        map.removeLayer(layerId);
+        const sectionIndex = layerId.split('-').pop();
+        const sourceId = `unpaved-section-${routeId}-${sectionIndex}`;
+        if (map.getSource(sourceId)) {
+          map.removeSource(sourceId);
+        }
+      }
+    });
 
     // Delete from context (this will also clear current route if needed)
     deleteRoute(routeId);

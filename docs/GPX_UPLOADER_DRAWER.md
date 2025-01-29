@@ -11,61 +11,113 @@ The GPX uploader drawer is a slide-out panel that appears when clicking the add 
 
 ### Current Features
 - Drag and drop GPX file upload
-- File name editing
-- File deletion
+- File name editing with proper route synchronization
+- Route list with distance information
 - Upload status feedback
 - Error handling
+- Centralized route state management
 
 ## Known Issues
 
-### 1. Delete Functionality (In Progress)
-- Delete button still not working properly despite several attempted fixes
-- Current Implementation:
-  - Added RouteContext for centralized route state management
-  - Implemented proper cleanup of map layers and sources
-  - Added route deletion through context
-  - Synchronized route IDs between components
+### Recent Updates
 
-- Attempted Solutions:
-  1. Centralized State Management:
-     - Created RouteContext to manage routes globally
-     - Implemented addRoute and deleteRoute functions
-     - Connected MapView and Uploader to use the same context
+#### 1. Route State Management
+- Implemented centralized route state using RouteContext
+- Routes are now managed through a single source of truth
+- Key files:
+  - `src/features/map/context/RouteContext.tsx` - Global route state management
+  - `src/features/gpx/hooks/useClientGpxProcessing.ts` - Route processing and ID generation
+  - `src/features/gpx/components/Uploader/Uploader.tsx` - Route operations handling
+  - `src/features/gpx/components/Uploader/UploaderUI.tsx` - Route list UI
 
-  2. Consistent Route ID Management:
-     - Added routeId to ProcessedRoute interface
-     - Generated consistent IDs in useClientGpxProcessing
-     - Used same ID format across components
+#### 2. Route ID System
+- Switched from timestamp-based IDs to UUIDs for uniqueness
+- Consistent ID format across all components
+- Proper ID preservation during route updates
 
-  3. Cleanup Implementation:
-     - Added map layer removal in MapView
-     - Added route state cleanup in context
-     - Added UI element cleanup through state changes
+#### 3. Route Operations
+- Added route rename functionality with proper state updates
+- Improved route addition to prevent duplicates
+- Routes now show distance information
 
-- Potential Issues to Investigate:
-  1. Route ID Synchronization:
-     - Verify route IDs are consistent between upload and delete
-     - Check if IDs are properly passed through context
-  2. Event Propagation:
-     - Check if delete button click events are being properly handled
-     - Verify event bubbling isn't interfering with deletion
-  3. State Updates:
-     - Ensure state updates trigger proper re-renders
-     - Verify context updates are propagating correctly
+#### 4. Delete Functionality
+- Fixed ID mismatch in delete operation
+- Implemented proper cleanup of all map elements (route layers, sources, unpaved sections)
+- Added error handling for route lookup
 
-- Next Steps:
-  1. Add logging to track route ID flow
-  2. Implement confirmation dialog before deletion
-  3. Add error handling for failed deletions
-  4. Consider adding route persistence
+#### 5. Unpaved Sections
+- Fixed issue with unpaved sections disappearing when adding multiple routes
+- Implemented route-specific IDs for unpaved section layers and sources
+- Added proper cleanup of unpaved sections during route deletion
+- Each route now maintains its own set of unpaved sections
 
-### 2. Route Processing
-- Surface detection process runs unnecessarily on route rename
+### Current Issues
+
+#### 1. Route Processing
+- Surface detection runs unnecessarily on route rename
 - Need to implement caching for processed route data
 
-### 3. Route Selection
+#### 2. Route Selection
 - Elevation profile not updating when switching between routes
 - Map view not syncing with selected route
+
+### Implementation Details
+
+#### Key Components and Their Roles
+1. RouteContext (`src/features/map/context/RouteContext.tsx`)
+   - Manages global route state
+   - Handles route operations (add, delete, update)
+   - Maintains current route selection
+
+2. Uploader (`src/features/gpx/components/Uploader/Uploader.tsx`)
+   - Handles file operations
+   - Processes GPX files
+   - Manages route updates
+   - Coordinates map cleanup on delete
+
+3. UploaderUI (`src/features/gpx/components/Uploader/UploaderUI.tsx`)
+   - Displays route list
+   - Handles user interactions
+   - Shows route information
+
+4. useClientGpxProcessing (`src/features/gpx/hooks/useClientGpxProcessing.ts`)
+   - Processes GPX files
+   - Generates unique route IDs
+   - Calculates route statistics
+
+#### State Flow
+1. File Upload:
+   ```
+   UploaderUI (file drop) 
+   -> Uploader (processGpx) 
+   -> RouteContext (addRoute)
+   -> MapView (display)
+   ```
+
+2. Route Rename:
+   ```
+   UploaderUI (rename click)
+   -> Uploader (handleFileRename)
+   -> processGpx
+   -> RouteContext (addRoute with preserved ID)
+   ```
+
+3. Route Delete:
+   ```
+   UploaderUI (delete click)
+   -> Uploader (handleFileDelete)
+   -> MapView (cleanup map layers, sources, unpaved sections)
+   -> RouteContext (deleteRoute)
+   -> ElevationProfile (auto-hide via currentRoute)
+   ```
+
+4. Surface Detection:
+   ```
+   MapView (handleUploadGpx)
+   -> addSurfaceOverlay (with route-specific IDs)
+   -> assignSurfacesViaNearest
+   -> MapView (add unpaved section layers)
+   ```
 
 ## Planned Improvements
 
@@ -88,11 +140,11 @@ The GPX uploader drawer is a slide-out panel that appears when clicking the add 
 - [ ] Implement route selection state synchronization
 
 ### 4. Delete Functionality
+- [x] Fix delete button functionality
+- [x] Remove route from map (including unpaved sections)
+- [x] Remove elevation profile
+- [x] Clean up route state
 - [ ] Add confirmation dialog
-- [ ] Remove route from map
-- [ ] Remove elevation profile
-- [ ] Clean up route state
-- [ ] Fix delete button functionality
 
 ### 5. Performance Improvements
 - [ ] Implement caching for processed route data
@@ -261,10 +313,9 @@ const handleKeyDown = (e: React.KeyboardEvent, routeId: string) => {
   - File processing status
 
 ## Next Steps
-1. Fix delete functionality and implement proper cleanup
+1. Add delete confirmation dialog
 2. Implement route data caching to avoid unnecessary processing
 3. Fix elevation profile updates on route selection
 4. Implement route selection state synchronization
-5. Add delete confirmations
-6. Add comprehensive error handling
-7. Test all interactions and edge cases
+5. Add comprehensive error handling
+6. Test all interactions and edge cases

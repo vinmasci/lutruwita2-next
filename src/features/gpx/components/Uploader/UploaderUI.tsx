@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UploaderUIProps } from './Uploader.types';
-import { Alert, Box, CircularProgress, Typography, IconButton, TextField, List, ListItem, ListItemText, ListItemSecondaryAction, Paper } from '@mui/material';
+import { Alert, Box, CircularProgress, Typography, IconButton, TextField, List, ListItem, ListItemText, ListItemSecondaryAction, Paper, Divider } from '@mui/material';
+import { useRouteContext } from '../../../map/context/RouteContext';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useDropzone, FileWithPath } from 'react-dropzone';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -14,16 +15,14 @@ interface EditingState {
 }
 
 const UploaderUI: React.FC<UploaderUIProps> = ({
-  files,
   isLoading,
   error,
-  selectedFileId,
   onFileAdd,
   onFileDelete,
   onFileRename,
-  onFileSelect,
 }) => {
   const [editing, setEditing] = useState<EditingState | null>(null);
+  const { routes, currentRoute, setCurrentRoute } = useRouteContext();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -55,25 +54,25 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, fileId: string) => {
+  const handleKeyDown = (e: React.KeyboardEvent, route: typeof routes[0]) => {
     switch (e.key) {
       case 'Enter':
       case ' ':
         e.preventDefault();
-        onFileSelect(fileId);
+        setCurrentRoute(route);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        const prevIndex = files.findIndex(f => f.id === fileId) - 1;
+        const prevIndex = routes.findIndex(r => r.id === route.id) - 1;
         if (prevIndex >= 0) {
-          onFileSelect(files[prevIndex].id);
+          setCurrentRoute(routes[prevIndex]);
         }
         break;
       case 'ArrowDown':
         e.preventDefault();
-        const nextIndex = files.findIndex(f => f.id === fileId) + 1;
-        if (nextIndex < files.length) {
-          onFileSelect(files[nextIndex].id);
+        const nextIndex = routes.findIndex(r => r.id === route.id) + 1;
+        if (nextIndex < routes.length) {
+          setCurrentRoute(routes[nextIndex]);
         }
         break;
     }
@@ -129,18 +128,20 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
         )}
       </Paper>
 
-      {files.length > 0 && (
+      <Divider sx={{ my: 2, backgroundColor: 'rgba(255, 255, 255, 0.1)', width: '100%' }} />
+      
+      {routes.length > 0 && (
         <List sx={{ width: '240px' }}>
-          {files.map((file) => (
+          {routes.map((route) => (
             <ListItem
-              key={file.id}
-              onClick={() => onFileSelect(file.id)}
-              onKeyDown={(e) => handleKeyDown(e, file.id)}
+              key={route.id}
+              onClick={() => setCurrentRoute(route)}
+              onKeyDown={(e) => handleKeyDown(e, route)}
               tabIndex={0}
               role="button"
-              aria-selected={file.id === selectedFileId}
+              aria-selected={currentRoute?.id === route.id}
               sx={{
-                backgroundColor: file.id === selectedFileId ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
+                backgroundColor: currentRoute?.id === route.id ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
                 borderRadius: '4px',
                 mb: 1,
                 padding: '8px 12px',
@@ -149,14 +150,14 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 position: 'relative',
                 outline: 'none',
                 '&:hover': {
-                  backgroundColor: file.id === selectedFileId ? 'rgba(65, 65, 65, 0.9)' : 'rgba(45, 45, 45, 0.9)',
+                  backgroundColor: currentRoute?.id === route.id ? 'rgba(65, 65, 65, 0.9)' : 'rgba(45, 45, 45, 0.9)',
                 },
                 '&:focus-visible': {
                   outline: '2px solid rgba(255, 255, 255, 0.5)',
                   outlineOffset: '-2px',
                 },
                 '&::before': {
-                  content: `"${files.indexOf(file) + 1}."`,
+                  content: `"${routes.indexOf(route) + 1}."`,
                   position: 'absolute',
                   left: '-24px',
                   color: 'rgba(255, 255, 255, 0.5)',
@@ -164,7 +165,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 }
               }}
             >
-              {editing?.fileId === file.id ? (
+              {editing?.fileId === route.id ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <TextField
                     size="small"
@@ -184,7 +185,8 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
               ) : (
                 <>
                   <ListItemText 
-                    primary={file.customName || file.name}
+                    primary={route.name}
+                    secondary={`${(route.statistics.totalDistance / 1000).toFixed(1)}km`}
                     sx={{ 
                       '& .MuiTypography-root': { 
                         fontSize: '0.875rem',
@@ -198,7 +200,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                     <IconButton
                       edge="end"
                       size="small"
-                      onClick={(e) => handleStartEditing(e, file.id, file.customName || file.name)}
+                      onClick={(e) => handleStartEditing(e, route.id, route.name)}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -207,7 +209,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                       size="small"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onFileDelete(file.id);
+                        onFileDelete(route.id);
                       }}
                     >
                       <DeleteIcon fontSize="small" />

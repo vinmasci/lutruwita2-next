@@ -491,9 +491,10 @@ export const addSurfaceOverlay = async (
     }
 
     // Add sections to map
+    const routeId = routeFeature.properties?.routeId || 'unknown';
     sections.forEach((section, index) => {
-      const sourceId = `unpaved-section-${index}`;
-      const layerId = `unpaved-section-layer-${index}`;
+      const sourceId = `unpaved-section-${routeId}-${index}`;
+      const layerId = `unpaved-section-layer-${routeId}-${index}`;
 
       // Clean up existing
       if (map.getSource(sourceId)) {

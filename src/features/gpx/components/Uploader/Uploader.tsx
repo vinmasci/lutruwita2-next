@@ -1,21 +1,15 @@
-import { useState, useEffect } from 'react';
 import { useClientGpxProcessing } from '../../hooks/useClientGpxProcessing';
 import { useMapContext } from '../../../map/context/MapContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
-import { GpxUploaderProps, UploadedFile } from './Uploader.types';
+import { GpxUploaderProps } from './Uploader.types';
+import { ProcessedRoute } from '../../types/gpx.types';
 import UploaderUI from './UploaderUI';
 
-const Uploader = ({ onUploadComplete }: GpxUploaderProps) => {
+const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   console.log('[Uploader] Component initializing');
   const { processGpx, isLoading, error } = useClientGpxProcessing();
   const { isMapReady } = useMapContext();
-  const { deleteRoute } = useRouteContext();
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-
-  useEffect(() => {
-    console.log('[Uploader] Component mounted');
-  }, []);
+  const { addRoute, deleteRoute, setCurrentRoute, routes } = useRouteContext();
 
   const handleFileAdd = async (file: File) => {
     console.log('[Uploader] File add triggered', { fileName: file.name });
@@ -26,23 +20,11 @@ const Uploader = ({ onUploadComplete }: GpxUploaderProps) => {
     }
 
     try {
-      // Read file content first
       const fileContent = await file.text();
-      
-      const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const routeId = `route-${fileId}`;
-
-      // Create an uploaded file with unique ID and content
-      const uploadedFile: UploadedFile = Object.assign(new File([fileContent], file.name, { type: file.type }), {
-        id: fileId,
-        routeId: routeId,
-        content: fileContent
-      });
-
-      setFiles(prev => [...prev, uploadedFile]);
-
-      const result = await processGpx(uploadedFile);
+      const result = await processGpx(file);
       if (result) {
+        addRoute(result);
+        setCurrentRoute(result);
         onUploadComplete(result);
       }
     } catch (error) {
@@ -51,67 +33,56 @@ const Uploader = ({ onUploadComplete }: GpxUploaderProps) => {
   };
 
   const handleFileDelete = (fileId: string) => {
-    // Find the file to get its route ID
-    const file = files.find(f => f.id === fileId);
-    if (file) {
-      // Delete route using the route ID format
-      const routeId = `route-${fileId}`;
-      deleteRoute(routeId);
-    }
-    
-    // Remove from local state
-    setFiles(prev => prev.filter(file => file.id !== fileId));
-    
-    // Clear selected file if it was the deleted one
-    if (selectedFileId === fileId) {
-      setSelectedFileId(null);
+    // Find the route using the fileId (which is the route's id)
+    const route = routes.find(r => r.id === fileId);
+    if (route?.routeId) {
+      // First clean up map layers
+      if (onDeleteRoute) {
+        onDeleteRoute(route.routeId);
+      }
+      // Then update route context state
+      deleteRoute(route.routeId);
+    } else {
+      console.error('[Uploader] Could not find route with id:', fileId);
     }
   };
 
   const handleFileRename = async (fileId: string, newName: string) => {
-    // Update local files state
-    setFiles(prev => prev.map(file => {
-      if (file.id === fileId) {
-        return {
-          ...file,
-          customName: newName
+    try {
+      // Find the existing route in context
+      const existingRoute = routes.find((r: ProcessedRoute) => r.id === fileId);
+      if (!existingRoute) {
+        console.error('[Uploader] Route not found for rename:', fileId);
+        return;
+      }
+
+      // Create a new file with the same content but new name
+      const file = new File([existingRoute.rawGpx], newName, { type: 'application/gpx+xml' });
+      const result = await processGpx(file);
+      
+      if (result) {
+        const updatedRoute = {
+          ...result,
+          id: existingRoute.id,
+          routeId: existingRoute.routeId,
+          name: newName
         };
+        addRoute(updatedRoute);
+        setCurrentRoute(updatedRoute);
+        onUploadComplete(updatedRoute);
       }
-      return file;
-    }));
-
-    const file = files.find(f => f.id === fileId);
-    if (file) {
-      try {
-        // Create a new file with the new name but same content
-        const newFile = new File([file.content], newName, { type: file.type });
-        const result = await processGpx(newFile);
-        if (result) {
-          onUploadComplete({
-            ...result,
-            name: newName
-          });
-        }
-      } catch (error) {
-        console.error('[Uploader] Error processing file:', error);
-      }
+    } catch (error) {
+      console.error('[Uploader] Error processing file:', error);
     }
-  };
-
-  const handleFileSelect = (fileId: string) => {
-    setSelectedFileId(fileId);
   };
 
   return (
     <UploaderUI 
-      files={files}
       isLoading={isLoading}
       error={error}
-      selectedFileId={selectedFileId}
       onFileAdd={handleFileAdd}
       onFileDelete={handleFileDelete}
       onFileRename={handleFileRename}
-      onFileSelect={handleFileSelect}
     />
   );
 };

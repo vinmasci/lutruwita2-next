@@ -52,6 +52,7 @@ export const Sidebar = (props: SidebarProps) => {
         }>
           <LazyUploader 
             onUploadComplete={handleUploadComplete}
+            onDeleteRoute={props.onDeleteRoute}
           />
         </Suspense>
       );
