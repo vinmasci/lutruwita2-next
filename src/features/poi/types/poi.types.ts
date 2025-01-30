@@ -14,24 +14,24 @@ export type POICategory =
 
 export type POIIconName =
   // Road Information
-  | 'triangle-alert' | 'octagon-x' | 'octagon-alert' | 'lock-keyhole'
-  | 'lock-keyhole-open' | 'waves' | 'chevrons-left-right-ellipsis'
-  | 'triangle-right' | 'audio-waveform' | 'route' | 'train-track' | 'construction'
+  | 'AlertTriangle' | 'Octagon' | 'AlertOctagon' | 'Lock'
+  | 'Unlock' | 'WaterCrossing' | 'ChevronsRightLeft'
+  | 'ArrowUpRight' | 'AudioWaveform' | 'Route' | 'RailTrail' | 'Construction'
   // Accommodation
-  | 'tent' | 'caravan' | 'concierge-bell' | 'bed-double' | 'bed-single'
+  | 'Tent' | 'Car' | 'Bell' | 'BedDouble' | 'BedSingle'
   // Food/Drink
-  | 'utensils' | 'coffee' | 'droplet' | 'pizza' | 'shopping-cart'
-  | 'store' | 'beer' | 'wine'
+  | 'Utensils' | 'Coffee' | 'Droplet' | 'Pizza' | 'ShoppingCart'
+  | 'Store' | 'Beer' | 'Wine'
   // Natural Features
-  | 'mountain-snow' | 'tree-pine' | 'binoculars' | 'waves-ladder'
+  | 'Mountain' | 'TreePine' | 'Binoculars' | 'Swimming'
   // Event Information
-  | 'circle-play' | 'circle-stop' | 'briefcase-medical'
-  | 'battery-charging' | 'x' | 'circle-dot' | 'wrench'
+  | 'PlayCircle' | 'StopCircle' | 'Stethoscope'
+  | 'BatteryCharging' | 'X' | 'CircleDot' | 'Wrench'
   // Town Services
-  | 'hospital' | 'toilet' | 'shower-head' | 'square-parking'
-  | 'fuel' | 'mail' | 'bike'
+  | 'Hospital' | 'Toilet' | 'ShowerHead' | 'ParkingSquare'
+  | 'Fuel' | 'Mail' | 'Bike'
   // Transportation
-  | 'bus-front' | 'train-front' | 'plane-takeoff' | 'ship';
+  | 'Bus' | 'TrainStation' | 'Plane' | 'Ship';
 
 export interface POIPhoto {
   url: string;

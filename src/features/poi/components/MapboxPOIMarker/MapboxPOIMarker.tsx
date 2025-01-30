@@ -29,20 +29,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
     el.innerHTML = `
       <div class="marker-container">
         <div class="marker-bubble" style="background-color: ${categoryColor}">
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="white"
-            stroke-width="2" 
-            stroke-linecap="round" 
-            stroke-linejoin="round"
-            class="marker-icon"
-          >
-            <path d="${ICON_PATHS[poi.icon.toLowerCase().replace(/([A-Z])/g, '-$1').toLowerCase()]}"></path>
-          </svg>
+          <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
         </div>
         <div class="marker-point" style="border-top-color: ${categoryColor}"></div>
       </div>

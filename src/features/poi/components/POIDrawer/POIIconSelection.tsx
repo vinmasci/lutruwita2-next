@@ -1,9 +1,9 @@
 import React from 'react';
 import { Typography, Button } from '@mui/material';
-import * as Icons from 'lucide-react';
 import { POIIconSelectionProps } from './types';
 import { POI_CATEGORIES } from '../../types/poi.types';
 import { getIconsByCategory } from '../../constants/poi-icons';
+import { ICON_PATHS } from '../../constants/icon-paths';
 import { 
   CategoryList, 
   CategoryItem, 
@@ -55,26 +55,23 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
           </Typography>
 
           <IconGrid>
-            {getIconsByCategory(selectedCategory).map(({ name, label, description }) => {
-              const IconComponent = Icons[name as keyof typeof Icons] as React.FC<Icons.LucideProps>;
-              return (
-                <IconGridItem
-                  key={name}
-                  selected={selectedIcon === name}
-                  onClick={() => onIconSelect(name)}
-                  onMouseEnter={() => setHoveredIcon(name)}
-                  onMouseLeave={() => setHoveredIcon(null)}
-                  sx={{ position: 'relative' }}
-                >
-                  <IconComponent size={24} />
-                  {hoveredIcon === name && (
-                    <StyledTooltip>
-                      {label}
-                    </StyledTooltip>
-                  )}
-                </IconGridItem>
-              );
-            })}
+            {getIconsByCategory(selectedCategory).map(({ name, label, description }) => (
+              <IconGridItem
+                key={name}
+                selected={selectedIcon === name}
+                onClick={() => onIconSelect(name)}
+                onMouseEnter={() => setHoveredIcon(name)}
+                onMouseLeave={() => setHoveredIcon(null)}
+                sx={{ position: 'relative' }}
+              >
+                <i className={ICON_PATHS[name]} style={{ fontSize: '24px' }} />
+                {hoveredIcon === name && (
+                  <StyledTooltip>
+                    {label}
+                  </StyledTooltip>
+                )}
+              </IconGridItem>
+            ))}
           </IconGrid>
         </>
       )}
