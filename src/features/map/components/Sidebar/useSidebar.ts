@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SidebarProps } from './types';
 import { useGpxProcessing } from '../../../gpx/hooks/useGpxProcessing';
+import { useMapContext } from '../../context/MapContext';
 
 export const useSidebar = (props: SidebarProps) => {
+  // All hooks must be called before any other code
+  const { setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
+  const { processGpxFile, isProcessing } = useGpxProcessing();
   const [isOpen, setIsOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { processGpxFile, isProcessing } = useGpxProcessing();
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
@@ -32,6 +35,28 @@ export const useSidebar = (props: SidebarProps) => {
     }
   };
 
+  // Reset POI placement mode when drawer closes or changes
+  useEffect(() => {
+    if (!isDrawerOpen || activeDrawer !== 'poi') {
+      setPoiPlacementMode(false);
+      setPoiPlacementClick(undefined);
+    }
+  }, [isDrawerOpen, activeDrawer, setPoiPlacementMode, setPoiPlacementClick]);
+
+  const handleAddPOI = () => {
+    if (activeDrawer === 'poi') {
+      setIsDrawerOpen(false);
+      setActiveDrawer(null);
+      setPoiPlacementMode(false);
+      setPoiPlacementClick(undefined);
+    } else {
+      setIsDrawerOpen(true);
+      setActiveDrawer('poi');
+      props.onItemClick('poi');
+      props.onAddPOI();
+    }
+  };
+
   return {
     isOpen,
     isDrawerOpen,
@@ -45,6 +70,7 @@ export const useSidebar = (props: SidebarProps) => {
     handleUploadGpx,
     handleSaveMap: props.onSaveMap,
     handleLoadMap: props.onLoadMap,
-    handlePlacePOI: props.onPlacePOI
+    handlePlacePOI: props.onPlacePOI,
+    handleAddPOI
   };
 };

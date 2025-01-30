@@ -8,6 +8,7 @@ import { styled } from '@mui/material/styles';
 import { Box, Typography, Paper, CircularProgress } from '@mui/material';
 import UploadIcon from '@mui/icons-material/Upload';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import { POIDrawer } from '../../../poi/components/POIDrawer';
 
 const StyledUploadBox = styled(Paper)(({ theme }) => ({
   width: 264,
@@ -35,7 +36,14 @@ const StyledUploadBox = styled(Paper)(({ theme }) => ({
 const LazyUploader = lazy(() => import('../../../gpx/components/Uploader/Uploader'));
 
 export const Sidebar = (props: SidebarProps) => {
-  const { isDrawerOpen, activeDrawer, handleUploadGpx, isProcessing, error } = useSidebar(props);
+  const { 
+    isDrawerOpen, 
+    activeDrawer, 
+    handleUploadGpx, 
+    handleAddPOI,
+    isProcessing, 
+    error 
+  } = useSidebar(props);
 
   const handleUploadComplete = async (result: ProcessedRoute) => {
     // Pass the processed route to MapView
@@ -43,22 +51,26 @@ export const Sidebar = (props: SidebarProps) => {
   };
 
   const activeDrawerContent = useMemo(() => {
-    if (activeDrawer === 'gpx') {
-      return (
-        <Suspense fallback={
-          <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-            <CircularProgress />
-          </Box>
-        }>
-          <LazyUploader 
-            onUploadComplete={handleUploadComplete}
-            onDeleteRoute={props.onDeleteRoute}
-          />
-        </Suspense>
-      );
+    switch (activeDrawer) {
+      case 'gpx':
+        return (
+          <Suspense fallback={
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+              <CircularProgress />
+            </Box>
+          }>
+            <LazyUploader 
+              onUploadComplete={handleUploadComplete}
+              onDeleteRoute={props.onDeleteRoute}
+            />
+          </Suspense>
+        );
+      case 'poi':
+        return null; // POI drawer is handled by NestedDrawer
+      default:
+        return null;
     }
-    return null;
-  }, [activeDrawer, handleUploadComplete]);
+  }, [activeDrawer, handleUploadComplete, handleAddPOI, props.onDeleteRoute]);
 
   return (
     <>
@@ -66,6 +78,7 @@ export const Sidebar = (props: SidebarProps) => {
         <SidebarListItems 
           {...props}
           onUploadGpx={() => handleUploadGpx()}
+          onAddPOI={() => handleAddPOI()}
         />
       </StyledDrawer>
       
@@ -73,9 +86,19 @@ export const Sidebar = (props: SidebarProps) => {
         variant="persistent"
         anchor="left"
         open={isDrawerOpen}
-        onClose={() => handleUploadGpx()}
+        onClose={() => {
+          if (activeDrawer === 'gpx') {
+            handleUploadGpx();
+          } else if (activeDrawer === 'poi') {
+            handleAddPOI();
+          }
+        }}
       >
-        {activeDrawerContent}
+        {activeDrawer === 'poi' ? (
+          <POIDrawer isOpen={isDrawerOpen} onClose={() => handleAddPOI()} />
+        ) : (
+          activeDrawerContent
+        )}
       </NestedDrawer>
     </>
   );

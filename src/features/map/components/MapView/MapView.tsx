@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
+import { POIProvider } from '../../../poi/context/POIContext';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
@@ -226,8 +227,48 @@ function MapViewContent() {
     // TODO: Implement photo adding
   };
 
+  const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
+  const [isPoiPlacementMode, setPoiPlacementMode] = useState(false);
+  const [onPoiPlacementClick, setPoiPlacementClick] = useState<((lngLat: [number, number]) => void) | undefined>(undefined);
+
+  // Update cursor style when in POI placement mode
+  useEffect(() => {
+    if (!mapInstance.current || !isMapReady) return;
+    
+    const map = mapInstance.current;
+    const canvas = map.getCanvas();
+    if (!canvas) return;
+
+    canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
+
+    if (isPoiPlacementMode) {
+      const clickHandler = (e: mapboxgl.MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
+        if (onPoiPlacementClick) {
+          const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+          onPoiPlacementClick(coords);
+        }
+      };
+
+      map.on('click', clickHandler);
+      return () => {
+        map.off('click', clickHandler);
+        // Reset cursor on cleanup
+        if (canvas) {
+          canvas.style.cursor = '';
+        }
+      };
+    }
+  }, [isPoiPlacementMode, onPoiPlacementClick, isMapReady]);
+
   const handleAddPOI = () => {
-    // TODO: Implement POI adding
+    if (isPOIDrawerOpen) {
+      // Clean up when drawer closes
+      setIsPOIDrawerOpen(false);
+      setPoiPlacementMode(false);
+      setPoiPlacementClick(undefined);
+    } else {
+      setIsPOIDrawerOpen(true);
+    }
   };
 
   const handleDeleteRoute = (routeId: string) => {
@@ -397,7 +438,11 @@ function MapViewContent() {
       map: mapInstance.current, 
       isMapReady,
       hoverCoordinates,
-      setHoverCoordinates
+      setHoverCoordinates,
+      isPoiPlacementMode,
+      setPoiPlacementMode,
+      onPoiPlacementClick,
+      setPoiPlacementClick
     }}>
     <div className="w-full h-full relative">
       <div 
@@ -454,7 +499,9 @@ function MapViewContent() {
 export default function MapView() {
   return (
     <RouteProvider>
-      <MapViewContent />
+      <POIProvider>
+        <MapViewContent />
+      </POIProvider>
     </RouteProvider>
   );
 }

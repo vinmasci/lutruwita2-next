@@ -3,16 +3,17 @@ import MuiDrawer from '@mui/material/Drawer';
 
 export const NestedDrawer = styled(MuiDrawer)(({ theme }) => ({
   position: 'absolute',
-  left: 56,
-  width: 300,
+  left: 0,
+  width: 264,
   flexShrink: 0,
   zIndex: 100,
   '& .MuiDrawer-paper': {
-    width: 300,
-    backgroundColor: '#1a1a1a',
+    width: 264,
+    backgroundColor: 'rgba(35, 35, 35, 0.9)',
     borderLeft: '1px solid #333',
     color: '#ffffff',
     marginLeft: 56,
+    padding: '16px',
   },
 }));
 
