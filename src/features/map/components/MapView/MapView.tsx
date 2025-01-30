@@ -232,9 +232,9 @@ function MapViewContent() {
 
   const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
   const [isPoiPlacementMode, setPoiPlacementMode] = useState(false);
-  const [onPoiPlacementClick, setPoiPlacementClick] = useState<((lngLat: [number, number]) => void) | undefined>(undefined);
+  const [onPoiPlacementClick, setPoiPlacementClick] = useState<((coords: [number, number]) => void) | undefined>(undefined);
 
-  // Update cursor style when in POI placement mode
+  // Update cursor style and click handler when in POI placement mode
   useEffect(() => {
     if (!mapInstance.current || !isMapReady) return;
     
@@ -245,24 +245,22 @@ function MapViewContent() {
     canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
 
     if (isPoiPlacementMode) {
-  const clickHandler = (e: mapboxgl.MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
-    console.log('[MapView] Map clicked:', e.lngLat);
-    console.log('[MapView] onPoiPlacementClick handler exists:', !!onPoiPlacementClick);
-    
-    if (onPoiPlacementClick) {
-      const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
-      console.log('[MapView] Calling onPoiPlacementClick with coords:', coords);
-      onPoiPlacementClick(coords);
-    }
-  };
+      const clickHandler = (e: mapboxgl.MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
+        console.log('[MapView] Map clicked:', e.lngLat);
+        console.log('[MapView] onPoiPlacementClick handler exists:', !!onPoiPlacementClick);
+        
+        if (onPoiPlacementClick) {
+          const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+          console.log('[MapView] Calling onPoiPlacementClick with coords:', coords);
+          onPoiPlacementClick(coords);
+        }
+      };
 
       map.on('click', clickHandler);
+      
       return () => {
         map.off('click', clickHandler);
-        // Reset cursor on cleanup
-        if (canvas) {
-          canvas.style.cursor = '';
-        }
+        canvas.style.cursor = '';
       };
     }
   }, [isPoiPlacementMode, onPoiPlacementClick, isMapReady]);
@@ -503,7 +501,6 @@ function MapViewContent() {
         onToggleSurface={() => {}}
         onPlacePOI={() => {}}
         onDeleteRoute={handleDeleteRoute}
-        isPOIDrawerOpen={isPOIDrawerOpen}
       />
       {/* Render POI markers */}
       {isMapReady && pois.map(poi => (

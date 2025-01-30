@@ -34,7 +34,6 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
         selectedIcon: null,
         selectedLocation: null,
         selectedPlaceId: null,
-        
         formData: null,
         isSubmitting: false,
         error: null,
@@ -47,12 +46,13 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   // Reset placement mode when drawer closes
   useEffect(() => {
     if (!isOpen) {
+      console.log('[POIDrawer] Drawer closed, cleaning up placement mode');
       setPoiPlacementMode(false);
       setPoiPlacementClick(undefined);
     }
   }, [isOpen, setPoiPlacementMode, setPoiPlacementClick]);
 
-  const handleLocationSelect = (location: { lat: number; lng: number }) => {
+  const handleLocationSelect = React.useCallback((location: { lat: number; lng: number }) => {
     console.log('[POIDrawer] handleLocationSelect called with:', location);
     setState(prev => ({
       ...prev,
@@ -63,15 +63,17 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       selectedLocation: location,
       step: 'icon-select'
     });
-  };
+  }, []);
 
   // Memoize the click handler
   const clickHandler = React.useCallback((coords: [number, number]) => {
+    console.log('[POIDrawer] Click handler called with coords:', coords);
     if (coords && coords.length === 2) {
       handleLocationSelect({ lat: coords[1], lng: coords[0] });
       setPoiPlacementMode(false);
+      setPoiPlacementClick(undefined); // Clear the handler after use
     }
-  }, [handleLocationSelect, setPoiPlacementMode]);
+  }, [handleLocationSelect, setPoiPlacementMode, setPoiPlacementClick]);
 
   // Set up click handler when in map mode
   useEffect(() => {
@@ -84,7 +86,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     if (state.mode === 'map' && state.step === 'location-select') {
       console.log('[POIDrawer] Setting up click handler');
       setPoiPlacementMode(true);
-      setPoiPlacementClick(clickHandler);
+      setPoiPlacementClick(() => clickHandler); // Use function to set handler
     } else {
       console.log('[POIDrawer] Cleaning up click handler');
       setPoiPlacementMode(false);
@@ -121,7 +123,6 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       selectedPlaceId: null
     }));
   };
-
 
   const handlePlaceSelect = (placeId: string) => {
     setState(prev => ({

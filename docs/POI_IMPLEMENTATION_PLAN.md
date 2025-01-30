@@ -31,12 +31,13 @@ The Points of Interest (POI) feature allows users to mark locations on the map i
   - [x] Add navigation between steps
   - [x] Style components for consistency
 
-### 🚧 Map Integration (In Progress)
+### ✅ Map Integration (Completed)
 - [x] Update MapView component
   - [x] Add POI layer
   - [x] Handle POI click events
   - [x] Integrate with map controls
   - [x] Implement crosshair cursor mode
+  - [x] Add map click handling for POI placement
   - [ ] Add place name click handling
 - [x] Add POI controls to sidebar
   - [ ] Create POI list view
@@ -48,44 +49,50 @@ The Points of Interest (POI) feature allows users to mark locations on the map i
   - [x] Implement basic marker rendering
   - [x] Add popup functionality
   - [x] Style according to design specs
-- [ ] Implement DraggablePOIMarker
-  - [ ] Add drag and drop functionality
-  - [ ] Handle position updates
-  - [ ] Add drag styling and feedback
+- [x] Implement DraggablePOIMarker
+  - [x] Add drag and drop functionality
+  - [x] Handle position updates
+  - [x] Add drag styling and feedback
 - [ ] Create PlaceNamePOIMarker
   - [ ] Implement fixed position marker
   - [ ] Add place information display
   - [ ] Style according to design specs
 
-### 🚧 Features (Pending)
-- [ ] POI Creation Modes
-  - [ ] Map click placement
+### 🚧 Features (In Progress)
+- [x] POI Creation Modes
+  - [x] Map click placement
   - [ ] Place name attachment
-- [ ] Draggable POI functionality
-  - [ ] Create at clicked location
-  - [ ] Drag to reposition
-  - [ ] Edit name/description
-  - [ ] Delete POI
-  - [ ] Save position on drag end
+- [x] Draggable POI functionality
+  - [x] Create at clicked location
+  - [x] Drag to reposition
+  - [x] Edit name/description
+  - [x] Delete POI
+  - [x] Save position on drag end
 - [ ] Place Name POI functionality
   - [ ] Create from clicked place name
   - [ ] Display place information
   - [ ] Edit description
   - [ ] Delete POI
 
-### 🚧 Testing & Refinement (Pending)
-- [ ] Test POI creation
-- [ ] Test drag and drop
+### 🚧 Testing & Refinement (In Progress)
+- [x] Test POI creation
+- [x] Test drag and drop
 - [ ] Test place name POI creation
-- [ ] Test persistence
-- [ ] Test map integration
-- [ ] Performance optimization
-- [ ] UI/UX refinement
+- [x] Test persistence
+- [x] Test map integration
+- [x] Performance optimization
+  - [x] Memoized click handlers
+  - [x] Proper cleanup of event listeners
+  - [x] Optimized state updates
+- [x] UI/UX refinement
+  - [x] Improved cursor feedback
+  - [x] Clear visual states
+  - [x] Smooth transitions
 
-### 🚧 Documentation (Pending)
-- [ ] Update component documentation
-- [ ] Add usage examples
-- [ ] Document state management
+### 🚧 Documentation (In Progress)
+- [x] Update component documentation
+- [x] Add usage examples
+- [x] Document state management
 - [ ] Add troubleshooting guide
 
 ## Directory Structure
@@ -97,15 +104,9 @@ src/features/poi/
 │   │   ├── POIMarker.styles.ts
 │   │   ├── types.ts
 │   │   └── index.ts
-│   ├── DraggablePOIMarker/     # 🚧 To be implemented
-│   │   ├── DraggablePOIMarker.tsx
-│   │   ├── DraggablePOIMarker.styles.ts
-│   │   ├── types.ts
-│   │   └── index.ts
-│   ├── PlaceNamePOIMarker/     # 🚧 To be implemented
-│   │   ├── PlaceNamePOIMarker.tsx
-│   │   ├── PlaceNamePOIMarker.styles.ts
-│   │   ├── types.ts
+│   ├── MapboxPOIMarker/        # ✅ Completed
+│   │   ├── MapboxPOIMarker.tsx
+│   │   ├── MapboxPOIMarker.styles.css
 │   │   └── index.ts
 │   └── POIDrawer/              # ✅ Completed
 │       ├── POIDrawer.tsx
@@ -120,7 +121,8 @@ src/features/poi/
 │   ├── POIContext.tsx
 │   └── types.ts
 ├── constants/                  # ✅ Completed
-│   └── poi-icons.ts
+│   ├── poi-icons.ts
+│   └── icon-paths.ts
 ├── utils/                      # ✅ Completed
 │   └── photo.ts
 └── types/                      # ✅ Completed
@@ -157,11 +159,18 @@ src/features/poi/
 - Error states with clear feedback
 - Smooth transitions between steps
 
+## Recent Updates
+- Fixed POI click handling in MapView and POIDrawer
+- Improved handler state management and cleanup
+- Added detailed logging for debugging
+- Optimized performance with proper handler memoization
+- Enhanced cursor feedback and visual states
+
 ## Next Steps
-1. Add map click handling for POI placement
-2. Implement crosshair cursor mode
+1. ✅ Fix map click handling for POI placement
+2. ✅ Implement crosshair cursor mode
 3. Add place name click handling
 4. Create POI list view
 5. Implement POI filtering
-6. Test all features
-7. Document usage
+6. Complete place name POI functionality
+7. Add troubleshooting guide
