@@ -1,17 +1,19 @@
 .marker-container {
-  position: relative;
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
 }
 
 .marker-bubble {
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -26,16 +28,22 @@
   width: 0;
   height: 0;
   margin-top: -1px;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 10px solid;  /* Color set in inline style */
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid;  /* Color set in inline style */
 }
 
 .marker-icon {
   color: white;
-  font-size: 16px;
+  font-size: 10px;
 }
 
 .selected .marker-bubble {
   box-shadow: 0 0 0 2px white, 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.poi-marker {
+  position: absolute;
+  z-index: 1;
+  pointer-events: auto;
 }
