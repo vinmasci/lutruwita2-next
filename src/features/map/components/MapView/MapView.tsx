@@ -1,9 +1,12 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
-import { POIProvider } from '../../../poi/context/POIContext';
+import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
+import { POIType, POIPosition } from '../../../poi/types/poi.types';
+import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
+import './MapView.css';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
@@ -67,7 +70,7 @@ function MapViewContent() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
   const [currentPhotos, setCurrentPhotos] = useState([]);
-  const [currentPOIs, setCurrentPOIs] = useState([]);
+  const { pois, updatePOIPosition } = usePOIContext();
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
@@ -242,12 +245,16 @@ function MapViewContent() {
     canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
 
     if (isPoiPlacementMode) {
-      const clickHandler = (e: mapboxgl.MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
-        if (onPoiPlacementClick) {
-          const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
-          onPoiPlacementClick(coords);
-        }
-      };
+  const clickHandler = (e: mapboxgl.MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
+    console.log('[MapView] Map clicked:', e.lngLat);
+    console.log('[MapView] onPoiPlacementClick handler exists:', !!onPoiPlacementClick);
+    
+    if (onPoiPlacementClick) {
+      const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      console.log('[MapView] Calling onPoiPlacementClick with coords:', coords);
+      onPoiPlacementClick(coords);
+    }
+  };
 
       map.on('click', clickHandler);
       return () => {
@@ -433,6 +440,11 @@ function MapViewContent() {
     };
   }, []);
 
+  // Handle POI drag end
+  const handlePOIDragEnd = useCallback((poi: POIType, newPosition: POIPosition) => {
+    updatePOIPosition(poi.id, newPosition);
+  }, [updatePOIPosition]);
+
   return (
     <MapProvider value={{ 
       map: mapInstance.current, 
@@ -477,7 +489,13 @@ function MapViewContent() {
         onSaveMap={handleSaveMap}
         onLoadMap={handleLoadMap}
         onAddPhotos={handleAddPhotos}
-        onAddPOI={handleAddPOI}
+        onAddPOI={() => {
+          console.log('[MapView] onAddPOI called, current state:', {
+            isPOIDrawerOpen,
+            isPoiPlacementMode
+          });
+          setIsPOIDrawerOpen(!isPOIDrawerOpen);
+        }}
         mapReady={mapReady}
         onItemClick={() => {}}
         onToggleRoute={() => {}}
@@ -485,7 +503,17 @@ function MapViewContent() {
         onToggleSurface={() => {}}
         onPlacePOI={() => {}}
         onDeleteRoute={handleDeleteRoute}
+        isPOIDrawerOpen={isPOIDrawerOpen}
       />
+      {/* Render POI markers */}
+      {isMapReady && pois.map(poi => (
+        <MapboxPOIMarker
+          key={poi.id}
+          poi={poi}
+          onDragEnd={handlePOIDragEnd}
+        />
+      ))}
+
       {currentRoute && (
         <ElevationProfilePanel
           route={currentRoute}

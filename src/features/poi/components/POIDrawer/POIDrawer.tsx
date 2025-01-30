@@ -53,11 +53,16 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   }, [isOpen, setPoiPlacementMode, setPoiPlacementClick]);
 
   const handleLocationSelect = (location: { lat: number; lng: number }) => {
+    console.log('[POIDrawer] handleLocationSelect called with:', location);
     setState(prev => ({
       ...prev,
       selectedLocation: location,
       step: 'icon-select'
     }));
+    console.log('[POIDrawer] State updated to:', {
+      selectedLocation: location,
+      step: 'icon-select'
+    });
   };
 
   // Memoize the click handler
@@ -70,18 +75,32 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
 
   // Set up click handler when in map mode
   useEffect(() => {
+    console.log('[POIDrawer] State changed:', {
+      mode: state.mode,
+      step: state.step,
+      isPoiPlacementMode: state.mode === 'map' && state.step === 'location-select'
+    });
+
     if (state.mode === 'map' && state.step === 'location-select') {
+      console.log('[POIDrawer] Setting up click handler');
       setPoiPlacementMode(true);
       setPoiPlacementClick(clickHandler);
     } else {
+      console.log('[POIDrawer] Cleaning up click handler');
       setPoiPlacementMode(false);
       setPoiPlacementClick(undefined);
     }
 
     return () => {
+      console.log('[POIDrawer] Cleanup effect');
       setPoiPlacementClick(undefined);
     };
   }, [state.mode, state.step, setPoiPlacementMode, setPoiPlacementClick, clickHandler]);
+
+  // Debug log when clickHandler is created/updated
+  useEffect(() => {
+    console.log('[POIDrawer] Click handler updated');
+  }, [clickHandler]);
 
   const handleModeSelect = (mode: POIDrawerState['mode']) => {
     setState(prev => ({
