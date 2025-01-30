@@ -1,26 +1,24 @@
-.poi-marker {
+.marker-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px 16px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.poi-marker.selected .marker-container {
-  border: 2px solid #ffffff;
+.marker-bubble:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
 }
 
-.mapboxgl-popup.bg-transparent {
-  background: transparent;
+.selected .marker-bubble {
+  box-shadow: 0 0 0 2px white, 0 3px 6px rgba(0, 0, 0, 0.3);
 }
 
-.mapboxgl-popup.border-none {
-  border: none;
-}
-
-.mapboxgl-popup.shadow-none {
-  box-shadow: none;
-}
-
-.mapboxgl-popup-content {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
+.poi-marker {
+  transform-origin: bottom center;
 }

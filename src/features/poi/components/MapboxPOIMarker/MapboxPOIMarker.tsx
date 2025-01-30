@@ -14,9 +14,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
   className,
 }) => {
   const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const popupRef = useRef<mapboxgl.Popup | null>(null);
   const isDraggable = poi.type === 'draggable';
-  const iconDefinition = getIconDefinition(poi.icon);
   const categoryColor = POI_CATEGORIES[poi.category].color;
   const { map } = useMapContext();
 
@@ -27,51 +25,24 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
     const el = document.createElement('div');
     el.className = `poi-marker ${className || ''} ${selected ? 'selected' : ''}`;
     
-    // Set up marker HTML with proper styling
+    // Set up marker HTML with new bubble style
     el.innerHTML = `
-      <div class="relative bg-gray-800 px-2 py-1 rounded flex items-center gap-1 shadow-md">
+      <div class="marker-bubble" style="background-color: ${categoryColor}">
         <svg 
           xmlns="http://www.w3.org/2000/svg" 
-          width="20" 
-          height="20" 
+          width="16" 
+          height="16" 
           viewBox="0 0 24 24" 
           fill="none" 
-          stroke="${categoryColor}"
+          stroke="white"
           stroke-width="2" 
           stroke-linecap="round" 
           stroke-linejoin="round"
         >
           <path d="${ICON_PATHS[poi.icon]}"></path>
         </svg>
-        ${poi.name ? `
-          <span class="text-white text-sm truncate max-w-[150px]">
-            ${poi.name}
-          </span>
-        ` : ''}
-        <div class="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0
-                    border-l-[6px] border-l-transparent
-                    border-r-[6px] border-r-transparent
-                    border-t-[6px] border-t-gray-800">
-        </div>
       </div>
     `;
-
-    // Create popup
-    const popupContent = document.createElement('div');
-    popupContent.className = 'bg-gray-800 text-white p-2 rounded shadow-lg';
-    popupContent.innerHTML = `
-      <div class="space-y-1">
-        <h3 class="font-medium">${poi.name}</h3>
-        ${poi.description ? `<p class="text-sm text-gray-300">${poi.description}</p>` : ''}
-        ${iconDefinition?.description ? `<p class="text-xs text-gray-400">${iconDefinition.description}</p>` : ''}
-      </div>
-    `;
-
-    popupRef.current = new mapboxgl.Popup({
-      offset: [0, -10],
-      closeButton: true,
-      className: 'bg-transparent border-none shadow-none'
-    }).setDOMContent(popupContent);
 
     // Create marker
     markerRef.current = new mapboxgl.Marker({
@@ -79,8 +50,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
       draggable: isDraggable,
       anchor: 'bottom'
     })
-      .setLngLat([poi.position.lng, poi.position.lat])
-      .setPopup(popupRef.current);
+      .setLngLat([poi.position.lng, poi.position.lat]);
 
     // Add event listeners
     if (onClick) {
@@ -101,7 +71,6 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
 
     return () => {
       markerRef.current?.remove();
-      popupRef.current?.remove();
     };
   }, [poi, onClick, onDragEnd, selected, className, isDraggable, categoryColor, map]);
 
