@@ -12,11 +12,16 @@ This document outlines the project structure and describes the purpose of key fi
 ├── vite.config.ts                 # Vite bundler configuration
 ├── docs/                          # Project documentation
 │   ├── ARCHITECTURE.md            # System architecture documentation
+│   ├── BASICGPX.MD               # Basic GPX functionality documentation
 │   ├── DIR.md                     # This directory structure document
+│   ├── ELEVATION_PROFILE.md      # Elevation profile feature documentation
 │   ├── GPX_Processing_Issues.md   # Known GPX processing issues and solutions
+│   ├── GPX_UPLOADER_DRAWER.md    # GPX uploader drawer documentation
 │   ├── MIGRATION_LOG.md           # Migration progress and changes log
 │   ├── MIGRATIONPLAN.md           # Plan for system migration
 │   ├── OLDFUNCTIONS.md            # Archive of previous implementations
+│   ├── POI_IMPLEMENTATION_PLAN.md # Points of Interest implementation plan
+│   ├── POI_PROGRESS_NOTES.md     # POI feature progress tracking
 │   ├── surface-detection.md       # Surface detection documentation
 │   └── surfacedetectionplan.md    # Planning for surface detection feature
 ├── logs/                          # Application logs
@@ -49,27 +54,60 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── features/               # Feature modules
 │   │   ├── gpx/               # GPX processing feature
 │   │   │   ├── components/    # GPX-specific components
-│   │   │   │   ├── Uploader/ # Handles GPX file upload and management
-│   │   │   │   │   ├── Uploader.tsx      # Main uploader logic
-│   │   │   │   │   ├── UploaderUI.tsx    # UI for file upload, rename, and deletion
-│   │   │   │   │   ├── Uploader.types.ts # Type definitions
-│   │   │   │   │   └── index.ts          # Component exports
+│   │   │   │   ├── ElevationProfile/ # Elevation visualization
+│   │   │   │   │   ├── ElevationProfile.tsx      # Main elevation profile component
+│   │   │   │   │   ├── ElevationProfilePanel.tsx # Profile panel component
+│   │   │   │   │   └── ElevationProfile.styles.ts # Styling
+│   │   │   │   └── Uploader/ # Handles GPX file upload and management
+│   │   │   │       ├── Uploader.tsx      # Main uploader logic
+│   │   │   │       ├── UploaderUI.tsx    # UI for file upload, rename, and deletion
+│   │   │   │       ├── Uploader.types.ts # Type definitions
+│   │   │   │       └── index.ts          # Component exports
 │   │   │   ├── hooks/        # GPX-related React hooks
 │   │   │   ├── services/     # GPX processing services
 │   │   │   ├── types/       # Type definitions
 │   │   │   └── utils/       # GPX utility functions
 │   │   ├── map/             # Map visualization feature
 │   │   │   ├── components/  # Map-related components
-│   │   │   │   └── Sidebar/ # Main sidebar and drawer system
+│   │   │   │   ├── MapControls/ # Map control components
+│   │   │   │   ├── MapView/    # Main map display
+│   │   │   │   │   ├── MapView.tsx # Map component
+│   │   │   │   │   └── MapView.css # Map styles
+│   │   │   │   └── Sidebar/    # Main sidebar and drawer system
 │   │   │   │       ├── Sidebar.tsx       # Main sidebar component
 │   │   │   │       ├── Sidebar.styles.ts # Styled drawer components
+│   │   │   │       ├── RouteList.tsx     # Route listing component
 │   │   │   │       ├── SidebarListItems.tsx # Icon button list
+│   │   │   │       ├── useSidebar.ts    # Sidebar hook
 │   │   │   │       └── types.ts         # Sidebar type definitions
 │   │   │   ├── context/    # Map state management
+│   │   │   │   ├── MapContext.tsx  # Map context provider
+│   │   │   │   └── RouteContext.tsx # Route management context
 │   │   │   ├── hooks/      # Map-related hooks
 │   │   │   ├── services/   # Map services
 │   │   │   └── types/     # Map type definitions
 │   │   └── poi/           # Points of Interest feature
+│   │       ├── components/ # POI-specific components
+│   │       │   ├── MapboxPOIMarker/ # Mapbox-specific POI marker
+│   │       │   │   ├── MapboxPOIMarker.tsx # Marker component
+│   │       │   │   └── MapboxPOIMarker.styles.css # Marker styles
+│   │       │   ├── POIDrawer/   # POI management drawer
+│   │       │   │   ├── POIDrawer.tsx # Main drawer component
+│   │       │   │   ├── POIDetailsForm.tsx # POI details form
+│   │       │   │   ├── POIIconSelection.tsx # Icon selection UI
+│   │       │   │   ├── POILocationInstructions.tsx # Location help
+│   │       │   │   ├── POIModeSelection.tsx # Mode selection UI
+│   │       │   │   └── POIDrawer.styles.ts # Drawer styling
+│   │       │   └── POIMarker/   # Generic POI marker component
+│   │       │       ├── POIMarker.tsx # Marker implementation
+│   │       │       └── POIMarker.styles.ts # Marker styling
+│   │       ├── constants/  # POI-related constants
+│   │       │   ├── icon-paths.ts # Icon asset paths
+│   │       │   └── poi-icons.ts  # POI icon definitions
+│   │       ├── context/    # POI state management
+│   │       │   └── POIContext.tsx # POI context provider
+│   │       ├── types/     # POI type definitions
+│   │       └── utils/     # POI utility functions
 │   ├── lib/               # Core utilities and helpers
 │   ├── types/            # Global type definitions
 │   └── utils/            # Shared utility functions
@@ -94,17 +132,33 @@ The GPX processing feature (`src/features/gpx/`) handles the upload, parsing, an
     - CAT 1: #ff3f34 (Red)
     - HORS: #b33939 (Dark Red)
 - GPX data processing services
+- Surface detection and analysis
 
 ### Map Visualization
 The map feature (`src/features/map/`) manages the interactive map display, including controls, sidebar navigation, and map state management. Key components include:
 - Sidebar System:
   - Main sidebar (`StyledDrawer`) - Fixed 56px width drawer containing action icons
   - Nested drawer (`NestedDrawer`) - 300px width drawer that slides out from the main sidebar
-  - The GPX file management UI appears in the nested drawer when the GPX upload action is triggered
+  - Route list management and display
+  - Integration with GPX and POI features
 - Map Context for sharing map state across components
+- MapView component for rendering the interactive map
+- Map controls for user interaction
 
 ### Points of Interest (POI)
-The POI feature (`src/features/poi/`) handles the display and management of points of interest on the map, including custom markers and POI-specific interactions.
+The POI feature (`src/features/poi/`) provides functionality for managing and displaying points of interest on the map. Key components include:
+- POI Drawer System:
+  - Mode selection for different POI operations
+  - Icon selection interface
+  - Location instructions
+  - Details form for POI information
+- Marker Components:
+  - Generic POI marker implementation
+  - Mapbox-specific marker integration
+  - Custom styling and interactions
+- POI Context for state management
+- Photo utilities for handling POI images
+- Comprehensive type system for POI data
 
 ## Architecture
 
