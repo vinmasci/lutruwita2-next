@@ -86,21 +86,38 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   ├── hooks/      # Map-related hooks
 │   │   │   ├── services/   # Map services
 │   │   │   └── types/     # Map type definitions
+│   │   ├── photo/         # Photo management feature
+│   │   │   ├── components/ # Photo-specific components
+│   │   │   │   └── Uploader/ # Photo upload handling
+│   │   │   │       ├── PhotoUploader.tsx # Main photo uploader
+│   │   │   │       ├── PhotoUploaderUI.tsx # Upload interface
+│   │   │   │       └── PhotoUploader.types.ts # Type definitions
+│   │   │   └── context/   # Photo state management
+│   │   │       └── PhotoContext.tsx # Photo context provider
 │   │   └── poi/           # Points of Interest feature
 │   │       ├── components/ # POI-specific components
 │   │       │   ├── MapboxPOIMarker/ # Mapbox-specific POI marker
 │   │       │   │   ├── MapboxPOIMarker.tsx # Marker component
-│   │       │   │   └── MapboxPOIMarker.styles.css # Marker styles
+│   │       │   │   ├── MapboxPOIMarker.styles.css # Marker styles
+│   │       │   │   └── index.ts     # Component exports
+│   │       │   ├── POIDetailsDrawer/ # POI details viewing drawer
+│   │       │   │   └── POIDetailsDrawer.tsx # Details display component
+│   │       │   ├── POIDragPreview/  # Drag and drop preview
+│   │       │   │   └── POIDragPreview.tsx # Drag preview component
 │   │       │   ├── POIDrawer/   # POI management drawer
 │   │       │   │   ├── POIDrawer.tsx # Main drawer component
 │   │       │   │   ├── POIDetailsForm.tsx # POI details form
 │   │       │   │   ├── POIIconSelection.tsx # Icon selection UI
 │   │       │   │   ├── POILocationInstructions.tsx # Location help
 │   │       │   │   ├── POIModeSelection.tsx # Mode selection UI
-│   │       │   │   └── POIDrawer.styles.ts # Drawer styling
+│   │       │   │   ├── POIDrawer.styles.ts # Drawer styling
+│   │       │   │   ├── types.ts    # POI drawer types
+│   │       │   │   └── index.ts    # Component exports
 │   │       │   └── POIMarker/   # Generic POI marker component
 │   │       │       ├── POIMarker.tsx # Marker implementation
-│   │       │       └── POIMarker.styles.ts # Marker styling
+│   │       │       ├── POIMarker.styles.ts # Marker styling
+│   │       │       ├── types.ts    # Marker type definitions
+│   │       │       └── index.ts    # Component exports
 │   │       ├── constants/  # POI-related constants
 │   │       │   ├── icon-paths.ts # Icon asset paths
 │   │       │   └── poi-icons.ts  # POI icon definitions
@@ -108,6 +125,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   └── POIContext.tsx # POI context provider
 │   │       ├── types/     # POI type definitions
 │   │       └── utils/     # POI utility functions
+│   │           └── photo.ts # Photo-related utilities
 │   ├── lib/               # Core utilities and helpers
 │   ├── types/            # Global type definitions
 │   └── utils/            # Shared utility functions
@@ -156,9 +174,20 @@ The POI feature (`src/features/poi/`) provides functionality for managing and di
   - Generic POI marker implementation
   - Mapbox-specific marker integration
   - Custom styling and interactions
+  - Drag and drop preview functionality
+- Details Drawer for viewing POI information
 - POI Context for state management
 - Photo utilities for handling POI images
 - Comprehensive type system for POI data
+
+### Photo Management
+The photo feature (`src/features/photo/`) handles photo upload and management functionality:
+- Photo Uploader:
+  - File upload interface
+  - Upload progress tracking
+  - Type validation
+- Photo Context for managing photo state
+- Integration with POI feature for attaching photos to points of interest
 
 ## Architecture
 
