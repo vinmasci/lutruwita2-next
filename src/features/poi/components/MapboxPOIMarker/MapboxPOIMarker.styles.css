@@ -3,18 +3,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  transform-origin: bottom center;
+  will-change: transform;
 }
 
 .marker-bubble {
-  width: 16px;
-  height: 16px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 8px;
+  background-color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
 }
 
 .marker-bubble:hover {
@@ -25,17 +30,37 @@
 .marker-point {
   width: 0;
   height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid;  /* Color set in inline style */
   margin-top: -1px;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 4px solid;  /* Color set in inline style */
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2));
 }
 
 .marker-icon {
+  width: 28px;
+  height: 28px;
   color: white;
-  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.poi-marker {
+  cursor: pointer;
+  transform-origin: bottom center;
+  /* Prevent text selection */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .selected .marker-bubble {
   box-shadow: 0 0 0 2px white, 0 3px 6px rgba(0, 0, 0, 0.3);
+  transform: scale(1.1);
 }
