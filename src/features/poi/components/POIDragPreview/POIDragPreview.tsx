@@ -3,6 +3,7 @@ import { POIPosition, POICategory, POIIconName } from '../../types/poi.types';
 import { useMapContext } from '../../../map/context/MapContext';
 import { ICON_PATHS } from '../../constants/icon-paths';
 import { POI_CATEGORIES } from '../../types/poi.types';
+import { getIconDefinition } from '../../constants/poi-icons';
 import '../MapboxPOIMarker/MapboxPOIMarker.styles.css';
 
 interface POIDragPreviewProps {
@@ -68,10 +69,18 @@ const POIDragPreview: React.FC<POIDragPreviewProps> = ({
       }}
     >
       <div className="marker-container">
-        <div className="marker-bubble" style={{ backgroundColor: POI_CATEGORIES[category].color }}>
-          <i className={`${ICON_PATHS[icon]} marker-icon`}></i>
-        </div>
-        <div className="marker-point" style={{ borderTopColor: POI_CATEGORIES[category].color }}></div>
+        {(() => {
+          const iconDefinition = getIconDefinition(icon);
+          const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[category].color;
+          return (
+            <>
+              <div className="marker-bubble" style={{ backgroundColor: markerColor }}>
+                <i className={`${ICON_PATHS[icon]} marker-icon`} style={{ color: 'white' }}></i>
+              </div>
+              <div className="marker-point" style={{ borderTopColor: markerColor }}></div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

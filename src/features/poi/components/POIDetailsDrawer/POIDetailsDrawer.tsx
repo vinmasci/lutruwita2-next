@@ -1,0 +1,246 @@
+import React, { useState, useEffect } from 'react';
+import { TextField, Button, Box, Typography } from '@mui/material';
+import { StyledDrawer, DrawerHeader, DrawerContent, DrawerFooter } from '../POIDrawer/POIDrawer.styles';
+import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
+import { POI_CATEGORIES, POIIconName, POICategory } from '../../types/poi.types';
+import { getIconDefinition } from '../../constants/poi-icons';
+
+interface POIDetailsDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  iconName: POIIconName;
+  category: POICategory;
+  onSave: (details: { name: string; description: string; photos: File[] }) => void;
+}
+
+const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
+  isOpen,
+  onClose,
+  iconName,
+  category,
+  onSave
+}) => {
+  // Get the icon definition for default name
+  const iconDef = getIconDefinition(iconName);
+  const categoryColor = POI_CATEGORIES[category].color;
+
+  // State for form fields
+  const [name, setName] = useState(iconDef?.label || '');
+  const [description, setDescription] = useState('');
+  const [photos, setPhotos] = useState<File[]>([]);
+
+  // Reset form when drawer opens with new POI
+  useEffect(() => {
+    if (isOpen) {
+      setName(iconDef?.label || '');
+      setDescription('');
+      setPhotos([]);
+    }
+  }, [isOpen, iconDef]);
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      setPhotos(Array.from(event.target.files));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      description,
+      photos
+    });
+  };
+
+  return (
+    <NestedDrawer
+      anchor="left"
+      open={isOpen}
+      onClose={onClose}
+      variant="persistent"
+      sx={{
+        zIndex: 1300 // Higher than POIDrawer
+      }}
+    >
+      <StyledDrawer>
+        <DrawerHeader>
+          <Typography variant="h6">Add POI Details</Typography>
+        </DrawerHeader>
+
+        <DrawerContent>
+          <form onSubmit={handleSubmit} style={{ height: '100%' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
+            {/* Icon preview */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1, 
+              backgroundColor: 'rgba(45, 45, 45, 0.9)',
+              padding: '12px',
+              borderRadius: '4px'
+            }}>
+              <i 
+                className={iconDef?.name} 
+                style={{ 
+                  color: categoryColor,
+                  fontSize: '24px' 
+                }} 
+              />
+              <Typography variant="body2" color="text.secondary">
+                {POI_CATEGORIES[category].label}
+              </Typography>
+            </Box>
+
+            {/* Name field */}
+            <TextField
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              fullWidth
+              variant="outlined"
+              size="small"
+              sx={{ 
+                backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                  }
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                },
+                '& .MuiOutlinedInput-input': {
+                  color: 'rgba(255, 255, 255, 0.9)'
+                }
+              }}
+            />
+
+            {/* Description field */}
+            <TextField
+              label="Description (optional)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              multiline
+              rows={4}
+              fullWidth
+              variant="outlined"
+              size="small"
+              sx={{ 
+                backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                  }
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                },
+                '& .MuiOutlinedInput-input': {
+                  color: 'rgba(255, 255, 255, 0.9)'
+                }
+              }}
+            />
+
+            {/* Photo upload */}
+            <Button
+              component="label"
+              variant="outlined"
+              fullWidth
+              sx={{ 
+                backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                color: 'rgba(255, 255, 255, 0.9)',
+                '&:hover': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  backgroundColor: 'rgba(45, 45, 45, 0.9)'
+                }
+              }}
+            >
+              Add Photos
+              <input
+                type="file"
+                hidden
+                multiple
+                accept="image/*"
+                onChange={handlePhotoChange}
+              />
+            </Button>
+
+            {/* Photo preview */}
+            {photos.length > 0 && (
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 1 
+              }}>
+                {photos.map((photo, index) => (
+                  <Box 
+                    key={index}
+                    sx={{
+                      aspectRatio: '1',
+                      backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                      borderRadius: 1,
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <img
+                      src={URL.createObjectURL(photo)}
+                      alt={`Upload ${index + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+              {/* Action buttons */}
+              <DrawerFooter>
+                <Button
+                  variant="text"
+                  onClick={onClose}
+                  fullWidth
+                  sx={{ color: 'white' }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  sx={{ 
+                    backgroundColor: categoryColor,
+                    '&:hover': {
+                      backgroundColor: categoryColor,
+                      opacity: 0.9
+                    }
+                  }}
+                >
+                  Save
+                </Button>
+              </DrawerFooter>
+            </Box>
+          </form>
+        </DrawerContent>
+      </StyledDrawer>
+    </NestedDrawer>
+  );
+};
+
+export default POIDetailsDrawer;

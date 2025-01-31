@@ -1,18 +1,18 @@
 // This file contains Font Awesome icon classes for POI markers
 export const ICON_PATHS: Record<string, string> = {
   // Road Information
-  'AlertTriangle': 'fa-solid fa-triangle-exclamation',
-  'Octagon': 'fa-solid fa-octagon',
-  'AlertOctagon': 'fa-solid fa-octagon-exclamation',
-  'Lock': 'fa-solid fa-lock',
-  'Unlock': 'fa-solid fa-lock-open',
+  'TrafficCone': 'fa-solid fa-traffic-cone',
+  'Octagon': 'fa-solid fa-road-circle-xmark',
+  'AlertOctagon': 'fa-solid fa-road-circle-exclamation',
+  'Lock': 'fa-solid fa-road-lock',
+  'Unlock': 'fa-solid fa-fence',
   'WaterCrossing': 'fa-solid fa-water', // Water crossing
-  'ChevronsRightLeft': 'fa-solid fa-road',
-  'ArrowUpRight': 'fa-solid fa-arrow-up-right',
-  'AudioWaveform': 'fa-solid fa-wave-square',
-  'Route': 'fa-solid fa-route',
+  'ChevronsRightLeft': 'fa-solid fa-car-bump',
+  'ArrowUpRight': 'fa-solid fa-arrow-up-right-and-arrow-down-left-from-center',
+  'AudioWaveform': 'fa-solid fa-xmarks-lines',
+  'Route': 'fa-solid fa-sign-post',
   'RailTrail': 'fa-solid fa-train-track', // Rail trail
-  'Construction': 'fa-solid fa-triangle-exclamation',
+  'Construction': 'fa-solid fa-triangle-person-digging',
   
   // Accommodation
   'Tent': 'fa-solid fa-tent',

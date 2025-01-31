@@ -14,7 +14,7 @@ export type POICategory =
 
 export type POIIconName =
   // Road Information
-  | 'AlertTriangle' | 'Octagon' | 'AlertOctagon' | 'Lock'
+  | 'TrafficCone' | 'Octagon' | 'AlertOctagon' | 'Lock'
   | 'Unlock' | 'WaterCrossing' | 'ChevronsRightLeft'
   | 'ArrowUpRight' | 'AudioWaveform' | 'Route' | 'RailTrail' | 'Construction'
   // Accommodation
@@ -93,11 +93,11 @@ export interface POIIconProps {
 }
 
 export const POI_CATEGORIES: Record<POICategory, { label: string; color: string }> = {
-  'road-information': { label: 'Road Information', color: '#dc3545' },
-  'accommodation': { label: 'Accommodation', color: '#28a745' },
-  'food-drink': { label: 'Food & Drink', color: '#ffc107' },
-  'natural-features': { label: 'Natural Features', color: '#17a2b8' },
-  'event-information': { label: 'Event Information', color: '#6610f2' },
-  'town-services': { label: 'Town Services', color: '#fd7e14' },
+  'road-information': { label: 'Road Information', color: '#ff5252' },
+  'accommodation': { label: 'Accommodation', color: '#40407a' },
+  'food-drink': { label: 'Food & Drink', color: '#ffa502' },
+  'natural-features': { label: 'Natural Features', color: '#27ae60' },
+  'event-information': { label: 'Event Information', color: '#e15f41' },
+  'town-services': { label: 'Town Services', color: '#3dc1d3' },
   'transportation': { label: 'Transportation', color: '#20c997' }
 };

@@ -5,22 +5,25 @@ export interface POIIconDefinition {
   category: POICategory;
   label: string;
   description?: string;
+  style?: {
+    color?: string;
+  };
 }
 
 export const POI_ICONS: POIIconDefinition[] = [
   // Road Information
-  { name: 'AlertTriangle', category: 'road-information', label: 'Road Hazard', description: 'Warning for road hazards or dangerous conditions' },
+  { name: 'TrafficCone', category: 'road-information', label: 'Road Hazard', description: 'Warning for road hazards or dangerous conditions' },
   { name: 'Octagon', category: 'road-information', label: 'Road Closed', description: 'Road is closed to all traffic' },
   { name: 'AlertOctagon', category: 'road-information', label: 'Private Road', description: 'Private road or restricted access' },
   { name: 'Lock', category: 'road-information', label: 'Locked Gate', description: 'Gate is locked, no access' },
   { name: 'Unlock', category: 'road-information', label: 'Gate', description: 'Gate present, may need to open/close' },
-  { name: 'WaterCrossing', category: 'road-information', label: 'Water Crossing', description: 'River, stream, or water crossing' },
   { name: 'ChevronsRightLeft', category: 'road-information', label: 'Rough Surface', description: 'Rough or uneven road surface' },
   { name: 'ArrowUpRight', category: 'road-information', label: 'Steep Gradient', description: 'Steep uphill or downhill section' },
   { name: 'AudioWaveform', category: 'road-information', label: 'Single Track', description: 'Narrow single track section' },
   { name: 'Route', category: 'road-information', label: 'Trailhead', description: 'Start of a trail or track' },
   { name: 'RailTrail', category: 'road-information', label: 'Rail Trail', description: 'Former railway line converted to trail' },
   { name: 'Construction', category: 'road-information', label: 'Road Construction', description: 'Road works or construction area' },
+  { name: 'WaterCrossing', category: 'road-information', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#3498db' } },
 
   // Accommodation
   { name: 'Tent', category: 'accommodation', label: 'Camping', description: 'Camping area or campsite' },
@@ -32,18 +35,18 @@ export const POI_ICONS: POIIconDefinition[] = [
   // Food/Drink
   { name: 'Utensils', category: 'food-drink', label: 'Restaurant', description: 'Restaurant or dining' },
   { name: 'Coffee', category: 'food-drink', label: 'Cafe', description: 'Cafe or coffee shop' },
-  { name: 'Droplet', category: 'food-drink', label: 'Drinking Water', description: 'Drinking water available' },
   { name: 'Pizza', category: 'food-drink', label: 'Roadhouse', description: 'Roadhouse or truck stop' },
   { name: 'ShoppingCart', category: 'food-drink', label: 'Supermarket', description: 'Supermarket or grocery store' },
   { name: 'Store', category: 'food-drink', label: 'General Store', description: 'General store or convenience store' },
   { name: 'Beer', category: 'food-drink', label: 'Bar/Pub', description: 'Bar or pub' },
   { name: 'Wine', category: 'food-drink', label: 'Winery', description: 'Winery or cellar door' },
+  { name: 'Droplet', category: 'food-drink', label: 'Drinking Water', description: 'Drinking water available', style: { color: '#3498db' } },
 
   // Natural Features
   { name: 'Mountain', category: 'natural-features', label: 'Summit', description: 'Mountain summit or peak' },
   { name: 'TreePine', category: 'natural-features', label: 'National Park', description: 'National park or reserve' },
   { name: 'Binoculars', category: 'natural-features', label: 'Viewpoint', description: 'Scenic viewpoint or lookout' },
-  { name: 'Swimming', category: 'natural-features', label: 'Swimming', description: 'Swimming spot or water access' },
+  { name: 'Swimming', category: 'natural-features', label: 'Swimming', description: 'Swimming spot or water access', style: { color: '#3498db' } },
 
   // Event Information
   { name: 'PlayCircle', category: 'event-information', label: 'Start', description: 'Event start point' },

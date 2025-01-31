@@ -24,7 +24,8 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
   });
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const isDraggable = poi.type === 'draggable';
-  const categoryColor = POI_CATEGORIES[poi.category].color;
+  const iconDefinition = getIconDefinition(poi.icon);
+  const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
   const { map } = useMapContext();
 
   // Create or recreate marker when position changes
@@ -54,10 +55,10 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
     // Set up marker HTML with bubble-pin style
     el.innerHTML = `
       <div class="marker-container">
-        <div class="marker-bubble" style="background-color: ${categoryColor}">
+        <div class="marker-bubble" style="background-color: ${markerColor}">
           <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
         </div>
-        <div class="marker-point" style="border-top-color: ${categoryColor}"></div>
+        <div class="marker-point" style="border-top-color: ${markerColor}"></div>
       </div>
     `;
 
@@ -258,7 +259,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
         markerRef.current = null;
       }
     };
-  }, [map, poi, onClick, onDragEnd, selected, className, isDraggable, categoryColor]); // Recreate marker when any of these change
+  }, [map, poi, onClick, onDragEnd, selected, className, isDraggable, markerColor]); // Recreate marker when any of these change
 
   return null;
 };

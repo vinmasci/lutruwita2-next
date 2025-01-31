@@ -14,6 +14,18 @@ export const useSidebar = (props: SidebarProps) => {
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
+  const handleAddPhotos = () => {
+    if (activeDrawer === 'photos') {
+      setIsDrawerOpen(false);
+      setActiveDrawer(null);
+    } else {
+      setIsDrawerOpen(true);
+      setActiveDrawer('photos');
+      props.onItemClick('photos');
+      props.onAddPhotos();
+    }
+  };
+
   const handleUploadGpx = async (file?: File) => {
     if (file) {
       try {
@@ -71,6 +83,7 @@ export const useSidebar = (props: SidebarProps) => {
     handleSaveMap: props.onSaveMap,
     handleLoadMap: props.onLoadMap,
     handlePlacePOI: props.onPlacePOI,
-    handleAddPOI
+    handleAddPOI,
+    handleAddPhotos
   };
 };

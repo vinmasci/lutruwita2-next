@@ -5,9 +5,9 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { POIDrawerProps, POIDrawerState, POIFormData } from './types';
 import { StyledDrawer } from './POIDrawer.styles';
 import { createPOIPhotos } from '../../utils/photo';
+import { POI_ICONS } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
-import POIDetailsForm from './POIDetailsForm';
 
 const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   const { addPOI } = usePOIContext();
@@ -67,28 +67,20 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     }));
   };
 
-  const handleCategorySelect = (category: POIDrawerState['selectedCategory']) => {
-    setState(prev => ({
-      ...prev,
-      selectedCategory: category,
-      selectedIcon: null
-    }));
-  };
-
   const handleIconSelect = (icon: POIDrawerState['selectedIcon']) => {
-    setState(prev => ({
-      ...prev,
-      selectedIcon: icon
-    }));
+    const category = POI_ICONS.find((icon_def) => icon_def.name === icon)?.category;
+    if (!icon || !category) return;
+
+    // Set drag preview and let MapView handle the details
+    setDragPreview({ icon, category });
   };
 
   const { setDragPreview } = useMapContext();
 
   const handleStartDrag = (icon: POIDrawerState['selectedIcon'], category: POIDrawerState['selectedCategory']) => {
     if (!icon || !category) return;
-    // Set drag preview and close drawer
+    // Set drag preview
     setDragPreview({ icon, category });
-    onClose();
   };
 
   const handleIconBack = () => {
@@ -100,72 +92,6 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     }));
   };
 
-  const handleIconNext = () => {
-    if (!state.selectedIcon || !state.selectedCategory) return;
-
-    setState(prev => ({
-      ...prev,
-      step: 'details',
-      formData: {
-        name: '',
-        description: '',
-        category: prev.selectedCategory!,
-        icon: prev.selectedIcon!,
-        photos: []
-      }
-    }));
-  };
-
-  const handleDetailsBack = () => {
-    setState(prev => ({
-      ...prev,
-      step: 'icon-select',
-      formData: null
-    }));
-  };
-
-  const handleDetailsSubmit = async (data: POIFormData) => {
-    setState(prev => ({ ...prev, isSubmitting: true }));
-
-    try {
-      // Convert photos to base64 URLs
-      const photos = data.photos?.length 
-        ? await createPOIPhotos(data.photos)
-        : undefined;
-
-      const baseData = {
-        ...data,
-        photos,
-        category: data.category,
-        icon: data.icon
-      };
-
-      if (state.mode === 'map' && state.selectedLocation) {
-        await addPOI({
-          ...baseData,
-          type: 'draggable',
-          position: state.selectedLocation,
-        });
-      } else if (state.mode === 'place' && state.selectedPlaceId) {
-        await addPOI({
-          ...baseData,
-          type: 'place',
-          placeId: state.selectedPlaceId,
-          position: state.selectedLocation!, // Position from place
-        });
-      }
-
-      onClose();
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to create POI'
-      }));
-    } finally {
-      setState(prev => ({ ...prev, isSubmitting: false }));
-    }
-  };
-
   const renderContent = () => {
     switch (state.step) {
       case 'mode-select':
@@ -174,23 +100,10 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
         return state.mode && (
           <POIIconSelection
             mode={state.mode}
-            selectedCategory={state.selectedCategory}
             selectedIcon={state.selectedIcon}
-            onCategorySelect={handleCategorySelect}
             onIconSelect={handleIconSelect}
             onBack={handleIconBack}
-            onNext={handleIconNext}
             startDrag={handleStartDrag}
-          />
-        );
-      case 'details':
-        return state.mode && state.formData && (
-          <POIDetailsForm
-            mode={state.mode}
-            initialData={state.formData}
-            onSubmit={handleDetailsSubmit}
-            onBack={handleDetailsBack}
-            isSubmitting={state.isSubmitting}
           />
         );
       default:

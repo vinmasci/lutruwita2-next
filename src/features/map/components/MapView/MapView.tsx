@@ -1,10 +1,17 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
 import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
+import { usePhotoContext } from '../../../photo/context/PhotoContext';
+import { NestedDrawer } from '../Sidebar/Sidebar.styles';
+
+// Lazy load components
+const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
 import { POIType, POIPosition, POICategory, POIIconName } from '../../../poi/types/poi.types';
+import { getIconDefinition } from '../../../poi/constants/poi-icons';
+import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
 import './MapView.css';
@@ -227,8 +234,11 @@ function MapViewContent() {
     // TODO: Implement map loading
   };
 
+  const [isPhotoDrawerOpen, setIsPhotoDrawerOpen] = useState(false);
+  const { addPhoto } = usePhotoContext();
+
   const handleAddPhotos = () => {
-    // TODO: Implement photo adding
+    setIsPhotoDrawerOpen(!isPhotoDrawerOpen);
   };
 
   const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
@@ -278,6 +288,40 @@ function MapViewContent() {
       setPoiPlacementClick(undefined);
     } else {
       setIsPOIDrawerOpen(true);
+    }
+  };
+
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
+  const [selectedPOIDetails, setSelectedPOIDetails] = useState<{
+    iconName: POIIconName;
+    category: POICategory;
+    position: POIPosition;
+  } | null>(null);
+
+  const handlePOICreation = (icon: POIIconName, category: POICategory, position: POIPosition) => {
+    setSelectedPOIDetails({ iconName: icon, category, position });
+    setDetailsDrawerOpen(true);
+  };
+
+  const handlePOIDetailsSave = async (details: { name: string; description: string; photos: File[] }) => {
+    if (!selectedPOIDetails) return;
+
+    try {
+      // Create POI with all details
+      addPOI({
+        type: 'draggable',
+        position: selectedPOIDetails.position,
+        name: details.name,
+        description: details.description,
+        category: selectedPOIDetails.category,
+        icon: selectedPOIDetails.iconName,
+      });
+
+      // Clear temporary marker and close drawer
+      setSelectedPOIDetails(null);
+      setDetailsDrawerOpen(false);
+    } catch (error) {
+      console.error('Error saving POI:', error);
     }
   };
 
@@ -547,14 +591,24 @@ function MapViewContent() {
           icon={dragPreview.icon}
           category={dragPreview.category}
           onPlace={(position) => {
-            addPOI({
-              type: 'draggable',
-              position,
-              name: dragPreview.icon,
-              category: dragPreview.category,
-              icon: dragPreview.icon,
-            });
+            handlePOICreation(dragPreview.icon, dragPreview.category, position);
             setDragPreview(null);
+          }}
+        />
+      )}
+
+      {/* Show temporary marker while details are being entered */}
+      {selectedPOIDetails && (
+        <MapboxPOIMarker
+          poi={{
+            id: 'temp-poi',
+            type: 'draggable',
+            position: selectedPOIDetails.position,
+            name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
+            category: selectedPOIDetails.category,
+            icon: selectedPOIDetails.iconName,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           }}
         />
       )}
@@ -563,6 +617,43 @@ function MapViewContent() {
         <ElevationProfilePanel
           route={currentRoute}
         />
+      )}
+
+      {/* Add the details drawer */}
+      {selectedPOIDetails && (
+        <POIDetailsDrawer
+          isOpen={detailsDrawerOpen}
+          onClose={() => {
+            setDetailsDrawerOpen(false);
+            setSelectedPOIDetails(null);
+          }}
+          iconName={selectedPOIDetails.iconName}
+          category={selectedPOIDetails.category}
+          onSave={handlePOIDetailsSave}
+        />
+      )}
+
+      {/* Photo drawer */}
+      {isPhotoDrawerOpen && (
+        <NestedDrawer
+          variant="persistent"
+          anchor="left"
+          open={isPhotoDrawerOpen}
+          onClose={() => setIsPhotoDrawerOpen(false)}
+        >
+          <Suspense fallback={
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+              <CircularProgress />
+            </Box>
+          }>
+            <LazyPhotoUploader 
+              onUploadComplete={addPhoto}
+              onDeletePhoto={(photoId: string) => {
+                // Handle photo deletion
+              }}
+            />
+          </Suspense>
+        </NestedDrawer>
       )}
     </div>
     </MapProvider>

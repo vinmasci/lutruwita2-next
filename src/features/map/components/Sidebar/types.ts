@@ -1,6 +1,16 @@
 import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+import { POIIconName, POICategory } from '../../../poi/types/poi.types';
+
+interface POIDetailsDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  iconName: POIIconName;
+  category: POICategory;
+  onSave: (data: any) => void;
+}
 
 export interface SidebarProps {
+  poiDetailsDrawer?: POIDetailsDrawerProps;
   onUploadGpx: (file?: File, processedRoute?: ProcessedRoute) => Promise<void>;
   onSaveMap: () => void;
   onLoadMap: () => void;

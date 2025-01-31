@@ -62,8 +62,8 @@ export const CategoryItem = styled(ListItem)<{ selected?: boolean }>(({ theme, s
 
 export const IconGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: '8px',
+  gridTemplateColumns: 'repeat(6, 1fr)',
+  gap: '4px',
   padding: '8px 0',
 }));
 
@@ -134,7 +134,7 @@ export const StyledTooltip = styled(Box)(({ theme }) => ({
   bottom: '100%',
   left: '50%',
   transform: 'translateX(-50%)',
-  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  backgroundColor: '#000000',
   padding: '4px 8px',
   borderRadius: '4px',
   fontSize: '12px',

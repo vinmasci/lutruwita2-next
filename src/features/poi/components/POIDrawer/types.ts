@@ -37,14 +37,11 @@ export interface POILocationInstructionsProps {
 }
 
 export interface POIIconSelectionProps {
-  mode: POICreationMode;
-  selectedCategory: POICategory | null;
-  selectedIcon: POIIconName | null;
-  onCategorySelect: (category: POICategory) => void;
-  onIconSelect: (icon: POIIconName) => void;
+  mode: POIDrawerState['mode'];
+  selectedIcon: POIDrawerState['selectedIcon'];
+  onIconSelect: (icon: POIDrawerState['selectedIcon']) => void;
   onBack: () => void;
-  onNext: () => void;
-  startDrag: (icon: POIIconName, category: POICategory) => void;
+  startDrag: (icon: POIDrawerState['selectedIcon'], category: POIDrawerState['selectedCategory']) => void;
 }
 
 export interface POIDetailsFormProps {
