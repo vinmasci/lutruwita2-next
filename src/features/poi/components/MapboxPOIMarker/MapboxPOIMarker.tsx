@@ -36,14 +36,17 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
       </div>
     `;
 
-    // Create marker
-    markerRef.current = new mapboxgl.Marker({
+    // Create marker with type-specific options
+    const markerOptions: mapboxgl.MarkerOptions = {
       element: el,
       draggable: isDraggable,
       anchor: 'bottom',
-      pitchAlignment: 'viewport',
-      rotationAlignment: 'viewport'
-    })
+      // Use map alignment for place POIs to maintain geographic accuracy
+      pitchAlignment: poi.type === 'place' ? 'map' : 'viewport',
+      rotationAlignment: poi.type === 'place' ? 'map' : 'viewport'
+    };
+
+    markerRef.current = new mapboxgl.Marker(markerOptions)
       .setLngLat([poi.position.lng, poi.position.lat])
       .addTo(map);
 
