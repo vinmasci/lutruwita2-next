@@ -14,6 +14,8 @@ import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
+import PlacePOILayer from '../../../poi/components/PlacePOILayer/PlacePOILayer';
+import '../../../poi/components/PlacePOILayer/PlacePOILayer.css';
 import './MapView.css';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
@@ -234,11 +236,10 @@ function MapViewContent() {
     // TODO: Implement map loading
   };
 
-  const [isPhotoDrawerOpen, setIsPhotoDrawerOpen] = useState(false);
   const { addPhoto } = usePhotoContext();
 
   const handleAddPhotos = () => {
-    setIsPhotoDrawerOpen(!isPhotoDrawerOpen);
+    // No-op since photo drawer is managed in Sidebar
   };
 
   const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
@@ -577,14 +578,19 @@ function MapViewContent() {
         onPlacePOI={() => {}}
         onDeleteRoute={handleDeleteRoute}
       />
-      {/* Render POI markers */}
-      {isMapReady && pois.map(poi => (
-        <MapboxPOIMarker
-          key={poi.id}
-          poi={poi}
-          onDragEnd={handlePOIDragEnd}
-        />
-      ))}
+      {/* Render POI markers and place POIs */}
+      {isMapReady && (
+        <>
+          <PlacePOILayer />
+          {pois.filter(poi => poi.type === 'draggable').map(poi => (
+            <MapboxPOIMarker
+              key={poi.id}
+              poi={poi}
+              onDragEnd={handlePOIDragEnd}
+            />
+          ))}
+        </>
+      )}
 
       {dragPreview && (
         <POIDragPreview
@@ -633,28 +639,6 @@ function MapViewContent() {
         />
       )}
 
-      {/* Photo drawer */}
-      {isPhotoDrawerOpen && (
-        <NestedDrawer
-          variant="persistent"
-          anchor="left"
-          open={isPhotoDrawerOpen}
-          onClose={() => setIsPhotoDrawerOpen(false)}
-        >
-          <Suspense fallback={
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-              <CircularProgress />
-            </Box>
-          }>
-            <LazyPhotoUploader 
-              onUploadComplete={addPhoto}
-              onDeletePhoto={(photoId: string) => {
-                // Handle photo deletion
-              }}
-            />
-          </Suspense>
-        </NestedDrawer>
-      )}
     </div>
     </MapProvider>
   );

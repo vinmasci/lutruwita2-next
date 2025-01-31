@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Drawer } from '@mui/material';
 import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
@@ -8,9 +8,12 @@ import { createPOIPhotos } from '../../utils/photo';
 import { POI_ICONS } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
+import PlacePOIInstructions from './PlacePOIInstructions';
+import { PlaceLabel, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 
 const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   const { addPOI } = usePOIContext();
+  const [hoveredPlace, setHoveredPlace] = useState<PlaceLabel | null>(null);
   const [state, setState] = React.useState<POIDrawerState>({
     mode: null,
     step: 'mode-select',
@@ -40,13 +43,33 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  const { setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
+  const { map, setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
 
-  // Reset placement mode when drawer closes
+  // Handle map hover events for place detection
+  useEffect(() => {
+    if (!map || state.mode !== 'place') {
+      setHoveredPlace(null);
+      return;
+    }
+
+    const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
+      const place = getPlaceLabelAtPoint(map, e.point);
+      setHoveredPlace(place);
+    };
+
+    map.on('mousemove', handleMouseMove);
+
+    return () => {
+      map.off('mousemove', handleMouseMove);
+    };
+  }, [map, state.mode]);
+
+  // Reset state when drawer closes
   useEffect(() => {
     if (!isOpen) {
       setPoiPlacementMode(false);
       setPoiPlacementClick(undefined);
+      setHoveredPlace(null);
     }
   }, [isOpen, setPoiPlacementMode, setPoiPlacementClick]);
 
@@ -71,8 +94,23 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     const category = POI_ICONS.find((icon_def) => icon_def.name === icon)?.category;
     if (!icon || !category) return;
 
-    // Set drag preview and let MapView handle the details
-    setDragPreview({ icon, category });
+    if (state.mode === 'place' && hoveredPlace) {
+      // Create place POI
+      addPOI({
+        type: 'place',
+        placeId: hoveredPlace.id,
+        name: hoveredPlace.name,
+        position: {
+          lat: hoveredPlace.coordinates[1],
+          lng: hoveredPlace.coordinates[0]
+        },
+        category,
+        icon,
+      });
+    } else {
+      // Set drag preview for map POI
+      setDragPreview({ icon, category });
+    }
   };
 
   const { setDragPreview } = useMapContext();
@@ -97,6 +135,19 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       case 'mode-select':
         return <POIModeSelection onModeSelect={handleModeSelect} />;
       case 'icon-select':
+        if (state.mode === 'place') {
+          return hoveredPlace ? (
+            <POIIconSelection
+              mode={state.mode}
+              selectedIcon={state.selectedIcon}
+              onIconSelect={handleIconSelect}
+              onBack={handleIconBack}
+              startDrag={handleStartDrag}
+            />
+          ) : (
+            <PlacePOIInstructions />
+          );
+        }
         return state.mode && (
           <POIIconSelection
             mode={state.mode}

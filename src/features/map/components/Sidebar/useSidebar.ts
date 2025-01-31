@@ -7,12 +7,9 @@ export const useSidebar = (props: SidebarProps) => {
   // All hooks must be called before any other code
   const { setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
   const { processGpxFile, isProcessing } = useGpxProcessing();
-  const [isOpen, setIsOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const toggleSidebar = () => setIsOpen(!isOpen);
 
   const handleAddPhotos = () => {
     if (activeDrawer === 'photos') {
@@ -22,7 +19,6 @@ export const useSidebar = (props: SidebarProps) => {
       setIsDrawerOpen(true);
       setActiveDrawer('photos');
       props.onItemClick('photos');
-      props.onAddPhotos();
     }
   };
 
@@ -70,12 +66,10 @@ export const useSidebar = (props: SidebarProps) => {
   };
 
   return {
-    isOpen,
     isDrawerOpen,
     activeDrawer,
     isProcessing,
     error,
-    toggleSidebar,
     handleToggleRoute: props.onToggleRoute,
     handleToggleGradient: props.onToggleGradient,
     handleToggleSurface: props.onToggleSurface,
