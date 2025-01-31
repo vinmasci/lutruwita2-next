@@ -21,6 +21,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── MIGRATIONPLAN.md           # Plan for system migration
 │   ├── OLDFUNCTIONS.md            # Archive of previous implementations
 │   ├── POI_IMPLEMENTATION_PLAN.md # Points of Interest implementation plan
+│   ├── POI_PLACES.md             # POI places feature documentation
 │   ├── POI_PROGRESS_NOTES.md     # POI feature progress tracking
 │   ├── surface-detection.md       # Surface detection documentation
 │   └── surfacedetectionplan.md    # Planning for surface detection feature
@@ -100,6 +101,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── MapboxPOIMarker.tsx # Marker component
 │   │       │   │   ├── MapboxPOIMarker.styles.css # Marker styles
 │   │       │   │   └── index.ts     # Component exports
+│   │       │   ├── PlacePOILayer/ # Place POI layer component
+│   │       │   │   ├── PlacePOILayer.tsx # Layer component
+│   │       │   │   └── PlacePOILayer.css # Layer styles
 │   │       │   ├── POIDetailsDrawer/ # POI details viewing drawer
 │   │       │   │   └── POIDetailsDrawer.tsx # Details display component
 │   │       │   ├── POIDragPreview/  # Drag and drop preview
@@ -110,6 +114,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── POIIconSelection.tsx # Icon selection UI
 │   │       │   │   ├── POILocationInstructions.tsx # Location help
 │   │       │   │   ├── POIModeSelection.tsx # Mode selection UI
+│   │       │   │   ├── PlacePOIInstructions.tsx # Place POI instructions
 │   │       │   │   ├── POIDrawer.styles.ts # Drawer styling
 │   │       │   │   ├── types.ts    # POI drawer types
 │   │       │   │   └── index.ts    # Component exports
@@ -125,7 +130,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   └── POIContext.tsx # POI context provider
 │   │       ├── types/     # POI type definitions
 │   │       └── utils/     # POI utility functions
-│   │           └── photo.ts # Photo-related utilities
+│   │           ├── photo.ts # Photo-related utilities
+│   │           └── placeDetection.ts # Place detection utilities
 │   ├── lib/               # Core utilities and helpers
 │   ├── types/            # Global type definitions
 │   └── utils/            # Shared utility functions
@@ -170,14 +176,17 @@ The POI feature (`src/features/poi/`) provides functionality for managing and di
   - Icon selection interface
   - Location instructions
   - Details form for POI information
+  - Place POI instructions
 - Marker Components:
   - Generic POI marker implementation
   - Mapbox-specific marker integration
   - Custom styling and interactions
   - Drag and drop preview functionality
+- Place POI Layer for place detection and visualization
 - Details Drawer for viewing POI information
 - POI Context for state management
 - Photo utilities for handling POI images
+- Place detection utilities for identifying and managing places
 - Comprehensive type system for POI data
 
 ### Photo Management
