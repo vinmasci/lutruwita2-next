@@ -18,12 +18,13 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
   const categoryColor = POI_CATEGORIES[poi.category].color;
   const { map } = useMapContext();
 
+  // Create marker once
   useEffect(() => {
     if (!map) return;
 
     // Create marker element
     const el = document.createElement('div');
-    el.className = `poi-marker ${className || ''} ${selected ? 'selected' : ''}`;
+    el.className = 'poi-marker';
     
     // Set up marker HTML with bubble-pin style
     el.innerHTML = `
@@ -39,9 +40,12 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
     markerRef.current = new mapboxgl.Marker({
       element: el,
       draggable: isDraggable,
-      anchor: 'bottom'
+      anchor: 'bottom',
+      pitchAlignment: 'viewport',
+      rotationAlignment: 'viewport'
     })
-      .setLngLat([poi.position.lng, poi.position.lat]);
+      .setLngLat([poi.position.lng, poi.position.lat])
+      .addTo(map);
 
     // Add event listeners
     if (onClick) {
@@ -57,12 +61,31 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
       });
     }
 
-    markerRef.current.addTo(map);
-
     return () => {
       markerRef.current?.remove();
     };
-  }, [poi, onClick, onDragEnd, selected, className, isDraggable, categoryColor, map]);
+  }, [map]); // Only recreate when map changes
+
+  // Update marker position
+  useEffect(() => {
+    if (!markerRef.current) return;
+    markerRef.current.setLngLat([poi.position.lng, poi.position.lat]);
+  }, [poi.position]);
+
+  // Update marker appearance
+  useEffect(() => {
+    if (!markerRef.current) return;
+    const el = markerRef.current.getElement();
+    el.className = `poi-marker ${className || ''} ${selected ? 'selected' : ''}`;
+    el.innerHTML = `
+      <div class="marker-container">
+        <div class="marker-bubble" style="background-color: ${categoryColor}">
+          <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
+        </div>
+        <div class="marker-point" style="border-top-color: ${categoryColor}"></div>
+      </div>
+    `;
+  }, [selected, className, categoryColor, poi.icon]);
 
   return null;
 };

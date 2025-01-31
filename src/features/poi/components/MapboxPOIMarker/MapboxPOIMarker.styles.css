@@ -1,15 +1,13 @@
 .marker-container {
-  position: absolute;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  transform: translate(-50%, -100%);
-  pointer-events: auto;
 }
 
 .marker-bubble {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -35,15 +33,9 @@
 
 .marker-icon {
   color: white;
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .selected .marker-bubble {
   box-shadow: 0 0 0 2px white, 0 3px 6px rgba(0, 0, 0, 0.3);
-}
-
-.poi-marker {
-  position: absolute;
-  z-index: 1;
-  pointer-events: auto;
 }
