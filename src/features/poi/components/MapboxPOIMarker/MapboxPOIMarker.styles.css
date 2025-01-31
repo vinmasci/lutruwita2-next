@@ -1,10 +1,12 @@
 .marker-container {
-  position: relative;
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
-  transform-origin: bottom center;
+  transform-origin: center center;
   will-change: transform;
+  pointer-events: auto;
+  z-index: 1;
 }
 
 .marker-bubble {
@@ -52,12 +54,16 @@
 
 .poi-marker {
   cursor: pointer;
-  transform-origin: bottom center;
+  position: absolute;
+  transform-origin: center center;
   /* Prevent text selection */
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  /* Ensure proper stacking */
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .selected .marker-bubble {

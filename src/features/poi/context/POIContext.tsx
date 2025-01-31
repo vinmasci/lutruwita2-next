@@ -141,9 +141,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    if (pois.length > 0) {
-      savePOIs();
-    }
+    savePOIs();
   }, [pois]);
 
   const addPOI = (poi: NewPOIInput) => {

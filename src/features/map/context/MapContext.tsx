@@ -1,7 +1,15 @@
 import { createContext, useContext } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { POICategory, POIIconName } from '../../poi/types/poi.types';
+
+type DragPreviewType = {
+  icon: POIIconName;
+  category: POICategory;
+} | null;
 
 type MapContextType = {
+  dragPreview: DragPreviewType;
+  setDragPreview: (preview: DragPreviewType) => void;
   map: mapboxgl.Map | null;
   isMapReady: boolean;
   hoverCoordinates: [number, number] | null;
@@ -13,6 +21,8 @@ type MapContextType = {
 };
 
 const MapContext = createContext<MapContextType>({
+  dragPreview: null,
+  setDragPreview: () => {},
   map: null,
   isMapReady: false,
   hoverCoordinates: null,

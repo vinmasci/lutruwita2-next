@@ -44,6 +44,7 @@ export interface POIIconSelectionProps {
   onIconSelect: (icon: POIIconName) => void;
   onBack: () => void;
   onNext: () => void;
+  startDrag: (icon: POIIconName, category: POICategory) => void;
 }
 
 export interface POIDetailsFormProps {

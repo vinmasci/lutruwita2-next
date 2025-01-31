@@ -31,24 +31,24 @@ The Points of Interest (POI) feature allows users to mark locations on the map i
   - [x] Add navigation between steps
   - [x] Style components for consistency
 
-### ✅ Map Integration (Completed)
+### 🚧 Map Integration (In Progress)
 - [x] Update MapView component
   - [x] Add POI layer
   - [x] Handle POI click events
   - [x] Integrate with map controls
-  - [x] Implement crosshair cursor mode
-  - [x] Add map click handling for POI placement
+  - [ ] Implement cursor-attached POI preview
   - [ ] Add place name click handling
 - [x] Add POI controls to sidebar
   - [ ] Create POI list view
   - [x] Add POI creation button
   - [ ] Implement POI filtering
 
-### ✅ POI Markers (Completed)
+### 🚧 POI Markers (In Progress)
 - [x] Create POIMarker base component
   - [x] Implement basic marker rendering
-  - [x] Add popup functionality
+  - [ ] Add click-to-edit functionality
   - [x] Style according to design specs
+  - [ ] Implement icon-only display with popup on click
 - [x] Implement DraggablePOIMarker
   - [x] Add drag and drop functionality
   - [x] Handle position updates
@@ -58,6 +58,25 @@ The Points of Interest (POI) feature allows users to mark locations on the map i
   - [ ] Add place information display
   - [ ] Style according to design specs
 
+### 🚧 New POI Creation Flow (In Progress)
+- [x] Initial drawer setup
+  - [x] Add POI button opens drawer
+  - [x] Mode selection options
+- [ ] Direct-to-icon selection
+  - [ ] Skip location selection step
+  - [ ] Show icon categories immediately after mode selection
+  - [ ] Auto-generate POI name from selected icon
+- [ ] Cursor-attached placement
+  - [ ] Pin selected icon to cursor
+  - [ ] Preview POI appearance while moving
+  - [ ] Click-to-place functionality
+- [ ] Details drawer
+  - [ ] Open right-side drawer after placement
+  - [ ] Pre-filled name from icon type
+  - [ ] Optional description field
+  - [ ] Optional photo upload
+  - [ ] Save/cancel actions
+
 ### 🚧 Features (In Progress)
 - [x] POI Creation Modes
   - [x] Map click placement
@@ -65,9 +84,9 @@ The Points of Interest (POI) feature allows users to mark locations on the map i
 - [x] Draggable POI functionality
   - [x] Create at clicked location
   - [x] Drag to reposition
-  - [x] Edit name/description
-  - [x] Delete POI
-  - [x] Save position on drag end
+  - [ ] Edit name/description
+  - [ ] Delete POI
+  - [ ] Save position on drag end
 - [ ] Place Name POI functionality
   - [ ] Create from clicked place name
   - [ ] Display place information
@@ -104,16 +123,16 @@ src/features/poi/
 │   │   ├── POIMarker.styles.ts
 │   │   ├── types.ts
 │   │   └── index.ts
-│   ├── MapboxPOIMarker/        # ✅ Completed
+│   ├── MapboxPOIMarker/        # 🚧 In Progress
 │   │   ├── MapboxPOIMarker.tsx
 │   │   ├── MapboxPOIMarker.styles.css
 │   │   └── index.ts
-│   └── POIDrawer/              # ✅ Completed
+│   └── POIDrawer/              # 🚧 In Progress
 │       ├── POIDrawer.tsx
 │       ├── POIModeSelection.tsx
-│       ├── POILocationInstructions.tsx
 │       ├── POIIconSelection.tsx
-│       ├── POIDetailsForm.tsx
+│       ├── POIDetailsDrawer.tsx       # New
+│       ├── POICursorPreview.tsx       # New
 │       ├── POIDrawer.styles.ts
 │       ├── types.ts
 │       └── index.ts
@@ -133,7 +152,7 @@ src/features/poi/
 
 ### POI Marker Icons
 - Draggable POI Icon:
-  - Default: Map pin icon in primary color (#007bff)
+  - Default: Icon-only display in category color
   - Hover: Slightly larger with drop shadow
   - Active/Dragging: Darker shade with elevation shadow
   - Size: 24x24px base size, 28x28px on hover
@@ -152,6 +171,15 @@ src/features/poi/
 - Category List: Colored borders matching icon types
 - Photo Grid: 3 columns with aspect ratio 1:1
 
+### POI Details Drawer Styling
+- Position: Right side
+- Width: 320px
+- Background: rgba(35, 35, 35, 0.9)
+- Pre-filled name field
+- Optional description textarea
+- Photo upload section
+- Save/Cancel buttons at bottom
+
 ### Interactive Elements
 - Buttons follow MUI theme
 - Hover states for all clickable elements
@@ -160,17 +188,18 @@ src/features/poi/
 - Smooth transitions between steps
 
 ## Recent Updates
-- Fixed POI click handling in MapView and POIDrawer
-- Improved handler state management and cleanup
-- Added detailed logging for debugging
-- Optimized performance with proper handler memoization
-- Enhanced cursor feedback and visual states
+- Changed POI creation flow to use cursor-attached placement
+- Removed map click step from workflow
+- Added right-side details drawer
+- Updated marker styling to icon-only with click interaction
+- Enhanced POI preview while placing
 
 ## Next Steps
 1. ✅ Fix map click handling for POI placement
-2. ✅ Implement crosshair cursor mode
-3. Add place name click handling
-4. Create POI list view
-5. Implement POI filtering
-6. Complete place name POI functionality
-7. Add troubleshooting guide
+2. ✅ Implement icon selection in drawer
+3. [ ] Implement cursor-attached POI preview
+4. [ ] Create right-side details drawer
+5. [ ] Update POI marker styling and interaction
+6. [ ] Add auto-generated POI names
+7. [ ] Implement place name POI functionality
+8. Complete documentation

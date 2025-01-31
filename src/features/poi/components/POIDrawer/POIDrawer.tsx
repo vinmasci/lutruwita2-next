@@ -6,7 +6,6 @@ import { POIDrawerProps, POIDrawerState, POIFormData } from './types';
 import { StyledDrawer } from './POIDrawer.styles';
 import { createPOIPhotos } from '../../utils/photo';
 import POIModeSelection from './POIModeSelection';
-import POILocationInstructions from './POILocationInstructions';
 import POIIconSelection from './POIIconSelection';
 import POIDetailsForm from './POIDetailsForm';
 
@@ -46,81 +45,17 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   // Reset placement mode when drawer closes
   useEffect(() => {
     if (!isOpen) {
-      console.log('[POIDrawer] Drawer closed, cleaning up placement mode');
       setPoiPlacementMode(false);
       setPoiPlacementClick(undefined);
     }
   }, [isOpen, setPoiPlacementMode, setPoiPlacementClick]);
 
-  const handleLocationSelect = React.useCallback((location: { lat: number; lng: number }) => {
-    console.log('[POIDrawer] handleLocationSelect called with:', location);
-    setState(prev => ({
-      ...prev,
-      selectedLocation: location,
-      step: 'icon-select'
-    }));
-    console.log('[POIDrawer] State updated to:', {
-      selectedLocation: location,
-      step: 'icon-select'
-    });
-  }, []);
-
-  // Memoize the click handler
-  const clickHandler = React.useCallback((coords: [number, number]) => {
-    console.log('[POIDrawer] Click handler called with coords:', coords);
-    if (coords && coords.length === 2) {
-      handleLocationSelect({ lat: coords[1], lng: coords[0] });
-      setPoiPlacementMode(false);
-      setPoiPlacementClick(undefined); // Clear the handler after use
-    }
-  }, [handleLocationSelect, setPoiPlacementMode, setPoiPlacementClick]);
-
-  // Set up click handler when in map mode
-  useEffect(() => {
-    console.log('[POIDrawer] State changed:', {
-      mode: state.mode,
-      step: state.step,
-      isPoiPlacementMode: state.mode === 'map' && state.step === 'location-select'
-    });
-
-    if (state.mode === 'map' && state.step === 'location-select') {
-      console.log('[POIDrawer] Setting up click handler');
-      setPoiPlacementMode(true);
-      setPoiPlacementClick(() => clickHandler); // Use function to set handler
-    } else {
-      console.log('[POIDrawer] Cleaning up click handler');
-      setPoiPlacementMode(false);
-      setPoiPlacementClick(undefined);
-    }
-
-    return () => {
-      console.log('[POIDrawer] Cleanup effect');
-      setPoiPlacementClick(undefined);
-    };
-  }, [state.mode, state.step, setPoiPlacementMode, setPoiPlacementClick, clickHandler]);
-
-  // Debug log when clickHandler is created/updated
-  useEffect(() => {
-    console.log('[POIDrawer] Click handler updated');
-  }, [clickHandler]);
-
   const handleModeSelect = (mode: POIDrawerState['mode']) => {
     setState(prev => ({
       ...prev,
       mode,
-      step: 'location-select'
-    }));
-  };
-
-  const handleLocationCancel = () => {
-    setPoiPlacementMode(false);
-    setPoiPlacementClick(undefined);
-    setState(prev => ({
-      ...prev,
-      mode: null,
-      step: 'mode-select',
-      selectedLocation: null,
-      selectedPlaceId: null
+      // Skip location-select, go straight to icon selection
+      step: 'icon-select'
     }));
   };
 
@@ -147,10 +82,19 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     }));
   };
 
+  const { setDragPreview } = useMapContext();
+
+  const handleStartDrag = (icon: POIDrawerState['selectedIcon'], category: POIDrawerState['selectedCategory']) => {
+    if (!icon || !category) return;
+    // Set drag preview and close drawer
+    setDragPreview({ icon, category });
+    onClose();
+  };
+
   const handleIconBack = () => {
     setState(prev => ({
       ...prev,
-      step: 'location-select',
+      step: 'mode-select',
       selectedCategory: null,
       selectedIcon: null
     }));
@@ -226,13 +170,6 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     switch (state.step) {
       case 'mode-select':
         return <POIModeSelection onModeSelect={handleModeSelect} />;
-      case 'location-select':
-        return state.mode && (
-          <POILocationInstructions
-            mode={state.mode}
-            onCancel={handleLocationCancel}
-          />
-        );
       case 'icon-select':
         return state.mode && (
           <POIIconSelection
@@ -243,6 +180,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
             onIconSelect={handleIconSelect}
             onBack={handleIconBack}
             onNext={handleIconNext}
+            startDrag={handleStartDrag}
           />
         );
       case 'details':

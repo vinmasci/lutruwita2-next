@@ -19,7 +19,8 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
   onCategorySelect,
   onIconSelect,
   onBack,
-  onNext
+  onNext,
+  startDrag
 }) => {
   const [hoveredIcon, setHoveredIcon] = React.useState<string | null>(null);
 
@@ -59,7 +60,12 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
               <IconGridItem
                 key={name}
                 selected={selectedIcon === name}
-                onClick={() => onIconSelect(name)}
+                onClick={() => {
+                  onIconSelect(name);
+                  if (selectedCategory) {
+                    startDrag(name, selectedCategory);
+                  }
+                }}
                 onMouseEnter={() => setHoveredIcon(name)}
                 onMouseLeave={() => setHoveredIcon(null)}
                 sx={{ position: 'relative' }}

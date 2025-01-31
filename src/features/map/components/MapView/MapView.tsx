@@ -4,8 +4,9 @@ import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
 import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
-import { POIType, POIPosition } from '../../../poi/types/poi.types';
+import { POIType, POIPosition, POICategory, POIIconName } from '../../../poi/types/poi.types';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
+import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
 import './MapView.css';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
@@ -70,7 +71,7 @@ function MapViewContent() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
   const [currentPhotos, setCurrentPhotos] = useState([]);
-  const { pois, updatePOIPosition } = usePOIContext();
+  const { pois, updatePOIPosition, addPOI } = usePOIContext();
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
@@ -231,6 +232,10 @@ function MapViewContent() {
   };
 
   const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
+  const [dragPreview, setDragPreview] = useState<{
+    icon: POIIconName;
+    category: POICategory;
+  } | null>(null);
   const [isPoiPlacementMode, setPoiPlacementMode] = useState(false);
   const [onPoiPlacementClick, setPoiPlacementClick] = useState<((coords: [number, number]) => void) | undefined>(undefined);
 
@@ -336,7 +341,9 @@ function MapViewContent() {
         padding: 0,
         pitch: 45,
         bearing: 0
-      }
+      },
+      projection: 'globe',
+      maxPitch: 85
     });
 
     // Add terrain
@@ -347,7 +354,29 @@ function MapViewContent() {
         tileSize: 512,
         maxzoom: 14
       });
-      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+      
+      // Set terrain configuration
+      map.setTerrain({ 
+        source: 'mapbox-dem', 
+        exaggeration: 1.5
+      });
+
+      // Add event listeners for marker orientation
+      map.on('pitch', () => {
+        const markers = document.querySelectorAll('.marker-container');
+        markers.forEach(marker => {
+          const el = marker as HTMLElement;
+          el.style.transform = `rotate(${-map.getPitch()}deg)`;
+        });
+      });
+
+      map.on('rotate', () => {
+        const markers = document.querySelectorAll('.marker-container');
+        markers.forEach(marker => {
+          const el = marker as HTMLElement;
+          el.style.transform = `rotate(${-map.getBearing()}deg)`;
+        });
+      });
 
       // Add custom roads layer
       const tileUrl = 'https://api.maptiler.com/tiles/5dd3666f-1ce4-4df6-9146-eda62a200bcb/{z}/{x}/{y}.pbf?key=DFSAZFJXzvprKbxHrHXv';
@@ -452,7 +481,9 @@ function MapViewContent() {
       isPoiPlacementMode,
       setPoiPlacementMode,
       onPoiPlacementClick,
-      setPoiPlacementClick
+      setPoiPlacementClick,
+      dragPreview,
+      setDragPreview
     }}>
     <div className="w-full h-full relative">
       <div 
@@ -510,6 +541,23 @@ function MapViewContent() {
           onDragEnd={handlePOIDragEnd}
         />
       ))}
+
+      {dragPreview && (
+        <POIDragPreview
+          icon={dragPreview.icon}
+          category={dragPreview.category}
+          onPlace={(position) => {
+            addPOI({
+              type: 'draggable',
+              position,
+              name: dragPreview.icon,
+              category: dragPreview.category,
+              icon: dragPreview.icon,
+            });
+            setDragPreview(null);
+          }}
+        />
+      )}
 
       {currentRoute && (
         <ElevationProfilePanel

@@ -122,9 +122,9 @@ The GPX uploader drawer is a slide-out panel that appears when clicking the add 
 ## Planned Improvements
 
 ### 1. Upload Area
-- [ ] Make upload area more prominent
-- [ ] Add ".GPX files only" text
-- [ ] Enhance drop zone styling
+- [x] Make upload area more prominent
+- [x] Add ".GPX files only" text
+- [x] Enhance drop zone styling
 
 ### 2. Route Management
 - [x] Add numbered list of routes
@@ -134,9 +134,9 @@ The GPX uploader drawer is a slide-out panel that appears when clicking the add 
 
 ### 3. Map Integration
 - [ ] Center map on selected route
-- [ ] Show elevation profile for selected route
+- [x] Show elevation profile for selected route
 - [ ] Smooth transitions between routes
-- [ ] Fix elevation profile updates when switching routes
+- [x] Fix elevation profile updates when switching routes
 - [ ] Implement route selection state synchronization
 
 ### 4. Delete Functionality
