@@ -38,11 +38,14 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
         return (
           <Box key={categoryKey} sx={{ mb: 3 }}>
             <Typography 
-              variant="subtitle1" 
+              variant="caption" 
               sx={{ 
-                color: category.color,
+                color: 'white',
                 mb: 1,
-                fontWeight: 'bold'
+                display: 'block',
+                fontSize: '0.7rem',
+                opacity: 0.7,
+                letterSpacing: '0.5px'
               }}
             >
               {category.label}
@@ -62,14 +65,19 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
                     onMouseLeave={() => setHoveredIcon(null)}
                     sx={{ 
                       position: 'relative',
-                      backgroundColor: `${iconColor}20`,
-                      border: `2px solid ${iconColor}`,
+                      width: '28px',
+                      height: '28px',
+                      backgroundColor: iconColor,
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       '&:hover': {
-                        backgroundColor: `${iconColor}40`
+                        transform: 'scale(1.1)'
                       }
                     }}
                   >
-                    <i className={ICON_PATHS[icon.name]} style={{ fontSize: '18px', color: 'white' }} />
+                    <i className={ICON_PATHS[icon.name]} style={{ fontSize: '16px', color: 'white' }} />
                     {hoveredIcon === icon.name && (
                       <StyledTooltip>
                         {icon.label}

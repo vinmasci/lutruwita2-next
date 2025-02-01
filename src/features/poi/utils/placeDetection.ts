@@ -13,7 +13,11 @@ export const getPlaceLabelAtPoint = (
 ): PlaceLabel | null => {
   // Query map features at point
   const features = map.queryRenderedFeatures(point, {
-    layers: ['settlement-label'] // Mapbox layer for place names (cities, towns, villages)
+    layers: [
+      'settlement-major-label',  // Cities
+      'settlement-minor-label',  // Towns
+      'settlement-subdivision-label' // Suburbs
+    ]
   });
   
   if (!features.length) return null;
@@ -49,14 +53,14 @@ export const calculatePOIPositions = (
     const col = i % config.maxPerRow;
     
     // Calculate offsets to center the POIs above the place name
-    const xOffset = (col * (config.iconSize + config.spacing)) - 
-                   ((Math.min(poiCount, config.maxPerRow) * (config.iconSize + config.spacing)) / 2);
-    const yOffset = config.baseOffset + (row * (config.iconSize + config.spacing));
+const xOffset = (col * (config.iconSize + config.spacing)) - 
+                   ((Math.min(poiCount, config.maxPerRow) * (config.iconSize + config.spacing)) / 2) + 10; // Added 30px to move right
+const yOffset = config.baseOffset + (row * (config.iconSize + config.spacing));
     
-    positions.push({
-      coordinates: place.coordinates,
-      offset: [xOffset, -yOffset] // Negative y to move up
-    });
+positions.push({
+  coordinates: place.coordinates,
+  offset: [xOffset, -yOffset] // Negative y to move up
+});
   }
   
   return positions;

@@ -8,12 +8,13 @@ import { createPOIPhotos } from '../../utils/photo';
 import { POI_ICONS } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
+import { PlacePOIIconSelection } from '../PlacePOIIconSelection/PlacePOIIconSelection';
 import PlacePOIInstructions from './PlacePOIInstructions';
 import { PlaceLabel, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 
 const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   const { addPOI } = usePOIContext();
-  const [hoveredPlace, setHoveredPlace] = useState<PlaceLabel | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceLabel | null>(null);
   const [state, setState] = React.useState<POIDrawerState>({
     mode: null,
     step: 'mode-select',
@@ -45,22 +46,22 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
 
   const { map, setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
 
-  // Handle map hover events for place detection
+  // Handle map click events for place selection
   useEffect(() => {
     if (!map || state.mode !== 'place') {
-      setHoveredPlace(null);
+      setSelectedPlace(null);
       return;
     }
 
-    const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
+    const handleClick = (e: mapboxgl.MapMouseEvent) => {
       const place = getPlaceLabelAtPoint(map, e.point);
-      setHoveredPlace(place);
+      setSelectedPlace(place);
     };
 
-    map.on('mousemove', handleMouseMove);
+    map.on('click', handleClick);
 
     return () => {
-      map.off('mousemove', handleMouseMove);
+      map.off('click', handleClick);
     };
   }, [map, state.mode]);
 
@@ -69,7 +70,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     if (!isOpen) {
       setPoiPlacementMode(false);
       setPoiPlacementClick(undefined);
-      setHoveredPlace(null);
+      setSelectedPlace(null);
     }
   }, [isOpen, setPoiPlacementMode, setPoiPlacementClick]);
 
@@ -80,6 +81,9 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       // Skip location-select, go straight to icon selection
       step: 'icon-select'
     }));
+    
+    // Enable place mode highlighting when "Add POI to Place" is selected
+    setPoiPlacementMode(mode === 'place');
   };
 
   const handlePlaceSelect = (placeId: string) => {
@@ -94,15 +98,15 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     const category = POI_ICONS.find((icon_def) => icon_def.name === icon)?.category;
     if (!icon || !category) return;
 
-    if (state.mode === 'place' && hoveredPlace) {
+    if (state.mode === 'place' && selectedPlace) {
       // Create place POI
       addPOI({
         type: 'place',
-        placeId: hoveredPlace.id,
-        name: hoveredPlace.name,
+        placeId: selectedPlace.id,
+        name: selectedPlace.name,
         position: {
-          lat: hoveredPlace.coordinates[1],
-          lng: hoveredPlace.coordinates[0]
+          lat: selectedPlace.coordinates[1],
+          lng: selectedPlace.coordinates[0]
         },
         category,
         icon,
@@ -128,6 +132,8 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       selectedCategory: null,
       selectedIcon: null
     }));
+    // Reset place mode when going back to mode selection
+    setPoiPlacementMode(false);
   };
 
   const renderContent = () => {
@@ -136,13 +142,10 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
         return <POIModeSelection onModeSelect={handleModeSelect} />;
       case 'icon-select':
         if (state.mode === 'place') {
-          return hoveredPlace ? (
-            <POIIconSelection
-              mode={state.mode}
-              selectedIcon={state.selectedIcon}
-              onIconSelect={handleIconSelect}
+          return selectedPlace ? (
+            <PlacePOIIconSelection
+              place={selectedPlace}
               onBack={handleIconBack}
-              startDrag={handleStartDrag}
             />
           ) : (
             <PlacePOIInstructions />

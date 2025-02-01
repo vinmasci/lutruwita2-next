@@ -30,17 +30,19 @@ User Flow:
 6. ✓ Added support for place POIs in POIContext
 7. ✓ Added POI positioning system for arranging POIs above place names
 
-### Known Issues
-- Place name hover detection is not working yet. This affects the ability to detect when the user hovers over a place name on the map. The implementation is using the correct Mapbox layer ('settlement-label') but may need additional debugging.
+### Status Update
+✓ Place name hover detection is now working with a white halo highlight effect
+✓ Clicking a place name updates the drawer to show POI icon selection
 
 ### Next Steps
-1. Fix place name hover detection in POIDrawer.tsx
-2. Test and verify place label layer interaction
-3. Add POI removal capability
-4. Implement POI hover effects
-5. Add place-specific POI categories
-6. Improve mobile responsiveness
-7. Add POI clustering at lower zoom levels
+1. Create a dedicated place POI icon selection drawer that:
+   - Allows selecting multiple icons at once
+   - Uses white icons with dark shadows (no bubbles)
+   - Positions icons above place names
+2. Add POI removal capability
+3. Add place-specific POI categories
+4. Improve mobile responsiveness
+5. Add POI clustering at lower zoom levels
 
 ## Integration Points
 This feature integrates with the existing POI system in several ways:
@@ -93,11 +95,18 @@ The following styles ensure proper POI display:
 ```
 
 ## Notes
-- All POIs added to places should be white for visibility
-- POIs should be non-interactive (pointer-events: none)
-- Position calculations should account for map zoom level
-- Consider performance with many place POIs
-- Ensure proper cleanup of markers when unmounting
+- Place POIs use a distinct styling:
+  - White icons with dark shadows
+  - No bubble backgrounds
+  - Non-interactive (pointer-events: none)
+  - Positioned above place names
+- Hover highlight:
+  - White halo effect around place names
+  - Scales with zoom level for better visibility
+  - Cursor changes to pointer on hover
+- Position calculations account for map zoom level
+- Performance considerations for many place POIs
+- Proper cleanup of markers when unmounting
 
 ## Important Implementation Notes
 1. This is NOT a new drawer - it's a mode within the existing POI drawer

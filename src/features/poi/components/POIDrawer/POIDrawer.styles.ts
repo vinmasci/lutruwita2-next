@@ -63,22 +63,23 @@ export const CategoryItem = styled(ListItem)<{ selected?: boolean }>(({ theme, s
 export const IconGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
   gridTemplateColumns: 'repeat(6, 1fr)',
-  gap: '4px',
-  padding: '8px 0',
+  gap: '12px',
+  padding: '4px 0',
+  justifyItems: 'center',
 }));
 
-export const IconGridItem = styled(Paper)<{ selected?: boolean }>(({ theme, selected }) => ({
+export const IconGridItem = styled(Box)<{ selected?: boolean }>(({ theme, selected }) => ({
   aspectRatio: '1',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: selected ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
   cursor: 'pointer',
   transition: 'all 0.2s ease-in-out',
-  '&:hover': {
-    backgroundColor: 'rgba(45, 45, 45, 0.9)',
-    transform: 'scale(1.05)',
-  },
+  background: 'none',
+  border: 'none',
+  ...(selected && {
+    transform: 'scale(1.1)'
+  })
 }));
 
 export const StyledForm = styled('form')(({ theme }) => ({
