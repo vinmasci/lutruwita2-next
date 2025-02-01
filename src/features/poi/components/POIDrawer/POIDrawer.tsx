@@ -8,7 +8,7 @@ import { createPOIPhotos } from '../../utils/photo';
 import { POI_ICONS } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
-import { PlacePOIIconSelection } from '../PlacePOIIconSelection/PlacePOIIconSelection';
+import PlacePOIIconSelection from '../PlacePOIIconSelection';
 import PlacePOIInstructions from './PlacePOIInstructions';
 import { PlaceLabel, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 

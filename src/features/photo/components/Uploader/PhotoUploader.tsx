@@ -1,11 +1,17 @@
 import { useState } from 'react';
+import exifr from 'exifr';
 import { PhotoUploaderProps, ProcessedPhoto } from './PhotoUploader.types';
 import PhotoUploaderUI from './PhotoUploaderUI';
 
-const PhotoUploader = ({ onUploadComplete, onDeletePhoto }: PhotoUploaderProps) => {
+const PhotoUploader = ({
+  onUploadComplete,
+  onDeletePhoto,
+  onAddToMap
+}: PhotoUploaderProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<{ message: string; details?: string } | undefined>();
+  const [error, setError] = useState<{ message: string; details?: string }>();
   const [photos, setPhotos] = useState<ProcessedPhoto[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 
   const processPhoto = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -23,8 +29,8 @@ const PhotoUploader = ({ onUploadComplete, onDeletePhoto }: PhotoUploaderProps) 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Set thumbnail size
-        const maxSize = 200;
+        // Set thumbnail size (larger for better quality)
+        const maxSize = 800;
         let width = img.width;
         let height = img.height;
         
@@ -44,43 +50,50 @@ const PhotoUploader = ({ onUploadComplete, onDeletePhoto }: PhotoUploaderProps) 
         canvas.height = height;
         
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
       };
       img.onerror = () => reject(new Error('Failed to create thumbnail'));
       img.src = url;
     });
   };
 
-  const handleFileAdd = async (file: File) => {
-    console.log('[PhotoUploader] File add triggered', { fileName: file.name });
+  const handleFileAdd = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsLoading(true);
+    setError(undefined);
     
-    if (!file.type.startsWith('image/')) {
-      setError({ message: 'Invalid file type', details: 'Please upload an image file' });
-      return;
-    }
-
     try {
-      setIsLoading(true);
-      setError(undefined);
-      
-      const url = await processPhoto(file);
-      const thumbnailUrl = await createThumbnail(url);
-      
-      const photo: ProcessedPhoto = {
-        id: `photo-${Date.now()}`,
-        name: file.name,
-        url: url,
-        thumbnailUrl: thumbnailUrl,
-        dateAdded: new Date()
-      };
+      const processedPhotos = await Promise.all(
+        files.map(async (file) => {
+          if (!file.type.startsWith('image/')) {
+            throw new Error(`Invalid file type for ${file.name}`);
+          }
 
-      setPhotos(prev => [...prev, photo]);
-      onUploadComplete(photo);
-      
+          const url = await processPhoto(file);
+          const thumbnailUrl = await createThumbnail(url);
+          
+          // Check for GPS data
+          const exif = await exifr.parse(file, { gps: true });
+          const hasGps = Boolean(exif?.latitude && exif?.longitude);
+
+          return {
+            id: `photo-${Date.now()}-${Math.random()}`,
+            name: file.name,
+            url,
+            thumbnailUrl,
+            dateAdded: new Date(),
+            hasGps
+          };
+        })
+      );
+
+      setPhotos(prev => [...prev, ...processedPhotos]);
+      onUploadComplete(processedPhotos);
     } catch (error) {
-      console.error('[PhotoUploader] Error processing file:', error);
+      console.error('[PhotoUploader] Error processing files:', error);
       setError({
-        message: 'Failed to process photo',
+        message: 'Failed to process photos',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     } finally {
@@ -88,8 +101,34 @@ const PhotoUploader = ({ onUploadComplete, onDeletePhoto }: PhotoUploaderProps) 
     }
   };
 
+  const handlePhotoSelect = (photoId: string) => {
+    setSelectedPhotos(prev => {
+      const next = new Set(prev);
+      if (next.has(photoId)) {
+        next.delete(photoId);
+      } else {
+        next.add(photoId);
+      }
+      return next;
+    });
+  };
+
+  const handleAddToMap = () => {
+    const selectedPhotosList = photos.filter(p => selectedPhotos.has(p.id));
+    if (selectedPhotosList.length > 0 && onAddToMap) {
+      onAddToMap(selectedPhotosList);
+    }
+    // Clear selection after adding to map
+    setSelectedPhotos(new Set());
+  };
+
   const handleFileDelete = (photoId: string) => {
     setPhotos(prev => prev.filter(p => p.id !== photoId));
+    setSelectedPhotos(prev => {
+      const next = new Set(prev);
+      next.delete(photoId);
+      return next;
+    });
     if (onDeletePhoto) {
       onDeletePhoto(photoId);
     }
@@ -105,9 +144,13 @@ const PhotoUploader = ({ onUploadComplete, onDeletePhoto }: PhotoUploaderProps) 
     <PhotoUploaderUI 
       isLoading={isLoading}
       error={error}
+      photos={photos}
+      selectedPhotos={selectedPhotos}
       onFileAdd={handleFileAdd}
       onFileDelete={handleFileDelete}
       onFileRename={handleFileRename}
+      onPhotoSelect={handlePhotoSelect}
+      onAddToMap={handleAddToMap}
     />
   );
 };

@@ -1,14 +1,19 @@
 export interface PhotoUploaderProps {
-  onUploadComplete: (photo: ProcessedPhoto) => void;
+  onUploadComplete: (photos: ProcessedPhoto[]) => void;
   onDeletePhoto?: (photoId: string) => void;
+  onAddToMap?: (photos: ProcessedPhoto[]) => void;
 }
 
 export interface PhotoUploaderUIProps {
   isLoading: boolean;
   error?: { message: string; details?: string };
-  onFileAdd: (file: File) => void;
+  photos: ProcessedPhoto[];
+  selectedPhotos: Set<string>;
+  onFileAdd: (files: File[]) => void;
   onFileDelete: (photoId: string) => void;
   onFileRename: (photoId: string, newName: string) => void;
+  onPhotoSelect: (photoId: string) => void;
+  onAddToMap: () => void;
 }
 
 export interface ProcessedPhoto {
@@ -17,4 +22,5 @@ export interface ProcessedPhoto {
   url: string;
   thumbnailUrl: string;
   dateAdded: Date;
+  hasGps: boolean;
 }

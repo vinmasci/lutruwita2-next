@@ -3,7 +3,7 @@ import { ProcessedPhoto } from '../components/Uploader/PhotoUploader.types';
 
 interface PhotoContextType {
   photos: ProcessedPhoto[];
-  addPhoto: (photo: ProcessedPhoto) => void;
+  addPhoto: (photos: ProcessedPhoto[]) => void;
   deletePhoto: (photoId: string) => void;
   updatePhoto: (photoId: string, updates: Partial<ProcessedPhoto>) => void;
 }
@@ -25,8 +25,8 @@ interface PhotoProviderProps {
 export const PhotoProvider: React.FC<PhotoProviderProps> = ({ children }) => {
   const [photos, setPhotos] = useState<ProcessedPhoto[]>([]);
 
-  const addPhoto = (photo: ProcessedPhoto) => {
-    setPhotos(prev => [...prev, photo]);
+  const addPhoto = (newPhotos: ProcessedPhoto[]) => {
+    setPhotos(prev => [...prev, ...newPhotos]);
   };
 
   const deletePhoto = (photoId: string) => {

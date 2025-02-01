@@ -1,132 +1,79 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { PhotoUploaderUIProps } from './PhotoUploader.types';
-import { Alert, Box, CircularProgress, Typography, IconButton, TextField, List, ListItem, ListItemText, ListItemSecondaryAction, Paper, Divider } from '@mui/material';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { useDropzone, FileWithPath } from 'react-dropzone';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-
-interface EditingState {
-  photoId: string;
-  newName: string;
-}
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Grid,
+  IconButton,
+  Paper,
+  Typography
+} from '@mui/material';
+import {
+  CloudUpload as UploadIcon,
+  Delete as DeleteIcon,
+  Map as MapIcon,
+  CheckCircle as SelectIcon,
+  LocationOn as LocationIcon
+} from '@mui/icons-material';
+import { useDropzone } from 'react-dropzone';
 
 const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
   isLoading,
   error,
+  photos,
+  selectedPhotos,
   onFileAdd,
   onFileDelete,
   onFileRename,
+  onPhotoSelect,
+  onAddToMap
 }) => {
-  const [editing, setEditing] = useState<EditingState | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'image/*': ['.jpg', '.jpeg', '.png', '.gif']
     },
-    onDrop: (acceptedFiles: FileWithPath[]) => {
-      if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        // Create preview URL
-        const objectUrl = URL.createObjectURL(file);
-        setPreviewUrl(objectUrl);
-        onFileAdd(file);
-        
-        // Clean up preview URL when component unmounts
-        return () => URL.revokeObjectURL(objectUrl);
-      }
-    },
+    multiple: true,
+    onDrop: acceptedFiles => onFileAdd(acceptedFiles)
   });
 
-  const handleStartEditing = (e: React.MouseEvent, photoId: string, currentName: string) => {
-    e.stopPropagation();
-    setEditing({ photoId, newName: currentName });
-  };
-
-  const handleCancelEditing = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditing(null);
-  };
-
-  const handleSaveEditing = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (editing) {
-      onFileRename(editing.photoId, editing.newName);
-      setEditing(null);
-    }
-  };
-
   return (
-    <Box sx={{ 
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      padding: '24px 32px 24px 1px',
-      width: '100%'
-    }}>
+    <Box sx={{ pr: 2, width: '100%' }}>
+      {/* Upload Area */}
       <Paper
         {...getRootProps()}
         elevation={0}
         sx={{
-          width: '220px',
-          minHeight: '120px',
-          padding: '20px',
-          marginBottom: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
+          p: 3,
+          mb: 2,
+          textAlign: 'center',
           backgroundColor: 'rgba(35, 35, 35, 0.9)',
           border: '2px dashed rgba(255, 255, 255, 0.2)',
-          borderRadius: '8px',
-          transition: 'all 0.2s ease-in-out',
+          borderRadius: 2,
           cursor: 'pointer',
+          transition: 'all 0.2s ease-in-out',
           '&:hover': {
             backgroundColor: 'rgba(45, 45, 45, 0.9)',
             border: '2px dashed rgba(255, 255, 255, 0.3)',
-          },
-          ...(isDragActive && {
-            backgroundColor: 'rgba(55, 55, 55, 0.9)',
-            border: '2px dashed rgba(255, 255, 255, 0.5)',
-            transform: 'scale(0.98)',
-          })
+          }
         }}
       >
         <input {...getInputProps()} />
-        {isLoading ? (
-          <CircularProgress size={32} />
-        ) : (
-          <>
-            {previewUrl ? (
-              <Box
-                component="img"
-                src={previewUrl}
-                alt="Preview"
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  borderRadius: '4px'
-                }}
-              />
-            ) : (
-              <>
-                <UploadFileIcon sx={{ fontSize: 36, opacity: 0.8 }} />
-                <Typography variant="body2" sx={{ textAlign: 'center' }}>
-                  {isDragActive ? 'Drop the photo here...' : 'Drop photo here or click to upload'}
-                </Typography>
-              </>
-            )}
-          </>
-        )}
+        <UploadIcon sx={{ fontSize: 48, mb: 2, opacity: 0.8 }} />
+        <Typography variant="body1">
+          {isDragActive
+            ? 'Drop photos here...'
+            : 'Drag & drop photos here or click to select'}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Supports: JPG, PNG, GIF
+        </Typography>
       </Paper>
 
+      {/* Error Display */}
       {error && (
-        <Alert severity="error" sx={{ mt: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
           {error.message}
           {error.details && (
             <Typography variant="caption" display="block">
@@ -134,6 +81,147 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
             </Typography>
           )}
         </Alert>
+      )}
+
+      {/* Loading Indicator */}
+      {isLoading && (
+        <Box sx={{ textAlign: 'center', my: 2 }}>
+          <CircularProgress size={32} />
+        </Box>
+      )}
+
+      {/* Photo Grid */}
+      {photos.length > 0 && (
+        <>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 2 
+          }}>
+            <Typography variant="h6">
+              {selectedPhotos.size} photo(s) selected
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<MapIcon />}
+              disabled={selectedPhotos.size === 0}
+              onClick={onAddToMap}
+            >
+              Add to Map
+            </Button>
+          </Box>
+
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            {photos.map((photo) => (
+              <Grid item xs={12} sm={6} key={photo.id}>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '1/1',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      transform: 'scale(1.02)'
+                    },
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    boxShadow: selectedPhotos.has(photo.id)
+                      ? '0 0 0 2px #3498db'
+                      : 'none'
+                  }}
+                  onClick={() => onPhotoSelect(photo.id)}
+                >
+                  <Box
+                    component="img"
+                    src={photo.thumbnailUrl}
+                    alt={photo.name}
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
+                  />
+                  
+                  {/* Selection and GPS Indicators */}
+                  <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
+                    {photo.hasGps && (
+                      <Box
+                        sx={{
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          borderRadius: '50%',
+                          padding: '2px',
+                          width: '20px',
+                          height: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <LocationIcon
+                          sx={{
+                            color: '#2ecc71',
+                            fontSize: 14
+                          }}
+                        />
+                      </Box>
+                    )}
+                    {selectedPhotos.has(photo.id) && (
+                      <Box
+                        sx={{
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          borderRadius: '50%',
+                          padding: '2px',
+                          width: '20px',
+                          height: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <SelectIcon
+                          sx={{
+                            color: '#3498db',
+                            fontSize: 14
+                          }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Delete Button */}
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFileDelete(photo.id);
+                    }}
+                    sx={{ 
+                      position: 'absolute',
+                      top: 8,
+                      left: 8,
+                      color: 'white',
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      padding: '12px',
+                      width: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0,0,0,0.7)'
+                      }
+                    }}
+                  >
+                    <DeleteIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </>
       )}
     </Box>
   );
