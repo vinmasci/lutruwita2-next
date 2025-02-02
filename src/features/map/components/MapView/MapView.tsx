@@ -4,8 +4,9 @@ import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
 import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
-import { usePhotoContext } from '../../../photo/context/PhotoContext';
+import { usePhotoContext, PhotoProvider } from '../../../photo/context/PhotoContext';
 import { NestedDrawer } from '../Sidebar/Sidebar.styles';
+import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
 
 // Lazy load components
 const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
@@ -581,6 +582,7 @@ function MapViewContent() {
       {/* Render POI markers and place POIs */}
       {isMapReady && (
         <>
+          <PhotoLayer />
           <PlacePOILayer />
           {pois.filter(poi => poi.type === 'draggable').map(poi => (
             <MapboxPOIMarker
@@ -646,10 +648,12 @@ function MapViewContent() {
 
 export default function MapView() {
   return (
-    <RouteProvider>
-      <POIProvider>
-        <MapViewContent />
-      </POIProvider>
-    </RouteProvider>
+    <PhotoProvider>
+      <RouteProvider>
+        <POIProvider>
+          <MapViewContent />
+        </POIProvider>
+      </RouteProvider>
+    </PhotoProvider>
   );
 }

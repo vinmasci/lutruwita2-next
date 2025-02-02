@@ -73,21 +73,36 @@ const PhotoUploader = ({
           const url = await processPhoto(file);
           const thumbnailUrl = await createThumbnail(url);
           
-          // Check for GPS data
+          // Extract EXIF data
           const exif = await exifr.parse(file, { gps: true });
           const hasGps = Boolean(exif?.latitude && exif?.longitude);
+          
+          // Log EXIF data for debugging
+          console.log('[PhotoUploader] EXIF data for', file.name, ':', exif);
+          console.log('[PhotoUploader] GPS data present:', hasGps);
 
-          return {
+          const photo: ProcessedPhoto = {
             id: `photo-${Date.now()}-${Math.random()}`,
             name: file.name,
             url,
             thumbnailUrl,
             dateAdded: new Date(),
-            hasGps
+            hasGps,
+            ...(hasGps && {
+              coordinates: {
+                lat: exif.latitude,
+                lng: exif.longitude
+              },
+              altitude: exif.altitude
+            })
           };
+
+          console.log('[PhotoUploader] Processed photo:', photo);
+          return photo;
         })
       );
 
+      console.log('[PhotoUploader] All processed photos:', processedPhotos);
       setPhotos(prev => [...prev, ...processedPhotos]);
       onUploadComplete(processedPhotos);
     } catch (error) {

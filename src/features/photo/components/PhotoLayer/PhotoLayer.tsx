@@ -5,6 +5,7 @@ import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
 import { PhotoPreviewModal } from '../PhotoPreview/PhotoPreviewModal';
 import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
 import mapboxgl from 'mapbox-gl';
+import './PhotoLayer.css';
 
 // Cluster configuration
 const CLUSTER_MAX_ZOOM = 14;
@@ -17,6 +18,9 @@ export const PhotoLayer: React.FC = () => {
 
   useEffect(() => {
     if (!map) return;
+
+    console.log('[PhotoLayer] Setting up photo markers with photos:', photos);
+    console.log('[PhotoLayer] Current zoom:', map.getZoom());
 
     // Add cluster source
     map.addSource('photos', {
@@ -93,6 +97,23 @@ export const PhotoLayer: React.FC = () => {
     };
   }, [map, photos]);
 
+  // Add zoom change listener
+  useEffect(() => {
+    if (!map) return;
+
+    const handleZoomChange = () => {
+      const zoom = map.getZoom() ?? 0;
+      console.log('[PhotoLayer] Zoom changed:', zoom);
+      console.log('[PhotoLayer] Should show markers:', zoom >= CLUSTER_MAX_ZOOM);
+    };
+
+    map.on('zoom', handleZoomChange);
+
+    return () => {
+      map.off('zoom', handleZoomChange);
+    };
+  }, [map]);
+
   // Handle cluster click
   useEffect(() => {
     if (!map) return;
@@ -108,14 +129,14 @@ export const PhotoLayer: React.FC = () => {
       // Get cluster expansion zoom
       const source = map.getSource('photos') as mapboxgl.GeoJSONSource;
       source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-        if (err || zoom === undefined) return;
+        if (err) return;
 
         const geometry = features[0]?.geometry;
-        if (!geometry) return;
+        if (!geometry || zoom === undefined) return;
 
         map.easeTo({
           center: (geometry as any).coordinates,
-          zoom: zoom
+          zoom: Math.min(zoom, 22) // Ensure zoom is within valid range
         });
       });
     };
