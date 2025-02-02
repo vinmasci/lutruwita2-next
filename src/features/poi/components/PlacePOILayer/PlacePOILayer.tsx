@@ -4,8 +4,9 @@ import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
 import { calculatePOIPositions, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 import { ICON_PATHS } from '../../constants/icon-paths';
-import { PlaceNamePOI } from '../../types/poi.types';
+import { PlaceNamePOI, POI_CATEGORIES } from '../../types/poi.types';
 import { PlaceLabel } from '../../utils/placeDetection';
+import { PlacePOIDetailsDrawer } from '../POIDetailsDrawer';
 
 const HIGHLIGHT_SOURCE = 'place-highlight-source';
 const HIGHLIGHT_LAYER = 'place-highlight-layer';
@@ -20,6 +21,29 @@ export const PlacePOILayer: React.FC = () => {
   const { pois } = usePOIContext();
   const markersRef = useRef<MarkerRef[]>([]);
   const [hoveredPlace, setHoveredPlace] = useState<PlaceLabel | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<{
+    id: string;
+    name: string;
+    description?: string;
+    photos?: POIPhoto[];
+  } | null>(null);
+
+  // Handle zoom changes
+  useEffect(() => {
+    if (!map) return;
+
+    const handleZoom = () => {
+      setZoom(map.getZoom());
+    };
+
+    map.on('zoom', handleZoom);
+    handleZoom(); // Set initial zoom
+
+    return () => {
+      map.off('zoom', handleZoom);
+    };
+  }, [map]);
 
   // Setup highlight layer
   useEffect(() => {
@@ -119,8 +143,19 @@ export const PlacePOILayer: React.FC = () => {
       return acc;
     }, {});
 
+    // Get current zoom level
+    const currentZoom = map.getZoom();
+
+    // Only show markers if zoom level is less than 12
+    if (currentZoom <= 9) {
+      return;
+    }
+
     // Create markers for each place's POIs
     Object.entries(poiGroups).forEach(([placeId, pois]) => {
+      // Adjust baseOffset based on zoom level
+      const baseOffset = currentZoom <= 8.06 ? -15 : -25; // Move icons up by 10px when zoomed out
+
       const positions = calculatePOIPositions(
         {
           id: placeId,
@@ -132,7 +167,7 @@ export const PlacePOILayer: React.FC = () => {
           iconSize: 16,
           spacing: 2,
           maxPerRow: 6,
-          baseOffset: -25
+          baseOffset
         }
       );
 
@@ -143,7 +178,27 @@ export const PlacePOILayer: React.FC = () => {
         // Create marker element
         const el = document.createElement('div');
         el.className = 'place-poi-marker';
-        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white;"></i>`;
+        const category = POI_CATEGORIES[poi.category];
+        const backgroundColor = poi.style?.color || category.color;
+        el.style.backgroundColor = backgroundColor;
+        el.style.width = '20px';
+        el.style.height = '20px';
+        el.style.borderRadius = '4px';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px;"></i>`;
+        
+        // Add click handler to open drawer
+        el.addEventListener('click', () => {
+          const firstPOI = pois[0];
+          setSelectedPlace({
+            id: placeId,
+            name: firstPOI.name,
+            description: firstPOI.description,
+            photos: firstPOI.photos || []
+          });
+        });
 
         // Create and add marker
         const marker = new mapboxgl.Marker({
@@ -165,9 +220,18 @@ export const PlacePOILayer: React.FC = () => {
       markersRef.current.forEach(({ marker }) => marker.remove());
       markersRef.current = [];
     };
-  }, [map, pois]);
+  }, [map, pois, zoom]); // Add zoom to dependencies to update markers when zoom changes
 
-  return null;
+  return (
+    <PlacePOIDetailsDrawer
+      isOpen={!!selectedPlace}
+      onClose={() => setSelectedPlace(null)}
+      placeId={selectedPlace?.id || ''}
+      placeName={selectedPlace?.name || ''}
+      description={selectedPlace?.description}
+      photos={selectedPlace?.photos}
+    />
+  );
 };
 
 export default PlacePOILayer;

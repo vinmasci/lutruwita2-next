@@ -23,8 +23,6 @@ export const POI_ICONS: POIIconDefinition[] = [
   { name: 'Route', category: 'road-information', label: 'Trailhead', description: 'Start of a trail or track' },
   { name: 'RailTrail', category: 'road-information', label: 'Rail Trail', description: 'Former railway line converted to trail' },
   { name: 'Construction', category: 'road-information', label: 'Road Construction', description: 'Road works or construction area' },
-  { name: 'WaterCrossing', category: 'road-information', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#3498db' } },
-
   // Accommodation
   { name: 'Tent', category: 'accommodation', label: 'Camping', description: 'Camping area or campsite' },
   { name: 'Car', category: 'accommodation', label: 'Caravan Park', description: 'Caravan and camping park' },
@@ -40,12 +38,13 @@ export const POI_ICONS: POIIconDefinition[] = [
   { name: 'Store', category: 'food-drink', label: 'General Store', description: 'General store or convenience store' },
   { name: 'Beer', category: 'food-drink', label: 'Bar/Pub', description: 'Bar or pub' },
   { name: 'Wine', category: 'food-drink', label: 'Winery', description: 'Winery or cellar door' },
-  { name: 'Droplet', category: 'food-drink', label: 'Drinking Water', description: 'Drinking water available', style: { color: '#3498db' } },
 
   // Natural Features
   { name: 'Mountain', category: 'natural-features', label: 'Summit', description: 'Mountain summit or peak' },
   { name: 'TreePine', category: 'natural-features', label: 'National Park', description: 'National park or reserve' },
   { name: 'Binoculars', category: 'natural-features', label: 'Viewpoint', description: 'Scenic viewpoint or lookout' },
+  { name: 'Droplet', category: 'natural-features', label: 'Drinking Water', description: 'Drinking water available', style: { color: '#3498db' } },
+  { name: 'WaterCrossing', category: 'natural-features', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#3498db' } },
   { name: 'Swimming', category: 'natural-features', label: 'Swimming', description: 'Swimming spot or water access', style: { color: '#3498db' } },
 
   // Event Information

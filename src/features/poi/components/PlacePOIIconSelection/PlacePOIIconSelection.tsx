@@ -85,9 +85,10 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
           { category: 'Road Information', icons: ['Plane', 'TrainStation', 'Bus', 'Ship'] },
           { category: 'Accommodation', icons: ['Bell', 'BedDouble', 'Car', 'Tent'] },
           { category: 'Food & Drink', icons: ['ShoppingCart', 'Utensils', 'Pizza', 'Coffee', 'Beer', 'Wine'] },
-          { category: 'Facilities', icons: ['Toilet', 'ShowerHead', 'Droplet'] },
-          { category: 'Town Services', icons: ['Bike', 'Hospital', 'Fuel', 'Store', 'Mail', 'Swimming'] },
-          { category: 'Event Information', icons: ['Stethoscope', 'BatteryCharging', 'X', 'CircleDot', 'Wrench'] }
+          { category: 'Facilities', icons: ['Toilet', 'ShowerHead'] },
+          { category: 'Town Services', icons: ['Bike', 'Hospital', 'Fuel', 'Store', 'Mail'] },
+          { category: 'Event Information', icons: ['Stethoscope', 'BatteryCharging', 'X', 'CircleDot', 'Wrench'] },
+          { category: 'Natural Features', icons: ['Swimming', 'Droplet'] }
         ].map(({ category, icons }, groupIndex) => (
           <Box key={groupIndex}>
             <Typography 
@@ -95,7 +96,7 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
               sx={{ 
                 color: 'white',
                 pl: 2,
-                pb: 0.5,
+                pb: 0.25,
                 display: 'block',
                 fontSize: '0.7rem',
                 opacity: 0.8
@@ -106,10 +107,10 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
             <IconGrid 
               sx={{ 
                 display: 'grid', 
-                gridTemplateColumns: `repeat(${icons.length}, 27px)`,
-                gap: '16px', 
+                gridTemplateColumns: `repeat(${icons.length}, 20px)`,
+                gap: '8px', 
                 justifyContent: 'start',
-                mb: 2,
+                mb: 1,
                 pl: 2
               }}
             >
@@ -127,8 +128,8 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
                   onMouseLeave={() => setHoveredIcon(null)}
                   sx={{ 
                     position: 'relative',
-                    width: '27px !important',
-                    height: '27px !important',
+                    width: '20px !important',
+                    height: '20px !important',
                     backgroundColor: '#1e1e1e',
                     borderRadius: '8px',
                     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.4)',
@@ -145,7 +146,7 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
                   <i 
                     className={ICON_PATHS[icon.name]} 
                     style={{ 
-                      fontSize: '18px', 
+                      fontSize: '12px', 
                       color: '#fff',
                       position: 'absolute',
                       top: '50%',

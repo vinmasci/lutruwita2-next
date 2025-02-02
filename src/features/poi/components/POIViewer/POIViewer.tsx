@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, IconButton, Typography, Dialog, DialogContent, TextField, Button, Drawer, Slide } from '@mui/material';
+import { Box, IconButton, Typography, Dialog, DialogContent, TextField, Button } from '@mui/material';
 import { ChevronLeft, Close, Edit, Save, Cancel } from '@mui/icons-material';
 import { DrawerHeader, DrawerContent } from '../POIDrawer/POIDrawer.styles';
+import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
 import { POI_CATEGORIES, POIType, POIPhoto } from '../../types/poi.types';
 import { getIconDefinition } from '../../constants/poi-icons';
 import { createPOIPhotos } from '../../utils/photo';
@@ -92,35 +93,22 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
 
   return (
     <>
-      <Drawer
+      <NestedDrawer
         anchor="left"
         open={Boolean(poi)}
         onClose={onClose}
         variant="temporary"
-        ModalProps={{
-          keepMounted: true,
-        }}
-        SlideProps={{
-          direction: "right"
-        }}
         sx={{
           '& .MuiDrawer-paper': {
-            width: '264px',
-            marginLeft: '56px',
-            backgroundColor: 'rgba(35, 35, 35, 0.9)',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
             borderLeft: '1px solid #333',
-            color: '#ffffff',
-            height: '100%',
-            position: 'absolute'
           }
         }}
       >
         <Box sx={{ 
-          width: '100%',
           height: '100%',
-          backgroundColor: 'rgba(35, 35, 35, 0.9)',
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: 'column'
         }}>
           <DrawerHeader>
             <IconButton
@@ -411,7 +399,7 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
             </Box>
           </DrawerContent>
         </Box>
-      </Drawer>
+      </NestedDrawer>
 
       {/* Full-screen Photo Dialog */}
       <Dialog 

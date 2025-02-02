@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import mapboxgl from 'mapbox-gl';
+import StyleControl, { MAP_STYLES } from '../StyleControl/StyleControl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
@@ -387,7 +388,7 @@ function MapViewContent() {
 
     const map = new mapboxgl.Map({
       container: mapRef.current,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
+      style: MAP_STYLES.satellite.url,
       bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
       fitBoundsOptions: {
         padding: 0,
@@ -486,6 +487,9 @@ function MapViewContent() {
       }),
       'top-right'
     );
+
+    // Add style control last so it appears at bottom
+    map.addControl(new StyleControl(), 'top-right');
 
     // Style controls
     const style = document.createElement('style');
@@ -649,11 +653,13 @@ function MapViewContent() {
       )}
 
       {/* POI Viewer */}
-      <POIViewer
-        poi={selectedPOI}
-        onClose={() => setSelectedPOI(null)}
-        onUpdate={updatePOI}
-      />
+      {selectedPOI && (
+        <POIViewer
+          poi={selectedPOI}
+          onClose={() => setSelectedPOI(null)}
+          onUpdate={updatePOI}
+        />
+      )}
 
     </div>
     </MapProvider>

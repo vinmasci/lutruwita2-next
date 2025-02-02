@@ -31,27 +31,50 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
           : 'Select one or more icons to attach to the selected place.'}
       </Typography>
 
-      {Object.entries(POI_CATEGORIES).map(([categoryKey, category]) => {
-        const categoryIcons = POI_ICONS.filter(icon => icon.category === categoryKey);
-        if (categoryIcons.length === 0) return null;
-        
+      {[
+        { 
+          category: 'road-information', 
+          label: 'Road Information', 
+          iconGroups: [
+            ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ChevronsRightLeft', 'ArrowUpRight', 'Construction'],
+            ['AudioWaveform', 'Route', 'RailTrail']
+          ]
+        },
+        { category: 'accommodation', label: 'Accommodation', iconGroups: [['Bell', 'BedDouble', 'Car', 'Tent']] },
+        { 
+          category: 'food-drink', 
+          label: 'Food & Drink', 
+          iconGroups: [
+            ['Utensils', 'Coffee', 'Pizza', 'ShoppingCart', 'Store', 'Beer', 'Wine'],
+            ['Droplet']
+          ]
+        },
+        { category: 'natural-features', label: 'Natural Features', iconGroups: [['Mountain', 'TreePine', 'Binoculars', 'WaterCrossing', 'Swimming']] },
+        { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'CircleDot', 'Wrench']] },
+        { category: 'town-services', label: 'Town Services', iconGroups: [['Hospital', 'Toilet', 'ShowerHead', 'ParkingSquare', 'Fuel', 'Mail', 'Bike']] },
+        { category: 'transportation', label: 'Transportation', iconGroups: [['Bus', 'TrainStation', 'Plane', 'Ship']] }
+      ].map(({ category: categoryKey, label, iconGroups }) => {
         return (
-          <Box key={categoryKey} sx={{ mb: 3 }}>
+          <Box key={`${categoryKey}-${iconGroups[0][0]}`} sx={{ mb: 2 }}>
             <Typography 
               variant="caption" 
               sx={{ 
                 color: 'white',
-                mb: 1,
+                mb: 0.5,
                 display: 'block',
                 fontSize: '0.7rem',
                 opacity: 0.7,
                 letterSpacing: '0.5px'
               }}
             >
-              {category.label}
+              {label}
             </Typography>
-            <IconGrid>
-              {categoryIcons.map((icon) => {
+            {iconGroups.map((icons, groupIndex) => (
+              <IconGrid key={groupIndex} sx={{ mb: groupIndex < iconGroups.length - 1 ? 1 : 0 }}>
+                {icons.map((iconName) => {
+                const icon = POI_ICONS.find(i => i.name === iconName);
+                if (!icon) return null;
+                const category = POI_CATEGORIES[categoryKey as POICategory];
                 const iconColor = icon.style?.color || category.color;
                 return (
                   <IconGridItem
@@ -65,8 +88,8 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
                     onMouseLeave={() => setHoveredIcon(null)}
                     sx={{ 
                       position: 'relative',
-                      width: '28px',
-                      height: '28px',
+                      width: '20px',
+                      height: '20px',
                       backgroundColor: iconColor,
                       borderRadius: '4px',
                       display: 'flex',
@@ -77,7 +100,7 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
                       }
                     }}
                   >
-                    <i className={ICON_PATHS[icon.name]} style={{ fontSize: '16px', color: 'white' }} />
+                    <i className={ICON_PATHS[icon.name]} style={{ fontSize: '12px', color: 'white' }} />
                     {hoveredIcon === icon.name && (
                       <StyledTooltip>
                         {icon.label}
@@ -85,8 +108,9 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
                     )}
                   </IconGridItem>
                 );
-              })}
-            </IconGrid>
+                })}
+              </IconGrid>
+            ))}
           </Box>
         );
       })}

@@ -87,6 +87,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── MapView/    # Main map display
 │   │   │   │   │   ├── MapView.tsx # Map component
 │   │   │   │   │   └── MapView.css # Map styles
+│   │   │   │   ├── StyleControl/ # Map style controls
+│   │   │   │   │   └── StyleControl.tsx # Style control component
 │   │   │   │   └── Sidebar/    # Main sidebar and drawer system
 │   │   │   │       ├── Sidebar.tsx       # Main sidebar component
 │   │   │   │       ├── Sidebar.styles.ts # Styled drawer components
@@ -119,10 +121,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │       ├── PhotoUploader.tsx # Main photo uploader
 │   │   │   │       ├── PhotoUploaderUI.tsx # Upload interface
 │   │   │   │       └── PhotoUploader.types.ts # Type definitions
-│   │   │   ├── context/   # Photo state management
-│   │   │   │   └── PhotoContext.tsx # Photo context provider
-│   │   │   └── styles/    # Photo-specific styles
-│   │   │       └── photo-markers.css # Marker styling
+│   │   │   └── context/   # Photo state management
+│   │   │       └── PhotoContext.tsx # Photo context provider
 │   │   └── poi/           # Points of Interest feature
 │   │       ├── components/ # POI-specific components
 │   │       │   ├── MapboxPOIMarker/ # Mapbox-specific POI marker
@@ -136,7 +136,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── PlacePOILayer.tsx # Layer component
 │   │       │   │   └── PlacePOILayer.css # Layer styles
 │   │       │   ├── POIDetailsDrawer/ # POI details viewing drawer
-│   │       │   │   └── POIDetailsDrawer.tsx # Details display component
+│   │       │   │   ├── POIDetailsDrawer.tsx # Details display component
+│   │       │   │   ├── PlacePOIDetailsDrawer.tsx # Place-specific details
+│   │       │   │   └── index.ts     # Component exports
 │   │       │   ├── POIDragPreview/  # Drag and drop preview
 │   │       │   │   └── POIDragPreview.tsx # Drag preview component
 │   │       │   ├── POIDrawer/   # POI management drawer
@@ -162,6 +164,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       ├── context/    # POI state management
 │   │       │   └── POIContext.tsx # POI context provider
 │   │       ├── types/     # POI type definitions
+│   │       │   └── poi.types.ts # POI type definitions
 │   │       └── utils/     # POI utility functions
 │   │           ├── photo.ts # Photo-related utilities
 │   │           └── placeDetection.ts # Place detection utilities
@@ -207,6 +210,7 @@ The map feature (`src/features/map/`) manages the interactive map display, inclu
 - Map Context for sharing map state across components
 - MapView component for rendering the interactive map
 - Map controls for user interaction
+- Style control for customizing map appearance
 
 ### Points of Interest (POI)
 The POI feature (`src/features/poi/`) provides functionality for managing and displaying points of interest on the map. Key components include:

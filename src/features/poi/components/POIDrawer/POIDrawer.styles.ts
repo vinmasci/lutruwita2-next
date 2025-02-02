@@ -20,7 +20,7 @@ export const DrawerHeader = styled(Box)(({ theme }) => ({
 export const DrawerContent = styled(Box)(({ theme }) => ({
   flex: 1,
   overflowY: 'auto',
-  padding: '16px',
+  padding: '12px',
 }));
 
 export const DrawerFooter = styled(Box)(({ theme }) => ({
@@ -28,7 +28,7 @@ export const DrawerFooter = styled(Box)(({ theme }) => ({
   borderTop: '1px solid rgba(255, 255, 255, 0.1)',
   display: 'flex',
   justifyContent: 'space-between',
-  gap: '8px',
+  gap: '4px',
 }));
 
 export const ModeSelectionCard = styled(Paper)(({ theme }) => ({
@@ -49,7 +49,7 @@ export const CategoryList = styled(List)(({ theme }) => ({
 }));
 
 export const CategoryItem = styled(ListItem)<{ selected?: boolean }>(({ theme, selected }) => ({
-  padding: '8px 12px',
+  padding: '4px 12px',
   marginBottom: '8px',
   backgroundColor: selected ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
   borderRadius: '4px',
@@ -62,9 +62,9 @@ export const CategoryItem = styled(ListItem)<{ selected?: boolean }>(({ theme, s
 
 export const IconGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(6, 1fr)',
-  gap: '12px',
-  padding: '4px 0',
+  gridTemplateColumns: 'repeat(9, 1fr)',
+  gap: '6px',
+  padding: '0px 0px',
   justifyItems: 'center',
 }));
 
@@ -150,7 +150,11 @@ export const StyledTooltip = styled(Box)(({ theme }) => ({
   backgroundColor: '#000000',
   padding: '4px 8px',
   borderRadius: '4px',
-  fontSize: '12px',
+  fontSize: '0.75rem',
+  fontFamily: '"Roboto","Helvetica","Arial",sans-serif',
+  fontWeight: 500,
+  lineHeight: '1.4em',
+  letterSpacing: '0.15px',
   whiteSpace: 'nowrap',
   pointerEvents: 'none',
   zIndex: 1000,
