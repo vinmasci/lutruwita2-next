@@ -68,7 +68,7 @@ export const IconGrid = styled(Box)(({ theme }) => ({
   justifyItems: 'center',
 }));
 
-export const IconGridItem = styled(Box)<{ selected?: boolean }>(({ theme, selected }) => ({
+export const IconGridItem = styled(Box)<{ selected?: boolean; zoom?: number }>(({ theme, selected, zoom }) => ({
   aspectRatio: '1',
   display: 'flex',
   alignItems: 'center',
@@ -79,7 +79,19 @@ export const IconGridItem = styled(Box)<{ selected?: boolean }>(({ theme, select
   border: 'none',
   ...(selected && {
     transform: 'scale(1.1)'
-  })
+  }),
+  ...(zoom === 3 && { transform: 'scale(0.5)' }),
+  ...(zoom === 4 && { transform: 'scale(0.5)' }),
+  ...(zoom === 5 && { transform: 'scale(0.6)' }),
+  ...(zoom === 6 && { transform: 'scale(0.6)' }),
+  ...(zoom === 7 && { transform: 'scale(0.7)' }),
+  ...(zoom === 8 && { transform: 'scale(0.7)' }),
+  ...(zoom === 9 && { transform: 'scale(0.8)' }),
+  ...(zoom === 10 && { transform: 'scale(0.8)' }),
+  ...(zoom === 11 && { transform: 'scale(0.9)' }),
+  ...(zoom === 12 && { transform: 'scale(0.9)' }),
+  ...(zoom === 13 && { transform: 'scale(1.0)' }),
+  ...(zoom === 14 && { transform: 'scale(1.0)' })
 }));
 
 export const StyledForm = styled('form')(({ theme }) => ({

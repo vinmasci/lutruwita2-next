@@ -120,18 +120,9 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
                     position: 'relative',
                     width: '100%',
                     aspectRatio: '1/1',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      transform: 'scale(1.02)'
-                    },
                     borderRadius: 1,
-                    overflow: 'hidden',
-                    boxShadow: selectedPhotos.has(photo.id)
-                      ? '0 0 0 2px #3498db'
-                      : 'none'
+                    overflow: 'hidden'
                   }}
-                  onClick={() => onPhotoSelect(photo.id)}
                 >
                   <Box
                     component="img"
@@ -145,51 +136,31 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
                     }}
                   />
                   
-                  {/* Selection and GPS Indicators */}
-                  <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
-                    {photo.hasGps && (
-                      <Box
+                  {/* GPS Indicator */}
+                  {photo.hasGps && (
+                    <Box 
+                      sx={{ 
+                        position: 'absolute', 
+                        top: 8, 
+                        right: 8,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        borderRadius: '50%',
+                        padding: '2px',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <LocationIcon
                         sx={{
-                          backgroundColor: 'rgba(0,0,0,0.5)',
-                          borderRadius: '50%',
-                          padding: '2px',
-                          width: '20px',
-                          height: '20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
+                          color: '#2ecc71',
+                          fontSize: 14
                         }}
-                      >
-                        <LocationIcon
-                          sx={{
-                            color: '#2ecc71',
-                            fontSize: 14
-                          }}
-                        />
-                      </Box>
-                    )}
-                    {selectedPhotos.has(photo.id) && (
-                      <Box
-                        sx={{
-                          backgroundColor: 'rgba(0,0,0,0.5)',
-                          borderRadius: '50%',
-                          padding: '2px',
-                          width: '20px',
-                          height: '20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <SelectIcon
-                          sx={{
-                            color: '#3498db',
-                            fontSize: 14
-                          }}
-                        />
-                      </Box>
-                    )}
-                  </Box>
+                      />
+                    </Box>
+                  )}
 
                   {/* Delete Button */}
                   <IconButton

@@ -11,6 +11,7 @@ import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
 // Lazy load components
 const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
 import { POIType, POIPosition, POICategory, POIIconName } from '../../../poi/types/poi.types';
+import { POIViewer } from '../../../poi/components/POIViewer/POIViewer';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
@@ -81,7 +82,7 @@ function MapViewContent() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
   const [currentPhotos, setCurrentPhotos] = useState([]);
-  const { pois, updatePOIPosition, addPOI } = usePOIContext();
+  const { pois, updatePOIPosition, addPOI, updatePOI } = usePOIContext();
   const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
@@ -299,6 +300,11 @@ function MapViewContent() {
     category: POICategory;
     position: POIPosition;
   } | null>(null);
+  const [selectedPOI, setSelectedPOI] = useState<POIType | null>(null);
+
+  const handlePOIClick = (poi: POIType) => {
+    setSelectedPOI(poi);
+  };
 
   const handlePOICreation = (icon: POIIconName, category: POICategory, position: POIPosition) => {
     setSelectedPOIDetails({ iconName: icon, category, position });
@@ -589,6 +595,7 @@ function MapViewContent() {
               key={poi.id}
               poi={poi}
               onDragEnd={handlePOIDragEnd}
+              onClick={() => handlePOIClick(poi)}
             />
           ))}
         </>
@@ -640,6 +647,13 @@ function MapViewContent() {
           onSave={handlePOIDetailsSave}
         />
       )}
+
+      {/* POI Viewer */}
+      <POIViewer
+        poi={selectedPOI}
+        onClose={() => setSelectedPOI(null)}
+        onUpdate={updatePOI}
+      />
 
     </div>
     </MapProvider>

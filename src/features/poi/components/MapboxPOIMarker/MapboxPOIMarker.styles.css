@@ -7,6 +7,38 @@
   will-change: transform;
   pointer-events: auto;
   z-index: 1;
+  transition: transform 0.2s ease;
+}
+
+/* Zoom-based scaling */
+.marker-container[data-zoom="3"],
+.marker-container[data-zoom="4"] {
+  transform: scale(0.5);
+}
+
+.marker-container[data-zoom="5"],
+.marker-container[data-zoom="6"] {
+  transform: scale(0.6);
+}
+
+.marker-container[data-zoom="7"],
+.marker-container[data-zoom="8"] {
+  transform: scale(0.7);
+}
+
+.marker-container[data-zoom="9"],
+.marker-container[data-zoom="10"] {
+  transform: scale(0.8);
+}
+
+.marker-container[data-zoom="11"],
+.marker-container[data-zoom="12"] {
+  transform: scale(0.9);
+}
+
+.marker-container[data-zoom="13"],
+.marker-container[data-zoom="14"] {
+  transform: scale(1.0);
 }
 
 .marker-bubble {

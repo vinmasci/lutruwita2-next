@@ -1,172 +1,193 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import mapboxgl from 'mapbox-gl';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
 import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
+import { PhotoCluster } from '../PhotoCluster/PhotoCluster';
 import { PhotoPreviewModal } from '../PhotoPreview/PhotoPreviewModal';
 import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
-import mapboxgl from 'mapbox-gl';
 import './PhotoLayer.css';
 
-// Cluster configuration
+const CLUSTER_RADIUS = 50; // pixels
 const CLUSTER_MAX_ZOOM = 14;
-const CLUSTER_RADIUS = 50;
+
+interface PhotoClusterType {
+  photos: ProcessedPhoto[];
+  center: { lng: number; lat: number };
+}
 
 export const PhotoLayer: React.FC = () => {
   const { map } = useMapContext();
   const { photos } = usePhotoContext();
   const [selectedPhoto, setSelectedPhoto] = useState<ProcessedPhoto | null>(null);
+  const [zoom, setZoom] = useState(map?.getZoom() ?? 0);
 
-  useEffect(() => {
-    if (!map) return;
-
-    console.log('[PhotoLayer] Setting up photo markers with photos:', photos);
-    console.log('[PhotoLayer] Current zoom:', map.getZoom());
-
-    // Add cluster source
-    map.addSource('photos', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: photos
-          .filter(p => p.coordinates)
-          .map(photo => ({
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [photo.coordinates!.lng, photo.coordinates!.lat]
-            },
-            properties: {
-              id: photo.id,
-              thumbnailUrl: photo.thumbnailUrl
-            }
-          }))
-      },
-      cluster: true,
-      clusterMaxZoom: CLUSTER_MAX_ZOOM,
-      clusterRadius: CLUSTER_RADIUS
-    });
-
-    // Add cluster layers
-    map.addLayer({
-      id: 'photo-clusters',
-      type: 'circle',
-      source: 'photos',
-      filter: ['has', 'point_count'],
-      paint: {
-        'circle-color': 'rgba(255, 255, 255, 0.8)',
-        'circle-radius': [
-          'step',
-          ['get', 'point_count'],
-          20,   // radius for count < 10
-          10,   // count >= 10
-          25,   // radius for count < 50
-          50,   // count >= 50
-          30    // radius for count >= 50
-        ],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff'
-      }
-    });
-
-    // Add cluster count labels
-    map.addLayer({
-      id: 'photo-cluster-count',
-      type: 'symbol',
-      source: 'photos',
-      filter: ['has', 'point_count'],
-      layout: {
-        'text-field': '{point_count_abbreviated}',
-        'text-size': 14
-      },
-      paint: {
-        'text-color': '#000000'
-      }
-    });
-
-    return () => {
-      // Cleanup
-      if (map.getLayer('photo-cluster-count')) {
-        map.removeLayer('photo-cluster-count');
-      }
-      if (map.getLayer('photo-clusters')) {
-        map.removeLayer('photo-clusters');
-      }
-      if (map.getSource('photos')) {
-        map.removeSource('photos');
-      }
-    };
-  }, [map, photos]);
-
-  // Add zoom change listener
+  // Update zoom on map change
   useEffect(() => {
     if (!map) return;
 
     const handleZoomChange = () => {
-      const zoom = map.getZoom() ?? 0;
-      console.log('[PhotoLayer] Zoom changed:', zoom);
-      console.log('[PhotoLayer] Should show markers:', zoom >= CLUSTER_MAX_ZOOM);
+      setZoom(map.getZoom() ?? 0);
     };
 
     map.on('zoom', handleZoomChange);
-
     return () => {
       map.off('zoom', handleZoomChange);
     };
   }, [map]);
 
-  // Handle cluster click
-  useEffect(() => {
-    if (!map) return;
+  // Helper function to calculate distance between two points
+  const calculateDistance = useCallback((point1: mapboxgl.Point, point2: mapboxgl.Point): number => {
+    return Math.sqrt(Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2));
+  }, []);
 
-    const handleClusterClick = (e: mapboxgl.MapMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: ['photo-clusters']
+  // Helper function to calculate cluster center with bounds checking
+  const calculateClusterCenter = useCallback((clusterPhotos: ProcessedPhoto[]): { lng: number; lat: number } => {
+    const validPhotos = clusterPhotos.filter(p => 
+      p.coordinates && 
+      p.coordinates.lng >= -180 && p.coordinates.lng <= 180 &&
+      p.coordinates.lat >= -90 && p.coordinates.lat <= 90
+    );
+
+    if (validPhotos.length === 0) {
+      throw new Error('No valid coordinates in cluster');
+    }
+
+    const center = validPhotos.reduce(
+      (acc, p) => {
+        acc.lng += p.coordinates!.lng;
+        acc.lat += p.coordinates!.lat;
+        return acc;
+      },
+      { lng: 0, lat: 0 }
+    );
+
+    return {
+      lng: center.lng / validPhotos.length,
+      lat: center.lat / validPhotos.length
+    };
+  }, []);
+
+  // Cluster photos based on distance with improved performance and error handling
+  const { clusters, singlePhotos } = useMemo(() => {
+    if (!map || zoom >= CLUSTER_MAX_ZOOM) {
+      return { 
+        clusters: [], 
+        singlePhotos: photos.filter(p => p.coordinates && 
+          p.coordinates.lng >= -180 && p.coordinates.lng <= 180 &&
+          p.coordinates.lat >= -90 && p.coordinates.lat <= 90
+        ) 
+      };
+    }
+
+    try {
+      // Create spatial index for better performance
+      const points = photos
+        .filter(p => p.coordinates)
+        .map(p => ({
+          photo: p,
+          point: map.project([p.coordinates!.lng, p.coordinates!.lat])
+        }))
+        .filter(p => !isNaN(p.point.x) && !isNaN(p.point.y));
+
+      const clusteredPhotos: PhotoClusterType[] = [];
+      const processed = new Set<string>();
+
+      for (let i = 0; i < points.length; i++) {
+        if (processed.has(points[i].photo.id)) continue;
+
+        const cluster: ProcessedPhoto[] = [points[i].photo];
+        processed.add(points[i].photo.id);
+
+        // Find nearby points using spatial index
+        for (let j = i + 1; j < points.length; j++) {
+          if (processed.has(points[j].photo.id)) continue;
+
+          const distance = calculateDistance(points[i].point, points[j].point);
+          
+          if (distance <= CLUSTER_RADIUS) {
+            cluster.push(points[j].photo);
+            processed.add(points[j].photo.id);
+          }
+        }
+
+        if (cluster.length > 1) {
+          try {
+            const center = calculateClusterCenter(cluster);
+            clusteredPhotos.push({ photos: cluster, center });
+          } catch (error) {
+            console.error('Failed to calculate cluster center:', error);
+          }
+        } else if (!processed.has(cluster[0].id)) {
+          processed.add(cluster[0].id);
+        }
+      }
+
+      const singlePhotos = points
+        .filter(p => !processed.has(p.photo.id))
+        .map(p => p.photo);
+
+      return {
+        clusters: clusteredPhotos,
+        singlePhotos
+      };
+    } catch (error) {
+      console.error('Error during clustering:', error);
+      return { clusters: [], singlePhotos: [] };
+    }
+  }, [map, photos, zoom, calculateDistance, calculateClusterCenter]);
+
+  const handleClusterClick = useCallback((clusterPhotos: ProcessedPhoto[]) => {
+    if (!map || clusterPhotos.length === 0) return;
+
+    try {
+      // Calculate bounds of all photos in cluster
+      const bounds = new mapboxgl.LngLatBounds();
+      const validPhotos = clusterPhotos.filter(photo => 
+        photo.coordinates &&
+        photo.coordinates.lng >= -180 && photo.coordinates.lng <= 180 &&
+        photo.coordinates.lat >= -90 && photo.coordinates.lat <= 90
+      );
+
+      if (validPhotos.length === 0) {
+        console.error('No valid coordinates in cluster for zooming');
+        return;
+      }
+
+      validPhotos.forEach(photo => {
+        bounds.extend([photo.coordinates!.lng, photo.coordinates!.lat]);
       });
 
-      const clusterId = features[0]?.properties?.cluster_id;
-      if (!clusterId) return;
-
-      // Get cluster expansion zoom
-      const source = map.getSource('photos') as mapboxgl.GeoJSONSource;
-      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-        if (err) return;
-
-        const geometry = features[0]?.geometry;
-        if (!geometry || zoom === undefined) return;
-
-        map.easeTo({
-          center: (geometry as any).coordinates,
-          zoom: Math.min(zoom, 22) // Ensure zoom is within valid range
-        });
+      // Zoom to fit all photos with animation
+      map.fitBounds(bounds, {
+        padding: 50,
+        maxZoom: CLUSTER_MAX_ZOOM,
+        duration: 500,
+        essential: true
       });
-    };
-
-    map.on('click', 'photo-clusters', handleClusterClick);
-
-    return () => {
-      map.off('click', 'photo-clusters', handleClusterClick);
-    };
+    } catch (error) {
+      console.error('Error handling cluster click:', error);
+    }
   }, [map]);
-
-  // Helper function to safely get zoom level
-  const shouldShowMarkers = (): boolean => {
-    if (!map) return false;
-    const mapInstance = map as mapboxgl.Map & { transform?: { zoom: number } };
-    const zoom = mapInstance.transform?.zoom ?? 0;
-    return zoom >= CLUSTER_MAX_ZOOM;
-  };
 
   return (
     <>
-      {photos
-        .filter(p => p.coordinates && shouldShowMarkers())
-        .map(photo => (
-          <PhotoMarker
-            key={photo.id}
-            photo={photo}
-            onClick={() => setSelectedPhoto(photo)}
-          />
-        ))}
+      {singlePhotos.map(photo => (
+        <PhotoMarker
+          key={photo.id}
+          photo={photo}
+          onClick={() => setSelectedPhoto(photo)}
+        />
+      ))}
+
+      {clusters.map((cluster, index) => (
+        <PhotoCluster
+          key={`cluster-${index}`}
+          photos={cluster.photos}
+          coordinates={cluster.center}
+          onClick={() => handleClusterClick(cluster.photos)}
+        />
+      ))}
 
       {selectedPhoto && (
         <PhotoPreviewModal

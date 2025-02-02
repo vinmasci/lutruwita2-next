@@ -29,6 +29,32 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
   const { map } = useMapContext();
 
   // Create or recreate marker when position changes
+  // Effect to update zoom-based scaling
+  useEffect(() => {
+    if (!map) return;
+
+    const updateZoomScale = () => {
+      const zoom = Math.floor(map.getZoom());
+      const markerElement = markerRef.current?.getElement();
+      if (markerElement) {
+        const container = markerElement.querySelector('.marker-container');
+        if (container) {
+          container.setAttribute('data-zoom', zoom.toString());
+        }
+      }
+    };
+
+    // Initial update
+    updateZoomScale();
+
+    // Update on zoom changes
+    map.on('zoom', updateZoomScale);
+
+    return () => {
+      map.off('zoom', updateZoomScale);
+    };
+  }, [map]);
+
   useEffect(() => {
     console.log('MapboxPOIMarker effect triggered:', {
       poiId: poi.id,
@@ -52,9 +78,10 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
     const el = document.createElement('div');
     el.className = `poi-marker ${className || ''} ${selected ? 'selected' : ''}`;
     
-    // Set up marker HTML with bubble-pin style
+    // Set up marker HTML with bubble-pin style and initial zoom level
+    const initialZoom = Math.floor(map.getZoom());
     el.innerHTML = `
-      <div class="marker-container">
+      <div class="marker-container" data-zoom="${initialZoom}">
         <div class="marker-bubble" style="background-color: ${markerColor}">
           <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
         </div>

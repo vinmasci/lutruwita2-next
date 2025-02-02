@@ -31,7 +31,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── rejections.log            # Promise rejection logs
 │   └── server.log                # Server activity logs
 ├── public/                        # Static public assets
-│   └── favicon.ico               # Site favicon
+│   ├── favicon.ico               # Site favicon
+│   └── images/                   # Static image assets
+│       └── photo-fallback.svg    # Fallback image for photo loading
 ├── server/                        # Backend server code
 │   ├── src/
 │   │   ├── server.ts             # Main server entry point
@@ -89,12 +91,25 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   └── types/     # Map type definitions
 │   │   ├── photo/         # Photo management feature
 │   │   │   ├── components/ # Photo-specific components
+│   │   │   │   ├── PhotoCluster/ # Photo clustering functionality
+│   │   │   │   │   ├── PhotoCluster.tsx # Cluster component
+│   │   │   │   │   └── PhotoCluster.css # Cluster styles
+│   │   │   │   ├── PhotoLayer/ # Photo layer management
+│   │   │   │   │   ├── PhotoLayer.tsx # Layer component
+│   │   │   │   │   └── PhotoLayer.css # Layer styles
+│   │   │   │   ├── PhotoMarker/ # Individual photo markers
+│   │   │   │   │   ├── PhotoMarker.tsx # Marker component
+│   │   │   │   │   └── PhotoMarker.css # Marker styles
+│   │   │   │   ├── PhotoPreview/ # Photo preview modal
+│   │   │   │   │   └── PhotoPreviewModal.tsx # Preview component
 │   │   │   │   └── Uploader/ # Photo upload handling
 │   │   │   │       ├── PhotoUploader.tsx # Main photo uploader
 │   │   │   │       ├── PhotoUploaderUI.tsx # Upload interface
 │   │   │   │       └── PhotoUploader.types.ts # Type definitions
-│   │   │   └── context/   # Photo state management
-│   │   │       └── PhotoContext.tsx # Photo context provider
+│   │   │   ├── context/   # Photo state management
+│   │   │   │   └── PhotoContext.tsx # Photo context provider
+│   │   │   └── styles/    # Photo-specific styles
+│   │   │       └── photo-markers.css # Marker styling
 │   │   └── poi/           # Points of Interest feature
 │   │       ├── components/ # POI-specific components
 │   │       │   ├── MapboxPOIMarker/ # Mapbox-specific POI marker
@@ -191,12 +206,19 @@ The POI feature (`src/features/poi/`) provides functionality for managing and di
 
 ### Photo Management
 The photo feature (`src/features/photo/`) handles photo upload and management functionality:
+- Photo Layer System:
+  - PhotoLayer component for managing photo display on map
+  - PhotoMarker for individual photo locations
+  - PhotoCluster for grouping nearby photos
+  - PhotoPreview modal for enlarged photo viewing
 - Photo Uploader:
   - File upload interface
   - Upload progress tracking
   - Type validation
 - Photo Context for managing photo state
 - Integration with POI feature for attaching photos to points of interest
+- Custom styling for markers and clusters
+- Fallback image support for loading states
 
 ## Architecture
 

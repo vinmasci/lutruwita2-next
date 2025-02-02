@@ -1,29 +1,28 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import './PhotoMarker.css';
+import './PhotoCluster.css';
 import mapboxgl from 'mapbox-gl';
 import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
 import { useMapContext } from '../../../map/context/MapContext';
 
-interface PhotoMarkerProps {
-  photo: ProcessedPhoto;
+interface PhotoClusterProps {
+  photos: ProcessedPhoto[];
+  coordinates: { lng: number; lat: number };
   onClick?: () => void;
 }
 
-export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
+export const PhotoCluster: React.FC<PhotoClusterProps> = ({ 
+  photos, 
+  coordinates, 
+  onClick 
+}) => {
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const { map } = useMapContext();
 
   useEffect(() => {
-    if (!map || !photo.coordinates || 
-        !photo.coordinates.lng || !photo.coordinates.lat ||
-        photo.coordinates.lng < -180 || photo.coordinates.lng > 180 ||
-        photo.coordinates.lat < -90 || photo.coordinates.lat > 90) {
-      console.error('Invalid photo coordinates:', photo.coordinates);
-      return;
-    }
+    if (!map || !coordinates || !coordinates.lng || !coordinates.lat || photos.length === 0) return;
 
     const el = document.createElement('div');
-    el.className = 'photo-marker';
+    el.className = 'photo-cluster';
     el.setAttribute('data-zoom', Math.floor(map.getZoom()).toString());
 
     // Update zoom attribute when map zooms
@@ -33,10 +32,10 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
     map.on('zoom', updateZoom);
 
     const container = document.createElement('div');
-    container.className = 'photo-marker-container';
+    container.className = 'photo-cluster-container';
 
     const bubble = document.createElement('div');
-    bubble.className = 'photo-marker-bubble';
+    bubble.className = 'photo-cluster-bubble';
     
     // Create click handler with cleanup
     const handleClick = (e: MouseEvent) => {
@@ -48,18 +47,31 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
       bubble.addEventListener('click', handleClick);
     }
 
+    // Create image container
+    const imageContainer = document.createElement('div');
+    imageContainer.className = 'photo-cluster-bubble-image';
+
+    // Use the first photo as the cluster preview with error handling
     const img = document.createElement('img');
     img.onerror = () => {
-      console.error('Failed to load photo thumbnail:', photo.thumbnailUrl);
       img.src = '/images/photo-fallback.svg';
-      img.alt = 'Failed to load photo';
+      img.alt = 'Failed to load cluster preview';
     };
-    img.src = photo.thumbnailUrl;
-    img.alt = photo.name || 'Photo';
-    bubble.appendChild(img);
+    img.src = photos[0].thumbnailUrl;
+    img.alt = `Cluster of ${photos.length} photos`;
+    imageContainer.appendChild(img);
+    bubble.appendChild(imageContainer);
+
+    // Add count indicator if there's more than one photo
+    if (photos.length > 1) {
+      const count = document.createElement('div');
+      count.className = 'photo-cluster-count';
+      count.textContent = `+${photos.length - 1}`;
+      bubble.appendChild(count);
+    }
 
     const point = document.createElement('div');
-    point.className = 'photo-marker-point';
+    point.className = 'photo-cluster-point';
 
     container.appendChild(bubble);
     container.appendChild(point);
@@ -70,7 +82,7 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
       element: el,
       anchor: 'center'
     })
-      .setLngLat([photo.coordinates.lng, photo.coordinates.lat])
+      .setLngLat([coordinates.lng, coordinates.lat])
       .addTo(map);
 
     markerRef.current = marker;
@@ -83,11 +95,11 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
       if (onClick) {
         bubble.removeEventListener('click', handleClick);
       }
-      // Clean up image error handler
-      img.onerror = null;
       map.off('zoom', updateZoom);
     };
-  }, [map, photo, onClick]);
+  }, [map, coordinates, photos, onClick]);
 
   return null;
 };
+
+export default PhotoCluster;

@@ -29,7 +29,6 @@ const PhotoUploader = ({
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Set thumbnail size (larger for better quality)
         const maxSize = 800;
         let width = img.width;
         let height = img.height;
@@ -73,16 +72,13 @@ const PhotoUploader = ({
           const url = await processPhoto(file);
           const thumbnailUrl = await createThumbnail(url);
           
-          // Extract EXIF data
           const exif = await exifr.parse(file, { gps: true });
           const hasGps = Boolean(exif?.latitude && exif?.longitude);
-          
-          // Log EXIF data for debugging
-          console.log('[PhotoUploader] EXIF data for', file.name, ':', exif);
-          console.log('[PhotoUploader] GPS data present:', hasGps);
+
+          const photoId = `photo-${Date.now()}-${Math.random()}`;
 
           const photo: ProcessedPhoto = {
-            id: `photo-${Date.now()}-${Math.random()}`,
+            id: photoId,
             name: file.name,
             url,
             thumbnailUrl,
@@ -97,21 +93,26 @@ const PhotoUploader = ({
             })
           };
 
-          console.log('[PhotoUploader] Processed photo:', photo);
+          // Add to local state only, don't call onUploadComplete yet
+          setPhotos(prev => [...prev, photo]);
+          // Auto-select the photo
+          setSelectedPhotos(prev => {
+            const next = new Set(prev);
+            next.add(photoId);
+            return next;
+          });
+
           return photo;
         })
       );
 
-      console.log('[PhotoUploader] All processed photos:', processedPhotos);
-      setPhotos(prev => [...prev, ...processedPhotos]);
-      onUploadComplete(processedPhotos);
+      setIsLoading(false);
     } catch (error) {
       console.error('[PhotoUploader] Error processing files:', error);
       setError({
         message: 'Failed to process photos',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -130,11 +131,16 @@ const PhotoUploader = ({
 
   const handleAddToMap = () => {
     const selectedPhotosList = photos.filter(p => selectedPhotos.has(p.id));
-    if (selectedPhotosList.length > 0 && onAddToMap) {
-      onAddToMap(selectedPhotosList);
+    if (selectedPhotosList.length > 0) {
+      // Only call onUploadComplete when actually adding to map
+      onUploadComplete(selectedPhotosList);
+      if (onAddToMap) {
+        onAddToMap(selectedPhotosList);
+      }
+      // Clear photos and selection after adding to map
+      setPhotos([]);
+      setSelectedPhotos(new Set());
     }
-    // Clear selection after adding to map
-    setSelectedPhotos(new Set());
   };
 
   const handleFileDelete = (photoId: string) => {
