@@ -50,10 +50,13 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   └── types/         # Shared type definitions
 ├── src/                          # Frontend source code
 │   ├── App.tsx                   # Main React application component
+│   ├── env.d.ts                 # Environment type definitions
+│   ├── index.css               # Global styles
 │   ├── main.tsx                 # Frontend entry point
 │   ├── theme.ts                 # Application theming
 │   ├── components/              # Shared UI components
 │   │   └── ui/                 # Base UI components
+│   │       └── skeleton.tsx    # Skeleton loading component
 │   ├── features/               # Feature modules
 │   │   ├── gpx/               # GPX processing feature
 │   │   │   ├── components/    # GPX-specific components
@@ -67,9 +70,17 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │       ├── Uploader.types.ts # Type definitions
 │   │   │   │       └── index.ts          # Component exports
 │   │   │   ├── hooks/        # GPX-related React hooks
+│   │   │   │   ├── useClientGpxProcessing.ts # Client-side GPX processing
+│   │   │   │   └── useGpxProcessing.ts      # GPX processing hook
 │   │   │   ├── services/     # GPX processing services
+│   │   │   │   ├── gpxService.ts        # GPX data service
+│   │   │   │   ├── mapMatchingService.ts # Map matching functionality
+│   │   │   │   └── surfaceService.ts    # Surface detection service
 │   │   │   ├── types/       # Type definitions
 │   │   │   └── utils/       # GPX utility functions
+│   │   │       ├── climbUtils.ts # Climb calculation utilities
+│   │   │       ├── gpxParser.ts  # GPX file parsing
+│   │   │       └── roadUtils.ts  # Road-related utilities
 │   │   ├── map/             # Map visualization feature
 │   │   │   ├── components/  # Map-related components
 │   │   │   │   ├── MapControls/ # Map control components
@@ -87,6 +98,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── MapContext.tsx  # Map context provider
 │   │   │   │   └── RouteContext.tsx # Route management context
 │   │   │   ├── hooks/      # Map-related hooks
+│   │   │   │   ├── useMap.ts      # Map interaction hook
+│   │   │   │   └── useGpxProcessing.ts # GPX processing hook
 │   │   │   ├── services/   # Map services
 │   │   │   └── types/     # Map type definitions
 │   │   ├── photo/         # Photo management feature
@@ -116,6 +129,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── MapboxPOIMarker.tsx # Marker component
 │   │       │   │   ├── MapboxPOIMarker.styles.css # Marker styles
 │   │       │   │   └── index.ts     # Component exports
+│   │       │   ├── PlacePOIIconSelection/ # Place POI icon selection
+│   │       │   │   ├── PlacePOIIconSelection.tsx # Icon selection component
+│   │       │   │   └── index.ts     # Component exports
 │   │       │   ├── PlacePOILayer/ # Place POI layer component
 │   │       │   │   ├── PlacePOILayer.tsx # Layer component
 │   │       │   │   └── PlacePOILayer.css # Layer styles
@@ -133,11 +149,13 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── POIDrawer.styles.ts # Drawer styling
 │   │       │   │   ├── types.ts    # POI drawer types
 │   │       │   │   └── index.ts    # Component exports
-│   │       │   └── POIMarker/   # Generic POI marker component
-│   │       │       ├── POIMarker.tsx # Marker implementation
-│   │       │       ├── POIMarker.styles.ts # Marker styling
-│   │       │       ├── types.ts    # Marker type definitions
-│   │       │       └── index.ts    # Component exports
+│   │       │   ├── POIMarker/   # Generic POI marker component
+│   │       │   │   ├── POIMarker.tsx # Marker implementation
+│   │       │   │   ├── POIMarker.styles.ts # Marker styling
+│   │       │   │   ├── types.ts    # Marker type definitions
+│   │       │   │   └── index.ts    # Component exports
+│   │       │   └── POIViewer/   # POI viewing component
+│   │       │       └── POIViewer.tsx # Viewer implementation
 │   │       ├── constants/  # POI-related constants
 │   │       │   ├── icon-paths.ts # Icon asset paths
 │   │       │   └── poi-icons.ts  # POI icon definitions
@@ -148,8 +166,14 @@ This document outlines the project structure and describes the purpose of key fi
 │   │           ├── photo.ts # Photo-related utilities
 │   │           └── placeDetection.ts # Place detection utilities
 │   ├── lib/               # Core utilities and helpers
+│   │   ├── errors.ts     # Error handling utilities
+│   │   └── utils.ts      # General utilities
 │   ├── types/            # Global type definitions
+│   │   ├── api.types.ts  # API-related types
+│   │   └── index.ts      # Type exports
 │   └── utils/            # Shared utility functions
+│       └── gpx/          # GPX-specific utilities
+│           └── parsing.ts # GPX parsing utilities
 └── uploads/              # Temporary GPX file storage
 ```
 
