@@ -23,4 +23,16 @@ export interface ProcessedPhoto {
   thumbnailUrl: string;
   dateAdded: Date;
   hasGps: boolean;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  rotation?: number;  // For image orientation
+  altitude?: number;  // Optional altitude data
+}
+
+export interface PhotoMarker {
+  id: string;
+  photo: ProcessedPhoto;
+  marker: mapboxgl.Marker;
 }
