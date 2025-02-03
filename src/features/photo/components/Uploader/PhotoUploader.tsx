@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import exifr from 'exifr';
 import { PhotoUploaderProps, ProcessedPhoto } from './PhotoUploader.types';
 import PhotoUploaderUI from './PhotoUploaderUI';
@@ -8,7 +8,12 @@ const PhotoUploader = ({
   onDeletePhoto,
   onAddToMap
 }: PhotoUploaderProps) => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Reset loading state after initial mount
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
   const [error, setError] = useState<{ message: string; details?: string }>();
   const [photos, setPhotos] = useState<ProcessedPhoto[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
@@ -93,7 +98,7 @@ const PhotoUploader = ({
             })
           };
 
-          // Add to local state only, don't call onUploadComplete yet
+          // Add to local state for preview
           setPhotos(prev => [...prev, photo]);
           // Auto-select the photo
           setSelectedPhotos(prev => {

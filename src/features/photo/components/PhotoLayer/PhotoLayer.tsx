@@ -41,32 +41,43 @@ export const PhotoLayer: React.FC = () => {
     return Math.sqrt(Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2));
   }, []);
 
-  // Helper function to calculate cluster center with bounds checking
+  // Helper function to normalize coordinates within valid bounds
+  const normalizeCoordinates = useCallback((lng: number, lat: number) => {
+    // Normalize longitude to [-180, 180]
+    let normalizedLng = lng;
+    while (normalizedLng > 180) normalizedLng -= 360;
+    while (normalizedLng < -180) normalizedLng += 360;
+    
+    // Clamp latitude to [-90, 90]
+    const normalizedLat = Math.max(-90, Math.min(90, lat));
+    
+    return { lng: normalizedLng, lat: normalizedLat };
+  }, []);
+
+  // Helper function to calculate cluster center with normalization
   const calculateClusterCenter = useCallback((clusterPhotos: ProcessedPhoto[]): { lng: number; lat: number } => {
-    const validPhotos = clusterPhotos.filter(p => 
-      p.coordinates && 
-      p.coordinates.lng >= -180 && p.coordinates.lng <= 180 &&
-      p.coordinates.lat >= -90 && p.coordinates.lat <= 90
-    );
+    const validPhotos = clusterPhotos.filter(p => p.coordinates);
 
     if (validPhotos.length === 0) {
-      throw new Error('No valid coordinates in cluster');
+      console.warn('No valid coordinates in cluster, using fallback position');
+      return { lng: 0, lat: 0 }; // Fallback to null island rather than throwing
     }
 
     const center = validPhotos.reduce(
       (acc, p) => {
-        acc.lng += p.coordinates!.lng;
-        acc.lat += p.coordinates!.lat;
+        const normalized = normalizeCoordinates(p.coordinates!.lng, p.coordinates!.lat);
+        acc.lng += normalized.lng;
+        acc.lat += normalized.lat;
         return acc;
       },
       { lng: 0, lat: 0 }
     );
 
-    return {
-      lng: center.lng / validPhotos.length,
-      lat: center.lat / validPhotos.length
-    };
-  }, []);
+    return normalizeCoordinates(
+      center.lng / validPhotos.length,
+      center.lat / validPhotos.length
+    );
+  }, [normalizeCoordinates]);
 
   // Cluster photos based on distance with improved performance and error handling
   const { clusters, singlePhotos } = useMemo(() => {
@@ -81,14 +92,23 @@ export const PhotoLayer: React.FC = () => {
     }
 
     try {
-      // Create spatial index for better performance
+      // Create spatial index for better performance with coordinate normalization
       const points = photos
         .filter(p => p.coordinates)
-        .map(p => ({
-          photo: p,
-          point: map.project([p.coordinates!.lng, p.coordinates!.lat])
-        }))
-        .filter(p => !isNaN(p.point.x) && !isNaN(p.point.y));
+        .map(p => {
+          const normalized = normalizeCoordinates(p.coordinates!.lng, p.coordinates!.lat);
+          try {
+            const point = map.project([normalized.lng, normalized.lat]);
+            return point.x >= 0 && point.y >= 0 ? {
+              photo: p,
+              point
+            } : null;
+          } catch (err) {
+            console.warn(`Failed to project coordinates for photo ${p.id}:`, err);
+            return null;
+          }
+        })
+        .filter((p): p is { photo: ProcessedPhoto; point: mapboxgl.Point } => p !== null);
 
       const clusteredPhotos: PhotoClusterType[] = [];
       const processed = new Set<string>();

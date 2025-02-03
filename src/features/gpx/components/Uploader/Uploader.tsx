@@ -11,6 +11,11 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   const { isMapReady } = useMapContext();
   const { addRoute, deleteRoute, setCurrentRoute, routes } = useRouteContext();
 
+  // Don't render until map is ready
+  if (!isMapReady) {
+    return null;
+  }
+
   const handleFileAdd = async (file: File) => {
     console.log('[Uploader] File add triggered', { fileName: file.name });
     

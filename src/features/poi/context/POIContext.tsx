@@ -152,8 +152,41 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'REMOVE_POI', payload: id });
   };
 
-  const updatePOI = (id: string, updates: Partial<Omit<POIType, 'id'>>) => {
-    dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
+  const updatePOI = async (id: string, updates: Partial<Omit<POIType, 'id'>>) => {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        // Ensure we have the latest state
+        const currentPOI = pois.find(poi => poi.id === id);
+        if (!currentPOI) {
+          throw new Error(`POI with id ${id} not found`);
+        }
+
+        // Dispatch update
+        dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
+
+        // Wait for next tick to ensure state is updated
+        setTimeout(() => {
+          const updatedPOI = pois.find(poi => poi.id === id);
+          if (!updatedPOI) {
+            reject(new Error(`Failed to update POI ${id}`));
+            return;
+          }
+
+          // Verify update was successful
+          const hasUpdated = Object.entries(updates).every(([key, value]) => {
+            return updatedPOI[key as keyof POIType] === value;
+          });
+
+          if (hasUpdated) {
+            resolve();
+          } else {
+            reject(new Error(`Failed to verify POI update for ${id}`));
+          }
+        }, 0);
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
   const updatePOIPosition = (id: string, position: POIPosition) => {

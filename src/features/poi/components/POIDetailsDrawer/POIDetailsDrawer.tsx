@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography } from '@mui/material';
+import { TextField, Button, Box, Typography, ButtonBase } from '@mui/material';
 import { StyledDrawer, DrawerHeader, DrawerContent, DrawerFooter } from '../POIDrawer/POIDrawer.styles';
 import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
 import { POI_CATEGORIES, POIIconName, POICategory } from '../../types/poi.types';
 import { getIconDefinition } from '../../constants/poi-icons';
+import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoPreviewModal';
+import { ProcessedPhoto } from '../../../photo/components/Uploader/PhotoUploader.types';
 
 interface POIDetailsDrawerProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
   const [name, setName] = useState(iconDef?.label || '');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<ProcessedPhoto | null>(null);
 
   // Reset form when drawer opens with new POI
   useEffect(() => {
@@ -183,17 +186,32 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
             {photos.length > 0 && (
               <Box sx={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: 'repeat(2, 1fr)',
                 gap: 1 
               }}>
                 {photos.map((photo, index) => (
-                  <Box 
+                  <ButtonBase
                     key={index}
+                    onClick={() => {
+                      const url = URL.createObjectURL(photo);
+                      const processedPhoto: ProcessedPhoto = {
+                        id: String(index),
+                        name: photo.name || `Photo ${index + 1}`,
+                        url: url,
+                        thumbnailUrl: url,
+                        dateAdded: new Date(),
+                        hasGps: false
+                      };
+                      setSelectedPhoto(processedPhoto);
+                    }}
                     sx={{
+                      display: 'block',
+                      width: '100%',
                       aspectRatio: '1',
                       backgroundColor: 'rgba(35, 35, 35, 0.9)',
                       borderRadius: 1,
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      position: 'relative'
                     }}
                   >
                     <img
@@ -205,7 +223,7 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
                         objectFit: 'cover'
                       }}
                     />
-                  </Box>
+                  </ButtonBase>
                 ))}
               </Box>
             )}
@@ -225,9 +243,9 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
                   variant="contained"
                   fullWidth
                   sx={{ 
-                    backgroundColor: categoryColor,
+                    backgroundColor: POI_CATEGORIES[category].color,
                     '&:hover': {
-                      backgroundColor: categoryColor,
+                      backgroundColor: POI_CATEGORIES[category].color,
                       opacity: 0.9
                     }
                   }}
@@ -239,6 +257,12 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
           </form>
         </DrawerContent>
       </StyledDrawer>
+      {selectedPhoto && (
+        <PhotoPreviewModal
+          photo={selectedPhoto}
+          onClose={() => setSelectedPhoto(null)}
+        />
+      )}
     </NestedDrawer>
   );
 };

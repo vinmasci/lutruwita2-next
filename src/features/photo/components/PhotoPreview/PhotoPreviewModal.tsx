@@ -23,8 +23,21 @@ export const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
     <Dialog
       open={true}
       onClose={onClose}
-      maxWidth="md"
-      fullWidth
+      fullScreen={false}
+      maxWidth={false}
+      fullWidth={false}
+      sx={{
+        '& .MuiDialog-container': {
+          alignItems: 'center',
+          justifyContent: 'center',
+          '& .MuiPaper-root': {
+            width: '800px',
+            maxWidth: '80%',
+            m: 2,
+            borderRadius: 1
+          }
+        }
+      }}
     >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">

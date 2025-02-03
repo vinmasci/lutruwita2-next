@@ -4,7 +4,7 @@ import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
 import { calculatePOIPositions, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 import { ICON_PATHS } from '../../constants/icon-paths';
-import { PlaceNamePOI, POI_CATEGORIES } from '../../types/poi.types';
+import { PlaceNamePOI, POI_CATEGORIES, POIPhoto } from '../../types/poi.types';
 import { PlaceLabel } from '../../utils/placeDetection';
 import { PlacePOIDetailsDrawer } from '../POIDetailsDrawer';
 
@@ -28,6 +28,28 @@ export const PlacePOILayer: React.FC = () => {
     description?: string;
     photos?: POIPhoto[];
   } | null>(null);
+
+  // Update selectedPlace when POIs change
+  useEffect(() => {
+    if (!selectedPlace) return;
+
+    const placePOIs = pois.filter(
+      (poi): poi is PlaceNamePOI => 
+        poi.type === 'place' && 
+        poi.placeId === selectedPlace.id
+    );
+
+    if (placePOIs.length > 0) {
+      const firstPOI = placePOIs[0];
+      setSelectedPlace(prev => ({
+        ...prev!,
+        description: firstPOI.description,
+        photos: firstPOI.photos || []
+      }));
+    }
+  }, [pois, selectedPlace?.id]);
+
+  const isDrawerOpen = selectedPlace !== null;
 
   // Handle zoom changes
   useEffect(() => {
@@ -82,7 +104,7 @@ export const PlacePOILayer: React.FC = () => {
       }
     });
 
-    // Handle mouse move for hover effect
+    // Handle mouse move and click for place labels
     const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
       const place = getPlaceLabelAtPoint(map, e.point);
       setHoveredPlace(place);
@@ -100,21 +122,52 @@ export const PlacePOILayer: React.FC = () => {
         });
       }
 
-      // Only show highlight when in POI placement mode and hovering over a place
+      // Show highlight when hovering over a place that has POIs
+      const hasPOIs = place && pois.some(
+        (poi): poi is PlaceNamePOI => 
+          poi.type === 'place' && 
+          poi.placeId === place.id
+      );
+
       map.setLayoutProperty(
         HIGHLIGHT_LAYER,
         'visibility',
-        isPoiPlacementMode && place ? 'visible' : 'none'
+        hasPOIs ? 'visible' : 'none'
       );
 
       // Update cursor
-      map.getCanvas().style.cursor = place ? 'pointer' : '';
+      map.getCanvas().style.cursor = hasPOIs ? 'pointer' : '';
+    };
+
+    const handleClick = (e: mapboxgl.MapMouseEvent) => {
+      const place = getPlaceLabelAtPoint(map, e.point);
+      if (!place) return;
+
+      // Check if this place has any POIs
+      const placePOIs = pois.filter(
+        (poi): poi is PlaceNamePOI => 
+          poi.type === 'place' && 
+          poi.placeId === place.id
+      );
+
+      if (placePOIs.length > 0) {
+        const firstPOI = placePOIs[0];
+        const newSelectedPlace = {
+          id: place.id,
+          name: place.name,
+          description: firstPOI.description,
+          photos: firstPOI.photos || []
+        };
+        setSelectedPlace(newSelectedPlace);
+      }
     };
 
     map.on('mousemove', handleMouseMove);
+    map.on('click', handleClick);
 
     return () => {
       map.off('mousemove', handleMouseMove);
+      map.off('click', handleClick);
       if (map.getLayer(HIGHLIGHT_LAYER)) {
         map.removeLayer(HIGHLIGHT_LAYER);
       }
@@ -192,12 +245,13 @@ export const PlacePOILayer: React.FC = () => {
         // Add click handler to open drawer
         el.addEventListener('click', () => {
           const firstPOI = pois[0];
-          setSelectedPlace({
+          const newSelectedPlace = {
             id: placeId,
             name: firstPOI.name,
             description: firstPOI.description,
             photos: firstPOI.photos || []
-          });
+          };
+          setSelectedPlace(newSelectedPlace);
         });
 
         // Create and add marker
@@ -224,9 +278,9 @@ export const PlacePOILayer: React.FC = () => {
 
   return (
     <PlacePOIDetailsDrawer
-      isOpen={!!selectedPlace}
+      isOpen={isDrawerOpen}
       onClose={() => setSelectedPlace(null)}
-      placeId={selectedPlace?.id || ''}
+      placeId={selectedPlace?.id || null}
       placeName={selectedPlace?.name || ''}
       description={selectedPlace?.description}
       photos={selectedPlace?.photos}
