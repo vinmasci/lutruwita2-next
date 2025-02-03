@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, IconButton, Typography, Dialog, DialogContent, TextField, Button } from '@mui/material';
-import { ChevronLeft, Close, Edit, Save, Cancel } from '@mui/icons-material';
+import { ChevronLeft, Close, Edit, Save, Cancel, Delete } from '@mui/icons-material';
 import { DrawerHeader, DrawerContent } from '../POIDrawer/POIDrawer.styles';
 import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
 import { POI_CATEGORIES, POIType, POIPhoto } from '../../types/poi.types';
@@ -15,7 +15,7 @@ interface POIViewerProps {
 }
 
 export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, onUpdate }) => {
-  const { pois } = usePOIContext();
+  const { pois, removePOI } = usePOIContext();
   const [poi, setPoi] = useState(initialPoi);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -357,19 +357,37 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
               pt: 2
             }}>
               {!isEditing ? (
-                <Button
-                  variant="contained"
-                  startIcon={<Edit />}
-                  onClick={handleStartEditing}
-                  sx={{ 
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.3)'
-                    }
-                  }}
-                >
-                  Edit
-                </Button>
+                <>
+                  <Button
+                    variant="contained"
+                    startIcon={<Delete />}
+                    onClick={() => {
+                      removePOI(poi.id);
+                      onClose();
+                    }}
+                    sx={{ 
+                      bgcolor: 'rgba(255, 0, 0, 0.2)',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 0, 0, 0.3)'
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Edit />}
+                    onClick={handleStartEditing}
+                    sx={{ 
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.3)'
+                      }
+                    }}
+                  >
+                    Edit
+                  </Button>
+                </>
               ) : (
                 <>
                   <Button

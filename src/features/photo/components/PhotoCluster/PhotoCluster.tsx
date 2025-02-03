@@ -47,11 +47,7 @@ export const PhotoCluster: React.FC<PhotoClusterProps> = ({
       bubble.addEventListener('click', handleClick);
     }
 
-    // Create image container
-    const imageContainer = document.createElement('div');
-    imageContainer.className = 'photo-cluster-bubble-image';
-
-    // Use the first photo as the cluster preview with error handling
+    // Create and add image directly to bubble
     const img = document.createElement('img');
     img.onerror = () => {
       img.src = '/images/photo-fallback.svg';
@@ -59,19 +55,18 @@ export const PhotoCluster: React.FC<PhotoClusterProps> = ({
     };
     img.src = photos[0].thumbnailUrl;
     img.alt = `Cluster of ${photos.length} photos`;
-    imageContainer.appendChild(img);
-    bubble.appendChild(imageContainer);
+    bubble.appendChild(img);
+
+    const point = document.createElement('div');
+    point.className = 'photo-cluster-point';
 
     // Add count indicator if there's more than one photo
     if (photos.length > 1) {
       const count = document.createElement('div');
       count.className = 'photo-cluster-count';
       count.textContent = `+${photos.length - 1}`;
-      bubble.appendChild(count);
+      container.appendChild(count);
     }
-
-    const point = document.createElement('div');
-    point.className = 'photo-cluster-point';
 
     container.appendChild(bubble);
     container.appendChild(point);

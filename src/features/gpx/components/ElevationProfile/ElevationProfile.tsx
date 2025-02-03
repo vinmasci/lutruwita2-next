@@ -297,7 +297,7 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
                       <rect
                         x={viewBox.x + xOffset}
                         y={viewBox.y - 25}
-                        width={textWidth + 10}
+                        width={textWidth}
                         height="16"
                         rx="2"
                         fill={climb.color}
@@ -308,7 +308,7 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
                         x={viewBox.x + xOffset + 5}
                         y={viewBox.y - 13}
                         fill="#fff"
-                        fontSize={10}
+                        fontSize={8}
                         fontFamily="Futura"
                       >
                         {text}

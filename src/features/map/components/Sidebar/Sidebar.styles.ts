@@ -29,6 +29,8 @@ export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
     borderRight: '1px solid #333',
     color: '#ffffff',
     overflowX: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
     transition: theme.transitions.create('width', {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,

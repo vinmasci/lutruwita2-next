@@ -20,6 +20,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── MIGRATION_LOG.md           # Detailed log of migration changes and progress
 │   ├── MIGRATIONPLAN.md           # Strategic plan for system migration
 │   ├── OLDFUNCTIONS.md            # Archive of previous implementations for reference
+│   ├── PLACE_METADATA_FIX.md     # Documentation for place metadata fixes
 │   ├── POI_IMPLEMENTATION_PLAN.md # Detailed plan for Points of Interest feature
 │   ├── POI_PLACES.md             # Documentation for POI places functionality
 │   ├── POI_PROGRESS_NOTES.md     # Tracking progress of POI feature development
@@ -59,6 +60,11 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   └── ui/                 # Base UI components
 │   │       └── skeleton.tsx    # Loading skeleton component for content
 │   ├── features/               # Feature modules
+│   │   ├── auth/               # Authentication feature
+│   │   │   └── components/     # Auth components
+│   │   │       └── Auth0Login/ # Auth0 integration
+│   │   │           ├── Auth0Login.tsx # Login component
+│   │   │           └── Auth0Login.css # Login styling
 │   │   ├── gpx/               # GPX processing feature
 │   │   │   ├── components/    # GPX-specific components
 │   │   │   │   ├── ElevationProfile/ # Elevation visualization
@@ -84,6 +90,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │       └── roadUtils.ts  # Road surface analysis
 │   │   ├── map/             # Map visualization feature
 │   │   │   ├── components/  # Map components
+│   │   │   │   ├── DistanceMarkers/ # Distance indicators
+│   │   │   │   │   ├── DistanceMarkers.tsx # Marker component
+│   │   │   │   │   └── DistanceMarkers.css # Marker styling
 │   │   │   │   ├── MapControls/ # Interactive controls
 │   │   │   │   ├── MapView/    # Core map component
 │   │   │   │   │   ├── MapView.tsx # Map rendering
@@ -123,6 +132,13 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │       └── PhotoUploader.types.ts # Type defs
 │   │   │   └── context/   # Photo state management
 │   │   │       └── PhotoContext.tsx # Photo data/state
+│   │   ├── place/         # Place management feature
+│   │   │   ├── context/   # Place state management
+│   │   │   │   └── PlaceContext.tsx # Place data/state
+│   │   │   ├── types/     # Place type definitions
+│   │   │   │   └── place.types.ts # Place interfaces
+│   │   │   └── utils/     # Place utilities
+│   │   │       └── migration.ts # Place data migration
 │   │   └── poi/           # Points of Interest feature
 │   │       ├── components/ # POI components
 │   │       │   ├── MapboxPOIMarker/ # Mapbox markers
@@ -130,12 +146,18 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── MapboxPOIMarker.styles.css # Styling
 │   │       │   │   └── index.ts     # Public exports
 │   │       │   ├── PlacePOIIconSelection/ # Place icons
+│   │       │   │   ├── PlacePOIIconSelection.tsx # Icon selector
+│   │       │   │   └── index.ts     # Public exports
 │   │       │   ├── PlacePOILayer/ # Place visualization
+│   │       │   │   ├── PlacePOILayer.tsx # Layer component
+│   │       │   │   ├── PlacePOILayer.css # Layer styling
+│   │       │   │   └── index.ts     # Public exports
 │   │       │   ├── POIDetailsDrawer/ # POI info display
 │   │       │   │   ├── POIDetailsDrawer.tsx # Generic details
 │   │       │   │   ├── PlacePOIDetailsDrawer.tsx # Place details
 │   │       │   │   └── index.ts     # Public exports
 │   │       │   ├── POIDragPreview/  # Drag feedback
+│   │       │   │   └── POIDragPreview.tsx # Preview component
 │   │       │   ├── POIDrawer/   # POI management
 │   │       │   │   ├── POIDrawer.tsx # Main drawer
 │   │       │   │   ├── POIDetailsForm.tsx # Info form
@@ -144,18 +166,22 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── POIModeSelection.tsx # Mode UI
 │   │       │   │   ├── PlacePOIInstructions.tsx # Place help
 │   │       │   │   ├── POIDrawer.styles.ts # Styling
-│   │       │   │   └── types.ts    # Type definitions
+│   │       │   │   ├── types.ts    # Type definitions
+│   │       │   │   └── index.ts    # Public exports
 │   │       │   ├── POIMarker/   # Generic markers
 │   │       │   │   ├── POIMarker.tsx # Base marker
 │   │       │   │   ├── POIMarker.styles.ts # Styling
-│   │       │   │   └── types.ts    # Type definitions
+│   │       │   │   ├── types.ts    # Type definitions
+│   │       │   │   └── index.ts    # Public exports
 │   │       │   └── POIViewer/   # POI display
+│   │       │       └── POIViewer.tsx # Viewer component
 │   │       ├── constants/  # POI configuration
 │   │       │   ├── icon-paths.ts # Icon file paths
 │   │       │   └── poi-icons.ts  # Icon definitions
 │   │       ├── context/    # POI state management
 │   │       │   └── POIContext.tsx # POI data/state
 │   │       ├── types/     # POI type definitions
+│   │       │   └── poi.types.ts # POI interfaces
 │   │       └── utils/     # POI utilities
 │   │           ├── photo.ts # Photo processing
 │   │           └── placeDetection.ts # Place detection
@@ -192,6 +218,12 @@ The application's features are tightly integrated while maintaining clear bounda
 - Shared photo processing utilities
 - Consistent styling between features
 
+### Place ↔ POI Integration
+- Places can contain multiple POIs
+- Place detection informs POI creation
+- Shared icon selection system
+- Consistent metadata structure
+
 ## Redundant Files (To Be Consolidated)
 
 The following files should be consolidated to maintain a cleaner architecture:
@@ -213,6 +245,7 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `RouteContext`: Handles route data, selection state, and route operations
 - `POIContext`: Controls POI data, active POI state, and POI operations
 - `PhotoContext`: Manages photo data, upload state, and photo operations
+- `PlaceContext`: Handles place data and place-POI relationships
 
 ### Core Services
 - `gpxService`: Handles GPX file parsing and data extraction

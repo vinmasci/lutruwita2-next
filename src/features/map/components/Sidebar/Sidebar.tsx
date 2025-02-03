@@ -7,6 +7,7 @@ import { SidebarProps } from './types';
 import { useSidebar } from './useSidebar';
 import { styled } from '@mui/material/styles';
 import { Box, Typography, Paper, CircularProgress } from '@mui/material';
+import { Auth0Login } from '../../../auth/components/Auth0Login/Auth0Login';
 import UploadIcon from '@mui/icons-material/Upload';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { POIDrawer } from '../../../poi/components/POIDrawer';
@@ -94,12 +95,15 @@ export const Sidebar = (props: SidebarProps) => {
   return (
     <>
       <StyledDrawer variant="permanent">
-        <SidebarListItems 
-          {...props}
-          onUploadGpx={() => handleUploadGpx()}
-          onAddPOI={() => handleAddPOI()}
-          onAddPhotos={() => handleAddPhotos()}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <SidebarListItems 
+            {...props}
+            onUploadGpx={() => handleUploadGpx()}
+            onAddPOI={() => handleAddPOI()}
+            onAddPhotos={() => handleAddPhotos()}
+          />
+          <Auth0Login />
+        </Box>
       </StyledDrawer>
       
       <>

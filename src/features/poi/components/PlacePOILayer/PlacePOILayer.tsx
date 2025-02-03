@@ -186,14 +186,14 @@ export const PlacePOILayer: React.FC = () => {
     const currentZoom = map.getZoom();
 
     // Only show markers if zoom level is less than 12
-    if (currentZoom <= 9) {
+    if (currentZoom <= 8) {
       return;
     }
 
     // Create markers for each place's POIs
     Object.entries(poiGroups).forEach(([placeId, pois]) => {
       // Adjust baseOffset based on zoom level
-      const baseOffset = currentZoom <= 8.06 ? -15 : -25; // Move icons up by 10px when zoomed out
+      const baseOffset = currentZoom <= 8.06 ? -15 : 9; // Move icons up by 10px when zoomed out
 
       const positions = calculatePOIPositions(
         {
@@ -204,7 +204,7 @@ export const PlacePOILayer: React.FC = () => {
         pois.length,
         {
           iconSize: 16,
-          spacing: 2,
+          spacing: 5.5,
           maxPerRow: 6,
           baseOffset
         }
@@ -219,10 +219,8 @@ export const PlacePOILayer: React.FC = () => {
         el.className = 'place-poi-marker';
         const category = POI_CATEGORIES[poi.category];
         const backgroundColor = poi.style?.color || category.color;
-        el.style.backgroundColor = backgroundColor;
         el.style.width = '20px';
         el.style.height = '20px';
-        el.style.borderRadius = '4px';
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';

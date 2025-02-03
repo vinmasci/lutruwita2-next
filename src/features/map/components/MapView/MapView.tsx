@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { DistanceMarkers } from '../DistanceMarkers/DistanceMarkers';
 import StyleControl, { MAP_STYLES } from '../StyleControl/StyleControl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
@@ -636,9 +637,14 @@ function MapViewContent() {
       )}
 
       {currentRoute && (
-        <ElevationProfilePanel
-          route={currentRoute}
-        />
+        <>
+          <ElevationProfilePanel
+            route={currentRoute}
+          />
+          {isMapReady && mapInstance.current && (
+            <DistanceMarkers map={mapInstance.current} />
+          )}
+        </>
       )}
 
       {/* Add the details drawer */}

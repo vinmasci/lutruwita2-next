@@ -19,11 +19,11 @@ export interface Climb {
 
 // Configuration for climb detection
 const CLIMB_CONFIG = {
-  MIN_GRADIENT: 2.5,           // Minimum gradient to consider as climbing (percent)
+  MIN_GRADIENT: 3,           // Minimum gradient to consider as climbing (percent)
   MIN_LENGTH: 1000,         // Minimum length for a climb segment (meters)
-  SMOOTHING_WINDOW: 6,      // Number of points to use for smoothing elevation data
+  SMOOTHING_WINDOW: 10,      // Number of points to use for smoothing elevation data
   PEAK_THRESHOLD: 50,       // Minimum elevation difference to consider as a peak (meters)
-  VALLEY_MERGE_DIST: 2000,  // Maximum distance between valleys to merge climbs (meters)
+  VALLEY_MERGE_DIST: 8000,  // Maximum distance between valleys to merge climbs (meters)
 };
 
 // Category configuration
