@@ -6,6 +6,7 @@ import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
 import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext, PhotoProvider } from '../../../photo/context/PhotoContext';
+import { PlaceProvider } from '../../../place/context/PlaceContext';
 import { NestedDrawer } from '../Sidebar/Sidebar.styles';
 import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
 
@@ -673,7 +674,9 @@ export default function MapView() {
     <PhotoProvider>
       <RouteProvider>
         <POIProvider>
-          <MapViewContent />
+          <PlaceProvider>
+            <MapViewContent />
+          </PlaceProvider>
         </POIProvider>
       </RouteProvider>
     </PhotoProvider>

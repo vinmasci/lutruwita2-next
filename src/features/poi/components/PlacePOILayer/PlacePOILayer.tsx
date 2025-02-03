@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
+import { usePlaceContext } from '../../../place/context/PlaceContext';
 import { calculatePOIPositions, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 import { ICON_PATHS } from '../../constants/icon-paths';
-import { PlaceNamePOI, POI_CATEGORIES, POIPhoto } from '../../types/poi.types';
+import { PlaceNamePOI, POI_CATEGORIES } from '../../types/poi.types';
 import { PlaceLabel } from '../../utils/placeDetection';
 import { PlacePOIDetailsDrawer } from '../POIDetailsDrawer';
+import { Place } from '../../../place/types/place.types';
 
 const HIGHLIGHT_SOURCE = 'place-highlight-source';
 const HIGHLIGHT_LAYER = 'place-highlight-layer';
@@ -19,35 +21,11 @@ interface MarkerRef {
 export const PlacePOILayer: React.FC = () => {
   const { map, isPoiPlacementMode } = useMapContext();
   const { pois } = usePOIContext();
+  const { places, updatePlace } = usePlaceContext();
   const markersRef = useRef<MarkerRef[]>([]);
   const [hoveredPlace, setHoveredPlace] = useState<PlaceLabel | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
-  const [selectedPlace, setSelectedPlace] = useState<{
-    id: string;
-    name: string;
-    description?: string;
-    photos?: POIPhoto[];
-  } | null>(null);
-
-  // Update selectedPlace when POIs change
-  useEffect(() => {
-    if (!selectedPlace) return;
-
-    const placePOIs = pois.filter(
-      (poi): poi is PlaceNamePOI => 
-        poi.type === 'place' && 
-        poi.placeId === selectedPlace.id
-    );
-
-    if (placePOIs.length > 0) {
-      const firstPOI = placePOIs[0];
-      setSelectedPlace(prev => ({
-        ...prev!,
-        description: firstPOI.description,
-        photos: firstPOI.photos || []
-      }));
-    }
-  }, [pois, selectedPlace?.id]);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   const isDrawerOpen = selectedPlace !== null;
 
@@ -122,8 +100,8 @@ export const PlacePOILayer: React.FC = () => {
         });
       }
 
-      // Show highlight when hovering over a place that has POIs
-      const hasPOIs = place && pois.some(
+      // Show highlight only when hovering over a place that has POIs
+      const hasData = place && pois.some(
         (poi): poi is PlaceNamePOI => 
           poi.type === 'place' && 
           poi.placeId === place.id
@@ -132,34 +110,42 @@ export const PlacePOILayer: React.FC = () => {
       map.setLayoutProperty(
         HIGHLIGHT_LAYER,
         'visibility',
-        hasPOIs ? 'visible' : 'none'
+        hasData ? 'visible' : 'none'
       );
 
       // Update cursor
-      map.getCanvas().style.cursor = hasPOIs ? 'pointer' : '';
+      map.getCanvas().style.cursor = hasData ? 'pointer' : '';
     };
 
-    const handleClick = (e: mapboxgl.MapMouseEvent) => {
+    const handleClick = async (e: mapboxgl.MapMouseEvent) => {
       const place = getPlaceLabelAtPoint(map, e.point);
       if (!place) return;
 
-      // Check if this place has any POIs
-      const placePOIs = pois.filter(
+      // Only handle click if place has POIs
+      const hasPOIs = pois.some(
         (poi): poi is PlaceNamePOI => 
           poi.type === 'place' && 
           poi.placeId === place.id
       );
 
-      if (placePOIs.length > 0) {
-        const firstPOI = placePOIs[0];
-        const newSelectedPlace = {
-          id: place.id,
-          name: place.name,
-          description: firstPOI.description,
-          photos: firstPOI.photos || []
-        };
-        setSelectedPlace(newSelectedPlace);
+      if (!hasPOIs) return;
+
+      // Get place data if it exists, or create and save new place
+      const placeData = places[place.id] || {
+        id: place.id,
+        name: place.name,
+        coordinates: place.coordinates,
+        description: '',
+        photos: [],
+        updatedAt: new Date().toISOString()
+      };
+
+      // If this is a new place, save it first
+      if (!places[place.id]) {
+        await updatePlace(place.id, placeData);
       }
+
+      setSelectedPlace(placeData);
     };
 
     map.on('mousemove', handleMouseMove);
@@ -176,7 +162,7 @@ export const PlacePOILayer: React.FC = () => {
       }
       map.getCanvas().style.cursor = '';
     };
-  }, [map, isPoiPlacementMode]);
+  }, [map, isPoiPlacementMode, places]);
 
   // Handle POI markers
   useEffect(() => {
@@ -243,15 +229,22 @@ export const PlacePOILayer: React.FC = () => {
         el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px;"></i>`;
         
         // Add click handler to open drawer
-        el.addEventListener('click', () => {
-          const firstPOI = pois[0];
-          const newSelectedPlace = {
+        el.addEventListener('click', async () => {
+          const placeData = places[placeId] || {
             id: placeId,
-            name: firstPOI.name,
-            description: firstPOI.description,
-            photos: firstPOI.photos || []
+            name: poi.name,
+            coordinates: [poi.position.lng, poi.position.lat],
+            description: '',
+            photos: [],
+            updatedAt: new Date().toISOString()
           };
-          setSelectedPlace(newSelectedPlace);
+
+          // If this is a new place, save it first
+          if (!places[placeId]) {
+            await updatePlace(placeId, placeData);
+          }
+
+          setSelectedPlace(placeData);
         });
 
         // Create and add marker
@@ -274,7 +267,7 @@ export const PlacePOILayer: React.FC = () => {
       markersRef.current.forEach(({ marker }) => marker.remove());
       markersRef.current = [];
     };
-  }, [map, pois, zoom]); // Add zoom to dependencies to update markers when zoom changes
+  }, [map, pois, zoom, places]); // Add places to dependencies
 
   return (
     <PlacePOIDetailsDrawer
