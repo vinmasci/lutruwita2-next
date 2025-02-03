@@ -12,6 +12,7 @@ type MapContextType = {
   setDragPreview: (preview: DragPreviewType) => void;
   map: mapboxgl.Map | null;
   isMapReady: boolean;
+  isInitializing: boolean;
   hoverCoordinates: [number, number] | null;
   setHoverCoordinates: (coords: [number, number] | null) => void;
   isPoiPlacementMode: boolean;
@@ -25,6 +26,7 @@ const MapContext = createContext<MapContextType>({
   setDragPreview: () => {},
   map: null,
   isMapReady: false,
+  isInitializing: true,
   hoverCoordinates: null,
   setHoverCoordinates: () => {},
   isPoiPlacementMode: false,

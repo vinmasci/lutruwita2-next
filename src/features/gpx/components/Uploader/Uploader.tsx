@@ -4,15 +4,27 @@ import { useRouteContext } from '../../../map/context/RouteContext';
 import { GpxUploaderProps } from './Uploader.types';
 import { ProcessedRoute } from '../../types/gpx.types';
 import UploaderUI from './UploaderUI';
+import { useEffect, useState } from 'react';
 
 const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   console.log('[Uploader] Component initializing');
-  const { processGpx, isLoading, error } = useClientGpxProcessing();
+  const { processGpx, isLoading: processingLoading, error } = useClientGpxProcessing();
   const { isMapReady } = useMapContext();
   const { addRoute, deleteRoute, setCurrentRoute, routes } = useRouteContext();
+  const [initializing, setInitializing] = useState(true);
 
-  // Don't render until map is ready
-  if (!isMapReady) {
+  useEffect(() => {
+    // Only set initializing to false once map is ready
+    if (isMapReady) {
+      setInitializing(false);
+    }
+  }, [isMapReady]);
+
+  // Show loading state only during actual processing, not initialization
+  const isLoading = !initializing && processingLoading;
+
+  // Don't show anything during initialization
+  if (initializing) {
     return null;
   }
 

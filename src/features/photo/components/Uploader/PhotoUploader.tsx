@@ -8,12 +8,7 @@ const PhotoUploader = ({
   onDeletePhoto,
   onAddToMap
 }: PhotoUploaderProps) => {
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Reset loading state after initial mount
-  useEffect(() => {
-    setIsLoading(false);
-  }, []);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<{ message: string; details?: string }>();
   const [photos, setPhotos] = useState<ProcessedPhoto[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());

@@ -81,6 +81,7 @@ function MapViewContent() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
   const [currentPhotos, setCurrentPhotos] = useState([]);
   const { pois, updatePOIPosition, addPOI, updatePOI } = usePOIContext();
@@ -532,6 +533,7 @@ function MapViewContent() {
     <MapProvider value={{ 
       map: mapInstance.current, 
       isMapReady,
+      isInitializing,
       hoverCoordinates,
       setHoverCoordinates,
       isPoiPlacementMode,

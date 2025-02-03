@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   POIContextType, 
@@ -109,6 +109,12 @@ const STORAGE_KEY = 'lutruwita2_pois';
 // Provider component
 export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [pois, dispatch] = useReducer(poiReducer, []);
+  const poisRef = useRef(pois);
+
+  // Keep ref updated with latest pois
+  useEffect(() => {
+    poisRef.current = pois;
+  }, [pois]);
 
   // Load POIs from local storage on mount
   useEffect(() => {
@@ -155,34 +161,55 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updatePOI = async (id: string, updates: Partial<Omit<POIType, 'id'>>) => {
     return new Promise<void>((resolve, reject) => {
       try {
-        // Ensure we have the latest state
+        // Get current POI
         const currentPOI = pois.find(poi => poi.id === id);
         if (!currentPOI) {
           throw new Error(`POI with id ${id} not found`);
         }
 
+        // Create a copy of updates without updatedAt since it's generated during update
+        const { updatedAt: _, ...updatesToVerify } = updates;
+
         // Dispatch update
         dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
 
-        // Wait for next tick to ensure state is updated
+        // Give React time to process the update
         setTimeout(() => {
+          // Get the updated POI
           const updatedPOI = pois.find(poi => poi.id === id);
           if (!updatedPOI) {
             reject(new Error(`Failed to update POI ${id}`));
             return;
           }
 
-          // Verify update was successful
-          const hasUpdated = Object.entries(updates).every(([key, value]) => {
-            return updatedPOI[key as keyof POIType] === value;
-          });
+          // Verify critical fields were updated
+          let verified = true;
+          for (const [key, value] of Object.entries(updatesToVerify)) {
+            // Skip verification for complex objects like photos
+            if (key === 'photos') continue;
+            
+            const currentValue = updatedPOI[key as keyof POIType];
+            if (typeof value === 'object' && value !== null) {
+              // For objects like position or style, check if the properties match
+              if (!Object.entries(value).every(([k, v]) => 
+                currentValue && typeof currentValue === 'object' && 
+                JSON.stringify(currentValue[k as keyof typeof currentValue]) === JSON.stringify(v)
+              )) {
+                verified = false;
+                break;
+              }
+            } else if (currentValue !== value) {
+              verified = false;
+              break;
+            }
+          }
 
-          if (hasUpdated) {
+          if (verified) {
             resolve();
           } else {
             reject(new Error(`Failed to verify POI update for ${id}`));
           }
-        }, 0);
+        }, 100); // Give enough time for React to process the update
       } catch (error) {
         reject(error);
       }

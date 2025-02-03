@@ -36,13 +36,15 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
   const [existingPhotos, setExistingPhotos] = useState<POIPhoto[]>(initialPhotos);
   const [selectedPhoto, setSelectedPhoto] = useState<ProcessedPhoto | null>(null);
 
-  // Reset form and sync with props
+  // Cleanup when drawer closes
   useEffect(() => {
-    setDescription(initialDescription);
-    setNewPhotos([]);
-    setExistingPhotos(initialPhotos);
-    setIsEditing(false);
-  }, [isOpen, initialDescription, initialPhotos, placeId]);
+    return () => {
+      if (!isOpen) {
+        setIsEditing(false);
+        setNewPhotos([]);
+      }
+    };
+  }, [isOpen]);
 
   // Get POIs associated with this place and memoize to prevent unnecessary recalculations
   const placePOIs = React.useMemo(() => 
@@ -66,11 +68,6 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
     }, {} as Record<POICategory, PlaceNamePOI[]>),
     [placePOIs]
   );
-
-  // Update local state when props change
-  useEffect(() => {
-    setDescription(initialDescription);
-  }, [initialDescription]);
 
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -127,6 +124,7 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
 
   return (
       <NestedDrawer
+        key={`${placeId}-${isOpen}`} // Force remount when place changes or drawer opens
         anchor="left"
         open={isOpen}
         onClose={() => {
