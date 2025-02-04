@@ -106,11 +106,16 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── MapView/    # Core map component
 │   │   │   │   │   ├── MapView.tsx # Map rendering and interaction logic
 │   │   │   │   │   └── MapView.css # Map styling and layout
+│   │   │   │   ├── SearchControl/ # Location search functionality
+│   │   │   │   │   ├── SearchControl.tsx # Search component
+│   │   │   │   │   └── SearchControl.css # Search styling
 │   │   │   │   ├── StyleControl/ # Map style switcher
 │   │   │   │   └── Sidebar/    # Navigation and route management
 │   │   │   │       ├── Sidebar.tsx       # Main sidebar component
 │   │   │   │       ├── Sidebar.styles.ts # Drawer styling
 │   │   │   │       ├── RouteList.tsx     # Route list management
+│   │   │   │       ├── SaveDialog.tsx    # Route saving dialog
+│   │   │   │       ├── LoadDialog.tsx    # Route loading dialog
 │   │   │   │       ├── useSidebar.ts    # Sidebar logic
 │   │   │   │       └── types.ts         # Type definitions
 │   │   │   ├── context/    # Map state management
