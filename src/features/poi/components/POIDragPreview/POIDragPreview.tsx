@@ -24,6 +24,9 @@ const POIDragPreview: React.FC<POIDragPreviewProps> = ({
   useEffect(() => {
     if (!map || !markerRef.current) return;
 
+    // Add class to body when dragging starts
+    document.body.classList.add('poi-dragging');
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDraggingRef.current || !markerRef.current) return;
       
@@ -56,6 +59,7 @@ const POIDragPreview: React.FC<POIDragPreviewProps> = ({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('poi-dragging');
     };
   }, [map, onPlace]);
 
@@ -66,6 +70,7 @@ const POIDragPreview: React.FC<POIDragPreviewProps> = ({
         position: 'fixed',
         zIndex: 1000,
         pointerEvents: 'none',
+        transform: 'scale(0.74)', // Scale down to match drawer size (20px/27px)
       }}
     >
       <div className="marker-container">

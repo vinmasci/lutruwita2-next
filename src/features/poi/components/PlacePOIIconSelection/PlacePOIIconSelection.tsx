@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Typography, Button, Box } from '@mui/material';
 import { POI_ICONS } from '../../constants/poi-icons';
 import { POI_CATEGORIES, POICategory, POIIconName } from '../../types/poi.types';
@@ -16,16 +16,7 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
   const { addPOI, removePOI, pois } = usePOIContext();
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
   
-  // Initialize with existing POIs for this place
-  const [selectedIcons, setSelectedIcons] = useState<Set<POIIconName>>(() => {
-    const existingIcons = new Set<POIIconName>();
-    pois.forEach(poi => {
-      if (poi.type === 'place' && poi.placeId === place.id) {
-        existingIcons.add(poi.icon);
-      }
-    });
-    return existingIcons;
-  });
+  const [selectedIcons, setSelectedIcons] = useState<Set<POIIconName>>(new Set());
 
   const handleIconClick = (iconName: POIIconName, category: POICategory) => {
     const newSelectedIcons = new Set(selectedIcons);
@@ -180,7 +171,10 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
           <Button 
             variant="contained" 
             color="primary"
-            onClick={onBack}
+            onClick={() => {
+              setSelectedIcons(new Set());
+              onBack();
+            }}
             sx={{ flex: 2 }}
           >
             Done

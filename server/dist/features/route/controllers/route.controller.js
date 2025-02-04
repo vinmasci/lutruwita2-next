@@ -1,53 +1,47 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RouteController = void 0;
-const route_service_js_1 = require("../services/route.service.js");
+const route_service_1 = require("../services/route.service");
 class RouteController {
     constructor() {
-        this.routeService = new route_service_js_1.RouteService();
+        this.routeService = new route_service_1.RouteService();
     }
     async saveRoute(req, res) {
         try {
-            // Get user ID from Auth0 token
             const userId = req.user?.sub;
             if (!userId) {
-                return res.status(401).json({ error: 'Unauthorized' });
+                return res.status(401).json({
+                    error: 'Unauthorized',
+                    details: 'User ID not found'
+                });
             }
-            // Validate request body
             const { name, type, isPublic, mapState, routes, photos, pois, places } = req.body;
-            if (!name || !type || typeof isPublic !== 'boolean') {
-                return res.status(400).json({
-                    error: 'Invalid request body',
-                    details: 'name, type, and isPublic are required'
-                });
-            }
-            if (!['tourism', 'event', 'bikepacking', 'single'].includes(type)) {
-                return res.status(400).json({
-                    error: 'Invalid route type',
-                    details: 'type must be one of: tourism, event, bikepacking, single'
-                });
-            }
             // Validate mapState if provided
             if (mapState) {
                 const { zoom, center, bearing, pitch } = mapState;
                 if (typeof zoom !== 'number' || !Array.isArray(center) ||
                     typeof bearing !== 'number' || typeof pitch !== 'number') {
                     return res.status(400).json({
-                        error: 'Invalid mapState',
-                        details: 'mapState must include zoom, center, bearing, and pitch'
+                        error: 'Invalid route data',
+                        details: 'mapState must include valid zoom, center, bearing, and pitch values'
                     });
                 }
             }
-            const result = await this.routeService.saveRoute(userId, {
+            // Add timestamps and user data
+            const routeToSave = {
                 name,
                 type,
                 isPublic,
+                userId,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 mapState,
                 routes,
                 photos,
                 pois,
                 places
-            });
+            };
+            const result = await this.routeService.saveRoute(userId, routeToSave);
             res.status(201).json(result);
         }
         catch (error) {

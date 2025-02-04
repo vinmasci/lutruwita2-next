@@ -69,15 +69,10 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
       isPublic: boolean
     ) => {
       try {
-        console.log('Starting saveCurrentState with:', { name, type, isPublic });
-        console.log('Current routes:', routes);
-        console.log('Current map state:', map ? {
-          zoom: map.getZoom(),
-          center: map.getCenter(),
-          bearing: map.getBearing(),
-          pitch: map.getPitch(),
-          style: map.getStyle()?.name
-        } : 'No map instance');
+        console.log('[RouteContext] Starting save with:', { name, type, isPublic });
+        if (!routes.length) {
+          throw new Error('No route data to save');
+        }
         
         setIsSaving(true);
         const routeState: SavedRouteState = {
@@ -119,18 +114,15 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
           places: Object.values(places),
         };
 
-        console.log('Prepared route state:', routeState);
-        
+        console.log('[RouteContext] Calling saveRoute with state:', routeState);
         const result = await routeService.saveRoute(routeState);
-        console.log('Save route API response:', result);
+        console.log('[RouteContext] Save successful:', result);
         
-        // Refresh the routes list after saving
+        // Refresh the routes list
         await listRoutes();
-        console.log('Routes list refreshed');
-        return;
       } catch (error) {
-        console.error("Failed to save route:", error);
-        throw error;
+        console.error('[RouteContext] Save failed:', error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to save route');
       } finally {
         setIsSaving(false);
       }

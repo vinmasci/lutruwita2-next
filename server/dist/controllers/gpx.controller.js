@@ -42,9 +42,9 @@ class GPXController {
                         }]
                 }
             });
-            const surfaceType = result.surfaceTypes[0] || 'unknown';
+            const surfaceType = result.surfaceTypes[0] || { type: 'unknown', percentage: 100, distance: 0 };
             this.surfaceCache.set(cacheKey, surfaceType);
-            res.json({ surface: surfaceType });
+            res.json({ surface: surfaceType.type });
         }
         catch (error) {
             logger_config_1.logger.error('Surface detection error:', error);
@@ -78,15 +78,15 @@ class GPXController {
             const sections = [];
             let currentSection = null;
             coordinates.forEach((coord, index) => {
-                const surfaceType = result.surfaceTypes[0] || 'unknown';
-                const isUnpaved = ['unpaved', 'dirt', 'gravel', 'fine_gravel', 'path', 'track', 'service', 'unknown'].includes(surfaceType);
+                const surfaceType = result.surfaceTypes[0] || { type: 'unknown', percentage: 100, distance: 0 };
+                const isUnpaved = ['unpaved', 'dirt', 'gravel', 'fine_gravel', 'path', 'track', 'service', 'unknown'].includes(surfaceType.type);
                 if (isUnpaved) {
                     if (!currentSection) {
                         currentSection = {
                             startIndex: index,
                             endIndex: index,
                             coordinates: [coord],
-                            surfaceType
+                            surfaceType: surfaceType.type
                         };
                     }
                     else {

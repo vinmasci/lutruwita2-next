@@ -5,7 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const route_controller_1 = require("../controllers/route.controller");
-const auth_middleware_1 = require("@shared/middlewares/auth.middleware");
+const auth_middleware_1 = require("../../../shared/middlewares/auth.middleware");
+const validateRoute_1 = require("../../../shared/middlewares/validateRoute");
 const router = express_1.default.Router();
 const controller = new route_controller_1.RouteController();
 // All routes require authentication
@@ -15,7 +16,7 @@ const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res)).catch(next);
 };
 // Save a new route
-router.post('/save', asyncHandler(controller.saveRoute.bind(controller)));
+router.post('/save', validateRoute_1.validateRouteData, asyncHandler(controller.saveRoute.bind(controller)));
 // Get a specific route
 router.get('/:id', asyncHandler(controller.loadRoute.bind(controller)));
 // List routes with optional filters

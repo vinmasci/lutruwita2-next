@@ -45,6 +45,11 @@ export const PlacePOILayer: React.FC = () => {
     };
   }, [map]);
 
+  // Clear selected place when POI placement mode changes
+  useEffect(() => {
+    setSelectedPlace(null);
+  }, [isPoiPlacementMode]);
+
   // Setup highlight layer
   useEffect(() => {
     if (!map) return;
@@ -100,11 +105,15 @@ export const PlacePOILayer: React.FC = () => {
         });
       }
 
-      // Show highlight only when hovering over a place that has POIs
-      const hasData = place && pois.some(
-        (poi): poi is PlaceNamePOI => 
-          poi.type === 'place' && 
-          poi.placeId === place.id
+      // Show highlight when in POI placement mode and hovering over a place,
+      // or when hovering over a place that has POIs
+      const hasData = place && (
+        isPoiPlacementMode || 
+        pois.some(
+          (poi): poi is PlaceNamePOI => 
+            poi.type === 'place' && 
+            poi.placeId === place.id
+        )
       );
 
       map.setLayoutProperty(

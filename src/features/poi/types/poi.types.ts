@@ -8,15 +8,16 @@ export type POICategory =
   | 'accommodation'
   | 'food-drink'
   | 'natural-features'
-  | 'event-information'
   | 'town-services'
-  | 'transportation';
+  | 'transportation'
+  | 'event-information';
 
 export type POIIconName =
   // Road Information
   | 'TrafficCone' | 'Octagon' | 'AlertOctagon' | 'Lock'
   | 'Unlock' | 'WaterCrossing' | 'ChevronsRightLeft'
   | 'ArrowUpRight' | 'AudioWaveform' | 'Route' | 'RailTrail' | 'Construction'
+  | 'HikeABike'
   // Accommodation
   | 'Tent' | 'Car' | 'Bell' | 'BedDouble' | 'BedSingle'
   // Food/Drink
@@ -24,14 +25,14 @@ export type POIIconName =
   | 'Store' | 'Beer' | 'Wine'
   // Natural Features
   | 'Mountain' | 'TreePine' | 'Binoculars' | 'Swimming'
-  // Event Information
-  | 'PlayCircle' | 'StopCircle' | 'Stethoscope'
-  | 'BatteryCharging' | 'X' | 'CircleDot' | 'Wrench'
   // Town Services
   | 'Hospital' | 'Toilet' | 'ShowerHead' | 'ParkingSquare'
   | 'Fuel' | 'Mail' | 'Bike'
   // Transportation
-  | 'Bus' | 'TrainStation' | 'Plane' | 'Ship';
+  | 'Bus' | 'TrainStation' | 'Plane' | 'Ship'
+  // Event Information
+  | 'PlayCircle' | 'StopCircle' | 'Stethoscope'
+  | 'BatteryCharging' | 'X' | 'CircleDot' | 'Wrench' | 'Flag';
 
 export interface POIPhoto {
   url: string;
@@ -94,10 +95,10 @@ export interface POIIconProps {
 
 export const POI_CATEGORIES: Record<POICategory, { label: string; color: string }> = {
   'road-information': { label: 'Road Information', color: '#ff5252' },
-  'accommodation': { label: 'Accommodation', color: '#40407a' },
-  'food-drink': { label: 'Food & Drink', color: '#ffa502' },
+  'accommodation': { label: 'Accommodation', color: '#8e44ad' },
+  'food-drink': { label: 'Food & Drink', color: '#e67e22' },
   'natural-features': { label: 'Natural Features', color: '#27ae60' },
-  'event-information': { label: 'Event Information', color: '#e15f41' },
   'town-services': { label: 'Town Services', color: '#3dc1d3' },
-  'transportation': { label: 'Transportation', color: '#20c997' }
+  'transportation': { label: 'Transportation', color: '#20c997' },
+  'event-information': { label: 'Event Information', color: '#34495e' }
 };

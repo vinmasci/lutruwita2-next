@@ -4,13 +4,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RouteService = void 0;
-const route_model_js_1 = require("../models/route.model.js");
+const route_model_1 = require("../models/route.model");
 const mongoose_1 = __importDefault(require("mongoose"));
 class RouteService {
     async saveRoute(userId, data) {
         try {
             const routeId = new mongoose_1.default.Types.ObjectId().toString();
-            const route = new route_model_js_1.RouteModel({
+            const route = new route_model_1.RouteModel({
                 id: routeId,
                 userId,
                 name: data.name,
@@ -37,7 +37,7 @@ class RouteService {
     }
     async loadRoute(userId, routeId) {
         try {
-            const route = await route_model_js_1.RouteModel.findOne({ id: routeId });
+            const route = await route_model_1.RouteModel.findOne({ id: routeId });
             if (!route) {
                 throw new Error('Route not found');
             }
@@ -70,7 +70,7 @@ class RouteService {
                 { userId },
                 { isPublic: true }
             ];
-            const routes = await route_model_js_1.RouteModel.find(query)
+            const routes = await route_model_1.RouteModel.find(query)
                 .select('id name type isPublic createdAt updatedAt')
                 .sort({ createdAt: -1 });
             return {
@@ -90,7 +90,7 @@ class RouteService {
     }
     async deleteRoute(userId, routeId) {
         try {
-            const route = await route_model_js_1.RouteModel.findOne({ id: routeId });
+            const route = await route_model_1.RouteModel.findOne({ id: routeId });
             if (!route) {
                 throw new Error('Route not found');
             }
@@ -98,7 +98,7 @@ class RouteService {
             if (route.userId !== userId) {
                 throw new Error('Access denied');
             }
-            await route_model_js_1.RouteModel.deleteOne({ id: routeId });
+            await route_model_1.RouteModel.deleteOne({ id: routeId });
         }
         catch (error) {
             throw new Error(`Failed to delete route: ${error instanceof Error ? error.message : 'Unknown error'}`);

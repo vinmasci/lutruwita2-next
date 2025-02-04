@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { RouteController } from '../controllers/route.controller';
 import { auth } from '../../../shared/middlewares/auth.middleware';
+import { validateRouteData } from '../../../shared/middlewares/validateRoute';
 import { RequestWithAuth } from '../../../shared/types/auth.types';
 
 const router = express.Router();
@@ -16,7 +17,10 @@ const asyncHandler = (fn: (req: RequestWithAuth, res: Response) => Promise<any>)
   };
 
 // Save a new route
-router.post('/save', asyncHandler(controller.saveRoute.bind(controller)));
+router.post('/save', 
+  validateRouteData,
+  asyncHandler(controller.saveRoute.bind(controller))
+);
 
 // Get a specific route
 router.get('/:id', asyncHandler(controller.loadRoute.bind(controller)));

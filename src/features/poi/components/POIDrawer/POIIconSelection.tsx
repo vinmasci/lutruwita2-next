@@ -36,7 +36,7 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
           category: 'road-information', 
           label: 'Road Information', 
           iconGroups: [
-            ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ChevronsRightLeft', 'ArrowUpRight', 'Construction'],
+            ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ChevronsRightLeft', 'ArrowUpRight', 'Construction', 'HikeABike'],
             ['AudioWaveform', 'Route', 'RailTrail']
           ]
         },
@@ -50,9 +50,9 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
           ]
         },
         { category: 'natural-features', label: 'Natural Features', iconGroups: [['Mountain', 'TreePine', 'Binoculars', 'WaterCrossing', 'Swimming']] },
-        { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'CircleDot', 'Wrench']] },
         { category: 'town-services', label: 'Town Services', iconGroups: [['Hospital', 'Toilet', 'ShowerHead', 'ParkingSquare', 'Fuel', 'Mail', 'Bike']] },
-        { category: 'transportation', label: 'Transportation', iconGroups: [['Bus', 'TrainStation', 'Plane', 'Ship']] }
+        { category: 'transportation', label: 'Transportation', iconGroups: [['Bus', 'TrainStation', 'Plane', 'Ship']] },
+        { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'CircleDot', 'Wrench', 'Flag']] }
       ].map(({ category: categoryKey, label, iconGroups }) => {
         return (
           <Box key={`${categoryKey}-${iconGroups[0][0]}`} sx={{ mb: 2 }}>

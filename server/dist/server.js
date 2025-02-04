@@ -46,7 +46,8 @@ createDirectory(uploadsDir, 'uploads');
 const app = (0, express_1.default)();
 // Middleware
 app.use((0, cors_1.default)(server_config_1.SERVER_CONFIG.cors));
-app.use(express_1.default.json());
+app.use(express_1.default.json({ limit: '50mb' }));
+app.use(express_1.default.urlencoded({ limit: '50mb', extended: true }));
 app.use((0, morgan_1.default)('combined', { stream: { write: (message) => logger_config_1.logger.info(message.trim()) } }));
 // Health check endpoint
 app.get('/api/health', (req, res) => {

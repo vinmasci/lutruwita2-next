@@ -12,8 +12,6 @@ interface POIDetailsDrawerProps {
 export interface SidebarProps {
   poiDetailsDrawer?: POIDetailsDrawerProps;
   onUploadGpx: (file?: File, processedRoute?: ProcessedRoute) => Promise<void>;
-  onSaveMap: () => void;
-  onLoadMap: () => void;
   onAddPhotos: () => void;
   onAddPOI: () => void;
   mapReady: boolean;

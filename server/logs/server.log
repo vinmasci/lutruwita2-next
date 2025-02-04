@@ -59,3 +59,23 @@
 2025-02-04 18:03:09 [[32minfo[39m]: Attempting to create uploads directory at:
 2025-02-04 18:03:09 [[32minfo[39m]: uploads directory already exists and has correct permissions
 2025-02-04 18:03:09 [[32minfo[39m]: Server running on port 8080
+2025-02-04 21:18:33 [[32minfo[39m]: Attempting to create logs directory at:
+2025-02-04 21:18:33 [[32minfo[39m]: logs directory already exists and has correct permissions
+2025-02-04 21:18:33 [[32minfo[39m]: Attempting to create uploads directory at:
+2025-02-04 21:18:33 [[32minfo[39m]: uploads directory already exists and has correct permissions
+2025-02-04 21:18:33 [[32minfo[39m]: Server running on port 8080
+2025-02-04 21:25:44 [[32minfo[39m]: Attempting to create logs directory at:
+2025-02-04 21:25:44 [[32minfo[39m]: logs directory already exists and has correct permissions
+2025-02-04 21:25:44 [[32minfo[39m]: Attempting to create uploads directory at:
+2025-02-04 21:25:44 [[32minfo[39m]: uploads directory already exists and has correct permissions
+2025-02-04 21:25:44 [[32minfo[39m]: Server running on port 8080
+2025-02-04 21:25:54 [[32minfo[39m]: Incoming Request:
+2025-02-04 21:25:54 [[32minfo[39m]: ::1 - - [04/Feb/2025:10:25:54 +0000] "GET /api HTTP/1.1" 404 142 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-04 21:25:56 [[32minfo[39m]: Incoming Request:
+2025-02-04 21:25:56 [[32minfo[39m]: ::1 - - [04/Feb/2025:10:25:56 +0000] "GET /api HTTP/1.1" 404 142 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-04 21:26:21 [[32minfo[39m]: Incoming Request:
+2025-02-04 21:26:21 [[32minfo[39m]: ::1 - - [04/Feb/2025:10:26:21 +0000] "POST /api/save HTTP/1.1" 404 148 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-04 21:36:03 [[32minfo[39m]: Incoming Request:
+2025-02-04 21:36:03 [[32minfo[39m]: ::1 - - [04/Feb/2025:10:36:03 +0000] "POST /api/save HTTP/1.1" 404 148 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-04 21:51:45 [[32minfo[39m]: Incoming Request:
+2025-02-04 21:51:45 [[32minfo[39m]: ::1 - - [04/Feb/2025:10:51:45 +0000] "GET /api HTTP/1.1" 404 142 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"

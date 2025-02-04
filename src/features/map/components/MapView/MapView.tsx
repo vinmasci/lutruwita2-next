@@ -2,17 +2,14 @@ import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import mapboxgl from 'mapbox-gl';
 import { DistanceMarkers } from '../DistanceMarkers/DistanceMarkers';
 import StyleControl, { MAP_STYLES } from '../StyleControl/StyleControl';
+import SearchControl from '../SearchControl/SearchControl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
 import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext, PhotoProvider } from '../../../photo/context/PhotoContext';
 import { PlaceProvider } from '../../../place/context/PlaceContext';
-import { NestedDrawer } from '../Sidebar/Sidebar.styles';
 import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
-
-// Lazy load components
-const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
 import { POIType, POIPosition, POICategory, POIIconName } from '../../../poi/types/poi.types';
 import { POIViewer } from '../../../poi/components/POIViewer/POIViewer';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
@@ -85,15 +82,13 @@ function MapViewContent() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
-  const [currentPhotos, setCurrentPhotos] = useState([]);
   const { pois, updatePOIPosition, addPOI, updatePOI } = usePOIContext();
-  const [activeRoute, setActiveRoute] = useState<{surfaces: string[]} | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
   const currentRouteId = useRef<string | null>(null);
   const [hoverCoordinates, setHoverCoordinates] = useState<[number, number] | null>(null);
   const hoverMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const { processGpx, isLoading } = useClientGpxProcessing();
+  const { processGpx } = useClientGpxProcessing();
   const { addRoute, deleteRoute, setCurrentRoute, currentRoute, routes } = useRouteContext();
 
   // Function to add route click handler
@@ -104,7 +99,7 @@ function MapViewContent() {
     map.off('click', layerId);
     
     // Add new click handler
-    map.on('click', layerId, () => {
+    map.on('click', layerId, (e: mapboxgl.MapMouseEvent) => {
       const route = routes.find((r: ProcessedRoute) => r.routeId === routeId);
       if (route) {
         setCurrentRoute(route);
@@ -271,7 +266,6 @@ function MapViewContent() {
 
         // Get coordinates from the GeoJSON
         const feature = result.geojson.features[0] as Feature<LineString>;
-        const coordinates = feature.geometry.coordinates as [number, number][];
 
         // Wait briefly for layers to be ready
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -311,26 +305,7 @@ function MapViewContent() {
       }
     } catch (error) {
       console.error('Error uploading GPX:', error);
-      // Keep drawer open to show error state
     }
-  };
-
-  const handleGpxDrawerClose = () => {
-    setIsGpxDrawerOpen(false);
-  };
-
-  const handleSaveMap = () => {
-    // TODO: Implement map saving
-  };
-
-  const handleLoadMap = () => {
-    // TODO: Implement map loading
-  };
-
-  const { addPhoto } = usePhotoContext();
-
-  const handleAddPhotos = () => {
-    // No-op since photo drawer is managed in Sidebar
   };
 
   const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
@@ -352,7 +327,7 @@ function MapViewContent() {
     canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
 
     if (isPoiPlacementMode) {
-      const clickHandler = (e: mapboxgl.MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
+      const clickHandler = (e: mapboxgl.MapMouseEvent) => {
         console.log('[MapView] Map clicked:', e.lngLat);
         console.log('[MapView] onPoiPlacementClick handler exists:', !!onPoiPlacementClick);
         
@@ -373,13 +348,10 @@ function MapViewContent() {
   }, [isPoiPlacementMode, onPoiPlacementClick, isMapReady]);
 
   const handleAddPOI = () => {
+    setIsPOIDrawerOpen(!isPOIDrawerOpen);
     if (isPOIDrawerOpen) {
-      // Clean up when drawer closes
-      setIsPOIDrawerOpen(false);
       setPoiPlacementMode(false);
       setPoiPlacementClick(undefined);
-    } else {
-      setIsPOIDrawerOpen(true);
     }
   };
 
@@ -561,6 +533,7 @@ function MapViewContent() {
     });
 
     // Add controls
+    map.addControl(new SearchControl(), 'top-right');
     map.addControl(new mapboxgl.NavigationControl({
       showCompass: true,
       showZoom: true,
@@ -630,132 +603,120 @@ function MapViewContent() {
       dragPreview,
       setDragPreview
     }}>
-    <div className="w-full h-full relative">
-      <div 
-        ref={mapRef}
-        style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 }}
-      />
-      
-      {!isMapReady && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <CircularProgress size={60} sx={{ mb: 2 }} />
-          <Typography variant="h6" color="white">
-            Loading map...
-          </Typography>
-        </Box>
-      )}
-
-      <Sidebar
-        onUploadGpx={handleUploadGpx}
-        onSaveMap={handleSaveMap}
-        onLoadMap={handleLoadMap}
-        onAddPhotos={handleAddPhotos}
-        onAddPOI={() => {
-          console.log('[MapView] onAddPOI called, current state:', {
-            isPOIDrawerOpen,
-            isPoiPlacementMode
-          });
-          setIsPOIDrawerOpen(!isPOIDrawerOpen);
-        }}
-        mapReady={mapReady}
-        onItemClick={() => {}}
-        onToggleRoute={() => {}}
-        onToggleGradient={() => {}}
-        onToggleSurface={() => {}}
-        onPlacePOI={() => {}}
-        onDeleteRoute={handleDeleteRoute}
-      />
-      {/* Render POI markers and place POIs */}
-      {isMapReady && (
-        <>
-          <PhotoLayer />
-          <PlacePOILayer />
-          {pois.filter(poi => poi.type === 'draggable').map(poi => (
-            <MapboxPOIMarker
-              key={poi.id}
-              poi={poi}
-              onDragEnd={handlePOIDragEnd}
-              onClick={() => handlePOIClick(poi)}
-            />
-          ))}
-        </>
-      )}
-
-      {dragPreview && (
-        <POIDragPreview
-          icon={dragPreview.icon}
-          category={dragPreview.category}
-          onPlace={(position) => {
-            handlePOICreation(dragPreview.icon, dragPreview.category, position);
-            setDragPreview(null);
-          }}
+      <div className="w-full h-full relative">
+        <div 
+          ref={mapRef}
+          style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 }}
         />
-      )}
+        
+        {!isMapReady && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}
+          >
+            <CircularProgress size={60} sx={{ mb: 2 }} />
+            <Typography variant="h6" color="white">
+              Loading map...
+            </Typography>
+          </Box>
+        )}
 
-      {/* Show temporary marker while details are being entered */}
-      {selectedPOIDetails && (
-        <MapboxPOIMarker
-          poi={{
-            id: 'temp-poi',
-            type: 'draggable',
-            position: selectedPOIDetails.position,
-            name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
-            category: selectedPOIDetails.category,
-            icon: selectedPOIDetails.iconName,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }}
+        <Sidebar
+          onUploadGpx={handleUploadGpx}
+          onAddPhotos={() => {}}
+          onAddPOI={handleAddPOI}
+          mapReady={mapReady}
+          onItemClick={() => {}}
+          onToggleRoute={() => {}}
+          onToggleGradient={() => {}}
+          onToggleSurface={() => {}}
+          onPlacePOI={() => {}}
+          onDeleteRoute={handleDeleteRoute}
         />
-      )}
 
-      {currentRoute && (
-        <>
-          <ElevationProfilePanel
-            route={currentRoute}
+        {isMapReady && (
+          <>
+            <PhotoLayer />
+            <PlacePOILayer />
+            {pois.filter(poi => poi.type === 'draggable').map(poi => (
+              <MapboxPOIMarker
+                key={poi.id}
+                poi={poi}
+                onDragEnd={handlePOIDragEnd}
+                onClick={() => handlePOIClick(poi)}
+              />
+            ))}
+          </>
+        )}
+
+        {dragPreview && (
+          <POIDragPreview
+            icon={dragPreview.icon}
+            category={dragPreview.category}
+            onPlace={(position) => {
+              handlePOICreation(dragPreview.icon, dragPreview.category, position);
+              setDragPreview(null);
+            }}
           />
-          {isMapReady && mapInstance.current && (
-            <DistanceMarkers map={mapInstance.current} />
-          )}
-        </>
-      )}
+        )}
 
-      {/* Add the details drawer */}
-      {selectedPOIDetails && (
-        <POIDetailsDrawer
-          isOpen={detailsDrawerOpen}
-          onClose={() => {
-            setDetailsDrawerOpen(false);
-            setSelectedPOIDetails(null);
-          }}
-          iconName={selectedPOIDetails.iconName}
-          category={selectedPOIDetails.category}
-          onSave={handlePOIDetailsSave}
-        />
-      )}
+        {selectedPOIDetails && (
+          <MapboxPOIMarker
+            poi={{
+              id: 'temp-poi',
+              type: 'draggable',
+              position: selectedPOIDetails.position,
+              name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
+              category: selectedPOIDetails.category,
+              icon: selectedPOIDetails.iconName,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }}
+          />
+        )}
 
-      {/* POI Viewer */}
-      {selectedPOI && (
-        <POIViewer
-          poi={selectedPOI}
-          onClose={() => setSelectedPOI(null)}
-          onUpdate={updatePOI}
-        />
-      )}
+        {currentRoute && (
+          <>
+            <ElevationProfilePanel
+              route={currentRoute}
+            />
+            {isMapReady && mapInstance.current && (
+              <DistanceMarkers map={mapInstance.current} />
+            )}
+          </>
+        )}
 
-    </div>
+        {selectedPOIDetails && (
+          <POIDetailsDrawer
+            isOpen={detailsDrawerOpen}
+            onClose={() => {
+              setDetailsDrawerOpen(false);
+              setSelectedPOIDetails(null);
+            }}
+            iconName={selectedPOIDetails.iconName}
+            category={selectedPOIDetails.category}
+            onSave={handlePOIDetailsSave}
+          />
+        )}
+
+        {selectedPOI && (
+          <POIViewer
+            poi={selectedPOI}
+            onClose={() => setSelectedPOI(null)}
+            onUpdate={updatePOI}
+          />
+        )}
+      </div>
     </MapProvider>
   );
 }
