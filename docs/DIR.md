@@ -24,6 +24,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── POI_IMPLEMENTATION_PLAN.md # Detailed plan for Points of Interest feature
 │   ├── POI_PLACES.md             # Documentation for POI places functionality
 │   ├── POI_PROGRESS_NOTES.md     # Tracking progress of POI feature development
+│   ├── SAVE_LOAD_IMPLEMENTATION.md # Documentation for save/load functionality
 │   ├── surface-detection.md       # Documentation for surface type detection
 │   └── surfacedetectionplan.md    # Planning document for surface detection
 ├── logs/                          # Application logging directory
@@ -40,11 +41,17 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   ├── server.ts             # Main Express server setup and configuration
 │   │   ├── controllers/          # [REDUNDANT] Main controllers (should be moved to features)
 │   │   ├── features/            # Feature-specific backend implementations
-│   │   │   └── gpx/             # GPX processing feature backend
-│   │   │       ├── controllers/  # GPX request handlers
-│   │   │       ├── routes/      # GPX API endpoint definitions
-│   │   │       ├── services/    # GPX data processing services
-│   │   │       └── types/       # GPX type definitions
+│   │   │   ├── gpx/             # GPX processing feature backend
+│   │   │   │   ├── controllers/  # GPX request handlers
+│   │   │   │   ├── routes/      # GPX API endpoint definitions
+│   │   │   │   ├── services/    # GPX data processing services
+│   │   │   │   └── types/       # GPX type definitions
+│   │   │   └── route/           # Route management feature backend
+│   │   │       ├── controllers/  # Route request handlers
+│   │   │       ├── models/      # Route data models
+│   │   │       ├── routes/      # Route API endpoint definitions
+│   │   │       ├── services/    # Route data services
+│   │   │       └── types/       # Route type definitions
 │   │   ├── routes/              # [REDUNDANT] Main routes (should be moved to features)
 │   │   ├── shared/              # Shared backend utilities
 │   │   │   ├── config/         # Server configuration (logging, env vars)
@@ -97,14 +104,13 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   │   └── DistanceMarkers.css # Marker styling
 │   │   │   │   ├── MapControls/ # Interactive controls
 │   │   │   │   ├── MapView/    # Core map component
-│   │   │   │   │   ├── MapView.tsx # Map rendering
-│   │   │   │   │   └── MapView.css # Map styling
+│   │   │   │   │   ├── MapView.tsx # Map rendering and interaction logic
+│   │   │   │   │   └── MapView.css # Map styling and layout
 │   │   │   │   ├── StyleControl/ # Map style switcher
-│   │   │   │   └── Sidebar/    # Navigation system
-│   │   │   │       ├── Sidebar.tsx       # Main sidebar
+│   │   │   │   └── Sidebar/    # Navigation and route management
+│   │   │   │       ├── Sidebar.tsx       # Main sidebar component
 │   │   │   │       ├── Sidebar.styles.ts # Drawer styling
-│   │   │   │       ├── RouteList.tsx     # Route management
-│   │   │   │       ├── SidebarListItems.tsx # Action buttons
+│   │   │   │       ├── RouteList.tsx     # Route list management
 │   │   │   │       ├── useSidebar.ts    # Sidebar logic
 │   │   │   │       └── types.ts         # Type definitions
 │   │   │   ├── context/    # Map state management
@@ -112,9 +118,14 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   └── RouteContext.tsx # Route data/state
 │   │   │   ├── hooks/      # Map functionality hooks
 │   │   │   │   ├── useMap.ts      # Map interactions
+│   │   │   │   ├── useRouteState.ts # Route state management
 │   │   │   │   └── useGpxProcessing.ts # Route processing
 │   │   │   ├── services/   # Map-related services
+│   │   │   │   ├── mapService.ts  # Map operations
+│   │   │   │   └── routeService.ts # Route operations
 │   │   │   └── types/     # Map type definitions
+│   │   │       ├── map.types.ts   # Map interfaces
+│   │   │       └── route.types.ts # Route interfaces
 │   │   ├── photo/         # Photo management feature
 │   │   │   ├── components/ # Photo components
 │   │   │   │   ├── PhotoCluster/ # Photo grouping
@@ -253,6 +264,7 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `gpxService`: Handles GPX file parsing and data extraction
 - `mapMatchingService`: Aligns GPS tracks with road networks
 - `surfaceService`: Analyzes and categorizes road surfaces
+- `routeService`: Manages route data persistence and operations
 - `placeDetection`: Identifies and processes place-based POIs
 
 ### Utility Functions

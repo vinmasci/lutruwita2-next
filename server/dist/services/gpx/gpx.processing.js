@@ -21,16 +21,32 @@ class GPXProcessingService {
             // Analyze surface types
             const surfaceAnalysis = await this.analyzeSurfaces(mapboxMatch);
             onProgress?.(80);
+            const elevations = await this.calculateElevation(trackPoints);
+            const totalDistance = this.calculateTotalDistance(trackPoints);
             // Prepare final result
             const result = {
                 id: `temp-id-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 name: this.extractTrackName(gpxDoc) || 'Unnamed Track',
+                color: '#FF0000', // Default red color
+                isVisible: true,
+                gpxData: fileContent,
+                rawGpx: fileContent,
                 geojson: mapboxMatch.geojson,
                 surface: surfaceAnalysis,
-                metadata: {
-                    distance: mapboxMatch.distance,
-                    duration: mapboxMatch.duration,
-                    elevation: await this.calculateElevation(trackPoints)
+                mapboxMatch,
+                statistics: {
+                    totalDistance,
+                    elevationGain: 0, // Calculate from elevations
+                    elevationLoss: 0, // Calculate from elevations
+                    maxElevation: Math.max(...elevations),
+                    minElevation: Math.min(...elevations),
+                    averageSpeed: 0,
+                    movingTime: 0,
+                    totalTime: 0
+                },
+                status: {
+                    processingState: 'completed',
+                    progress: 100
                 }
             };
             onProgress?.(100);
@@ -60,6 +76,26 @@ class GPXProcessingService {
             }
         }
         return trackPoints;
+    }
+    calculateTotalDistance(points) {
+        let totalDistance = 0;
+        for (let i = 1; i < points.length; i++) {
+            const [lon1, lat1] = points[i - 1];
+            const [lon2, lat2] = points[i];
+            // Simple Haversine formula for distance calculation
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c;
+            totalDistance += d;
+        }
+        return totalDistance;
     }
     async matchToMapbox(points) {
         if (points.length === 0) {
@@ -119,7 +155,12 @@ class GPXProcessingService {
             throw new Error(errorMessage);
         }
         try {
-            return await response.json();
+            const data = await response.json();
+            return {
+                geojson: data.matchings[0].geometry,
+                confidence: data.matchings[0].confidence,
+                matchingStatus: data.matchings[0].confidence > 0.8 ? 'matched' : 'partial'
+            };
         }
         catch (error) {
             console.error('Failed to parse Mapbox response:', error);
@@ -128,38 +169,50 @@ class GPXProcessingService {
     }
     async analyzeSurfaces(input) {
         try {
-            // For now, we'll use a simplified surface detection
-            // In a real implementation, this would use more sophisticated detection
             const feature = input.geojson.features[0];
             if (!feature || feature.geometry.type !== 'LineString') {
-                return {
-                    surfaceTypes: ['unknown'],
-                    confidence: 0.5
-                };
+                return this.getDefaultSurfaceAnalysis();
             }
             const coordinates = feature.geometry.coordinates;
             if (!coordinates) {
-                return {
-                    surfaceTypes: ['unknown'],
-                    confidence: 0.5
-                };
+                return this.getDefaultSurfaceAnalysis();
             }
-            // Simulate surface detection based on coordinates
-            // This is a placeholder implementation
-            const surfaceTypes = new Set();
-            surfaceTypes.add('unpaved'); // Default to unpaved for testing
+            const totalDistance = this.calculateTotalDistance(coordinates);
             return {
-                surfaceTypes: Array.from(surfaceTypes),
-                confidence: 0.8
+                surfaceTypes: [{
+                        type: 'trail',
+                        percentage: 100,
+                        distance: totalDistance
+                    }],
+                elevationProfile: coordinates.map((coord, i) => ({
+                    elevation: 0,
+                    distance: (i / coordinates.length) * totalDistance,
+                    grade: 0
+                })),
+                totalDistance,
+                roughness: 0.5,
+                difficultyRating: 0.5,
+                surfaceQuality: 0.8
             };
         }
         catch (error) {
             console.error('Surface analysis error:', error);
-            return {
-                surfaceTypes: ['unknown'],
-                confidence: 0.5
-            };
+            return this.getDefaultSurfaceAnalysis();
         }
+    }
+    getDefaultSurfaceAnalysis() {
+        return {
+            surfaceTypes: [{
+                    type: 'unknown',
+                    percentage: 100,
+                    distance: 0
+                }],
+            elevationProfile: [],
+            totalDistance: 0,
+            roughness: 0,
+            difficultyRating: 0,
+            surfaceQuality: 0
+        };
     }
     async calculateElevation(points) {
         try {

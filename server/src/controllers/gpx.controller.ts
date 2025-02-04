@@ -13,7 +13,7 @@ interface ProcessingJob {
 export class GPXController {
   private gpxService: GPXProcessingService;
   private processingJobs: Map<string, ProcessingJob> = new Map();
-  private surfaceCache: Map<string, string> = new Map();
+  private surfaceCache: Map<string, { type: 'road' | 'trail' | 'water' | 'unknown'; percentage: number; distance: number }> = new Map();
 
   constructor() {
     this.gpxService = new GPXProcessingService(process.env.MAPBOX_TOKEN || '');
@@ -53,10 +53,10 @@ export class GPXController {
         }
       });
 
-      const surfaceType = result.surfaceTypes[0] || 'unknown';
+      const surfaceType = result.surfaceTypes[0] || { type: 'unknown', percentage: 100, distance: 0 };
       this.surfaceCache.set(cacheKey, surfaceType);
 
-      res.json({ surface: surfaceType });
+      res.json({ surface: surfaceType.type });
     } catch (error) {
       logger.error('Surface detection error:', error);
       res.status(500).json({ 
@@ -102,8 +102,8 @@ export class GPXController {
       let currentSection: Section | null = null;
       
       coordinates.forEach((coord, index) => {
-        const surfaceType = result.surfaceTypes[0] || 'unknown';
-        const isUnpaved = ['unpaved', 'dirt', 'gravel', 'fine_gravel', 'path', 'track', 'service', 'unknown'].includes(surfaceType);
+        const surfaceType = result.surfaceTypes[0] || { type: 'unknown', percentage: 100, distance: 0 };
+        const isUnpaved = ['unpaved', 'dirt', 'gravel', 'fine_gravel', 'path', 'track', 'service', 'unknown'].includes(surfaceType.type);
         
         if (isUnpaved) {
           if (!currentSection) {
@@ -111,7 +111,7 @@ export class GPXController {
               startIndex: index,
               endIndex: index,
               coordinates: [coord],
-              surfaceType
+              surfaceType: surfaceType.type
             };
           } else {
             currentSection.endIndex = index;

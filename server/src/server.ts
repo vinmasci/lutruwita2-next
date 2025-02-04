@@ -5,6 +5,7 @@ import winston from 'winston';
 import path from 'path';
 import { SERVER_CONFIG } from './shared/config/server.config';
 import { gpxRoutes } from './features/gpx/routes/gpx.routes';
+import routeRoutes from './features/route/routes/route.routes';
 import { errorHandler } from './shared/middlewares/error-handling';
 import 'dotenv/config';
 
@@ -68,6 +69,7 @@ app.use((req, res, next) => {
 
 // Feature Routes
 app.use('/api/gpx', gpxRoutes);
+app.use('/api/routes', routeRoutes);
 
 // Error handling
 app.use(errorHandler);

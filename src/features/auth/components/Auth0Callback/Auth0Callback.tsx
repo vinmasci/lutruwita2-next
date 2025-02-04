@@ -3,16 +3,24 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 
 export const Auth0Callback: React.FC = () => {
-  const { isAuthenticated, error } = useAuth0();
+  const { isAuthenticated, error, user } = useAuth0();
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Auth0Callback State:', {
+      isAuthenticated,
+      error: error?.message,
+      user,
+      currentPath: window.location.pathname
+    });
+
     if (isAuthenticated) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, error, user]);
 
   if (error) {
+    console.error('Auth0Callback Error:', error);
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem' }}>
         <div>Authentication error</div>
