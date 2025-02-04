@@ -186,7 +186,7 @@ export const PlacePOILayer: React.FC = () => {
     const currentZoom = map.getZoom();
 
     // Only show markers if zoom level is less than 12
-    if (currentZoom <= 8) {
+    if (currentZoom <= 9) {
       return;
     }
 
@@ -205,7 +205,7 @@ export const PlacePOILayer: React.FC = () => {
         {
           iconSize: 16,
           spacing: 5.5,
-          maxPerRow: 6,
+          maxPerRow: 3,
           baseOffset
         }
       );

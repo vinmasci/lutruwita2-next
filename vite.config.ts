@@ -11,5 +11,22 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  base: '/',
+  appType: 'spa',
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {}
+      }
+    }
+  },
+  optimizeDeps: {
+    include: ['@auth0/auth0-react']
   }
 })

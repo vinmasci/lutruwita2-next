@@ -2,6 +2,8 @@
   padding: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: auto;
+  display: flex;
+  justify-content: center;
 }
 
 .auth0-loading {
@@ -10,32 +12,19 @@
   font-size: 14px;
 }
 
-.auth0-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .auth0-avatar {
   width: 32px;
   height: 32px;
   border-radius: 16px;
   object-fit: cover;
+  transition: opacity 0.2s ease;
+  background-color: #2a2a2a;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  padding: 2px;
 }
 
-.auth0-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.auth0-name {
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.auth0-avatar:hover {
+  opacity: 0.8;
 }
 
 .auth0-button {
@@ -47,7 +36,6 @@
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
-  width: 100%;
 }
 
 .auth0-button:hover {

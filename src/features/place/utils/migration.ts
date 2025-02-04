@@ -9,12 +9,37 @@ const STORAGE_KEY = 'lutruwita2_places';
  * from the POI system to the dedicated place storage.
  */
 export const migratePlaceMetadata = () => {
+  // Check if places data already exists
+  const existingPlaces = localStorage.getItem(STORAGE_KEY);
+  if (existingPlaces) {
+    console.log('[Migration] Places data already exists, skipping migration');
+    return true;
+  }
+
   // Get existing POIs
   const poiData = localStorage.getItem('lutruwita2_pois');
-  if (!poiData) return;
+  if (!poiData) {
+    console.log('[Migration] No POIs data found, skipping migration');
+    return true;
+  }
 
   try {
-    const pois = JSON.parse(poiData) as POIType[];
+    const storedData = JSON.parse(poiData) as {
+      draggable: POIType[];
+      places: PlaceNamePOI[];
+    };
+    
+    // Handle the new storage format where POIs are split into draggable and places arrays
+    if (!storedData || typeof storedData !== 'object') {
+      console.error('[Migration] Invalid POIs data format');
+      return false;
+    }
+
+    // Combine both arrays into a single array of POIs
+    const pois: POIType[] = [
+      ...(Array.isArray(storedData.draggable) ? storedData.draggable : []),
+      ...(Array.isArray(storedData.places) ? storedData.places : [])
+    ];
     
     // Group POIs by placeId
     const placeGroups = pois.reduce((acc: Record<string, PlaceNamePOI[]>, poi: POIType) => {
@@ -57,8 +82,12 @@ export const migratePlaceMetadata = () => {
       return poi;
     });
 
-    // Save updated POIs
-    localStorage.setItem('lutruwita2_pois', JSON.stringify(updatedPOIs));
+    // Save updated POIs in the correct format
+    const updatedStoredData = {
+      draggable: updatedPOIs.filter(poi => poi.type === 'draggable'),
+      places: updatedPOIs.filter(poi => poi.type === 'place')
+    };
+    localStorage.setItem('lutruwita2_pois', JSON.stringify(updatedStoredData));
 
     console.log('[Migration] Successfully migrated place metadata');
     return true;

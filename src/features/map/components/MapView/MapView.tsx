@@ -94,7 +94,36 @@ function MapViewContent() {
   const [hoverCoordinates, setHoverCoordinates] = useState<[number, number] | null>(null);
   const hoverMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const { processGpx, isLoading } = useClientGpxProcessing();
-  const { addRoute, deleteRoute, setCurrentRoute, currentRoute } = useRouteContext();
+  const { addRoute, deleteRoute, setCurrentRoute, currentRoute, routes } = useRouteContext();
+
+  // Function to add route click handler
+  const addRouteClickHandler = useCallback((map: mapboxgl.Map, routeId: string) => {
+    const layerId = `${routeId}-line`;
+    
+    // Remove existing handler if any
+    map.off('click', layerId);
+    
+    // Add new click handler
+    map.on('click', layerId, () => {
+      const route = routes.find((r: ProcessedRoute) => r.routeId === routeId);
+      if (route) {
+        setCurrentRoute(route);
+      }
+    });
+  }, [routes, setCurrentRoute]);
+
+  // Effect to add click handlers for existing routes when map loads
+  useEffect(() => {
+    if (!mapInstance.current || !isMapReady) return;
+    
+    const map = mapInstance.current;
+    routes.forEach(route => {
+      const routeId = route.routeId || `route-${route.id}`;
+      if (map.getLayer(`${routeId}-line`)) {
+        addRouteClickHandler(map, routeId);
+      }
+    });
+  }, [isMapReady, routes, addRouteClickHandler]);
 
   // Update hover marker when coordinates change
   useEffect(() => {
@@ -148,10 +177,19 @@ function MapViewContent() {
         const routeId = currentRouteId.current;
         console.log('[MapView] Adding route layers...');
 
-        // Add the source
+        // Add the source with generated feature IDs
+        const sourceData = {
+          ...result.geojson,
+          features: result.geojson.features.map((feature, index) => ({
+            ...feature,
+            id: index
+          }))
+        };
+        
         map.addSource(routeId, {
           type: 'geojson',
-          data: result.geojson
+          data: sourceData,
+          generateId: false // We manually set IDs above
         });
 
         // Add single route layer with white border
@@ -179,10 +217,57 @@ function MapViewContent() {
             'line-cap': 'round'
           },
           paint: {
-            'line-color': '#ee5253',
-            'line-width': 3
+            'line-color': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              '#ff8f8f', // Hover color
+              '#ee5253'  // Default color
+            ],
+            'line-width': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              5, // Hover width
+              3  // Default width
+            ]
           }
         });
+
+        // Add hover effects
+        let hoveredRouteId: string | null = null;
+        let hoveredFeatureId: number | null = null;
+
+        map.on('mousemove', `${routeId}-line`, (e) => {
+          if (e.features && e.features.length > 0) {
+            if (hoveredRouteId && hoveredFeatureId !== null) {
+              map.setFeatureState(
+                { source: hoveredRouteId, id: hoveredFeatureId },
+                { hover: false }
+              );
+            }
+            hoveredRouteId = routeId;
+            hoveredFeatureId = e.features[0].id as number;
+            map.setFeatureState(
+              { source: routeId, id: hoveredFeatureId },
+              { hover: true }
+            );
+            map.getCanvas().style.cursor = 'pointer';
+          }
+        });
+
+        map.on('mouseleave', `${routeId}-line`, () => {
+          if (hoveredRouteId && hoveredFeatureId !== null) {
+            map.setFeatureState(
+              { source: hoveredRouteId, id: hoveredFeatureId },
+              { hover: false }
+            );
+          }
+          hoveredRouteId = null;
+          hoveredFeatureId = null;
+          map.getCanvas().style.cursor = '';
+        });
+
+        // Add click handler for the new route
+        addRouteClickHandler(map, routeId);
 
         // Get coordinates from the GeoJSON
         const feature = result.geojson.features[0] as Feature<LineString>;

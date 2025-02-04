@@ -23,7 +23,7 @@ const CLIMB_CONFIG = {
   MIN_LENGTH: 1000,         // Minimum length for a climb segment (meters)
   SMOOTHING_WINDOW: 10,      // Number of points to use for smoothing elevation data
   PEAK_THRESHOLD: 50,       // Minimum elevation difference to consider as a peak (meters)
-  VALLEY_MERGE_DIST: 8000,  // Maximum distance between valleys to merge climbs (meters)
+  VALLEY_MERGE_DIST: 20000,  // Maximum distance between valleys to merge climbs (meters)
 };
 
 // Category configuration

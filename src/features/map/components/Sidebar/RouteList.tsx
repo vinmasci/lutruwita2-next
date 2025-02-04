@@ -7,11 +7,17 @@ const StyledListItem = styled(ListItem)(({ theme }) => ({
   backgroundColor: 'rgba(35, 35, 35, 0.9)',
   marginBottom: '8px',
   borderRadius: '4px',
+  transition: 'all 0.2s ease-in-out',
+  border: '1px solid transparent',
   '&:hover': {
-    backgroundColor: 'rgba(45, 45, 45, 0.9)',
+    backgroundColor: 'rgba(45, 45, 45, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    transform: 'translateX(4px)',
   },
   '&.selected': {
-    backgroundColor: 'rgba(55, 55, 55, 0.9)',
+    backgroundColor: 'rgba(55, 55, 55, 0.95)',
+    borderLeft: '3px solid #4a9eff',
+    paddingLeft: '13px', // Compensate for the border to prevent content shift
   }
 }));
 

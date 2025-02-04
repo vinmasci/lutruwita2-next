@@ -15,18 +15,28 @@ export const PlaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [places, setPlaces] = useState<Record<string, Place>>({});
 
   useEffect(() => {
-    // Run migration first
-    migratePlaceMetadata();
-
-    // Load places from localStorage on mount
-    const storedPlaces = localStorage.getItem(STORAGE_KEY);
-    if (storedPlaces) {
+    const loadPlaces = () => {
       try {
-        setPlaces(JSON.parse(storedPlaces));
+        // Check if migration has been run before
+        const migrationRun = localStorage.getItem('lutruwita2_migration_complete');
+        if (!migrationRun) {
+          const success = migratePlaceMetadata();
+          if (success) {
+            localStorage.setItem('lutruwita2_migration_complete', 'true');
+          }
+        }
+
+        // Load places from localStorage
+        const storedPlaces = localStorage.getItem(STORAGE_KEY);
+        if (storedPlaces) {
+          setPlaces(JSON.parse(storedPlaces));
+        }
       } catch (error) {
-        console.error('Failed to parse stored places:', error);
+        console.error('Failed to load places:', error);
       }
-    }
+    };
+
+    loadPlaces();
   }, []);
 
   useEffect(() => {

@@ -62,9 +62,11 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── features/               # Feature modules
 │   │   ├── auth/               # Authentication feature
 │   │   │   └── components/     # Auth components
-│   │   │       └── Auth0Login/ # Auth0 integration
-│   │   │           ├── Auth0Login.tsx # Login component
-│   │   │           └── Auth0Login.css # Login styling
+│   │   │       ├── Auth0Login/ # Auth0 integration
+│   │   │       │   ├── Auth0Login.tsx # Login component
+│   │   │       │   └── Auth0Login.css # Login styling
+│   │   │       └── Auth0Callback/ # Auth0 callback handling
+│   │   │           └── Auth0Callback.tsx # Callback component
 │   │   ├── gpx/               # GPX processing feature
 │   │   │   ├── components/    # GPX-specific components
 │   │   │   │   ├── ElevationProfile/ # Elevation visualization
