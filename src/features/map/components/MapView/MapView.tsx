@@ -166,12 +166,58 @@ function MapViewContent() {
     const routeId = route.routeId || `route-${route.id}`;
     console.log('[MapView] Rendering route:', routeId);
 
-    // Clean up existing layers
-    if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
-    if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
-    if (map.getSource(routeId)) map.removeSource(routeId);
+  // Clean up existing layers
+  if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
+  if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
+  if (map.getSource(routeId)) map.removeSource(routeId);
 
-    // Add the source with generated feature IDs
+  // Differentiate between loaded and new routes
+  if ('routes' in route && Array.isArray(route.routes) && route.routes.length === 2) {
+    // This is a loaded route from MongoDB with pre-processed surface data
+    const [mainRoute, unpavedRoute] = route.routes;
+    
+    // Render the main route (solid line)
+    map.addSource(`${routeId}-main`, {
+      type: 'geojson',
+      data: mainRoute.geojson
+    });
+    
+    map.addLayer({
+      id: `${routeId}-line`,
+      type: 'line',
+      source: `${routeId}-main`,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#ee5253',
+        'line-width': 3
+      }
+    });
+
+    // Render the unpaved sections (dashed line)
+    map.addSource(`${routeId}-unpaved`, {
+      type: 'geojson',
+      data: unpavedRoute.geojson
+    });
+
+    map.addLayer({
+      id: `${routeId}-unpaved-line`,
+      type: 'line',
+      source: `${routeId}-unpaved`,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#ffffff',
+        'line-width': 2,
+        'line-dasharray': [1, 3]
+      }
+    });
+  } else {
+    // This is a new route, add source and layers as before
     const sourceData = {
       ...route.geojson,
       features: route.geojson.features.map((feature, index) => ({
@@ -225,6 +271,7 @@ function MapViewContent() {
         ]
       }
     });
+  }
 
     // Add hover effects
     let hoveredRouteId: string | null = null;
@@ -269,10 +316,8 @@ function MapViewContent() {
     // Wait briefly for layers to be ready
     await new Promise(resolve => setTimeout(resolve, 500));
     
-  // For newly added GPX files, do surface detection
-  // For loaded routes, render the saved unpaved sections
-  // Check if this is a route loaded from MongoDB (has createdAt timestamp)
-  if (!('createdAt' in route)) {
+  // Only do surface detection for new routes (ones without pre-processed data)
+  if (!('routes' in route) || !Array.isArray(route.routes)) {
     try {
       const featureWithRouteId = {
         ...feature,
@@ -285,49 +330,6 @@ function MapViewContent() {
     } catch (error) {
       console.error('[MapView] Surface detection error:', error);
     }
-  } else if (route.unpavedSections && route.unpavedSections.length > 0) {
-    // Render saved unpaved sections
-    route.unpavedSections.forEach((section, index) => {
-      const sourceId = `unpaved-section-${routeId}-${index}`;
-      const layerId = `unpaved-section-layer-${routeId}-${index}`;
-
-      // Clean up existing
-      if (map.getSource(sourceId)) {
-        map.removeLayer(layerId);
-        map.removeSource(sourceId);
-      }
-
-      // Add source with surface property
-      map.addSource(sourceId, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {
-            surface: 'unpaved'
-          },
-          geometry: {
-            type: 'LineString',
-            coordinates: section.coordinates
-          }
-        }
-      });
-
-      // Add white dashed line for unpaved segments
-      map.addLayer({
-        id: layerId,
-        type: 'line',
-        source: sourceId,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 2,
-          'line-dasharray': [1, 3]
-        }
-      });
-    });
   }
 
     // Fit bounds to show the route
@@ -464,39 +466,49 @@ function MapViewContent() {
     
     const map = mapInstance.current;
 
-    // Remove main route layers
-    if (map.getLayer(`${routeId}-border`)) {
-      map.removeLayer(`${routeId}-border`);
-    }
-    if (map.getLayer(`${routeId}-line`)) {
-      map.removeLayer(`${routeId}-line`);
-    }
-    if (map.getLayer(`${routeId}-surface`)) {
-      map.removeLayer(`${routeId}-surface`);
-    }
+    // Clean up layers and sources for both new and loaded routes
+    const layersToRemove = [
+      `${routeId}-border`,
+      `${routeId}-line`,
+      `${routeId}-surface`,
+      `${routeId}-unpaved-line`
+    ];
 
-    // Remove main route source
-    if (map.getSource(routeId)) {
-      map.removeSource(routeId);
-    }
-
-    // Clean up unpaved section layers and sources
-    const style = map.getStyle();
-    if (!style || !style.layers) return;
-    
-    const layerIds = style.layers.map(layer => layer.id);
-    
-    // Find and remove all unpaved section layers and sources for this route
-    layerIds.forEach(layerId => {
-      if (layerId.startsWith(`unpaved-section-layer-${routeId}-`)) {
+    // Remove layers
+    layersToRemove.forEach(layerId => {
+      if (map.getLayer(layerId)) {
         map.removeLayer(layerId);
-        const sectionIndex = layerId.split('-').pop();
-        const sourceId = `unpaved-section-${routeId}-${sectionIndex}`;
-        if (map.getSource(sourceId)) {
-          map.removeSource(sourceId);
-        }
       }
     });
+
+    // Remove sources
+    const sourcesToRemove = [
+      routeId,
+      `${routeId}-main`,
+      `${routeId}-unpaved`
+    ];
+
+    sourcesToRemove.forEach(sourceId => {
+      if (map.getSource(sourceId)) {
+        map.removeSource(sourceId);
+      }
+    });
+
+    // Clean up any remaining unpaved section layers and sources from old routes
+    const style = map.getStyle();
+    if (style?.layers) {
+      const layerIds = style.layers.map(layer => layer.id);
+      layerIds.forEach(layerId => {
+        if (layerId.startsWith(`unpaved-section-layer-${routeId}-`)) {
+          map.removeLayer(layerId);
+          const sectionIndex = layerId.split('-').pop();
+          const sourceId = `unpaved-section-${routeId}-${sectionIndex}`;
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
+          }
+        }
+      });
+    }
 
     // Delete from context (this will also clear current route if needed)
     deleteRoute(routeId);

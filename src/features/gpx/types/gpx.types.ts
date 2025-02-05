@@ -68,6 +68,10 @@ export interface ProcessedRoute {
   surface?: SurfaceAnalysis;
   mapboxMatch?: MapboxMatchResult;
   unpavedSections?: UnpavedSection[];
+  routes?: {
+    id: string;
+    geojson: GeoJSON.FeatureCollection;
+  }[];
   statistics: {
     totalDistance: number;
     elevationGain: number;
