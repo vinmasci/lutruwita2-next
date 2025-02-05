@@ -45,7 +45,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
   // Context hooks
   const routeService = useRouteService();
   const { map } = useMapContext();
-  const { pois, addPOI } = usePOIContext();
+  const { pois, getPOIsForRoute, loadPOIsFromRoute } = usePOIContext();
   const { photos, addPhoto } = usePhotoContext();
   const { places, updatePlace } = usePlaceContext();
 
@@ -70,8 +70,11 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
     ) => {
       try {
         console.log('[RouteContext] Starting save with:', { name, type, isPublic });
-        if (!routes.length) {
-          throw new Error('No route data to save');
+        const pois = getPOIsForRoute();
+        console.log('[RouteContext] POIs to save:', pois);
+        
+        if (!routes.length && (!pois.draggable.length && !pois.places.length)) {
+          throw new Error('No route or POI data to save');
         }
         
         setIsSaving(true);
@@ -107,14 +110,17 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
             altitude: photo.altitude,
             hasGps: !!photo.coordinates
           })),
-          pois: {
-            draggable: pois.filter(poi => poi.type === 'draggable') as DraggablePOI[],
-            places: pois.filter(poi => poi.type === 'place') as PlaceNamePOI[]
-          },
+          pois: (() => {
+            console.log('[RouteContext] Getting POIs for route...');
+            const pois = getPOIsForRoute();
+            console.log('[RouteContext] POIs to save:', pois);
+            return pois;
+          })(),
           places: Object.values(places),
         };
 
-        console.log('[RouteContext] Calling saveRoute with state:', routeState);
+        console.log('[RouteContext] Full route state to save:', JSON.stringify(routeState, null, 2));
+        console.log('[RouteContext] POIs in route state:', routeState.pois);
         const result = await routeService.saveRoute(routeState);
         console.log('[RouteContext] Save successful:', result);
         
@@ -127,7 +133,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsSaving(false);
       }
     },
-    [map, routes, photos, pois, places, routeService]
+    [map, routes, photos, getPOIsForRoute, places, routeService]
   );
 
   // Load a saved route
@@ -172,16 +178,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
 
           // Update POIs context
           if (route.pois) {
-            // Add each POI individually
-            [...route.pois.draggable, ...route.pois.places].forEach(poi => {
-              addPOI({
-                ...poi,
-                type: poi.type,
-                position: poi.position,
-                name: poi.name,
-                placeId: poi.type === 'place' ? (poi as any).placeId : undefined
-              });
-            });
+            loadPOIsFromRoute(route.pois);
           }
 
           // Update places context
@@ -199,7 +196,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsLoading(false);
       }
     },
-    [routeService, map, addPhoto, addPOI, updatePlace]
+    [routeService, map, addPhoto, loadPOIsFromRoute, updatePlace]
   );
 
   // List saved routes

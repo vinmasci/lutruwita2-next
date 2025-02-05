@@ -1,3 +1,5 @@
+import { SavedRouteState } from '../../map/types/route.types';
+
 export interface POIPosition {
   lat: number;
   lng: number;
@@ -73,10 +75,14 @@ export type NewPOIInput =
 
 export interface POIContextType {
   pois: POIType[];
-  addPOI: (poi: NewPOIInput) => void;
-  removePOI: (id: string) => void;
-  updatePOI: (id: string, updates: Partial<Omit<POIType, 'id'>>) => void;
-  updatePOIPosition: (id: string, position: POIPosition) => void;
+  isLoading: boolean;
+  error: Error | null;
+  addPOI: (poi: NewPOIInput) => Promise<void>;
+  removePOI: (id: string) => Promise<void>;
+  updatePOI: (id: string, updates: Partial<Omit<POIType, 'id'>>) => Promise<void>;
+  updatePOIPosition: (id: string, position: POIPosition) => Promise<void>;
+  getPOIsForRoute: () => SavedRouteState['pois'];
+  loadPOIsFromRoute: (routePOIs: SavedRouteState['pois']) => void;
 }
 
 export interface StoredPOIs {

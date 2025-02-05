@@ -9,138 +9,104 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
       if (!map || !route) return;
 
       const routeId = route.routeId || `route-${route.id}`;
-
-      // Store event handler references for cleanup
-      const mousemoveHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
-        if (e.features && e.features.length > 0) {
-          if (hoveredFeatureId !== null) {
-            map.setFeatureState(
-              { source: `${routeId}-main`, id: hoveredFeatureId },
-              { hover: false }
-            );
-          }
-          hoveredFeatureId = e.features[0].id as number;
-          map.setFeatureState(
-            { source: `${routeId}-main`, id: hoveredFeatureId },
-            { hover: true }
-          );
-          map.getCanvas().style.cursor = 'pointer';
-        }
-      };
-
-      const mouseleaveHandler = () => {
-        if (hoveredFeatureId !== null) {
-          map.setFeatureState(
-            { source: `${routeId}-main`, id: hoveredFeatureId },
-            { hover: false }
-          );
-        }
-        hoveredFeatureId = null;
-        map.getCanvas().style.cursor = '';
-      };
+      const mainLayerId = `${routeId}-main-line`;
+      const borderLayerId = `${routeId}-main-border`;
+      const hoverLayerId = `${routeId}-hover`;
+      const mainSourceId = `${routeId}-main`;
 
       // Clean up any existing layers
       const cleanup = () => {
-        // Remove event listeners
-        map.off('mousemove', `${routeId}-line`, mousemoveHandler);
-        map.off('mouseleave', `${routeId}-line`, mouseleaveHandler);
-
-        // Remove layers
-        if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
-        if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
-        if (map.getLayer(`${routeId}-unpaved-line`)) map.removeLayer(`${routeId}-unpaved-line`);
-
-        // Remove sources
-        if (map.getSource(`${routeId}-main`)) map.removeSource(`${routeId}-main`);
-        if (map.getSource(`${routeId}-unpaved`)) map.removeSource(`${routeId}-unpaved`);
+        if (map.getLayer(hoverLayerId)) map.removeLayer(hoverLayerId);
+        if (map.getLayer(mainLayerId)) map.removeLayer(mainLayerId);
+        if (map.getLayer(borderLayerId)) map.removeLayer(borderLayerId);
+        if (map.getSource(mainSourceId)) map.removeSource(mainSourceId);
       };
 
       cleanup();
 
-      // Declare hoveredFeatureId after cleanup
-      let hoveredFeatureId: number | null = null;
+      // Get the GeoJSON data from the correct location
+      const mainGeoJson = route.routes?.[0]?.geojson || route.geojson;
+      if (!mainGeoJson) return;
 
-      // Use the saved route data directly
-      const mainGeoJson = route.routes?.[0]?.geojson;
-      const unpavedGeoJson = route.routes?.[1]?.geojson;
+      // Add main route source
+      map.addSource(mainSourceId, {
+        type: 'geojson',
+        data: mainGeoJson,
+        tolerance: 0.5
+      });
 
-      if (mainGeoJson) {
-        // Add main route source
-        map.addSource(`${routeId}-main`, {
-          type: 'geojson',
-          data: mainGeoJson,
-          generateId: true
-        });
+      // Add border layer for main route
+      map.addLayer({
+        id: borderLayerId,
+        type: 'line',
+        source: mainSourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          visibility: 'visible'
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 5,
+          'line-opacity': 1
+        }
+      });
 
-        // Add border layer for main route
-        map.addLayer({
-          id: `${routeId}-border`,
-          type: 'line',
-          source: `${routeId}-main`,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 5
-          }
-        });
+      // Add main route layer
+      map.addLayer({
+        id: mainLayerId,
+        type: 'line',
+        source: mainSourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          visibility: 'visible'
+        },
+        paint: {
+          'line-color': '#ee5253',
+          'line-width': 3,
+          'line-opacity': 1
+        }
+      });
 
-        // Add main route layer
-        map.addLayer({
-          id: `${routeId}-line`,
-          type: 'line',
-          source: `${routeId}-main`,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': [
-              'case',
-              ['boolean', ['feature-state', 'hover'], false],
-              '#ff8f8f',
-              '#ee5253'
-            ],
-            'line-width': [
-              'case',
-              ['boolean', ['feature-state', 'hover'], false],
-              5,
-              3
-            ]
-          }
-        });
+      // Add hover layer (initially hidden)
+      map.addLayer({
+        id: hoverLayerId,
+        type: 'line',
+        source: mainSourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          visibility: 'none'
+        },
+        paint: {
+          'line-color': '#ff8f8f',
+          'line-width': 5,
+          'line-opacity': 1
+        }
+      });
 
-        // Add hover effects for main route
-        map.on('mousemove', `${routeId}-line`, mousemoveHandler);
-        map.on('mouseleave', `${routeId}-line`, mouseleaveHandler);
-      }
+      // Add hover handlers
+      const mouseHandler = () => {
+        map.getCanvas().style.cursor = 'pointer';
+        map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
+      };
 
-      if (unpavedGeoJson) {
-        // Add unpaved sections source
-        map.addSource(`${routeId}-unpaved`, {
-          type: 'geojson',
-          data: unpavedGeoJson,
-          generateId: true
-        });
+      const mouseleaveHandler = () => {
+        map.getCanvas().style.cursor = '';
+        map.setLayoutProperty(hoverLayerId, 'visibility', 'none');
+      };
 
-        // Add unpaved sections layer
-        map.addLayer({
-          id: `${routeId}-unpaved-line`,
-          type: 'line',
-          source: `${routeId}-unpaved`,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 2,
-            'line-dasharray': [1, 3]
-          }
-        });
-      }
+      map.on('mouseenter', mainLayerId, mouseHandler);
+      map.on('mousemove', mainLayerId, mouseHandler);
+      map.on('mouseleave', mainLayerId, mouseleaveHandler);
+
+      // Log layer info for debugging
+      console.log('[RouteLayer] Layer info:', {
+        layerId: mainLayerId,
+        source: map.getSource(mainSourceId),
+        layer: map.getLayer(mainLayerId)
+      });
 
       // Fit bounds to route
       if (mainGeoJson?.features?.[0]) {
@@ -158,10 +124,14 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
         });
       }
 
-      return cleanup;
+      return () => {
+        map.off('mouseenter', mainLayerId, mouseHandler);
+        map.off('mousemove', mainLayerId, mouseHandler);
+        map.off('mouseleave', mainLayerId, mouseleaveHandler);
+        cleanup();
+      };
     } catch (error) {
       console.error('[RouteLayer] Error rendering route:', error);
-      // Fallback to original rendering if needed
     }
   }, [map, route]);
 

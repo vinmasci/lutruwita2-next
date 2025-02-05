@@ -1,4 +1,4 @@
-import { RouteModel } from '../models/route.model';
+ import { RouteModel } from '../models/route.model';
 import { SaveRouteRequest, SaveRouteResponse, LoadRouteResponse, SavedRouteState, ListRoutesResponse } from '../types/route.types';
 import mongoose from 'mongoose';
 
@@ -6,6 +6,15 @@ export class RouteService {
   async saveRoute(userId: string, data: SaveRouteRequest & Partial<SavedRouteState>): Promise<SaveRouteResponse> {
     try {
       const routeId = new mongoose.Types.ObjectId().toString();
+
+      console.log('[RouteService] Saving route with POIs:', data.pois);
+      
+      // Ensure POIs structure is correct
+      const pois = {
+        draggable: data.pois?.draggable || [],
+        places: data.pois?.places || []
+      };
+      console.log('[RouteService] Structured POIs:', pois);
 
       const route = new RouteModel({
         id: routeId,
@@ -16,14 +25,14 @@ export class RouteService {
         mapState: data.mapState,
         routes: data.routes || [],
         photos: data.photos || [],
-        pois: {
-          draggable: data.pois?.draggable || [],
-          places: data.pois?.places || []
-        },
+        pois,
         places: data.places || []
       });
 
-      await route.save();
+      console.log('[RouteService] Route model before save:', route.toObject());
+
+      const savedRoute = await route.save();
+      console.log('[RouteService] Saved route:', savedRoute.toObject());
 
       return {
         id: routeId,
@@ -47,8 +56,11 @@ export class RouteService {
         throw new Error('Access denied');
       }
 
+      const routeData = route.toJSON() as SavedRouteState;
+      console.log('[RouteService] Loading route with POIs:', routeData.pois);
+      
       return {
-        route: route.toJSON() as SavedRouteState,
+        route: routeData,
         message: 'Route loaded successfully'
       };
     } catch (error) {

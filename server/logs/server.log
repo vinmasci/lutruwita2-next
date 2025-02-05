@@ -350,3 +350,91 @@
 2025-02-05 18:13:28 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:13:28 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
 2025-02-05 18:13:29 [[32minfo[39m]: Incoming Request:
 2025-02-05 18:13:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:13:29 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:27:22 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:27:22 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:27:22 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:27:28 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:27:28 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:27:28 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:27:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:27:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:27:29 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:29:45 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:29:45 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:29:45 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:29:45 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:29:46 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:29:46 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:57:53 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:57:54 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:57:54 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:57:55 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:57:55 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:57:55 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 19:26:44 [[32minfo[39m]: Incoming Request:
+2025-02-05 19:26:44 [[32minfo[39m]: ::1 - - [05/Feb/2025:08:26:44 +0000] "POST /api/routes/save HTTP/1.1" 201 70 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 19:26:44 [[32minfo[39m]: Incoming Request:
+2025-02-05 19:26:44 [[32minfo[39m]: ::1 - - [05/Feb/2025:08:26:44 +0000] "GET /api/routes HTTP/1.1" 200 335 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 19:26:56 [[32minfo[39m]: Incoming Request:
+2025-02-05 19:26:56 [[32minfo[39m]: ::1 - - [05/Feb/2025:08:26:56 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 19:26:57 [[32minfo[39m]: Incoming Request:
+2025-02-05 19:26:58 [[32minfo[39m]: ::1 - - [05/Feb/2025:08:26:58 +0000] "GET /api/routes/67a320c4b1b8734e1e814978 HTTP/1.1" 200 52487 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:09:36 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:09:36 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:09:36 +0000] "POST /api/routes/save HTTP/1.1" 201 70 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:09:36 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:09:37 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:09:37 +0000] "GET /api/routes HTTP/1.1" 200 497 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:09:41 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:09:41 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:09:41 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:09:42 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:09:42 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:09:42 +0000] "GET /api/routes/67a32ad0b1b8734e1e814982 HTTP/1.1" 200 52486 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:21:39 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:21:39 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:21:39 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:21:39 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:21:39 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:21:39 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:21:39 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:21:39 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:21:39 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:21:39 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:21:39 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:21:39 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:22:33 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:22:33 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:22:33 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:22:33 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:22:33 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:22:33 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:22:33 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:22:33 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:22:33 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 20:22:33 [[32minfo[39m]: Incoming Request:
+2025-02-05 20:22:33 [[32minfo[39m]: ::1 - - [05/Feb/2025:09:22:33 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:16:31 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:16:31 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:16:31 +0000] "POST /api/pois HTTP/1.1" 404 148 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:16:33 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:16:33 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:16:33 +0000] "PUT /api/pois/0c76d4fc-94db-43e5-a734-ceb16cd10b91 HTTP/1.1" 404 184 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:16:36 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:16:36 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:16:36 +0000] "POST /api/pois HTTP/1.1" 404 148 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:16:38 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:16:38 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:16:38 +0000] "PUT /api/pois/0621c5fa-6300-4d2e-aca2-0c6192dbace7 HTTP/1.1" 404 184 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:16:41 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:16:41 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:16:41 +0000] "PUT /api/pois/0621c5fa-6300-4d2e-aca2-0c6192dbace7 HTTP/1.1" 404 184 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:17:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:17:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:17:29 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:17:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:17:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:17:29 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:17:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:17:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:17:29 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:17:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:17:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:17:29 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:19 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:19 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:19 +0000] "POST /api/pois HTTP/1.1" 404 148 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:20 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:20 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:20 +0000] "PUT /api/pois/7c54ad9c-96b1-488a-8c7f-4084e6878e99 HTTP/1.1" 404 184 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:26 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:26 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:26 +0000] "POST /api/pois HTTP/1.1" 404 148 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:27 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:27 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:27 +0000] "PUT /api/pois/e4cbc89f-efea-4e18-a5f0-e84afd4db4c5 HTTP/1.1" 404 184 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:37 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:37 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:37 +0000] "POST /api/routes/save HTTP/1.1" 201 70 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:37 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:37 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:37 +0000] "GET /api/routes HTTP/1.1" 200 172 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:58 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:58 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:58 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:58 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:58 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:58 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:58 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:58 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:58 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:18:58 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:18:58 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:18:58 +0000] "GET /api/pois HTTP/1.1" 404 147 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:19:02 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:19:02 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:19:02 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 21:19:03 [[32minfo[39m]: Incoming Request:
+2025-02-05 21:19:03 [[32minfo[39m]: ::1 - - [05/Feb/2025:10:19:03 +0000] "GET /api/routes/67a33afdb1b8734e1e81498c HTTP/1.1" 200 209346 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"

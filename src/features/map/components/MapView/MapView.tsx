@@ -94,11 +94,11 @@ function MapViewContent() {
 
   // Function to add route click handler
   const addRouteClickHandler = useCallback((map: mapboxgl.Map, routeId: string) => {
-    const layerId = `${routeId}-line`;
+    const mainLayerId = `${routeId}-main-line`;
     
     // Create click handler
     const clickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
-      console.log('[MapView] Route layer clicked:', layerId);
+      console.log('[MapView] Route layer clicked:', mainLayerId);
       const route = routes.find((r: ProcessedRoute) => r.routeId === routeId);
       if (route) {
         console.log('[MapView] Found matching route:', route.routeId);
@@ -108,10 +108,10 @@ function MapViewContent() {
       }
     };
     // Remove existing handler if any
-    map.off('click', layerId, clickHandler);
+    map.off('click', mainLayerId, clickHandler);
     
     // Add new click handler
-    map.on('click', layerId, clickHandler);
+    map.on('click', mainLayerId, clickHandler);
   }, [routes, setCurrentRoute]);
 
   // Effect to add click handlers for existing routes when map loads
@@ -122,8 +122,8 @@ function MapViewContent() {
     console.log('[MapView] Adding click handlers for routes:', routes);
     routes.forEach(route => {
       const routeId = route.routeId || `route-${route.id}`;
-      console.log('[MapView] Checking for route layer:', `${routeId}-line`);
-      if (map.getLayer(`${routeId}-line`)) {
+      console.log('[MapView] Checking for route layer:', `${routeId}-main-line`);
+      if (map.getLayer(`${routeId}-main-line`)) {
         console.log('[MapView] Adding click handler for route:', routeId);
         addRouteClickHandler(map, routeId);
       }
@@ -167,44 +167,64 @@ function MapViewContent() {
     const routeId = route.routeId || `route-${route.id}`;
     console.log('[MapView] Rendering route:', routeId);
 
+    const mainLayerId = `${routeId}-main-line`;
+    const borderLayerId = `${routeId}-main-border`;
+    const mainSourceId = `${routeId}-main`;
+
     // Clean up existing layers
-    if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
-    if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
-    if (map.getSource(routeId)) map.removeSource(routeId);
+    if (map.getLayer(borderLayerId)) map.removeLayer(borderLayerId);
+    if (map.getLayer(mainLayerId)) map.removeLayer(mainLayerId);
+    if (map.getSource(mainSourceId)) map.removeSource(mainSourceId);
 
     // Add the main route source and layers
-    map.addSource(routeId, {
+    map.addSource(mainSourceId, {
       type: 'geojson',
-      data: route.geojson
+      data: route.geojson,
+      generateId: true,
+      tolerance: 0.5
     });
 
     // Add main route layers
     map.addLayer({
-      id: `${routeId}-border`,
+      id: borderLayerId,
       type: 'line',
-      source: routeId,
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#ffffff',
-        'line-width': 5
-      }
+      source: mainSourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+            visibility: 'visible'
+          },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 5,
+            'line-opacity': 1
+          }
     });
 
     map.addLayer({
-      id: `${routeId}-line`,
+      id: mainLayerId,
       type: 'line',
-      source: routeId,
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#ee5253',
-        'line-width': 3
-      }
+      source: mainSourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+            visibility: 'visible'
+          },
+          paint: {
+            'line-color': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              '#ff8f8f',
+              '#ee5253'
+            ],
+            'line-width': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              5,
+              3
+            ],
+            'line-opacity': 1
+          }
     });
 
     // For new routes, detect and save unpaved sections
@@ -442,8 +462,8 @@ function MapViewContent() {
 
     // Clean up layers and sources for both new and loaded routes
     const layersToRemove = [
-      `${routeId}-border`,
-      `${routeId}-line`,
+      `${routeId}-main-border`,
+      `${routeId}-main-line`,
       `${routeId}-surface`,
       `${routeId}-unpaved-line`
     ];
@@ -457,7 +477,6 @@ function MapViewContent() {
 
     // Remove sources
     const sourcesToRemove = [
-      routeId,
       `${routeId}-main`,
       `${routeId}-unpaved`
     ];
