@@ -105,6 +105,10 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   │   ├── DistanceMarkers.tsx # Marker component
 │   │   │   │   │   └── DistanceMarkers.css # Marker styling
 │   │   │   │   ├── MapControls/ # Interactive controls
+│   │   │   │   ├── RouteLayer/  # Route visualization
+│   │   │   │   │   ├── RouteLayer.tsx # Route rendering
+│   │   │   │   │   ├── types.ts      # Route layer types
+│   │   │   │   │   └── index.ts      # Public exports
 │   │   │   │   ├── MapView/    # Core map component
 │   │   │   │   │   ├── MapView.tsx # Map rendering and interaction logic
 │   │   │   │   │   └── MapView.css # Map styling and layout
@@ -277,6 +281,7 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `surfaceService`: Analyzes and categorizes road surfaces
 - `routeService`: Manages route data persistence and operations
 - `placeDetection`: Identifies and processes place-based POIs
+- `photoService`: Handles photo upload and processing operations
 
 ### Utility Functions
 - `climbUtils`: Categorizes climbs based on gradient and distance
