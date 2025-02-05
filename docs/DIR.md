@@ -24,6 +24,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── POI_IMPLEMENTATION_PLAN.md # Detailed plan for Points of Interest feature
 │   ├── POI_PLACES.md             # Documentation for POI places functionality
 │   ├── POI_PROGRESS_NOTES.md     # Tracking progress of POI feature development
+│   ├── SAVE_ISSUE_ANALYSIS.md    # Analysis of save functionality issues
 │   ├── SAVE_LOAD_IMPLEMENTATION.md # Documentation for save/load functionality
 │   ├── surface-detection.md       # Documentation for surface type detection
 │   └── surfacedetectionplan.md    # Planning document for surface detection
@@ -53,6 +54,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │       ├── services/    # Route data services
 │   │   │       └── types/       # Route type definitions
 │   │   ├── routes/              # [REDUNDANT] Main routes (should be moved to features)
+│   │   ├── services/            # [REDUNDANT] Main services (should be moved to features)
 │   │   ├── shared/              # Shared backend utilities
 │   │   │   ├── config/         # Server configuration (logging, env vars)
 │   │   │   ├── middlewares/    # Express middlewares (error handling, file upload)
@@ -116,6 +118,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │       ├── RouteList.tsx     # Route list management
 │   │   │   │       ├── SaveDialog.tsx    # Route saving dialog
 │   │   │   │       ├── LoadDialog.tsx    # Route loading dialog
+│   │   │   │       ├── SidebarListItems.tsx # List item components
 │   │   │   │       ├── useSidebar.ts    # Sidebar logic
 │   │   │   │       └── types.ts         # Type definitions
 │   │   │   ├── context/    # Map state management
@@ -253,6 +256,9 @@ The following files should be consolidated to maintain a cleaner architecture:
 2. Server Routes:
    - `server/src/routes/gpx.routes.ts` should be removed
    - Keep `server/src/features/gpx/routes/gpx.routes.ts`
+
+3. Server Services:
+   - `server/src/services/gpx/gpx.processing.ts` should be moved to `server/src/features/gpx/services/`
 
 This consolidation aligns with the feature-based architecture and reduces maintenance overhead.
 
