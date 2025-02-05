@@ -25,6 +25,7 @@ import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessin
 import { Feature, LineString } from 'geojson';
 import { ProcessedRoute } from '../../../gpx/types/gpx.types';
 import { addSurfaceOverlay } from '../../../gpx/services/surfaceService';
+import { RouteLayer } from '../RouteLayer';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -166,73 +167,18 @@ function MapViewContent() {
     const routeId = route.routeId || `route-${route.id}`;
     console.log('[MapView] Rendering route:', routeId);
 
-  // Clean up existing layers
-  if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
-  if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
-  if (map.getSource(routeId)) map.removeSource(routeId);
+    // Clean up existing layers
+    if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
+    if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
+    if (map.getSource(routeId)) map.removeSource(routeId);
 
-  // Differentiate between loaded and new routes
-  if ('routes' in route && Array.isArray(route.routes) && route.routes.length === 2) {
-    // This is a loaded route from MongoDB with pre-processed surface data
-    const [mainRoute, unpavedRoute] = route.routes;
-    
-    // Render the main route (solid line)
-    map.addSource(`${routeId}-main`, {
-      type: 'geojson',
-      data: mainRoute.geojson
-    });
-    
-    map.addLayer({
-      id: `${routeId}-line`,
-      type: 'line',
-      source: `${routeId}-main`,
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#ee5253',
-        'line-width': 3
-      }
-    });
-
-    // Render the unpaved sections (dashed line)
-    map.addSource(`${routeId}-unpaved`, {
-      type: 'geojson',
-      data: unpavedRoute.geojson
-    });
-
-    map.addLayer({
-      id: `${routeId}-unpaved-line`,
-      type: 'line',
-      source: `${routeId}-unpaved`,
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#ffffff',
-        'line-width': 2,
-        'line-dasharray': [1, 3]
-      }
-    });
-  } else {
-    // This is a new route, add source and layers as before
-    const sourceData = {
-      ...route.geojson,
-      features: route.geojson.features.map((feature, index) => ({
-        ...feature,
-        id: index
-      }))
-    };
-    
+    // Add the main route source and layers
     map.addSource(routeId, {
       type: 'geojson',
-      data: sourceData,
-      generateId: false
+      data: route.geojson
     });
 
-    // Add border layer
+    // Add main route layers
     map.addLayer({
       id: `${routeId}-border`,
       type: 'line',
@@ -247,7 +193,6 @@ function MapViewContent() {
       }
     });
 
-    // Add main route layer
     map.addLayer({
       id: `${routeId}-line`,
       type: 'line',
@@ -257,55 +202,74 @@ function MapViewContent() {
         'line-cap': 'round'
       },
       paint: {
-        'line-color': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          '#ff8f8f',
-          '#ee5253'
-        ],
-        'line-width': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          5,
-          3
-        ]
+        'line-color': '#ee5253',
+        'line-width': 3
       }
     });
-  }
 
-    // Add hover effects
-    let hoveredRouteId: string | null = null;
-    let hoveredFeatureId: number | null = null;
+    // For new routes, detect and save unpaved sections
+    if (!route.unpavedSections || route.unpavedSections.length === 0) {
+      const feature = route.geojson.features[0] as Feature<LineString>;
+      try {
+        const featureWithRouteId = {
+          ...feature,
+          properties: {
+            ...feature.properties,
+            routeId: routeId
+          }
+        };
+        // Detect and save unpaved sections
+        const sections = await addSurfaceOverlay(map, featureWithRouteId);
+        // Update route with unpaved sections
+        route.unpavedSections = sections;
+        // If this is a save operation, the sections will be saved to MongoDB
+      } catch (error) {
+        console.error('[MapView] Surface detection error:', error);
+      }
+    } else {
+      // For loaded routes, render existing unpaved sections
+      route.unpavedSections.forEach((section, index) => {
+        const sourceId = `unpaved-section-${routeId}-${index}`;
+        const layerId = `unpaved-section-layer-${routeId}-${index}`;
 
-    map.on('mousemove', `${routeId}-line`, (e) => {
-      if (e.features && e.features.length > 0) {
-        if (hoveredRouteId && hoveredFeatureId !== null) {
-          map.setFeatureState(
-            { source: hoveredRouteId, id: hoveredFeatureId },
-            { hover: false }
-          );
+        // Clean up existing
+        if (map.getSource(sourceId)) {
+          map.removeLayer(layerId);
+          map.removeSource(sourceId);
         }
-        hoveredRouteId = routeId;
-        hoveredFeatureId = e.features[0].id as number;
-        map.setFeatureState(
-          { source: routeId, id: hoveredFeatureId },
-          { hover: true }
-        );
-        map.getCanvas().style.cursor = 'pointer';
-      }
-    });
 
-    map.on('mouseleave', `${routeId}-line`, () => {
-      if (hoveredRouteId && hoveredFeatureId !== null) {
-        map.setFeatureState(
-          { source: hoveredRouteId, id: hoveredFeatureId },
-          { hover: false }
-        );
-      }
-      hoveredRouteId = null;
-      hoveredFeatureId = null;
-      map.getCanvas().style.cursor = '';
-    });
+        // Add source with surface property
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {
+              surface: 'unpaved'
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: section.coordinates
+            }
+          }
+        });
+
+        // Add white dashed line for unpaved segments
+        map.addLayer({
+          id: layerId,
+          type: 'line',
+          source: sourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 2,
+            'line-dasharray': [1, 3]
+          }
+        });
+      });
+    }
 
     // Add click handler
     addRouteClickHandler(map, routeId);
@@ -316,22 +280,6 @@ function MapViewContent() {
     // Wait briefly for layers to be ready
     await new Promise(resolve => setTimeout(resolve, 500));
     
-  // Only do surface detection for new routes (ones without pre-processed data)
-  if (!('routes' in route) || !Array.isArray(route.routes)) {
-    try {
-      const featureWithRouteId = {
-        ...feature,
-        properties: {
-          ...feature.properties,
-          routeId: routeId
-        }
-      };
-      await addSurfaceOverlay(map, featureWithRouteId);
-    } catch (error) {
-      console.error('[MapView] Surface detection error:', error);
-    }
-  }
-
     // Fit bounds to show the route
     const bounds = new mapboxgl.LngLatBounds();
     feature.geometry.coordinates.forEach((coord) => {
@@ -347,15 +295,41 @@ function MapViewContent() {
     });
   }, [isMapReady, addRouteClickHandler]);
 
+  // Function to handle surface detection for new routes
+  const handleSurfaceDetection = useCallback(async (route: ProcessedRoute) => {
+    if (!mapInstance.current || !isMapReady) return;
+
+    const routeId = route.routeId || `route-${route.id}`;
+    const feature = route.geojson.features[0] as Feature<LineString>;
+
+    try {
+      const featureWithRouteId = {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          routeId: routeId
+        }
+      };
+      await addSurfaceOverlay(mapInstance.current, featureWithRouteId);
+    } catch (error) {
+      console.error('[MapView] Surface detection error:', error);
+    }
+  }, [isMapReady]);
+
   // Effect to render current route when it changes
   useEffect(() => {
-    if (currentRoute) {
-      console.log('[MapView] Current route changed:', currentRoute.id);
+    if (!currentRoute || !mapInstance.current || !isMapReady) return;
+
+    console.log('[MapView] Current route changed:', currentRoute.id);
+
+    // For new routes (GPX uploads), use renderRouteOnMap
+    if (!('routes' in currentRoute)) {
       renderRouteOnMap(currentRoute).catch(error => {
         console.error('[MapView] Error rendering route:', error);
       });
     }
-  }, [currentRoute, renderRouteOnMap]);
+    // For loaded routes (from MongoDB), RouteLayer component handles rendering
+  }, [currentRoute, isMapReady, renderRouteOnMap]);
 
   const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
     if (!file && !processedRoute) {
@@ -762,14 +736,18 @@ function MapViewContent() {
           />
         )}
 
-        {currentRoute && (
+        {currentRoute && isMapReady && mapInstance.current && (
           <>
-            <ElevationProfilePanel
-              route={currentRoute}
-            />
-            {isMapReady && mapInstance.current && (
-              <DistanceMarkers map={mapInstance.current} />
+            {/* For loaded routes, use the new RouteLayer */}
+            {currentRoute.routes && (
+              <RouteLayer 
+                map={mapInstance.current} 
+                route={currentRoute} 
+              />
             )}
+            
+            <ElevationProfilePanel route={currentRoute} />
+            <DistanceMarkers map={mapInstance.current} />
           </>
         )}
 

@@ -17,6 +17,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── ELEVATION_PROFILE.md      # Elevation profile feature implementation details
 │   ├── GPX_Processing_Issues.md   # Known GPX processing issues and their solutions
 │   ├── GPX_UPLOADER_DRAWER.md    # GPX uploader drawer implementation guide
+│   ├── LOAD.md                   # Documentation for load functionality
 │   ├── MIGRATION_LOG.md           # Detailed log of migration changes and progress
 │   ├── MIGRATIONPLAN.md           # Strategic plan for system migration
 │   ├── OLDFUNCTIONS.md            # Archive of previous implementations for reference
@@ -24,6 +25,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── POI_IMPLEMENTATION_PLAN.md # Detailed plan for Points of Interest feature
 │   ├── POI_PLACES.md             # Documentation for POI places functionality
 │   ├── POI_PROGRESS_NOTES.md     # Tracking progress of POI feature development
+│   ├── ROUTE_RENDERING_DISCOVERY.md # Analysis of route rendering improvements
 │   ├── SAVE_ISSUE_ANALYSIS.md    # Analysis of save functionality issues
 │   ├── SAVE_LOAD_IMPLEMENTATION.md # Documentation for save/load functionality
 │   ├── surface-detection.md       # Documentation for surface type detection
@@ -254,15 +256,16 @@ The application's features are tightly integrated while maintaining clear bounda
 The following files should be consolidated to maintain a cleaner architecture:
 
 1. Server Controllers:
-   - `server/src/controllers/gpx.controller.ts` should be removed
-   - Keep `server/src/features/gpx/controllers/gpx.controller.ts`
+   - `server/src/controllers/gpx.controller.ts` should be moved to `server/src/features/gpx/controllers/`
 
 2. Server Routes:
-   - `server/src/routes/gpx.routes.ts` should be removed
-   - Keep `server/src/features/gpx/routes/gpx.routes.ts`
+   - `server/src/routes/gpx.routes.ts` should be moved to `server/src/features/gpx/routes/`
 
 3. Server Services:
    - `server/src/services/gpx/gpx.processing.ts` should be moved to `server/src/features/gpx/services/`
+
+4. GPX Processing:
+   - `src/features/map/hooks/useGpxProcessing.ts` should be consolidated with `src/features/gpx/hooks/useGpxProcessing.ts`
 
 This consolidation aligns with the feature-based architecture and reduces maintenance overhead.
 
@@ -282,6 +285,7 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `routeService`: Manages route data persistence and operations
 - `placeDetection`: Identifies and processes place-based POIs
 - `photoService`: Handles photo upload and processing operations
+- `authService`: Manages authentication and authorization
 
 ### Utility Functions
 - `climbUtils`: Categorizes climbs based on gradient and distance

@@ -15,7 +15,7 @@ export default function App() {
       clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
       authorizationParams={{
         redirect_uri: `${window.location.origin}/callback`,
-        audience: `https://${import.meta.env.VITE_AUTH0_DOMAIN}/api/v2/`,
+        audience: 'https://dev-8jmwfh4hugvdjwh8.au.auth0.com/api/v2/',
         scope: 'openid profile email offline_access'
       }}
       cacheLocation="localstorage"

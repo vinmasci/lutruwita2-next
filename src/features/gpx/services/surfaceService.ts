@@ -445,7 +445,7 @@ export const assignSurfacesViaNearest = async (
 export const addSurfaceOverlay = async (
   map: mapboxgl.Map,
   routeFeature: Feature<LineString>
-): Promise<void> => {
+): Promise<UnpavedSection[]> => {
   console.log('[surfaceService] Starting surface detection...');
 
   try {
@@ -535,6 +535,7 @@ export const addSurfaceOverlay = async (
     });
 
     console.log('[surfaceService] Surface detection complete');
+    return sections;  // Return the sections array
   } catch (error) {
     console.error('[surfaceService] Error in surface detection:', error);
     throw error;

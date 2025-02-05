@@ -246,3 +246,107 @@
 2025-02-05 16:23:48 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:23:48 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
 2025-02-05 16:23:49 [[32minfo[39m]: Incoming Request:
 2025-02-05 16:23:49 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:23:49 +0000] "GET /api/routes/67a2ee9db1b8734e1e8148d3 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:30:39 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:30:39 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:30:39 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:30:40 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:30:40 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:30:40 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:36:00 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:36:00 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:36:00 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:36:01 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:36:01 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:36:01 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:40:24 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:40:24 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:40:24 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:40:25 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:40:25 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:40:25 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:40:53 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:40:53 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:40:53 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:40:54 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:40:55 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:40:55 +0000] "GET /api/routes/67a2f25db1b8734e1e8148e1 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:44:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:44:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:44:29 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:44:32 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:44:32 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:44:32 +0000] "GET /api/routes/67a2f25db1b8734e1e8148e1 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:56:42 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:56:42 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:56:42 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:56:43 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:56:43 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:56:43 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:59:36 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:59:36 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:59:36 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:59:37 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:59:37 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:59:37 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:59:43 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:59:43 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:59:43 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 16:59:44 [[32minfo[39m]: Incoming Request:
+2025-02-05 16:59:45 [[32minfo[39m]: ::1 - - [05/Feb/2025:05:59:45 +0000] "GET /api/routes/67a2f25db1b8734e1e8148e1 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:00:01 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:00:01 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:00:01 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:00:02 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:00:02 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:00:02 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:03:45 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:03:45 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:03:45 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:03:46 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:03:46 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:03:46 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:04:25 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:04:25 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:04:25 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:04:26 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:04:26 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:04:26 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:10:25 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:10:25 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:10:25 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:10:27 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:10:27 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:10:27 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:17:40 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:17:40 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:17:40 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:17:41 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:17:41 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:17:41 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:20:15 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:20:15 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:20:15 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:20:16 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:20:16 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:20:16 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:21:24 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:21:24 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:21:24 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:21:25 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:21:25 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:21:25 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:22:23 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:22:23 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:22:23 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:22:24 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:22:24 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:22:24 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:24:14 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:24:14 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:24:14 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:24:15 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:24:15 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:24:15 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:27:08 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:27:08 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:27:08 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:27:09 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:27:09 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:27:09 +0000] "GET /api/routes/67a2f5b4b1b8734e1e8148fa HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:27:13 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:27:13 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:27:13 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:27:13 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:27:13 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:27:13 +0000] "GET /api/routes/67a2f25db1b8734e1e8148e1 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:33:16 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:33:16 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:33:16 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:34:36 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:34:36 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:34:36 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:34:39 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:34:40 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:34:40 +0000] "GET /api/routes/67a2ee9db1b8734e1e8148d3 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:35:40 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:35:40 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:35:40 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 17:35:41 [[32minfo[39m]: Incoming Request:
+2025-02-05 17:35:41 [[32minfo[39m]: ::1 - - [05/Feb/2025:06:35:41 +0000] "GET /api/routes/67a2f25db1b8734e1e8148e1 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:10:36 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:10:37 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:10:37 +0000] "POST /api/routes/save HTTP/1.1" 201 70 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:10:37 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:10:37 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:10:37 +0000] "GET /api/routes HTTP/1.1" 200 172 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:10:51 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:10:51 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:10:51 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:10:52 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:10:52 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:10:52 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 200 157246 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:12:33 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:12:33 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:12:33 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:12:34 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:12:34 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:12:34 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:13:04 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:13:04 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:13:04 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:13:28 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:13:28 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:13:28 +0000] "GET /api/routes HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"
+2025-02-05 18:13:29 [[32minfo[39m]: Incoming Request:
+2025-02-05 18:13:29 [[32minfo[39m]: ::1 - - [05/Feb/2025:07:13:29 +0000] "GET /api/routes/67a30eedb1b8734e1e814951 HTTP/1.1" 304 - "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15"

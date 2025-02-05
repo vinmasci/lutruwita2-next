@@ -35,12 +35,19 @@ export const LoadDialog = ({
         sx: { 
           backgroundColor: 'rgb(35, 35, 35)',
           color: 'white',
-          minWidth: '400px'
+          minWidth: '400px',
+          borderRadius: '8px'
         }
       }}
     >
-      <DialogTitle>Load Route</DialogTitle>
-      <DialogContent>
+      <DialogTitle sx={{ 
+        pb: 1,
+        fontSize: '1.5rem',
+        fontWeight: 500
+      }}>
+        Load Route
+      </DialogTitle>
+      <DialogContent sx={{ pt: '8px !important' }}>
         {routes.length === 0 ? (
           <Typography sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
             No saved routes found
@@ -50,33 +57,56 @@ export const LoadDialog = ({
             {routes.map((route) => (
               <ListItem
                 key={route.id}
-                component="button"
+                component="div"
                 onClick={() => onLoad(route.id)}
                 sx={{
+                  width: '100%',
+                  py: 1.5,
+                  px: 2,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  borderRadius: '4px',
+                  mb: 0.5,
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   '&:hover': {
                     backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                  },
+                  '&:active': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)'
                   }
                 }}
               >
                 <ListItemText
-                  primary={route.name}
+                  primary={
+                    <Typography sx={{
+                      color: 'white',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      mb: 0.5
+                    }}>
+                      {route.name}
+                    </Typography>
+                  }
                   secondary={
                     <Typography 
                       component="span" 
                       sx={{ 
                         color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: '0.875rem'
+                        fontSize: '0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
                       }}
                     >
-                      Type: {route.type}
-                      {route.isPublic && ' • Public'}
+                      <span>Type: {route.type}</span>
+                      {route.isPublic && (
+                        <>
+                          <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>•</span>
+                          <span>Public</span>
+                        </>
+                      )}
                     </Typography>
                   }
-                  sx={{
-                    '& .MuiListItemText-primary': {
-                      color: 'white'
-                    }
-                  }}
                 />
                 {onDelete && (
                   <ListItemSecondaryAction>
@@ -89,8 +119,10 @@ export const LoadDialog = ({
                       sx={{ 
                         color: 'rgba(255, 255, 255, 0.7)',
                         '&:hover': {
-                          color: '#f44336'
-                        }
+                          color: '#f44336',
+                          backgroundColor: 'rgba(244, 67, 54, 0.1)'
+                        },
+                        transition: 'all 0.2s'
                       }}
                     >
                       <Delete />
