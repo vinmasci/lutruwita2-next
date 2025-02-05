@@ -269,12 +269,10 @@ function MapViewContent() {
     // Wait briefly for layers to be ready
     await new Promise(resolve => setTimeout(resolve, 500));
     
-  // Only do surface detection for newly added GPX files, not loaded routes
-  // When loading from server, route.id will be in the route.routes array
-  // When uploading new GPX, route.id will be a UUID
-  console.log('[MapView] Route ID:', route.id);
-  if (!route.routeId?.startsWith('route-')) {
-    console.log('[MapView] Processing surface for new GPX file');
+  // For newly added GPX files, do surface detection
+  // For loaded routes, render the saved unpaved sections
+  // Check if this is a route loaded from MongoDB (has createdAt timestamp)
+  if (!('createdAt' in route)) {
     try {
       const featureWithRouteId = {
         ...feature,
@@ -287,6 +285,49 @@ function MapViewContent() {
     } catch (error) {
       console.error('[MapView] Surface detection error:', error);
     }
+  } else if (route.unpavedSections && route.unpavedSections.length > 0) {
+    // Render saved unpaved sections
+    route.unpavedSections.forEach((section, index) => {
+      const sourceId = `unpaved-section-${routeId}-${index}`;
+      const layerId = `unpaved-section-layer-${routeId}-${index}`;
+
+      // Clean up existing
+      if (map.getSource(sourceId)) {
+        map.removeLayer(layerId);
+        map.removeSource(sourceId);
+      }
+
+      // Add source with surface property
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {
+            surface: 'unpaved'
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: section.coordinates
+          }
+        }
+      });
+
+      // Add white dashed line for unpaved segments
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 2,
+          'line-dasharray': [1, 3]
+        }
+      });
+    });
   }
 
     // Fit bounds to show the route
