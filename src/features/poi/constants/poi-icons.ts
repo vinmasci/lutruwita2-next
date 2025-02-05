@@ -23,7 +23,7 @@ export const POI_ICONS: POIIconDefinition[] = [
   { name: 'Route', category: 'road-information', label: 'Trailhead', description: 'Start of a trail or track' },
   { name: 'RailTrail', category: 'road-information', label: 'Rail Trail', description: 'Former railway line converted to trail' },
   { name: 'Construction', category: 'road-information', label: 'Road Construction', description: 'Road works or construction area' },
-  { name: 'HikeABike', category: 'road-information', label: 'Hike-a-bike', description: 'Section where bike must be carried' },
+  { name: 'HikeABike', category: 'road-information', label: 'Hike-a-bike', description: 'Section where bike must be carried', style: { color: '#e74c3c' } },
   
   // Accommodation
   { name: 'Tent', category: 'accommodation', label: 'Camping', description: 'Camping area or campsite' },
@@ -69,7 +69,6 @@ export const POI_ICONS: POIIconDefinition[] = [
   { name: 'StopCircle', category: 'event-information', label: 'Finish', description: 'Event finish point' },
   { name: 'Stethoscope', category: 'event-information', label: 'Aid Station', description: 'Medical or aid station' },
   { name: 'BatteryCharging', category: 'event-information', label: 'Rest Stop', description: 'Rest or recovery point' },
-  { name: 'X', category: 'event-information', label: 'Checkpoint', description: 'Event checkpoint' },
   { name: 'CircleDot', category: 'event-information', label: 'Control Point', description: 'Event control point' },
   { name: 'Wrench', category: 'event-information', label: 'Bike Hub', description: 'Bike maintenance or repair' },
   { name: 'Flag', category: 'event-information', label: 'Checkpoint', description: 'Event checkpoint' }

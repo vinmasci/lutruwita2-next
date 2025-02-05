@@ -3,6 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import winston from 'winston';
 import path from 'path';
+import mongoose from 'mongoose';
 import { SERVER_CONFIG } from './shared/config/server.config';
 import { gpxRoutes } from './features/gpx/routes/gpx.routes';
 import routeRoutes from './features/route/routes/route.routes';
@@ -10,6 +11,16 @@ import { errorHandler } from './shared/middlewares/error-handling';
 import 'dotenv/config';
 
 import { logger } from './shared/config/logger.config';
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI!)
+  .then(() => {
+    logger.info('Connected to MongoDB');
+  })
+  .catch((error) => {
+    logger.error('MongoDB connection error:', error);
+    process.exit(1);
+  });
 
 // Create required directories
 import fs from 'fs';

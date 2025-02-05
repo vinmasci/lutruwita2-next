@@ -53,7 +53,7 @@ export const useRouteService = () => {
       console.log('[routeService] Starting save route...');
       const headers = await getAuthHeaders();
       
-      console.log('[routeService] Making API call to:', `${API_BASE}/save`);
+      console.log('[routeService] Making API call to:', API_BASE);
       console.log('[routeService] Request headers:', headers);
       console.log('[routeService] Request body:', routeData);
 
@@ -75,12 +75,16 @@ export const useRouteService = () => {
   const loadRoute = async (id: string): Promise<LoadRouteResponse> => {
     try {
       const headers = await getAuthHeaders();
+      console.log('[routeService] Loading route:', id);
       const response = await fetch(`${API_BASE}/${id}`, {
         method: 'GET',
         headers,
         credentials: 'include'
       });
-      return handleResponse(response);
+      console.log('[routeService] Load response status:', response.status);
+      const data = await handleResponse(response);
+      console.log('[routeService] Loaded route data:', data);
+      return data;
     } catch (error) {
       console.error('Load route error:', error);
       throw error;

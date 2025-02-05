@@ -7,7 +7,7 @@ export const ICON_PATHS: Record<string, string> = {
   'Lock': 'fa-solid fa-road-lock',
   'Unlock': 'fa-regular fa-fence',
   'WaterCrossing': 'fa-solid fa-water', // Water crossing
-  'ChevronsRightLeft': 'fa-solid fa-car-bump',
+  'ChevronsRightLeft': 'fa-solid fa-hill-rockslide',
   'ArrowUpRight': 'fa-solid fa-arrow-up-right-and-arrow-down-left-from-center',
   'AudioWaveform': 'fa-solid fa-xmarks-lines',
   'Route': 'fa-solid fa-sign-post',
@@ -45,7 +45,7 @@ export const ICON_PATHS: Record<string, string> = {
   'ParkingSquare': 'fa-solid fa-square-parking',
   'Fuel': 'fa-solid fa-gas-pump',
   'Mail': 'fa-solid fa-envelope',
-  'Bike': 'fa-regular fa-person-biking-mountain',
+  'Bike': 'fa-solid fa-bicycle',
   
   // Transportation
   'Bus': 'fa-solid fa-bus',
@@ -55,7 +55,7 @@ export const ICON_PATHS: Record<string, string> = {
   
   // Event Information
   'PlayCircle': 'fa-solid fa-circle-play',
-  'StopCircle': 'fa-solid fa-circle-stop',
+  'StopCircle': 'fa-solid fa-flag-checkered',
   'Stethoscope': 'fa-solid fa-kit-medical',
   'BatteryCharging': 'fa-solid fa-battery-half',
   'X': 'fa-solid fa-xmark',

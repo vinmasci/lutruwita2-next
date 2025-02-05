@@ -95,16 +95,22 @@ function MapViewContent() {
   const addRouteClickHandler = useCallback((map: mapboxgl.Map, routeId: string) => {
     const layerId = `${routeId}-line`;
     
-    // Remove existing handler if any
-    map.off('click', layerId);
-    
-    // Add new click handler
-    map.on('click', layerId, (e: mapboxgl.MapMouseEvent) => {
+    // Create click handler
+    const clickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+      console.log('[MapView] Route layer clicked:', layerId);
       const route = routes.find((r: ProcessedRoute) => r.routeId === routeId);
       if (route) {
+        console.log('[MapView] Found matching route:', route.routeId);
         setCurrentRoute(route);
+      } else {
+        console.log('[MapView] No matching route found for ID:', routeId);
       }
-    });
+    };
+    // Remove existing handler if any
+    map.off('click', layerId, clickHandler);
+    
+    // Add new click handler
+    map.on('click', layerId, clickHandler);
   }, [routes, setCurrentRoute]);
 
   // Effect to add click handlers for existing routes when map loads
@@ -112,9 +118,12 @@ function MapViewContent() {
     if (!mapInstance.current || !isMapReady) return;
     
     const map = mapInstance.current;
+    console.log('[MapView] Adding click handlers for routes:', routes);
     routes.forEach(route => {
       const routeId = route.routeId || `route-${route.id}`;
+      console.log('[MapView] Checking for route layer:', `${routeId}-line`);
       if (map.getLayer(`${routeId}-line`)) {
+        console.log('[MapView] Adding click handler for route:', routeId);
         addRouteClickHandler(map, routeId);
       }
     });
@@ -146,161 +155,176 @@ function MapViewContent() {
     }
   }, [hoverCoordinates]);
 
-  const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
-    console.log('[MapView] Starting upload at:', new Date().toISOString());
-    
-    if (!file && !processedRoute) {
-      setIsGpxDrawerOpen(true);
-      return;
-    }
-    
+  // Reusable function to render a route on the map
+  const renderRouteOnMap = useCallback(async (route: ProcessedRoute) => {
     if (!mapInstance.current || !isMapReady) {
       console.error('Map is not ready');
       return;
     }
 
+    const map = mapInstance.current;
+    const routeId = route.routeId || `route-${route.id}`;
+    console.log('[MapView] Rendering route:', routeId);
+
+    // Clean up existing layers
+    if (map.getLayer(`${routeId}-border`)) map.removeLayer(`${routeId}-border`);
+    if (map.getLayer(`${routeId}-line`)) map.removeLayer(`${routeId}-line`);
+    if (map.getSource(routeId)) map.removeSource(routeId);
+
+    // Add the source with generated feature IDs
+    const sourceData = {
+      ...route.geojson,
+      features: route.geojson.features.map((feature, index) => ({
+        ...feature,
+        id: index
+      }))
+    };
+    
+    map.addSource(routeId, {
+      type: 'geojson',
+      data: sourceData,
+      generateId: false
+    });
+
+    // Add border layer
+    map.addLayer({
+      id: `${routeId}-border`,
+      type: 'line',
+      source: routeId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#ffffff',
+        'line-width': 5
+      }
+    });
+
+    // Add main route layer
+    map.addLayer({
+      id: `${routeId}-line`,
+      type: 'line',
+      source: routeId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          '#ff8f8f',
+          '#ee5253'
+        ],
+        'line-width': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          5,
+          3
+        ]
+      }
+    });
+
+    // Add hover effects
+    let hoveredRouteId: string | null = null;
+    let hoveredFeatureId: number | null = null;
+
+    map.on('mousemove', `${routeId}-line`, (e) => {
+      if (e.features && e.features.length > 0) {
+        if (hoveredRouteId && hoveredFeatureId !== null) {
+          map.setFeatureState(
+            { source: hoveredRouteId, id: hoveredFeatureId },
+            { hover: false }
+          );
+        }
+        hoveredRouteId = routeId;
+        hoveredFeatureId = e.features[0].id as number;
+        map.setFeatureState(
+          { source: routeId, id: hoveredFeatureId },
+          { hover: true }
+        );
+        map.getCanvas().style.cursor = 'pointer';
+      }
+    });
+
+    map.on('mouseleave', `${routeId}-line`, () => {
+      if (hoveredRouteId && hoveredFeatureId !== null) {
+        map.setFeatureState(
+          { source: hoveredRouteId, id: hoveredFeatureId },
+          { hover: false }
+        );
+      }
+      hoveredRouteId = null;
+      hoveredFeatureId = null;
+      map.getCanvas().style.cursor = '';
+    });
+
+    // Add click handler
+    addRouteClickHandler(map, routeId);
+
+    // Get coordinates from the GeoJSON
+    const feature = route.geojson.features[0] as Feature<LineString>;
+
+    // Wait briefly for layers to be ready
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+  // Only do surface detection for newly added GPX files, not loaded routes
+  // When loading from server, route.id will be in the route.routes array
+  // When uploading new GPX, route.id will be a UUID
+  console.log('[MapView] Route ID:', route.id);
+  if (!route.routeId?.startsWith('route-')) {
+    console.log('[MapView] Processing surface for new GPX file');
+    try {
+      const featureWithRouteId = {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          routeId: routeId
+        }
+      };
+      await addSurfaceOverlay(map, featureWithRouteId);
+    } catch (error) {
+      console.error('[MapView] Surface detection error:', error);
+    }
+  }
+
+    // Fit bounds to show the route
+    const bounds = new mapboxgl.LngLatBounds();
+    feature.geometry.coordinates.forEach((coord) => {
+      if (coord.length >= 2) {
+        bounds.extend([coord[0], coord[1]]);
+      }
+    });
+    
+    map.fitBounds(bounds, { 
+      padding: 50,
+      maxZoom: 13,
+      minZoom: 13
+    });
+  }, [isMapReady, addRouteClickHandler]);
+
+  // Effect to render current route when it changes
+  useEffect(() => {
+    if (currentRoute) {
+      console.log('[MapView] Current route changed:', currentRoute.id);
+      renderRouteOnMap(currentRoute).catch(error => {
+        console.error('[MapView] Error rendering route:', error);
+      });
+    }
+  }, [currentRoute, renderRouteOnMap]);
+
+  const handleUploadGpx = async (file?: File, processedRoute?: ProcessedRoute) => {
+    if (!file && !processedRoute) {
+      setIsGpxDrawerOpen(true);
+      return;
+    }
+
     try {
       const result = processedRoute || (file ? await processGpx(file) : null);
-      console.log('[MapView] Got result at:', new Date().toISOString());
       if (result) {
         addRoute(result);
         setCurrentRoute(result);
-        
-        // Add the route to the map
-        const map = mapInstance.current;
-        currentRouteId.current = result.routeId || `route-${result.id}`;
-        const routeId = currentRouteId.current;
-        console.log('[MapView] Adding route layers...');
-
-        // Add the source with generated feature IDs
-        const sourceData = {
-          ...result.geojson,
-          features: result.geojson.features.map((feature, index) => ({
-            ...feature,
-            id: index
-          }))
-        };
-        
-        map.addSource(routeId, {
-          type: 'geojson',
-          data: sourceData,
-          generateId: false // We manually set IDs above
-        });
-
-        // Add single route layer with white border
-        map.addLayer({
-          id: `${routeId}-border`,
-          type: 'line',
-          source: routeId,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 5
-          }
-        });
-
-        // Add main route layer
-        map.addLayer({
-          id: `${routeId}-line`,
-          type: 'line',
-          source: routeId,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': [
-              'case',
-              ['boolean', ['feature-state', 'hover'], false],
-              '#ff8f8f', // Hover color
-              '#ee5253'  // Default color
-            ],
-            'line-width': [
-              'case',
-              ['boolean', ['feature-state', 'hover'], false],
-              5, // Hover width
-              3  // Default width
-            ]
-          }
-        });
-
-        // Add hover effects
-        let hoveredRouteId: string | null = null;
-        let hoveredFeatureId: number | null = null;
-
-        map.on('mousemove', `${routeId}-line`, (e) => {
-          if (e.features && e.features.length > 0) {
-            if (hoveredRouteId && hoveredFeatureId !== null) {
-              map.setFeatureState(
-                { source: hoveredRouteId, id: hoveredFeatureId },
-                { hover: false }
-              );
-            }
-            hoveredRouteId = routeId;
-            hoveredFeatureId = e.features[0].id as number;
-            map.setFeatureState(
-              { source: routeId, id: hoveredFeatureId },
-              { hover: true }
-            );
-            map.getCanvas().style.cursor = 'pointer';
-          }
-        });
-
-        map.on('mouseleave', `${routeId}-line`, () => {
-          if (hoveredRouteId && hoveredFeatureId !== null) {
-            map.setFeatureState(
-              { source: hoveredRouteId, id: hoveredFeatureId },
-              { hover: false }
-            );
-          }
-          hoveredRouteId = null;
-          hoveredFeatureId = null;
-          map.getCanvas().style.cursor = '';
-        });
-
-        // Add click handler for the new route
-        addRouteClickHandler(map, routeId);
-
-        // Get coordinates from the GeoJSON
-        const feature = result.geojson.features[0] as Feature<LineString>;
-
-        // Wait briefly for layers to be ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Try surface detection
-        console.log('[MapView] Starting surface detection at:', new Date().toISOString());
-        try {
-          // Add routeId to feature properties for unique unpaved section IDs
-          const featureWithRouteId = {
-            ...feature,
-            properties: {
-              ...feature.properties,
-              routeId: routeId
-            }
-          };
-          await addSurfaceOverlay(map, featureWithRouteId);
-        } catch (error) {
-          console.error('[MapView] Surface detection error:', error);
-        }
-
-        // Fit bounds to show the route with zoom constraints
-        const bounds = new mapboxgl.LngLatBounds();
-        feature.geometry.coordinates.forEach((coord) => {
-          if (coord.length >= 2) {
-            bounds.extend([coord[0], coord[1]]);
-          }
-        });
-        
-        // Fit bounds and force zoom level 13
-        map.fitBounds(bounds, { 
-          padding: 50,
-          maxZoom: 13,
-          minZoom: 13  // Force zoom level 13
-        });
-
         setIsGpxDrawerOpen(false);
       }
     } catch (error) {

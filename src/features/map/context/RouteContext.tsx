@@ -135,14 +135,20 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
     async (id: string) => {
       try {
         setIsLoading(true);
+        console.log('[RouteContext] Starting to load route:', id);
         const { route } = await routeService.loadRoute(id);
+        console.log('[RouteContext] Route loaded from DB:', route);
+        console.log('[RouteContext] Route.routes:', route.routes);
 
         // Update route state
+        console.log('[RouteContext] Setting routes state');
         setRoutes(route.routes);
+        console.log('[RouteContext] Setting current route:', route.routes[0] || null);
         setCurrentRoute(route.routes[0] || null);
         
         // Update map state if available
         if (map && route.mapState) {
+          console.log('[RouteContext] Updating map state');
           map.setZoom(route.mapState.zoom);
           map.setCenter(route.mapState.center);
           map.setBearing(route.mapState.bearing);
@@ -151,6 +157,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
             map.setStyle(route.mapState.style);
           }
         }
+        console.log('[RouteContext] Route load complete');
 
           // Update photos context
           if (route.photos) {
