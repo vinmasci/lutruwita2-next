@@ -51,6 +51,12 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── routes/      # GPX API endpoint definitions
 │   │   │   │   ├── services/    # GPX data processing services
 │   │   │   │   └── types/       # GPX type definitions
+│   │   │   ├── poi/             # POI management feature backend
+│   │   │   │   ├── controllers/  # POI request handlers
+│   │   │   │   ├── models/      # POI data models (MongoDB schemas)
+│   │   │   │   ├── routes/      # POI API endpoint definitions
+│   │   │   │   ├── services/    # POI data services
+│   │   │   │   └── types/       # POI type definitions
 │   │   │   └── route/           # Route management feature backend
 │   │   │       ├── controllers/  # Route request handlers
 │   │   │       ├── models/      # Route data models
@@ -236,10 +242,14 @@ The application's features are tightly integrated while maintaining clear bounda
 - Surface detection results overlay on the map
 
 ### POI ↔ Map Integration
-- POI markers render on the map layer
-- Map interactions trigger POI operations
-- Place detection uses map viewport
-- Drag and drop uses map coordinates
+- POI markers render on the map layer using MapboxPOIMarker
+- Map interactions trigger POI operations through POIContext
+- Place detection uses map viewport for location-based POIs
+- Drag and drop uses map coordinates for precise positioning
+- POIs are saved and loaded with route data
+- POIs support two types: draggable (free-form) and place-based
+- POIs are categorized (road info, accommodation, food/drink, etc.)
+- Each POI type has specific icons and styling options
 
 ### Photo ↔ POI Integration
 - Photos can be attached to POIs
@@ -285,6 +295,7 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `mapMatchingService`: Aligns GPS tracks with road networks
 - `surfaceService`: Analyzes and categorizes road surfaces
 - `routeService`: Manages route data persistence and operations
+- `poiService`: Handles POI CRUD operations and persistence
 - `placeDetection`: Identifies and processes place-based POIs
 - `photoService`: Handles photo upload and processing operations
 - `authService`: Manages authentication and authorization
