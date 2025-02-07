@@ -13,26 +13,20 @@ export class RouteService {
 
   async saveRoute(userId: string, data: SaveRouteRequest & Partial<SavedRouteState>): Promise<SaveRouteResponse> {
     try {
-      const routeId = new mongoose.Types.ObjectId();
-
       console.log('[RouteService] Starting route save process...');
-      console.log('[RouteService] POIs received from client:', {
-        draggable: data.pois?.draggable?.length || 0,
-        places: data.pois?.places?.length || 0
-      });
-      console.log('[RouteService] Full POI data from client:', data.pois);
 
-      // First save POIs using POI service
-      console.log('[RouteService] Saving POIs using POI service...');
-      const savedPOIs = await this.poiService.savePOIs({
-        draggable: data.pois?.draggable || [],
-        places: data.pois?.places || []
-      });
-      console.log('[RouteService] POIs saved successfully:', savedPOIs);
+      let savedPois;
+      // Save POIs first
+      if (data.pois) {
+        console.log('[RouteService] Saving POIs...');
+        savedPois = await this.poiService.savePOIs({
+          draggable: data.pois.draggable || [],
+          places: data.pois.places || []
+        });
+      }
 
-      // Create route with saved POIs
+      // Create route with saved POIs that have MongoDB IDs
       const route = new RouteModel({
-        _id: routeId,
         userId,
         name: data.name,
         type: data.type,
@@ -40,18 +34,14 @@ export class RouteService {
         mapState: data.mapState,
         routes: data.routes || [],
         photos: data.photos || [],
-        pois: savedPOIs,
+        pois: savedPois || { draggable: [], places: [] },
         places: data.places || []
       });
 
-      console.log('[RouteService] Route model prepared for save:', route.toObject());
-
-      const savedRoute = await route.save();
-      console.log('[RouteService] Route saved successfully to MongoDB');
-      console.log('[RouteService] Saved route details:', savedRoute.toObject());
+      await route.save();
+      console.log('[RouteService] Route saved successfully');
 
       return {
-        id: routeId.toString(),
         message: 'Route saved successfully'
       };
     } catch (error) {
@@ -73,34 +63,8 @@ export class RouteService {
         throw new Error('Access denied');
       }
 
-      // Get route data with POIs included
       const routeData = route.toJSON() as SavedRouteState;
-
-      // Ensure POIs are properly typed
-      if (routeData.pois) {
-        console.log('[RouteService] Loading POIs from route:', {
-          draggable: routeData.pois.draggable?.length || 0,
-          places: routeData.pois.places?.length || 0
-        });
-
-        // Load POIs through POI service to ensure proper typing
-        const poiIds = [
-          ...(routeData.pois.draggable?.map(poi => poi.id) || []),
-          ...(routeData.pois.places?.map(poi => poi.id) || [])
-        ];
-
-        if (poiIds.length > 0) {
-          const loadedPOIs = await this.poiService.getPOIsByIds(poiIds);
-          
-          // Separate POIs by type
-          routeData.pois = {
-            draggable: loadedPOIs.filter((poi): poi is DraggablePOI => poi.type === 'draggable'),
-            places: loadedPOIs.filter((poi): poi is PlaceNamePOI => poi.type === 'place')
-          };
-        }
-      }
-
-      console.log('[RouteService] Route loaded with typed POIs:', routeData.pois);
+      console.log('[RouteService] Route loaded successfully');
 
       return {
         route: routeData,
@@ -163,17 +127,8 @@ export class RouteService {
         throw new Error('Access denied');
       }
 
-      // Get POI IDs before deleting the route
-      const poiIds = [
-        ...(route.pois?.draggable?.map(poi => poi.id) || []),
-        ...(route.pois?.places?.map(poi => poi.id) || [])
-      ];
-
-      // Delete POIs first
-      if (poiIds.length > 0) {
-        console.log('[RouteService] Deleting associated POIs:', poiIds);
-        await this.poiService.deletePOIs(poiIds);
-      }
+      // Delete all POIs
+      await this.poiService.deleteAllPOIs();
 
       // Delete the route
       await RouteModel.deleteOne({ _id: routeId });

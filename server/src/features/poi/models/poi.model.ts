@@ -11,7 +11,6 @@ const poiStyleSchema = new mongoose.Schema({
 });
 
 const poiSchema = new mongoose.Schema({
-  routeId: { type: String },
   position: {
     lat: { type: Number, required: true },
     lng: { type: Number, required: true }
@@ -43,40 +42,6 @@ const poiSchema = new mongoose.Schema({
     enum: ['draggable', 'place']
   },
   placeId: { type: String } // Only for place type POIs
-}, {
-  timestamps: true,
-  toJSON: {
-    transform: function(doc: any, ret: any) {
-      ret.id = ret._id.toString();  // Convert MongoDB _id to string id for client
-      delete ret._id;
-      delete ret.__v;
-      delete ret.createdAt;
-      delete ret.updatedAt;
-      // Ensure type is preserved for proper type discrimination
-      ret.type = ret.type;
-      // Ensure placeId is only included for place type POIs
-      if (ret.type !== 'place') {
-        delete ret.placeId;
-      }
-      return ret;
-    }
-  },
-  toObject: {
-    transform: function(doc: any, ret: any) {
-      ret.id = ret._id.toString();  // Convert MongoDB _id to string id for client
-      delete ret._id;
-      delete ret.__v;
-      delete ret.createdAt;
-      delete ret.updatedAt;
-      // Ensure type is preserved for proper type discrimination
-      ret.type = ret.type;
-      // Ensure placeId is only included for place type POIs
-      if (ret.type !== 'place') {
-        delete ret.placeId;
-      }
-      return ret;
-    }
-  }
 });
 
 export const POIModel = mongoose.model('POI', poiSchema);

@@ -53,7 +53,6 @@ export interface SaveRouteRequest {
 }
 
 export interface SaveRouteResponse {
-  id: string;
   message: string;
 }
 

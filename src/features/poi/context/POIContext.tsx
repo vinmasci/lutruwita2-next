@@ -24,23 +24,25 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
   switch (action.type) {
     case 'ADD_POI': {
       const now = new Date().toISOString();
+      // Generate a temporary ID for frontend state management
+      const tempId = `temp-${uuidv4()}`;
       const base = {
-        id: uuidv4(),
         ...action.payload.poi,
+        id: tempId // Add temporary ID
       };
 
       if (action.payload.poi.type === 'place') {
-        const placePOI: PlaceNamePOI = {
+        const placePOI = {
           ...base,
-          type: 'place',
+          type: 'place' as const,
           placeId: action.payload.poi.placeId,
         };
         console.log('[POIReducer] Creating place POI:', placePOI);
         return [...state, placePOI];
       } else {
-        const draggablePOI: DraggablePOI = {
+        const draggablePOI = {
           ...base,
-          type: 'draggable',
+          type: 'draggable' as const,
         };
         console.log('[POIReducer] Creating draggable POI:', draggablePOI);
         return [...state, draggablePOI];
@@ -154,18 +156,52 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Get POIs in route format - all POIs are for the current route by default
   const getPOIsForRoute = (_routeId?: string): SavedRouteState['pois'] => {
-    console.log('[POIContext] Getting POIs from state:', pois);
+    console.log('[POIContext] Getting POIs from state:', JSON.stringify(pois, null, 2));
     
-    // Split POIs by type
-    const draggablePois = pois.filter((poi): poi is DraggablePOI => poi.type === 'draggable');
-    const placePois = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
+    // Split POIs by type and validate
+    const draggablePois = pois.filter((poi): poi is DraggablePOI => {
+      if (poi.type !== 'draggable') return false;
+      
+      // Validate required fields
+      if (!poi.id || !poi.position || !poi.name || !poi.category || !poi.icon) {
+        console.warn('[POIContext] Invalid draggable POI missing required fields:', {
+          id: !!poi.id,
+          position: !!poi.position,
+          name: !!poi.name,
+          category: !!poi.category,
+          icon: !!poi.icon,
+          fullPoi: poi
+        });
+        return false;
+      }
+      return true;
+    });
+    
+    const placePois = pois.filter((poi): poi is PlaceNamePOI => {
+      if (poi.type !== 'place') return false;
+      
+      // Validate required fields
+      if (!poi.id || !poi.position || !poi.name || !poi.category || !poi.icon || !poi.placeId) {
+        console.warn('[POIContext] Invalid place POI missing required fields:', {
+          id: !!poi.id,
+          position: !!poi.position,
+          name: !!poi.name,
+          category: !!poi.category,
+          icon: !!poi.icon,
+          placeId: !!poi.placeId,
+          fullPoi: poi
+        });
+        return false;
+      }
+      return true;
+    });
     
     const result = {
       draggable: draggablePois,
       places: placePois
     };
     
-    console.log('[POIContext] Returning POIs:', result);
+    console.log('[POIContext] Returning validated POIs:', JSON.stringify(result, null, 2));
     return result;
   };
 

@@ -62,12 +62,32 @@ export const useRouteService = () => {
       console.log('[routeService] Request headers:', headers);
       console.log('[routeService] Request body:', JSON.stringify(routeData, null, 2));
 
-      const response = await fetch(`${API_BASE}/save`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(routeData),
-        credentials: 'include'
-      });
+      console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
+      console.log('[routeService] Full route data:', JSON.stringify(routeData, null, 2));
+      
+// Transform frontend IDs to MongoDB _ids for POIs
+const transformedData = {
+  ...routeData,
+  pois: {
+    draggable: routeData.pois.draggable.map(poi => ({
+      ...poi,
+      _id: poi.id,
+      id: undefined
+    })),
+    places: routeData.pois.places.map(poi => ({
+      ...poi,
+      _id: poi.id,
+      id: undefined
+    }))
+  }
+};
+
+const response = await fetch(`${API_BASE}/save`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify(transformedData),
+  credentials: 'include'
+});
 
       console.log('[routeService] Save response status:', response.status);
       const result = await handleResponse(response);

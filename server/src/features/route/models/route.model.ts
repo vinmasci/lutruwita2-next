@@ -27,6 +27,7 @@ const photoSchema = new mongoose.Schema({
 
 // POI base schema - for points of interest along routes
 const poiSchema = new mongoose.Schema({
+  _id: { type: String, required: true }, // Allow string IDs for POIs
   position: {
     lat: { type: Number, required: true },
     lng: { type: Number, required: true }
@@ -205,44 +206,16 @@ const routeSchema = new mongoose.Schema({
     places: [placeNamePOISchema]
   },
   places: [placeSchema]
+// At the end of the schema definition
 }, {
   timestamps: true,
   toJSON: {
     transform: function(doc: any, ret: any) {
-      ret.id = ret._id.toString();
+      // Only transform dates
       ret.createdAt = ret.createdAt.toISOString();
       ret.updatedAt = ret.updatedAt.toISOString();
       
-      // Transform nested documents
-      if (ret.photos) {
-        ret.photos = ret.photos.map((photo: any) => ({
-          ...photo,
-          id: photo._id.toString()
-        }));
-      }
-      
-      if (ret.pois) {
-        if (ret.pois.draggable) {
-          ret.pois.draggable = ret.pois.draggable.map((poi: any) => ({
-            ...poi,
-            id: poi._id.toString()
-          }));
-        }
-        if (ret.pois.places) {
-          ret.pois.places = ret.pois.places.map((poi: any) => ({
-            ...poi,
-            id: poi._id.toString()
-          }));
-        }
-      }
-      
-      if (ret.places) {
-        ret.places = ret.places.map((place: any) => ({
-          ...place,
-          id: place._id.toString()
-        }));
-      }
-
+      // Clean up MongoDB internal fields
       delete ret._id;
       delete ret.__v;
     }

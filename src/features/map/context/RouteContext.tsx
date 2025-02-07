@@ -62,17 +62,44 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Save current state to backend
-  const saveCurrentState = useCallback(
-    async (
-      name: string,
-      type: "tourism" | "event" | "bikepacking" | "single",
-      isPublic: boolean
-    ) => {
-      try {
-        console.log('[RouteContext] Starting save with:', { name, type, isPublic });
-        console.log('[RouteContext] Getting POIs from local state...');
-        const pois = getPOIsForRoute();
-        console.log('[RouteContext] POIs retrieved:', pois);
+// AFTER:
+const saveCurrentState = useCallback(
+  async (
+    name: string,
+    type: "tourism" | "event" | "bikepacking" | "single",
+    isPublic: boolean
+  ) => {
+    try {
+      console.log('[RouteContext] Starting save with:', { name, type, isPublic });
+      console.log('[RouteContext] Getting POIs from local state...');
+      const pois = getPOIsForRoute();
+      console.log('[RouteContext] POIs retrieved:', JSON.stringify(pois, null, 2));
+      
+      // Validate POIs
+      const allPois = [...pois.draggable, ...pois.places];
+      const invalidPoi = allPois.find(poi => {
+        const missing = {
+          id: !poi.id,
+          position: !poi.position,
+          name: !poi.name,
+          category: !poi.category,
+          icon: !poi.icon,
+          ...(poi.type === 'place' ? { placeId: !poi.placeId } : {})
+        };
+        
+        if (Object.values(missing).some(v => v)) {
+          console.error('[RouteContext] Invalid POI found:', {
+            missingFields: missing,
+            poi: poi
+          });
+          return true;
+        }
+        return false;
+      });
+      
+      if (invalidPoi) {
+        throw new Error('Invalid POI data found - missing required fields');
+      }
         
         if (!routes.length) {
           throw new Error('No route data to save');
