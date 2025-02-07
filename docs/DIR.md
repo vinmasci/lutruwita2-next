@@ -22,7 +22,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── MIGRATIONPLAN.md           # Strategic plan for system migration
 │   ├── OLDFUNCTIONS.md            # Archive of previous implementations for reference
 │   ├── PLACE_METADATA_FIX.md     # Documentation for place metadata fixes
+│   ├── POI_DISAPPEARANCE_ANALYSIS.md # Analysis of POI visibility issues
 │   ├── POI_IMPLEMENTATION_PLAN.md # Detailed plan for Points of Interest feature
+│   ├── POINOTES.md               # General POI feature documentation and notes
 │   ├── POI_PLACES.md             # Documentation for POI places functionality
 │   ├── POI_PROGRESS_NOTES.md     # Tracking progress of POI feature development
 │   ├── ROUTE_RENDERING_DISCOVERY.md # Analysis of route rendering improvements
