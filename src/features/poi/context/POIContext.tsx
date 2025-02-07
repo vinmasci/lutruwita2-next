@@ -10,7 +10,7 @@ import {
   NewPOIInput
 } from '../types/poi.types';
 import { SavedRouteState } from '../../map/types/route.types';
-import API from '../services/poiService';
+import { usePOIService } from '../services/poiService';
 
 // Action types
 type POIAction =
@@ -27,8 +27,6 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
       const now = new Date().toISOString();
       const base = {
         id: uuidv4(),
-        createdAt: now,
-        updatedAt: now,
         ...action.payload,
       };
 
@@ -65,7 +63,6 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
             ...placeUpdates,
             type: 'place',
             placeId: placeUpdates.placeId || poi.placeId,
-            updatedAt: new Date().toISOString(),
           };
         } else {
           const draggableUpdates = updates as Partial<Omit<DraggablePOI, 'id'>>;
@@ -73,7 +70,6 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
             ...poi,
             ...draggableUpdates,
             type: 'draggable',
-            updatedAt: new Date().toISOString(),
           };
         }
       });
@@ -85,13 +81,11 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
           return {
             ...poi,
             position: action.payload.position,
-            updatedAt: new Date().toISOString(),
           } as PlaceNamePOI;
         } else {
           return {
             ...poi,
             position: action.payload.position,
-            updatedAt: new Date().toISOString(),
           } as DraggablePOI;
         }
       });
@@ -114,6 +108,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const poisRef = useRef(pois);
+  const poiService = usePOIService();
 
   // Keep ref updated with latest pois
   useEffect(() => {
@@ -123,11 +118,27 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load POIs on mount
   useEffect(() => {
     const loadPOIs = async () => {
+      if (!poiService) {
+        console.log('POI service not initialized yet');
+        return;
+      }
+
+      // Check if we already have POIs loaded
+      if (pois.length > 0) {
+        console.log('POIs already loaded, skipping fetch');
+        return;
+      }
+
       try {
         setIsLoading(true);
         // Try to load from API first
-        const serverPOIs = await API.getAllPOIs();
-        dispatch({ type: 'LOAD_POIS', payload: serverPOIs });
+        const serverPOIs = await poiService.getAllPOIs();
+        if (Array.isArray(serverPOIs)) {
+          dispatch({ type: 'LOAD_POIS', payload: serverPOIs });
+        } else {
+          console.error('Server returned invalid POIs data:', serverPOIs);
+          throw new Error('Invalid POIs data from server');
+        }
       } catch (error) {
         console.error('Error loading POIs from server:', error);
         setError(error as Error);
@@ -137,7 +148,9 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const storedData = localStorage.getItem(STORAGE_KEY);
           if (storedData) {
             const { draggable, places }: StoredPOIs = JSON.parse(storedData);
-            dispatch({ type: 'LOAD_POIS', payload: [...draggable, ...places] });
+            if (Array.isArray(draggable) && Array.isArray(places)) {
+              dispatch({ type: 'LOAD_POIS', payload: [...draggable, ...places] });
+            }
           }
         } catch (localError) {
           console.error('Error loading from localStorage:', localError);
@@ -148,7 +161,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     loadPOIs();
-  }, []);
+  }, []); // Only run on mount
 
   // Save POIs to localStorage as backup
   useEffect(() => {
@@ -168,12 +181,25 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [pois]);
 
   const addPOI = async (poi: NewPOIInput) => {
+    if (!poiService) {
+      console.log('POI service not initialized yet');
+      return;
+    }
+
     try {
+      // Generate ID first so we can use it both locally and on server
+      const id = uuidv4();
+      const now = new Date().toISOString();
+      const poiWithId: POIType = {
+        ...poi,
+        id,
+      } as POIType;
+      
       // Optimistically update local state
       dispatch({ type: 'ADD_POI', payload: poi });
       
-      // Then save to server
-      await API.createPOI(poi);
+      // Then save to server with the same ID
+      await poiService.createPOI(poiWithId);
     } catch (error) {
       console.error('Error saving POI to server:', error);
       // Note: We don't rollback the optimistic update since we have localStorage as backup
@@ -181,12 +207,17 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removePOI = async (id: string) => {
+    if (!poiService) {
+      console.log('POI service not initialized yet');
+      return;
+    }
+
     try {
       // Optimistically update local state
       dispatch({ type: 'REMOVE_POI', payload: id });
       
       // Then remove from server
-      await API.deletePOI(id);
+      await poiService.deletePOI(id);
     } catch (error) {
       console.error('Error deleting POI from server:', error);
       // Note: We don't rollback the optimistic update since we have localStorage as backup
@@ -194,12 +225,17 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePOI = async (id: string, updates: Partial<Omit<POIType, 'id'>>) => {
+    if (!poiService) {
+      console.log('POI service not initialized yet');
+      return;
+    }
+
     try {
       // Optimistically update local state
       dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
       
       // Then update server
-      await API.updatePOI(id, updates);
+      await poiService.updatePOI(id, updates);
     } catch (error) {
       console.error('Error updating POI on server:', error);
       // Note: We don't rollback the optimistic update since we have localStorage as backup
@@ -207,31 +243,43 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePOIPosition = async (id: string, position: POIPosition) => {
+    if (!poiService) {
+      console.log('POI service not initialized yet');
+      return;
+    }
+
     try {
       // Optimistically update local state
       dispatch({ type: 'UPDATE_POSITION', payload: { id, position } });
       
       // Then update server
-      await API.updatePOI(id, { position });
+      await poiService.updatePOI(id, { position });
     } catch (error) {
       console.error('Error updating POI position on server:', error);
       // Note: We don't rollback the optimistic update since we have localStorage as backup
     }
   };
 
-  // Add function to get POIs in route format
+  // Add function to get POIs in route format (as IDs)
   const getPOIsForRoute = (): SavedRouteState['pois'] => {
     console.log('[POI] getPOIsForRoute called, current pois:', pois);
+    const draggablePois = pois.filter((poi): poi is DraggablePOI => poi.type === 'draggable');
+    const placePois = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
+    
+    console.log('[POI] Filtered POIs:', { draggable: draggablePois, places: placePois });
+    
+    // Use id for both client and server since we're using client-generated UUIDs as MongoDB _id
     const result = {
-      draggable: pois.filter((poi): poi is DraggablePOI => poi.type === 'draggable'),
-      places: pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place')
+      draggable: draggablePois.map(poi => poi.id),
+      places: placePois.map(poi => poi.id)
     };
-    console.log('[POI] getPOIsForRoute returning:', result);
+    
+    console.log('[POI] getPOIsForRoute returning POI IDs:', result);
     return result;
   };
 
   // Add function to load POIs from route
-  const loadPOIsFromRoute = (routePOIs?: SavedRouteState['pois']) => {
+  const loadPOIsFromRoute = async (routePOIs?: SavedRouteState['pois']) => {
     try {
       // Handle missing POI data
       if (!routePOIs) {
@@ -245,27 +293,27 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error('Invalid POI data structure');
       }
 
-      // Validate individual POIs
-      const allPOIs = [...routePOIs.draggable, ...routePOIs.places];
-      const validPOIs = allPOIs.filter(poi => {
-        return (
-          poi &&
-          typeof poi === 'object' &&
-          'id' in poi &&
-          'type' in poi &&
-          'position' in poi &&
-          typeof poi.position === 'object' &&
-          'lat' in poi.position &&
-          'lng' in poi.position
-        );
-      });
+      // Collect all POI IDs
+      const poiIds = [
+        ...routePOIs.draggable.map(poi => typeof poi === 'string' ? poi : poi.id),
+        ...routePOIs.places.map(poi => typeof poi === 'string' ? poi : poi.id)
+      ];
 
-      if (validPOIs.length !== allPOIs.length) {
-        console.warn('[POI] Some POIs were invalid and filtered out');
+      // Fetch full POI data for IDs
+      const serverPOIs = await poiService.getAllPOIs();
+      const poiMap = new Map(serverPOIs.map(poi => [poi.id, poi]));
+
+      // Reconstruct POIs in correct order
+      const reconstructedPOIs = poiIds
+        .map(id => poiMap.get(id))
+        .filter((poi): poi is POIType => poi !== undefined);
+
+      if (reconstructedPOIs.length !== poiIds.length) {
+        console.warn('[POI] Some POIs were not found on server');
       }
 
-      console.log('[POI] Loading POIs from route:', validPOIs);
-      dispatch({ type: 'LOAD_POIS', payload: validPOIs });
+      console.log('[POI] Loading POIs from route:', reconstructedPOIs);
+      dispatch({ type: 'LOAD_POIS', payload: reconstructedPOIs });
     } catch (error) {
       console.error('[POI] Error loading POIs from route:', error);
       // Reset to empty state on error

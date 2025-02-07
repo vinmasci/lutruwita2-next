@@ -96,15 +96,13 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
       // Convert processed photos to PlacePhoto format
       const newPlacePhotos: PlacePhoto[] = processedPhotos.map(photo => ({
         url: photo.url,
-        caption: photo.caption,
-        createdAt: new Date().toISOString()
+        caption: photo.caption
       }));
 
       // Update place with new data
       await updatePlace(placeId, {
         description,
-        photos: [...existingPhotos, ...newPlacePhotos],
-        updatedAt: new Date().toISOString()
+        photos: [...existingPhotos, ...newPlacePhotos]
       });
 
       // Clear state and close drawer
@@ -327,7 +325,7 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                             name: photo.caption || `Photo ${index + 1}`,
                             url: photo.url,
                             thumbnailUrl: photo.url,
-                            dateAdded: new Date(photo.createdAt),
+                            dateAdded: new Date(),
                             hasGps: false
                           };
                           setSelectedPhoto(processedPhoto);

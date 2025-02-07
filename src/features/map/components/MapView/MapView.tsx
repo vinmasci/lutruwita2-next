@@ -748,9 +748,7 @@ function MapViewContent() {
               position: selectedPOIDetails.position,
               name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
               category: selectedPOIDetails.category,
-              icon: selectedPOIDetails.iconName,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              icon: selectedPOIDetails.iconName
             }}
           />
         )}

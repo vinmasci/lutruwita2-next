@@ -83,7 +83,7 @@ app.use((req, res, next) => {
 // Feature Routes
 app.use('/api/gpx', gpxRoutes);
 app.use('/api/routes', routeRoutes);
-app.use('/api', poiRoutes);
+app.use('/api/pois', poiRoutes);
 
 // Error handling
 app.use(errorHandler);

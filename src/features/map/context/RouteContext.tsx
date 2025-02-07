@@ -73,8 +73,8 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
         const pois = getPOIsForRoute();
         console.log('[RouteContext] POIs to save:', pois);
         
-        if (!routes.length && (!pois.draggable.length && !pois.places.length)) {
-          throw new Error('No route or POI data to save');
+        if (!routes.length) {
+          throw new Error('No route data to save');
         }
         
         setIsSaving(true);

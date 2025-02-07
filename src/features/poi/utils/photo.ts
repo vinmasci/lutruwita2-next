@@ -73,8 +73,7 @@ export const createPOIPhoto = async (file: File) => {
   const url = await convertFileToBase64(new File([resizedBlob], file.name, { type: 'image/jpeg' }));
   return {
     url,
-    caption: file.name,
-    createdAt: new Date().toISOString()
+    caption: file.name
   };
 };
 

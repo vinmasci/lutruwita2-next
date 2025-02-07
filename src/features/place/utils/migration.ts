@@ -63,8 +63,7 @@ export const migratePlaceMetadata = () => {
         name: firstPOI.name,
         description: firstPOI.description,
         photos: firstPOI.photos || [],
-        coordinates: [firstPOI.position.lng, firstPOI.position.lat],
-        updatedAt: firstPOI.updatedAt
+        coordinates: [firstPOI.position.lng, firstPOI.position.lat]
       };
     });
 

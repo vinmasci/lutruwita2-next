@@ -17,7 +17,7 @@ const photoSchema = new mongoose.Schema({
   name: { type: String, required: true },
   url: { type: String, required: true },
   thumbnailUrl: { type: String, required: true },
-  dateAdded: { type: String, required: true },
+  dateAdded: String,
   coordinates: {
     lat: Number,
     lng: Number
@@ -35,8 +35,6 @@ const poiSchema = new mongoose.Schema({
   },
   name: { type: String, required: true },
   description: String,
-  createdAt: { type: String, required: true },
-  updatedAt: { type: String, required: true },
   category: {
     type: String,
     enum: [
@@ -53,8 +51,7 @@ const poiSchema = new mongoose.Schema({
   icon: { type: String, required: true },
   photos: [{
     url: { type: String, required: true },
-    caption: String,
-    createdAt: { type: String, required: true }
+    caption: String
   }],
   style: {
     color: String,
@@ -78,14 +75,12 @@ placeNamePOISchema.add({
 const placeSchema = new mongoose.Schema({
   id: { type: String, required: true },
   name: { type: String, required: true },
-  description: String,
   photos: [{
     url: { type: String, required: true },
-    caption: String,
-    createdAt: { type: String, required: true }
+    caption: String
   }],
   coordinates: { type: [Number], required: true },
-  updatedAt: { type: String, required: true }
+  description: String
 });
 
 // Main route schema
@@ -137,27 +132,31 @@ const routeSchema = new mongoose.Schema({
         distance: { type: Number, required: true },
         grade: { type: Number, required: true }
       }],
-      // Optional analysis fields
-      totalDistance: { type: Number },
-      roughness: { type: Number },
-      difficultyRating: { type: Number },
-      surfaceQuality: { type: Number }
+      // Made explicitly optional
+      totalDistance: { type: Number, required: false },
+      roughness: { type: Number, required: false },
+      difficultyRating: { type: Number, required: false },
+      surfaceQuality: { type: Number, required: false }
     },
 
-    // Optional Mapbox matching data
+    // Made entirely optional
     mapboxMatch: {
-      geojson: { type: mongoose.Schema.Types.Mixed },
-      confidence: { type: Number },
-      matchingStatus: { 
-        type: String, 
-        enum: ['matched', 'partial', 'failed']
+      type: {
+        geojson: { type: mongoose.Schema.Types.Mixed, required: false },
+        confidence: { type: Number, required: false },
+        matchingStatus: { 
+          type: String, 
+          enum: ['matched', 'partial', 'failed'],
+          required: false
+        },
+        debugData: {
+          rawTrace: mongoose.Schema.Types.Mixed,
+          matchedTrace: mongoose.Schema.Types.Mixed,
+          matchingPoints: Number,
+          distanceDeviation: Number
+        }
       },
-      debugData: {
-        rawTrace: mongoose.Schema.Types.Mixed,
-        matchedTrace: mongoose.Schema.Types.Mixed,
-        matchingPoints: Number,
-        distanceDeviation: Number
-      }
+      required: false  // Makes the entire mapboxMatch object optional
     },
 
     // Unpaved section markers
@@ -207,8 +206,8 @@ const routeSchema = new mongoose.Schema({
   // Associated data
   photos: [photoSchema],
   pois: {
-    draggable: [draggablePOISchema],
-    places: [placeNamePOISchema]
+    draggable: [{ type: String, required: true }], // Array of POI IDs
+    places: [{ type: String, required: true }]     // Array of POI IDs
   },
   places: [placeSchema]
 }, {

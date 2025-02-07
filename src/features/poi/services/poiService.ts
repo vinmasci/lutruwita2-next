@@ -1,38 +1,109 @@
+import { useAuth0 } from '@auth0/auth0-react';
 import { POIType, NewPOIInput } from '../types/poi.types';
 
-const API = {
-  async getAllPOIs(): Promise<POIType[]> {
-    const response = await fetch('/api/pois');
-    if (!response.ok) throw new Error('Failed to fetch POIs');
-    return response.json();
-  },
+export const usePOIService = () => {
+  const { getAccessTokenSilently } = useAuth0();
+  
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/pois';
 
-  async createPOI(poi: NewPOIInput): Promise<POIType> {
-    const response = await fetch('/api/pois', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(poi),
-    });
-    if (!response.ok) throw new Error('Failed to create POI');
-    return response.json();
-  },
+  const getAuthHeaders = async () => {
+    try {
+      const token = await getAccessTokenSilently();
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      throw new Error('Authentication required');
+    }
+  };
 
-  async updatePOI(id: string, updates: Partial<POIType>): Promise<POIType> {
-    const response = await fetch(`/api/pois/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    });
-    if (!response.ok) throw new Error('Failed to update POI');
-    return response.json();
-  },
+  const handleResponse = async (response: Response) => {
+    const contentType = response.headers.get('content-type');
+    const isJson = contentType && contentType.includes('application/json');
+    
+    if (!response.ok) {
+      if (isJson) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || 'An error occurred');
+      } else {
+        const text = await response.text();
+        throw new Error(text || `HTTP error! status: ${response.status}`);
+      }
+    }
+    
+    if (isJson) {
+      return response.json();
+    }
+    return response.text();
+  };
 
-  async deletePOI(id: string): Promise<void> {
-    const response = await fetch(`/api/pois/${id}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete POI');
-  },
+  const getAllPOIs = async (): Promise<POIType[]> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(API_BASE, {
+        headers,
+        credentials: 'include'
+      });
+      return handleResponse(response);
+    } catch (error) {
+      console.error('Get POIs error:', error);
+      throw error;
+    }
+  };
+
+  const createPOI = async (poi: POIType): Promise<POIType> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(API_BASE, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(poi),
+        credentials: 'include'
+      });
+      return handleResponse(response);
+    } catch (error) {
+      console.error('Create POI error:', error);
+      throw error;
+    }
+  };
+
+  const updatePOI = async (id: string, updates: Partial<POIType>): Promise<POIType> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updates),
+        credentials: 'include'
+      });
+      return handleResponse(response);
+    } catch (error) {
+      console.error('Update POI error:', error);
+      throw error;
+    }
+  };
+
+  const deletePOI = async (id: string): Promise<void> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include'
+      });
+      await handleResponse(response);
+    } catch (error) {
+      console.error('Delete POI error:', error);
+      throw error;
+    }
+  };
+
+  return {
+    getAllPOIs,
+    createPOI,
+    updatePOI,
+    deletePOI
+  };
 };
-
-export default API;

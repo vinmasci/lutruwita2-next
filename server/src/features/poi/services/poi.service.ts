@@ -8,19 +8,25 @@ export class POIService {
 
   async createPOI(userId: string, poiData: POIType) {
     const poi = new POI({
+      _id: poiData.id, // Use client-generated UUID as _id
       ...poiData,
       userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     });
-    return poi.save();
+    
+    try {
+      const savedPoi = await poi.save();
+      return savedPoi;
+    } catch (error) {
+      console.error('Error creating POI:', error);
+      throw error;
+    }
   }
 
   async updatePOI(userId: string, id: string, updates: Partial<POIType>) {
     const poi = await POI.findOneAndUpdate(
-      { id, userId },
-      { ...updates, updatedAt: new Date().toISOString() },
-      { new: true }
+      { _id: id, userId },
+      updates,
+      { new: true, runValidators: true }
     );
     if (!poi) {
       throw new Error('POI not found');
@@ -29,7 +35,7 @@ export class POIService {
   }
 
   async deletePOI(userId: string, id: string) {
-    const poi = await POI.findOneAndDelete({ id, userId });
+    const poi = await POI.findOneAndDelete({ _id: id, userId });
     if (!poi) {
       throw new Error('POI not found');
     }

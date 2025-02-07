@@ -16,15 +16,15 @@ const asyncHandler = (fn: (req: RequestWithAuth, res: Response) => Promise<any>)
   };
 
 // Get all POIs
-router.get('/pois', asyncHandler(controller.getAll.bind(controller)));
+router.get('/', asyncHandler(controller.getAll.bind(controller)));
 
 // Create a new POI
-router.post('/pois', asyncHandler(controller.create.bind(controller)));
+router.post('/', asyncHandler(controller.create.bind(controller)));
 
 // Update a POI
-router.put('/pois/:id', asyncHandler(controller.update.bind(controller)));
+router.put('/:id', asyncHandler(controller.update.bind(controller)));
 
 // Delete a POI
-router.delete('/pois/:id', asyncHandler(controller.delete.bind(controller)));
+router.delete('/:id', asyncHandler(controller.delete.bind(controller)));
 
 export default router;

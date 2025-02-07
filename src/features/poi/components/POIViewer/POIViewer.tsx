@@ -337,16 +337,6 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
               </Box>
             </Box>
 
-            {/* Created/Updated Info */}
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="caption" color="text.secondary" display="block">
-                Created: {new Date(poi.createdAt).toLocaleString()}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block">
-                Updated: {new Date(poi.updatedAt).toLocaleString()}
-              </Typography>
-            </Box>
-
             {/* Edit/Save Controls */}
             <Box sx={{ 
               mt: 3, 

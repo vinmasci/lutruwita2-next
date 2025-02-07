@@ -7,12 +7,23 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
 const path_1 = __importDefault(require("path"));
+const mongoose_1 = __importDefault(require("mongoose"));
 const server_config_1 = require("./shared/config/server.config");
 const gpx_routes_1 = require("./features/gpx/routes/gpx.routes");
 const route_routes_1 = __importDefault(require("./features/route/routes/route.routes"));
+const poi_routes_1 = __importDefault(require("./features/poi/routes/poi.routes"));
 const error_handling_1 = require("./shared/middlewares/error-handling");
 require("dotenv/config");
 const logger_config_1 = require("./shared/config/logger.config");
+// Connect to MongoDB
+mongoose_1.default.connect(process.env.MONGODB_URI)
+    .then(() => {
+    logger_config_1.logger.info('Connected to MongoDB');
+})
+    .catch((error) => {
+    logger_config_1.logger.error('MongoDB connection error:', error);
+    process.exit(1);
+});
 // Create required directories
 const fs_1 = __importDefault(require("fs"));
 const createDirectory = (dir, name) => {
@@ -67,6 +78,7 @@ app.use((req, res, next) => {
 // Feature Routes
 app.use('/api/gpx', gpx_routes_1.gpxRoutes);
 app.use('/api/routes', route_routes_1.default);
+app.use('/api/pois', poi_routes_1.default);
 // Error handling
 app.use(error_handling_1.errorHandler);
 // Start server

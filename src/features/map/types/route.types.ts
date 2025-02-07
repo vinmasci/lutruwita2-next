@@ -36,8 +36,8 @@ export interface SavedRouteState {
   }[];
 
   pois: {
-    draggable: DraggablePOI[];
-    places: PlaceNamePOI[];
+    draggable: (DraggablePOI | string)[];  // Can be full POI objects or just IDs
+    places: (PlaceNamePOI | string)[];      // Can be full POI objects or just IDs
   };
   places: Place[];
 }

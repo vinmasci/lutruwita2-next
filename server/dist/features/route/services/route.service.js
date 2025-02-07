@@ -10,6 +10,13 @@ class RouteService {
     async saveRoute(userId, data) {
         try {
             const routeId = new mongoose_1.default.Types.ObjectId().toString();
+            console.log('[RouteService] Saving route with POIs:', data.pois);
+            // Extract POI IDs for storage - use the same ID that's used as MongoDB _id
+            const pois = {
+                draggable: data.pois?.draggable || [],
+                places: data.pois?.places || []
+            };
+            console.log('[RouteService] Storing POI references:', pois);
             const route = new route_model_1.RouteModel({
                 id: routeId,
                 userId,
@@ -19,13 +26,12 @@ class RouteService {
                 mapState: data.mapState,
                 routes: data.routes || [],
                 photos: data.photos || [],
-                pois: {
-                    draggable: data.pois?.draggable || [],
-                    places: data.pois?.places || []
-                },
+                pois,
                 places: data.places || []
             });
-            await route.save();
+            console.log('[RouteService] Route model before save:', route.toObject());
+            const savedRoute = await route.save();
+            console.log('[RouteService] Saved route:', savedRoute.toObject());
             return {
                 id: routeId,
                 message: 'Route saved successfully'
@@ -45,8 +51,37 @@ class RouteService {
             if (route.userId !== userId && !route.isPublic) {
                 throw new Error('Access denied');
             }
+            // Get route data
+            const routeData = route.toJSON();
+            console.log('[RouteService] Loading route with POI references:', routeData.pois);
+            // Fetch full POI data
+            const poiIds = [...routeData.pois.draggable, ...routeData.pois.places];
+            console.log('[RouteService] Fetching POIs with IDs:', poiIds);
+            const pois = await mongoose_1.default.model('POI').find({ _id: { $in: poiIds } });
+            console.log('[RouteService] Found POIs:', pois);
+            // Reconstruct POIs structure using _id since we're using client-generated UUIDs as MongoDB _id
+            const poiMap = new Map(pois.map(poi => [poi._id.toString(), poi]));
+            console.log('[RouteService] POI Map:', Array.from(poiMap.entries()));
+            const reconstructedPois = {
+                draggable: routeData.pois.draggable.map(id => {
+                    const poi = poiMap.get(id);
+                    if (!poi)
+                        console.log('[RouteService] Missing POI for ID:', id);
+                    return poi;
+                }).filter(Boolean),
+                places: routeData.pois.places.map(id => {
+                    const poi = poiMap.get(id);
+                    if (!poi)
+                        console.log('[RouteService] Missing POI for ID:', id);
+                    return poi;
+                }).filter(Boolean)
+            };
+            console.log('[RouteService] Reconstructed POIs:', reconstructedPois);
             return {
-                route: route.toJSON(),
+                route: {
+                    ...routeData,
+                    pois: reconstructedPois
+                },
                 message: 'Route loaded successfully'
             };
         }

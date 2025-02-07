@@ -36,7 +36,6 @@ export type POIIconName =
 export interface POIPhoto {
   url: string;
   caption?: string;
-  createdAt: string;
 }
 
 export interface BasePOI {
@@ -44,8 +43,6 @@ export interface BasePOI {
   position: POIPosition;
   name: string;
   description?: string;
-  createdAt: string;
-  updatedAt: string;
   category: POICategory;
   icon: POIIconName;
   photos?: POIPhoto[];

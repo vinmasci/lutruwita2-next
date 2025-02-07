@@ -9,12 +9,12 @@ export class RouteService {
 
       console.log('[RouteService] Saving route with POIs:', data.pois);
       
-      // Ensure POIs structure is correct
+      // Extract POI IDs for storage - use the same ID that's used as MongoDB _id
       const pois = {
         draggable: data.pois?.draggable || [],
         places: data.pois?.places || []
       };
-      console.log('[RouteService] Structured POIs:', pois);
+      console.log('[RouteService] Storing POI references:', pois);
 
       const route = new RouteModel({
         id: routeId,
@@ -56,11 +56,39 @@ export class RouteService {
         throw new Error('Access denied');
       }
 
+      // Get route data
       const routeData = route.toJSON() as SavedRouteState;
-      console.log('[RouteService] Loading route with POIs:', routeData.pois);
+      console.log('[RouteService] Loading route with POI references:', routeData.pois);
+
+      // Fetch full POI data
+      const poiIds = [...routeData.pois.draggable, ...routeData.pois.places];
+      console.log('[RouteService] Fetching POIs with IDs:', poiIds);
+      const pois = await mongoose.model('POI').find({ _id: { $in: poiIds } });
+      console.log('[RouteService] Found POIs:', pois);
+
+      // Reconstruct POIs structure using _id since we're using client-generated UUIDs as MongoDB _id
+      const poiMap = new Map(pois.map(poi => [poi._id.toString(), poi]));
+      console.log('[RouteService] POI Map:', Array.from(poiMap.entries()));
       
+      const reconstructedPois = {
+        draggable: routeData.pois.draggable.map(id => {
+          const poi = poiMap.get(id);
+          if (!poi) console.log('[RouteService] Missing POI for ID:', id);
+          return poi;
+        }).filter(Boolean),
+        places: routeData.pois.places.map(id => {
+          const poi = poiMap.get(id);
+          if (!poi) console.log('[RouteService] Missing POI for ID:', id);
+          return poi;
+        }).filter(Boolean)
+      };
+      console.log('[RouteService] Reconstructed POIs:', reconstructedPois);
+
       return {
-        route: routeData,
+        route: {
+          ...routeData,
+          pois: reconstructedPois
+        },
         message: 'Route loaded successfully'
       };
     } catch (error) {

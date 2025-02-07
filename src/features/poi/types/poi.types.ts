@@ -39,16 +39,14 @@ export type POIIconName =
 export interface POIPhoto {
   url: string;
   caption?: string;
-  createdAt: string;
 }
 
 export interface BasePOI {
   id: string;
+  _id?: string; // MongoDB _id field
   position: POIPosition;
   name: string;
   description?: string;
-  createdAt: string;
-  updatedAt: string;
   category: POICategory;
   icon: POIIconName;
   photos?: POIPhoto[];
@@ -70,8 +68,8 @@ export interface PlaceNamePOI extends BasePOI {
 export type POIType = DraggablePOI | PlaceNamePOI;
 
 export type NewPOIInput = 
-  | (Omit<DraggablePOI, 'id' | 'createdAt' | 'updatedAt'>) 
-  | (Omit<PlaceNamePOI, 'id' | 'createdAt' | 'updatedAt'>);
+  | (Omit<DraggablePOI, 'id'>) 
+  | (Omit<PlaceNamePOI, 'id'>);
 
 export interface POIContextType {
   pois: POIType[];

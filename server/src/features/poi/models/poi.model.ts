@@ -1,71 +1,52 @@
 import mongoose from 'mongoose';
-import { POICategory, POIIconName } from '../../../shared/types/poi.types';
-
-const photoSchema = new mongoose.Schema({
-  url: { type: String, required: true },
-  caption: String,
-  createdAt: { type: String, required: true }
-});
-
-const styleSchema = new mongoose.Schema({
-  color: String,
-  size: Number
-});
 
 const poiSchema = new mongoose.Schema({
-  id: { type: String, required: true },
-  type: {
-    type: String,
-    enum: ['draggable', 'place'],
-    required: true
-  },
+  _id: { type: String, required: true }, // Use client-generated UUID as _id
+  userId: { type: String, required: true },
   position: {
     lat: { type: Number, required: true },
     lng: { type: Number, required: true }
   },
   name: { type: String, required: true },
+  type: { type: String, required: true, enum: ['draggable', 'place'] },
+  category: { type: String, required: true },
+  icon: { type: String, required: true },
+  placeId: { 
+    type: String, 
+    validate: {
+      validator: function(this: any, v: string | undefined) {
+        if (this.type === 'place') {
+          return typeof v === 'string' && v.length > 0;
+        }
+        return true;
+      } as (this: any, v: string | undefined) => boolean,
+      message: 'placeId is required for place type POIs'
+    }
+  },
+  
+  // Optional fields
   description: String,
-  category: {
-    type: String,
-    required: true,
-    enum: [
-      'road-information',
-      'accommodation',
-      'food-drink',
-      'natural-features',
-      'town-services',
-      'transportation',
-      'event-information'
-    ]
-  },
-  icon: {
-    type: String,
-    required: true
-  },
-  photos: [photoSchema],
-  style: styleSchema,
-  placeId: String, // Only for place type POIs
-  userId: { type: String, required: true }, // Added for authentication
-  createdAt: { type: Date, required: true },
-  updatedAt: { type: Date, required: true }
-}, { 
-  timestamps: true,
+  photos: [{
+    url: String,
+    caption: String
+  }],
+  style: {
+    color: String,
+    size: Number
+  }
+}, {
   toJSON: {
+    virtuals: true,
     transform: function(doc, ret) {
-      // Convert MongoDB _id to id if needed
-      if (!ret.id && ret._id) {
-        ret.id = ret._id.toString();
-      }
+      ret.id = ret._id.toString();
       delete ret._id;
       delete ret.__v;
+      return ret;
     }
   }
 });
 
-// Indexes
-poiSchema.index({ id: 1 });
-poiSchema.index({ userId: 1 });
-poiSchema.index({ type: 1 });
+// Add index for geospatial queries
 poiSchema.index({ 'position.lat': 1, 'position.lng': 1 });
 
 export const POI = mongoose.model('POI', poiSchema);

@@ -5,12 +5,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RouteModel = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
+// These surface types are from MapTiler source - do not modify without checking MapTiler data
+const VALID_SURFACE_TYPES = [
+    // Paved surfaces
+    'paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar', 'chipseal',
+    // Unpaved surfaces
+    'unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth', 'ground', 'sand', 'grass',
+    // Highway types
+    'track', 'trail', 'path'
+];
+// Photo schema - used for route photo attachments
 const photoSchema = new mongoose_1.default.Schema({
     id: { type: String, required: true },
     name: { type: String, required: true },
     url: { type: String, required: true },
     thumbnailUrl: { type: String, required: true },
-    dateAdded: { type: String, required: true },
+    dateAdded: String,
     coordinates: {
         lat: Number,
         lng: Number
@@ -18,6 +28,7 @@ const photoSchema = new mongoose_1.default.Schema({
     rotation: Number,
     altitude: Number
 });
+// POI base schema - for points of interest along routes
 const poiSchema = new mongoose_1.default.Schema({
     id: { type: String, required: true },
     position: {
@@ -26,8 +37,6 @@ const poiSchema = new mongoose_1.default.Schema({
     },
     name: { type: String, required: true },
     description: String,
-    createdAt: { type: String, required: true },
-    updatedAt: { type: String, required: true },
     category: {
         type: String,
         enum: [
@@ -44,14 +53,14 @@ const poiSchema = new mongoose_1.default.Schema({
     icon: { type: String, required: true },
     photos: [{
             url: { type: String, required: true },
-            caption: String,
-            createdAt: { type: String, required: true }
+            caption: String
         }],
     style: {
         color: String,
         size: Number
     }
 });
+// POI variants
 const draggablePOISchema = poiSchema.clone();
 draggablePOISchema.add({
     type: { type: String, enum: ['draggable'], required: true }
@@ -61,18 +70,18 @@ placeNamePOISchema.add({
     type: { type: String, enum: ['place'], required: true },
     placeId: { type: String, required: true }
 });
+// Places schema - for named locations
 const placeSchema = new mongoose_1.default.Schema({
     id: { type: String, required: true },
     name: { type: String, required: true },
-    description: String,
     photos: [{
             url: { type: String, required: true },
-            caption: String,
-            createdAt: { type: String, required: true }
+            caption: String
         }],
     coordinates: { type: [Number], required: true },
-    updatedAt: { type: String, required: true }
+    description: String
 });
+// Main route schema
 const routeSchema = new mongoose_1.default.Schema({
     id: { type: String, required: true },
     name: { type: String, required: true },
@@ -83,6 +92,7 @@ const routeSchema = new mongoose_1.default.Schema({
     },
     isPublic: { type: Boolean, required: true },
     userId: { type: String, required: true },
+    // Map view state
     mapState: {
         zoom: { type: Number, required: true },
         center: { type: [Number], required: true },
@@ -90,6 +100,7 @@ const routeSchema = new mongoose_1.default.Schema({
         pitch: { type: Number, required: true },
         style: String
     },
+    // Route data array - can contain multiple routes
     routes: [{
             id: { type: String, required: true },
             routeId: String,
@@ -100,9 +111,14 @@ const routeSchema = new mongoose_1.default.Schema({
             gpxData: { type: String, required: true },
             rawGpx: { type: String, required: true },
             geojson: { type: mongoose_1.default.Schema.Types.Mixed, required: true },
+            // Surface information - core part of route analysis
             surface: {
                 surfaceTypes: [{
-                        type: { type: String, enum: ['road', 'trail', 'water', 'unknown'], required: true },
+                        type: {
+                            type: String,
+                            enum: VALID_SURFACE_TYPES,
+                            required: true
+                        },
                         percentage: { type: Number, required: true },
                         distance: { type: Number, required: true }
                     }],
@@ -111,28 +127,43 @@ const routeSchema = new mongoose_1.default.Schema({
                         distance: { type: Number, required: true },
                         grade: { type: Number, required: true }
                     }],
-                totalDistance: { type: Number, required: true },
-                roughness: { type: Number, required: true },
-                difficultyRating: { type: Number, required: true },
-                surfaceQuality: { type: Number, required: true }
+                // Made explicitly optional
+                totalDistance: { type: Number, required: false },
+                roughness: { type: Number, required: false },
+                difficultyRating: { type: Number, required: false },
+                surfaceQuality: { type: Number, required: false }
             },
+            // Made entirely optional
             mapboxMatch: {
-                geojson: { type: mongoose_1.default.Schema.Types.Mixed, required: true },
-                confidence: { type: Number, required: true },
-                matchingStatus: { type: String, enum: ['matched', 'partial', 'failed'], required: true },
-                debugData: {
-                    rawTrace: mongoose_1.default.Schema.Types.Mixed,
-                    matchedTrace: mongoose_1.default.Schema.Types.Mixed,
-                    matchingPoints: Number,
-                    distanceDeviation: Number
-                }
+                type: {
+                    geojson: { type: mongoose_1.default.Schema.Types.Mixed, required: false },
+                    confidence: { type: Number, required: false },
+                    matchingStatus: {
+                        type: String,
+                        enum: ['matched', 'partial', 'failed'],
+                        required: false
+                    },
+                    debugData: {
+                        rawTrace: mongoose_1.default.Schema.Types.Mixed,
+                        matchedTrace: mongoose_1.default.Schema.Types.Mixed,
+                        matchingPoints: Number,
+                        distanceDeviation: Number
+                    }
+                },
+                required: false // Makes the entire mapboxMatch object optional
             },
+            // Unpaved section markers
             unpavedSections: [{
                     startIndex: { type: Number, required: true },
                     endIndex: { type: Number, required: true },
                     coordinates: { type: [[Number]], required: true },
-                    surfaceType: { type: String, required: true }
+                    surfaceType: {
+                        type: String,
+                        enum: VALID_SURFACE_TYPES,
+                        required: true
+                    }
                 }],
+            // Route statistics
             statistics: {
                 totalDistance: { type: Number, required: true },
                 elevationGain: { type: Number, required: true },
@@ -143,6 +174,7 @@ const routeSchema = new mongoose_1.default.Schema({
                 movingTime: { type: Number, required: true },
                 totalTime: { type: Number, required: true }
             },
+            // Processing status
             status: {
                 processingState: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], required: true },
                 progress: { type: Number, required: true },
@@ -152,6 +184,7 @@ const routeSchema = new mongoose_1.default.Schema({
                     details: String
                 }
             },
+            // Debug information
             debug: {
                 rawTrace: mongoose_1.default.Schema.Types.Mixed,
                 matchedTrace: mongoose_1.default.Schema.Types.Mixed,
@@ -159,10 +192,11 @@ const routeSchema = new mongoose_1.default.Schema({
                 warnings: [String]
             }
         }],
+    // Associated data
     photos: [photoSchema],
     pois: {
-        draggable: [draggablePOISchema],
-        places: [placeNamePOISchema]
+        draggable: [{ type: String, required: true }], // Array of POI IDs
+        places: [{ type: String, required: true }] // Array of POI IDs
     },
     places: [placeSchema]
 }, {
@@ -176,7 +210,7 @@ const routeSchema = new mongoose_1.default.Schema({
         }
     }
 });
-// Indexes
+// Indexes for efficient queries
 routeSchema.index({ userId: 1 });
 routeSchema.index({ type: 1 });
 routeSchema.index({ isPublic: 1 });

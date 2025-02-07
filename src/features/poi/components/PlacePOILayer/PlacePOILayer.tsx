@@ -145,8 +145,7 @@ export const PlacePOILayer: React.FC = () => {
         name: place.name,
         coordinates: place.coordinates,
         description: '',
-        photos: [],
-        updatedAt: new Date().toISOString()
+        photos: []
       };
 
       // If this is a new place, save it first
@@ -242,8 +241,7 @@ export const PlacePOILayer: React.FC = () => {
             name: poi.name,
             coordinates: [poi.position.lng, poi.position.lat],
             description: '',
-            photos: [],
-            updatedAt: new Date().toISOString()
+            photos: []
           };
 
           // If this is a new place, save it first
