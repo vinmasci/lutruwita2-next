@@ -42,6 +42,7 @@ export interface POIPhoto {
 }
 
 export interface BasePOI {
+  id: string;
   position: POIPosition;
   name: string;
   description?: string;
@@ -64,6 +65,8 @@ export interface PlaceNamePOI extends BasePOI {
 }
 
 export type POIType = DraggablePOI | PlaceNamePOI;
+
+export type NewPOIInput = Omit<DraggablePOI, 'id'> | Omit<PlaceNamePOI, 'id'>;
 
 export interface POIContextType {
   pois: POIType[];

@@ -78,6 +78,10 @@ const saveCurrentState = useCallback(
       // Validate POIs
       const allPois = [...pois.draggable, ...pois.places];
       const invalidPoi = allPois.find(poi => {
+        // Skip validation for string POIs (these are just IDs)
+        if (typeof poi === 'string') return false;
+        
+        // Now TypeScript knows poi is a DraggablePOI | PlaceNamePOI
         const missing = {
           id: !poi.id,
           position: !poi.position,
@@ -171,11 +175,26 @@ const saveCurrentState = useCallback(
         console.log('[RouteContext] Route loaded from DB:', route);
         console.log('[RouteContext] Route.routes:', route.routes);
 
-        // Update route state
+        // Update route state - preserve structure for future additions
         console.log('[RouteContext] Setting routes state');
-        setRoutes(route.routes);
+        setRoutes(prevRoutes => {
+          // Filter out any routes that would conflict with loaded routes
+          const nonConflicting = prevRoutes.filter(r => 
+            !route.routes.some(loadedRoute => loadedRoute.id === r.id)
+          );
+          return [...nonConflicting, ...route.routes];
+        });
+        
+        // Set current route while maintaining loaded state
         console.log('[RouteContext] Setting current route:', route.routes[0] || null);
-        setCurrentRoute(route.routes[0] || null);
+        if (route.routes[0]) {
+          setCurrentRoute({
+            ...route.routes[0],
+            routes: route.routes // Preserve full route collection reference
+          });
+        } else {
+          setCurrentRoute(null);
+        }
         
         // Update map state if available
         if (map && route.mapState) {

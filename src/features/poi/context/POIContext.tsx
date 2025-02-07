@@ -209,18 +209,24 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadPOIsFromRoute = (routePOIs?: SavedRouteState['pois']) => {
     console.log('[POIContext] Loading POIs from route:', routePOIs);
     if (!routePOIs) {
-      console.log('[POIContext] No POIs to load, clearing state');
-      dispatch({ type: 'LOAD_POIS', payload: [] });
+      console.log('[POIContext] No POIs to load, keeping existing state');
       return;
     }
 
-    const allPOIs: POIType[] = [
+    // Process new POIs
+    const newPOIs: POIType[] = [
       ...routePOIs.draggable.map(poi => typeof poi === 'string' ? null : poi),
       ...routePOIs.places.map(poi => typeof poi === 'string' ? null : poi)
     ].filter((poi): poi is POIType => poi !== null);
     
-    console.log('[POIContext] Loading POIs into state:', allPOIs);
-    dispatch({ type: 'LOAD_POIS', payload: allPOIs });
+    // Merge with existing POIs
+    dispatch({ type: 'LOAD_POIS', payload: pois.concat(
+      newPOIs.filter(newPoi => 
+        !pois.some(existingPoi => existingPoi.id === newPoi.id)
+      )
+    )});
+    
+    console.log('[POIContext] Merged POIs into state');
   };
 
   return (
