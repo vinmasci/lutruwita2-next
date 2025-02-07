@@ -13,7 +13,6 @@ const VALID_SURFACE_TYPES = [
 
 // Photo schema - used for route photo attachments
 const photoSchema = new mongoose.Schema({
-  id: { type: String, required: true },
   name: { type: String, required: true },
   url: { type: String, required: true },
   thumbnailUrl: { type: String, required: true },
@@ -28,7 +27,6 @@ const photoSchema = new mongoose.Schema({
 
 // POI base schema - for points of interest along routes
 const poiSchema = new mongoose.Schema({
-  id: { type: String, required: true },
   position: {
     lat: { type: Number, required: true },
     lng: { type: Number, required: true }
@@ -73,7 +71,6 @@ placeNamePOISchema.add({
 
 // Places schema - for named locations
 const placeSchema = new mongoose.Schema({
-  id: { type: String, required: true },
   name: { type: String, required: true },
   photos: [{
     url: { type: String, required: true },
@@ -85,7 +82,6 @@ const placeSchema = new mongoose.Schema({
 
 // Main route schema
 const routeSchema = new mongoose.Schema({
-  id: { type: String, required: true },
   name: { type: String, required: true },
   type: {
     type: String,
@@ -106,7 +102,6 @@ const routeSchema = new mongoose.Schema({
 
   // Route data array - can contain multiple routes
   routes: [{
-    id: { type: String, required: true },
     routeId: String,
     matchedIndices: [Number],
     name: { type: String, required: true },
@@ -206,18 +201,50 @@ const routeSchema = new mongoose.Schema({
   // Associated data
   photos: [photoSchema],
   pois: {
-    draggable: [{ type: String, required: true }], // Array of POI IDs
-    places: [{ type: String, required: true }]     // Array of POI IDs
+    draggable: [draggablePOISchema],
+    places: [placeNamePOISchema]
   },
   places: [placeSchema]
 }, {
   timestamps: true,
   toJSON: {
     transform: function(doc: any, ret: any) {
+      ret.id = ret._id.toString();
       ret.createdAt = ret.createdAt.toISOString();
       ret.updatedAt = ret.updatedAt.toISOString();
-      delete ret.__v;
+      
+      // Transform nested documents
+      if (ret.photos) {
+        ret.photos = ret.photos.map((photo: any) => ({
+          ...photo,
+          id: photo._id.toString()
+        }));
+      }
+      
+      if (ret.pois) {
+        if (ret.pois.draggable) {
+          ret.pois.draggable = ret.pois.draggable.map((poi: any) => ({
+            ...poi,
+            id: poi._id.toString()
+          }));
+        }
+        if (ret.pois.places) {
+          ret.pois.places = ret.pois.places.map((poi: any) => ({
+            ...poi,
+            id: poi._id.toString()
+          }));
+        }
+      }
+      
+      if (ret.places) {
+        ret.places = ret.places.map((place: any) => ({
+          ...place,
+          id: place._id.toString()
+        }));
+      }
+
       delete ret._id;
+      delete ret.__v;
     }
   }
 });

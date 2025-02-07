@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Drawer } from '@mui/material';
 import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
+import { useRouteContext } from '../../../map/context/RouteContext';
 import { POIDrawerProps, POIDrawerState, POIFormData } from './types';
 import { StyledDrawer } from './POIDrawer.styles';
 import { createPOIPhotos } from '../../utils/photo';
-import { POI_ICONS } from '../../constants/poi-icons';
+import { POI_ICONS, getIconDefinition } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
 import PlacePOIIconSelection from '../PlacePOIIconSelection';
@@ -14,6 +15,7 @@ import { PlaceLabel, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 
 const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   const { addPOI } = usePOIContext();
+  const { currentRoute } = useRouteContext();
   const [selectedPlace, setSelectedPlace] = useState<PlaceLabel | null>(null);
   const [state, setState] = React.useState<POIDrawerState>({
     mode: null,
@@ -26,6 +28,9 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     isSubmitting: false,
     error: null,
   });
+
+  // State to store draggable POI data that will be displayed and saved to MongoDB
+  const [draggablePoiData, setDraggablePoiData] = React.useState<any[]>([]);
 
   // Reset state when drawer closes
   React.useEffect(() => {
@@ -98,20 +103,13 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     const category = POI_ICONS.find((icon_def) => icon_def.name === icon)?.category;
     if (!icon || !category) return;
 
+    console.log('[POIDrawer] Handling icon select:', { icon, category });
+
     if (state.mode === 'place' && selectedPlace) {
-      // Create place POI
-      addPOI({
-        type: 'place',
-        placeId: selectedPlace.id,
-        name: selectedPlace.name,
-        position: {
-          lat: selectedPlace.coordinates[1],
-          lng: selectedPlace.coordinates[0]
-        },
-        category,
-        icon,
-      });
+      // Place POIs are handled by PlacePOIDetailsDrawer
+      return;
     } else {
+      console.log('[POIDrawer] Setting drag preview for map POI:', { icon, category });
       // Set drag preview for map POI
       setDragPreview({ icon, category });
     }
@@ -121,9 +119,40 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
 
   const handleStartDrag = (icon: POIDrawerState['selectedIcon'], category: POIDrawerState['selectedCategory']) => {
     if (!icon || !category) return;
-    // Set drag preview
-    setDragPreview({ icon, category });
+    // Set drag preview with POI data
+    const dragPreviewData = {
+      icon,
+      category,
+      type: 'draggable' as const,
+      name: getIconDefinition(icon)?.label || 'New POI'
+    };
+    setDragPreview(dragPreviewData);
+
+    // Add to draggable POI data array that will be displayed
+    setDraggablePoiData(prev => [...prev, dragPreviewData]);
   };
+
+  // Handle when a draggable POI is dropped on the map
+  useEffect(() => {
+    const handleDrop = (e: CustomEvent) => {
+      const { lat, lng } = e.detail;
+      const lastPoi = draggablePoiData[draggablePoiData.length - 1];
+      if (lastPoi && lastPoi.type === 'draggable') {
+        // Update the last POI with its final position
+        const updatedPoi = {
+          ...lastPoi,
+          position: { lat, lng }
+        };
+        setDraggablePoiData(prev => [...prev.slice(0, -1), updatedPoi]);
+        addPOI(updatedPoi);
+      }
+    };
+
+    window.addEventListener('poi-dropped', handleDrop as EventListener);
+    return () => {
+      window.removeEventListener('poi-dropped', handleDrop as EventListener);
+    };
+  }, [draggablePoiData, addPOI]);
 
   const handleIconBack = () => {
     setState(prev => ({
@@ -181,6 +210,26 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     >
       <StyledDrawer>
         {renderContent()}
+        
+        {/* Display draggable POI data that will be saved to MongoDB */}
+        <div 
+          id="poi-data-for-mongo"
+          style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: '#1e1e1e',
+            color: '#fff',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            borderRadius: '4px',
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}
+        >
+          {JSON.stringify(draggablePoiData, null, 2)}
+        </div>
       </StyledDrawer>
     </Drawer>
   );

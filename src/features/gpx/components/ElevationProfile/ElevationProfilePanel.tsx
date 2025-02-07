@@ -15,11 +15,6 @@ export const ElevationProfilePanel = ({
   route,
   header
 }: ElevationProfilePanelProps) => {
-  console.log('[ElevationProfilePanel] Rendering:', {
-    hasRoute: !!route,
-    routeId: route?.id
-  });
-
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (

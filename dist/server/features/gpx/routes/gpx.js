@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import fileUpload from 'express-fileupload';
-import { useGpxProcessingApi } from '../services/gpxService';
+import { useGpxProcessingApi } from '../services/gpxService.ts';
 import { HttpError } from '@/types/api.types';
 const router = Router();
 const { processGpxFile } = useGpxProcessingApi();

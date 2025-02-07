@@ -11,7 +11,7 @@ export const useRouteService = () => {
   const { getAccessTokenSilently } = useAuth0();
   
   // Use environment variable for API base
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/routes';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/routes` : 'http://localhost:8080/api/routes';
 
   const getAuthHeaders = async () => {
     try {
@@ -51,11 +51,16 @@ export const useRouteService = () => {
   ): Promise<SaveRouteResponse> => {
     try {
       console.log('[routeService] Starting save route...');
-      const headers = await getAuthHeaders();
+      console.log('[routeService] POIs to save:', {
+        draggable: routeData.pois.draggable.length + ' POIs',
+        places: routeData.pois.places.length + ' POIs'
+      });
+      console.log('[routeService] POI details:', routeData.pois);
       
+      const headers = await getAuthHeaders();
       console.log('[routeService] Making API call to:', API_BASE);
       console.log('[routeService] Request headers:', headers);
-      console.log('[routeService] Request body:', routeData);
+      console.log('[routeService] Request body:', JSON.stringify(routeData, null, 2));
 
       const response = await fetch(`${API_BASE}/save`, {
         method: 'POST',
@@ -65,7 +70,10 @@ export const useRouteService = () => {
       });
 
       console.log('[routeService] Save response status:', response.status);
-      return handleResponse(response);
+      const result = await handleResponse(response);
+      console.log('[routeService] Server response:', result);
+      console.log('[routeService] POIs have been saved to MongoDB');
+      return result;
     } catch (error) {
       console.error('Save route error:', error);
       throw error;

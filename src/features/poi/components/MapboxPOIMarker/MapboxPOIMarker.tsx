@@ -14,14 +14,6 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
   selected,
   className,
 }) => {
-  // Debug logging for initial props
-  console.log('MapboxPOIMarker render:', {
-    poiId: poi.id,
-    position: poi.position,
-    type: poi.type,
-    category: poi.category,
-    selected,
-  });
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const isDraggable = poi.type === 'draggable';
   const iconDefinition = getIconDefinition(poi.icon);
@@ -56,21 +48,11 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
   }, [map]);
 
   useEffect(() => {
-    console.log('MapboxPOIMarker effect triggered:', {
-      poiId: poi.id,
-      hasMap: !!map,
-      currentMarker: !!markerRef.current,
-    });
-
     if (!map) return;
 
     // Remove existing marker if it exists
     if (markerRef.current) {
       const oldPos = markerRef.current.getLngLat();
-      console.log('Removing existing marker:', {
-        poiId: poi.id,
-        oldPosition: oldPos,
-      });
       markerRef.current.remove();
       markerRef.current = null;
     }
@@ -89,82 +71,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
       </div>
     `;
 
-    // Debug map state and viewport
-    try {
-      const mapCenter = map.getCenter();
-      const mapBounds = map.getBounds();
-      const viewport = {
-        zoom: map.getZoom(),
-        center: [mapCenter.lng, mapCenter.lat],
-        bounds: mapBounds ? {
-          sw: [mapBounds.getWest(), mapBounds.getSouth()],
-          ne: [mapBounds.getEast(), mapBounds.getNorth()]
-        } : null,
-        pitch: map.getPitch(),
-        bearing: map.getBearing()
-      };
-      console.log('Map viewport:', viewport);
-
-      // Get map state
-      const zoom = map.getZoom();
-      const scale = Math.pow(2, zoom);
-      const containerPoint = map.project([poi.position.lng, poi.position.lat]);
-      const lngLat = map.unproject(containerPoint);
-
-      // Debug coordinate transformations
-      console.log('Coordinate transformations:', {
-        poiId: poi.id,
-        original: {
-          lng: poi.position.lng,
-          lat: poi.position.lat
-        },
-        projected: containerPoint,
-        unprojected: lngLat,
-        delta: {
-          lng: lngLat.lng - poi.position.lng,
-          lat: lngLat.lat - poi.position.lat
-        },
-        zoom,
-        scale
-      });
-
-      // Create marker with original config
-      console.log('Creating new marker:', {
-        poiId: poi.id,
-        position: poi.position,
-        isDraggable,
-        inBounds: mapBounds ? mapBounds.contains(poi.position) : null,
-        zoom,
-        scale,
-        projectedPosition: containerPoint
-      });
-    } catch (error) {
-      console.error('Error during debug logging:', error);
-    }
-
-    try {
-      // Get coordinate transformations for debugging
-      const originalPoint = map.project([poi.position.lng, poi.position.lat]);
-      const zoom = map.getZoom();
-      const worldSize = 512 * Math.pow(2, zoom);
-      const mercatorScale = worldSize / 360;
-      const mercatorX = (poi.position.lng + 180) * mercatorScale;
-      const mercatorY = (180 - (180 / Math.PI * Math.log(Math.tan(Math.PI / 4 + poi.position.lat * Math.PI / 360)))) * mercatorScale;
-      
-      console.log('Coordinate analysis:', {
-        poiId: poi.id,
-        original: poi.position,
-        screen: originalPoint,
-        mercator: { x: mercatorX, y: mercatorY },
-        worldSize,
-        camera: {
-          zoom,
-          pitch: map.getPitch(),
-          bearing: map.getBearing(),
-          center: map.getCenter()
-        }
-      });
-
+      try {
       // Create marker with viewport alignment
       markerRef.current = new mapboxgl.Marker({
         element: el,
@@ -177,52 +84,6 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
         .setLngLat(poi.position)
         .addTo(map);
 
-      // Debug marker positioning
-      const markerElement = markerRef.current.getElement();
-      const markerPos = markerRef.current.getLngLat();
-      const markerPixel = map.project([markerPos.lng, markerPos.lat]);
-      const markerBounds = markerElement.getBoundingClientRect();
-      const mapBounds = map.getCanvas().getBoundingClientRect();
-      
-      console.log('Marker positioning:', {
-        poiId: poi.id,
-        position: {
-          geographic: markerPos,
-          pixel: markerPixel,
-          screen: {
-            left: markerBounds.left - mapBounds.left,
-            top: markerBounds.top - mapBounds.top,
-            width: markerBounds.width,
-            height: markerBounds.height
-          }
-        },
-        style: {
-          transform: markerElement.style.transform,
-          position: window.getComputedStyle(markerElement).position
-        },
-        map: {
-          zoom: map.getZoom(),
-          center: map.getCenter(),
-          bearing: map.getBearing(),
-          pitch: map.getPitch()
-        }
-      });
-
-      // Verify marker position and pixel coordinates
-      if (markerRef.current) {
-        const actualPos = markerRef.current.getLngLat();
-        const pixelPos = map.project([actualPos.lng, actualPos.lat]);
-        const currentZoom = map.getZoom();
-        console.log('Marker verification:', {
-          poiId: poi.id,
-          intended: poi.position,
-          actual: actualPos,
-          pixelCoordinates: pixelPos,
-          matches: actualPos.lng === poi.position.lng && actualPos.lat === poi.position.lat,
-          zoom: currentZoom,
-          scale: Math.pow(2, currentZoom)
-        });
-      }
     } catch (error) {
       console.error('Error creating marker:', error);
     }

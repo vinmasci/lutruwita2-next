@@ -7,7 +7,6 @@ import mongoose from 'mongoose';
 import { SERVER_CONFIG } from './shared/config/server.config';
 import { gpxRoutes } from './features/gpx/routes/gpx.routes';
 import routeRoutes from './features/route/routes/route.routes';
-import poiRoutes from './features/poi/routes/poi.routes';
 import { errorHandler } from './shared/middlewares/error-handling';
 import 'dotenv/config';
 
@@ -83,7 +82,6 @@ app.use((req, res, next) => {
 // Feature Routes
 app.use('/api/gpx', gpxRoutes);
 app.use('/api/routes', routeRoutes);
-app.use('/api/pois', poiRoutes);
 
 // Error handling
 app.use(errorHandler);

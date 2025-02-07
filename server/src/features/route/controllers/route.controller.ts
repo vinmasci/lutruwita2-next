@@ -25,7 +25,14 @@ export class RouteController {
         });
       }
 
+      console.log('[RouteController] Starting save route...');
       const { name, type, isPublic, mapState, routes, photos, pois, places } = req.body;
+
+      console.log('[RouteController] POIs received:', {
+        draggable: pois?.draggable?.length || 0,
+        places: pois?.places?.length || 0
+      });
+      console.log('[RouteController] Full POI data:', pois);
 
       // Validate mapState if provided
       if (mapState) {
@@ -54,10 +61,14 @@ export class RouteController {
         places
       };
 
+      console.log('[RouteController] Saving route to database...');
       const result = await this.routeService.saveRoute(userId, routeToSave);
+      console.log('[RouteController] Route saved successfully. Result:', result);
+      console.log('[RouteController] POIs have been saved to MongoDB');
       res.status(201).json(result);
     } catch (error) {
-      console.error('Save route error:', error);
+      console.error('[RouteController] Save route error:', error);
+      console.error('[RouteController] Error details:', error instanceof Error ? error.stack : 'Unknown error');
       res.status(500).json({
         error: 'Failed to save route',
         details: error instanceof Error ? error.message : 'Unknown error'

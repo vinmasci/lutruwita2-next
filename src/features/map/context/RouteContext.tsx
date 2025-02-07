@@ -70,8 +70,9 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
     ) => {
       try {
         console.log('[RouteContext] Starting save with:', { name, type, isPublic });
+        console.log('[RouteContext] Getting POIs from local state...');
         const pois = getPOIsForRoute();
-        console.log('[RouteContext] POIs to save:', pois);
+        console.log('[RouteContext] POIs retrieved:', pois);
         
         if (!routes.length) {
           throw new Error('No route data to save');
@@ -91,7 +92,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
             center: [map.getCenter().lng, map.getCenter().lat],
             bearing: map.getBearing(),
             pitch: map.getPitch(),
-            style: map.getStyle()?.name
+            style: map.getStyle()?.name || undefined
           } : {
             zoom: 0,
             center: [0, 0],
@@ -110,19 +111,16 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
             altitude: photo.altitude,
             hasGps: !!photo.coordinates
           })),
-          pois: (() => {
-            console.log('[RouteContext] Getting POIs for route...');
-            const pois = getPOIsForRoute();
-            console.log('[RouteContext] POIs to save:', pois);
-            return pois;
-          })(),
+          pois: pois, // Use the POIs we already retrieved with the correct routeId
           places: Object.values(places),
         };
 
         console.log('[RouteContext] Full route state to save:', JSON.stringify(routeState, null, 2));
         console.log('[RouteContext] POIs in route state:', routeState.pois);
+        console.log('[RouteContext] Sending save request to server...');
         const result = await routeService.saveRoute(routeState);
-        console.log('[RouteContext] Save successful:', result);
+        console.log('[RouteContext] Save successful. Server response:', result);
+        console.log('[RouteContext] POIs have been saved to MongoDB');
         
         // Refresh the routes list
         await listRoutes();

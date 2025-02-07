@@ -437,15 +437,21 @@ function MapViewContent() {
     if (!selectedPOIDetails) return;
 
     try {
+      // Get current route ID
+      const currentRouteId = currentRoute?.routeId || `route-${currentRoute?.id}`;
+      
       // Create POI with all details
-      addPOI({
-        type: 'draggable',
+      const poiDetails = {
+        type: 'draggable' as const,
         position: selectedPOIDetails.position,
         name: details.name,
         description: details.description,
         category: selectedPOIDetails.category,
         icon: selectedPOIDetails.iconName,
-      });
+      };
+
+      console.log('[POI_DETAILS_FOR_MONGODB]', JSON.stringify(poiDetails, null, 2));
+      addPOI(poiDetails);
 
       // Clear temporary marker and close drawer
       setSelectedPOIDetails(null);
@@ -795,14 +801,8 @@ function MapViewContent() {
 
 export default function MapView() {
   return (
-    <PhotoProvider>
-      <RouteProvider>
-        <POIProvider>
-          <PlaceProvider>
-            <MapViewContent />
-          </PlaceProvider>
-        </POIProvider>
-      </RouteProvider>
-    </PhotoProvider>
+    <RouteProvider>
+      <MapViewContent />
+    </RouteProvider>
   );
 }
