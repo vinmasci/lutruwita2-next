@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import './PlacePOILayer.css';
 import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
@@ -193,16 +192,7 @@ export const PlacePOILayer: React.FC = () => {
 
   // Handle POI markers
   useEffect(() => {
-    if (!map || !isStyleLoaded || !document.querySelector('[class*="fa-"]')) {
-      // Wait for Font Awesome to load
-      const checkFontAwesome = setInterval(() => {
-        if (document.querySelector('[class*="fa-"]')) {
-          clearInterval(checkFontAwesome);
-          setZoom(map?.getZoom() || null); // Trigger re-render
-        }
-      }, 100);
-      return () => clearInterval(checkFontAwesome);
-    }
+    if (!map || !isStyleLoaded) return;
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
@@ -261,10 +251,7 @@ export const PlacePOILayer: React.FC = () => {
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
-        el.style.backgroundColor = backgroundColor;
-        el.style.borderRadius = '100%';
-        el.style.cursor = 'pointer';
-        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"></i>`;
+        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px;"></i>`;
         
         // Add click handler to open drawer
         el.addEventListener('click', async () => {
@@ -299,11 +286,6 @@ export const PlacePOILayer: React.FC = () => {
     });
 
     return () => {
-      // Clear interval if it exists
-      if (!document.querySelector('[class*="fa-"]')) {
-        return;
-      }
-      // Clean up markers
       markersRef.current.forEach(({ marker }) => marker.remove());
       markersRef.current = [];
     };

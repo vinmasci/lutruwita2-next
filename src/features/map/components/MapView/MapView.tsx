@@ -17,6 +17,7 @@ import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetail
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
 import PlacePOILayer from '../../../poi/components/PlacePOILayer/PlacePOILayer';
+import '../../../poi/components/PlacePOILayer/PlacePOILayer.css';
 import './MapView.css';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
@@ -381,7 +382,7 @@ function MapViewContent() {
     const canvas = map.getCanvas();
     if (!canvas) return;
 
-    canvas.style.cursor = '';
+    canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
 
     if (isPoiPlacementMode) {
       const clickHandler = (e: mapboxgl.MapMouseEvent) => {
