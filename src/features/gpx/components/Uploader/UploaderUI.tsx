@@ -177,11 +177,11 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 }
               }}
             >
-              {editing?.fileId === route.id ? (
+              {editing?.fileId === route.id && editing ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <TextField
                     size="small"
-                    value={editing.newName}
+                    value={editing?.newName || ''}
                     onChange={handleEditingChange}
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
