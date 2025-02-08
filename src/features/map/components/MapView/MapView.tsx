@@ -359,15 +359,32 @@ function MapViewContent() {
     }
 
     try {
+      // Process the new GPX file or use provided processed route
       const gpxResult = processedRoute || (file ? await processGpx(file) : null);
-      if (gpxResult) {
-        const normalizedRoute = normalizeRoute(gpxResult);
-        addRoute(normalizedRoute);
-        setCurrentRoute(normalizedRoute);
-        setIsGpxDrawerOpen(false);
+      if (!gpxResult) {
+        console.error('[MapView] No GPX result available');
+        return;
       }
+
+      // Normalize the new route
+      const normalizedRoute = normalizeRoute(gpxResult);
+      console.log('[MapView] Normalized route:', normalizedRoute);
+
+      // Add to existing routes
+      addRoute(normalizedRoute);
+
+      // Set as current route but preserve existing routes
+      const updatedRoute = {
+        ...normalizedRoute,
+        routes: routes.concat(normalizedRoute)
+      };
+      console.log('[MapView] Setting current route with preserved routes:', updatedRoute);
+      setCurrentRoute(updatedRoute);
+
+      setIsGpxDrawerOpen(false);
     } catch (error) {
-      console.error('Error uploading GPX:', error);
+      console.error('[MapView] Error processing GPX:', error);
+      // TODO: Add error notification to user
     }
   };
 

@@ -12,26 +12,8 @@ This document outlines the project structure and describes the purpose of key fi
 ├── vite.config.ts                 # Vite bundler configuration for build optimization
 ├── docs/                          # Project documentation
 │   ├── ARCHITECTURE.md            # Overall system architecture and design decisions
-│   ├── BASICGPX.MD               # Core GPX functionality implementation details
 │   ├── DIR.md                     # This directory structure document
-│   ├── ELEVATION_PROFILE.md      # Elevation profile feature implementation details
-│   ├── GPX_Processing_Issues.md   # Known GPX processing issues and their solutions
-│   ├── GPX_UPLOADER_DRAWER.md    # GPX uploader drawer implementation guide
-│   ├── LOAD.md                   # Documentation for load functionality
-│   ├── MIGRATION_LOG.md           # Detailed log of migration changes and progress
-│   ├── MIGRATIONPLAN.md           # Strategic plan for system migration
-│   ├── OLDFUNCTIONS.md            # Archive of previous implementations for reference
-│   ├── PLACE_METADATA_FIX.md     # Documentation for place metadata fixes
-│   ├── POI_DISAPPEARANCE_ANALYSIS.md # Analysis of POI visibility issues
-│   ├── POI_IMPLEMENTATION_PLAN.md # Detailed plan for Points of Interest feature
-│   ├── POINOTES.md               # General POI feature documentation and notes
-│   ├── POI_PLACES.md             # Documentation for POI places functionality
-│   ├── POI_PROGRESS_NOTES.md     # Tracking progress of POI feature development
-│   ├── ROUTE_RENDERING_DISCOVERY.md # Analysis of route rendering improvements
-│   ├── SAVE_ISSUE_ANALYSIS.md    # Analysis of save functionality issues
-│   ├── SAVE_LOAD_IMPLEMENTATION.md # Documentation for save/load functionality
-│   ├── surface-detection.md       # Documentation for surface type detection
-│   └── surfacedetectionplan.md    # Planning document for surface detection
+│   └── POIDIR.md                  # POI feature documentation
 ├── logs/                          # Application logging directory
 │   ├── error.log                  # General application error logs
 │   ├── exceptions.log             # Detailed exception tracking
@@ -76,8 +58,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── main.tsx                 # Frontend entry point and provider setup
 │   ├── theme.ts                 # Global theme configuration
 │   ├── components/              # Shared UI components
-│   │   └── ui/                 # Base UI components
-│   │       └── skeleton.tsx    # Loading skeleton component for content
+│   │   ├── ui/                 # Base UI components
+│   │   │   └── skeleton.tsx    # Loading skeleton component for content
+│   │   └── ErrorBoundary.tsx   # Error boundary for component error handling
 │   ├── features/               # Feature modules
 │   │   ├── auth/               # Authentication feature
 │   │   │   └── components/     # Auth components
@@ -120,7 +103,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   │   ├── types.ts      # Route layer types
 │   │   │   │   │   └── index.ts      # Public exports
 │   │   │   │   ├── MapView/    # Core map component
-│   │   │   │   │   ├── MapView.tsx # Map rendering and interaction logic
+│   │   │   │   │   ├── MapView.tsx # Map rendering and state management
 │   │   │   │   │   └── MapView.css # Map styling and layout
 │   │   │   │   ├── SearchControl/ # Location search functionality
 │   │   │   │   │   ├── SearchControl.tsx # Search component
@@ -137,17 +120,18 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │       └── types.ts         # Type definitions
 │   │   │   ├── context/    # Map state management
 │   │   │   │   ├── MapContext.tsx  # Map instance/state
-│   │   │   │   └── RouteContext.tsx # Route data/state
+│   │   │   │   └── RouteContext.tsx # Route data/state with multi-route support
 │   │   │   ├── hooks/      # Map functionality hooks
 │   │   │   │   ├── useMap.ts      # Map interactions
+│   │   │   │   ├── useMapStyle.ts # Map style loading state
 │   │   │   │   ├── useRouteState.ts # Route state management
 │   │   │   │   └── useGpxProcessing.ts # Route processing
 │   │   │   ├── services/   # Map-related services
 │   │   │   │   ├── mapService.ts  # Map operations
-│   │   │   │   └── routeService.ts # Route operations
+│   │   │   │   └── routeService.ts # Route operations with state preservation
 │   │   │   └── types/     # Map type definitions
 │   │   │       ├── map.types.ts   # Map interfaces
-│   │   │       └── route.types.ts # Route interfaces
+│   │   │       └── route.types.ts # Route interfaces with multi-route support
 │   │   ├── photo/         # Photo management feature
 │   │   │   ├── components/ # Photo components
 │   │   │   │   ├── PhotoCluster/ # Photo grouping
@@ -184,7 +168,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── PlacePOIIconSelection.tsx # Icon selector
 │   │       │   │   └── index.ts     # Public exports
 │   │       │   ├── PlacePOILayer/ # Place visualization
-│   │       │   │   ├── PlacePOILayer.tsx # Layer component
+│   │       │   │   ├── PlacePOILayer.tsx # Layer component with style checks
 │   │       │   │   ├── PlacePOILayer.css # Layer styling
 │   │       │   │   └── index.ts     # Public exports
 │   │       │   ├── POIDetailsDrawer/ # POI info display
@@ -214,7 +198,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   ├── icon-paths.ts # Icon file paths
 │   │       │   └── poi-icons.ts  # Icon definitions
 │   │       ├── context/    # POI state management
-│   │       │   └── POIContext.tsx # POI data/state
+│   │       │   └── POIContext.tsx # POI data/state with improved merging
 │   │       ├── types/     # POI type definitions
 │   │       │   └── poi.types.ts # POI interfaces
 │   │       └── utils/     # POI utilities
@@ -240,6 +224,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - Map context maintains the visual state of routes
 - Elevation profile syncs with map interactions
 - Surface detection results overlay on the map
+- Multiple routes can be loaded and managed simultaneously
 
 ### POI ↔ Map Integration
 - POI markers render on the map layer using MapboxPOIMarker
@@ -250,6 +235,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - POIs support two types: draggable (free-form) and place-based
 - POIs are categorized (road info, accommodation, food/drink, etc.)
 - Each POI type has specific icons and styling options
+- Layer management respects map style loading state
 
 ### Photo ↔ POI Integration
 - Photos can be attached to POIs
@@ -262,31 +248,14 @@ The application's features are tightly integrated while maintaining clear bounda
 - Place detection informs POI creation
 - Shared icon selection system
 - Consistent metadata structure
-
-## Redundant Files (To Be Consolidated)
-
-The following files should be consolidated to maintain a cleaner architecture:
-
-1. Server Controllers:
-   - `server/src/controllers/gpx.controller.ts` should be moved to `server/src/features/gpx/controllers/`
-
-2. Server Routes:
-   - `server/src/routes/gpx.routes.ts` should be moved to `server/src/features/gpx/routes/`
-
-3. Server Services:
-   - `server/src/services/gpx/gpx.processing.ts` should be moved to `server/src/features/gpx/services/`
-
-4. GPX Processing:
-   - `src/features/map/hooks/useGpxProcessing.ts` should be consolidated with `src/features/gpx/hooks/useGpxProcessing.ts`
-
-This consolidation aligns with the feature-based architecture and reduces maintenance overhead.
+- Improved state merging for place-based POIs
 
 ## Key Components
 
 ### Context Providers
 - `MapContext`: Manages map instance, viewport state, and map interactions
-- `RouteContext`: Handles route data, selection state, and route operations
-- `POIContext`: Controls POI data, active POI state, and POI operations
+- `RouteContext`: Handles route data, selection state, and multi-route operations
+- `POIContext`: Controls POI data with improved state merging and error handling
 - `PhotoContext`: Manages photo data, upload state, and photo operations
 - `PlaceContext`: Handles place data and place-POI relationships
 
@@ -294,8 +263,8 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `gpxService`: Handles GPX file parsing and data extraction
 - `mapMatchingService`: Aligns GPS tracks with road networks
 - `surfaceService`: Analyzes and categorizes road surfaces
-- `routeService`: Manages route data persistence and operations
-- `poiService`: Handles POI CRUD operations and persistence
+- `routeService`: Manages route data persistence and multi-route operations
+- `poiService`: Handles POI CRUD operations with improved state management
 - `placeDetection`: Identifies and processes place-based POIs
 - `photoService`: Handles photo upload and processing operations
 - `authService`: Manages authentication and authorization
@@ -306,6 +275,7 @@ This consolidation aligns with the feature-based architecture and reduces mainte
 - `photo`: Handles photo processing and optimization
 - `placeDetection`: Implements place detection algorithms
 - `gpxParser`: Provides low-level GPX file parsing
+- `useMapStyle`: Manages map style loading state
 
 ## Configuration
 

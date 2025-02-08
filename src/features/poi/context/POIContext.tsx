@@ -207,26 +207,44 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load POIs from route
   const loadPOIsFromRoute = (routePOIs?: SavedRouteState['pois']) => {
-    console.log('[POIContext] Loading POIs from route:', routePOIs);
-    if (!routePOIs) {
-      console.log('[POIContext] No POIs to load, keeping existing state');
-      return;
-    }
+    try {
+      console.log('[POIContext] Loading POIs from route:', routePOIs);
+      
+      // Keep existing POIs if no new ones provided
+      if (!routePOIs) {
+        console.log('[POIContext] No new POIs to load, preserving current state');
+        return;
+      }
 
-    // Process new POIs
-    const newPOIs: POIType[] = [
-      ...routePOIs.draggable.map(poi => typeof poi === 'string' ? null : poi),
-      ...routePOIs.places.map(poi => typeof poi === 'string' ? null : poi)
-    ].filter((poi): poi is POIType => poi !== null);
-    
-    // Merge with existing POIs
-    dispatch({ type: 'LOAD_POIS', payload: pois.concat(
-      newPOIs.filter(newPoi => 
-        !pois.some(existingPoi => existingPoi.id === newPoi.id)
-      )
-    )});
-    
-    console.log('[POIContext] Merged POIs into state');
+      // Process new POIs
+      const newPOIs: POIType[] = [
+        ...routePOIs.draggable.map(poi => typeof poi === 'string' ? null : poi),
+        ...routePOIs.places.map(poi => typeof poi === 'string' ? null : poi)
+      ].filter((poi): poi is POIType => poi !== null);
+
+      // Merge with existing POIs, avoiding duplicates
+      const mergedPOIs = [...pois];
+      newPOIs.forEach(newPoi => {
+        const existingIndex = mergedPOIs.findIndex(p => p.id === newPoi.id);
+        if (existingIndex === -1) {
+          mergedPOIs.push(newPoi);
+        } else {
+          // Update existing POI with new data while preserving local changes
+          mergedPOIs[existingIndex] = {
+            ...mergedPOIs[existingIndex],
+            ...newPoi,
+            // Preserve position if it was locally modified
+            position: mergedPOIs[existingIndex].position
+          };
+        }
+      });
+
+      console.log('[POIContext] Merged POIs:', mergedPOIs);
+      dispatch({ type: 'LOAD_POIS', payload: mergedPOIs });
+    } catch (error) {
+      console.error('[POIContext] Error loading POIs:', error);
+      setError(error instanceof Error ? error : new Error('Failed to load POIs'));
+    }
   };
 
   return (

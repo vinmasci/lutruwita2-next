@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
+import { useMapStyle } from '../../../map/hooks/useMapStyle';
 import { usePlaceContext } from '../../../place/context/PlaceContext';
 import { calculatePOIPositions, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 import { ICON_PATHS } from '../../constants/icon-paths';
-import { PlaceNamePOI, POI_CATEGORIES } from '../../types/poi.types';
+import { PlaceNamePOI, POI_CATEGORIES, POICategory } from '../../types/poi.types';
 import { PlaceLabel } from '../../utils/placeDetection';
 import { PlacePOIDetailsDrawer } from '../POIDetailsDrawer';
 import { Place } from '../../../place/types/place.types';
@@ -28,6 +29,7 @@ export const PlacePOILayer: React.FC = () => {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   const isDrawerOpen = selectedPlace !== null;
+  const isStyleLoaded = useMapStyle(map);
 
   // Handle zoom changes
   useEffect(() => {
@@ -52,42 +54,8 @@ export const PlacePOILayer: React.FC = () => {
 
   // Setup highlight layer
   useEffect(() => {
-    if (!map) return;
+    if (!map || !isStyleLoaded) return;
 
-    // Add highlight source and layer
-    map.addSource(HIGHLIGHT_SOURCE, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [0, 0]
-        },
-        properties: {}
-      }
-    });
-
-    map.addLayer({
-      id: HIGHLIGHT_LAYER,
-      type: 'circle',
-      source: HIGHLIGHT_SOURCE,
-      paint: {
-        'circle-radius': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          10, 10,  // Smaller at zoom 10
-          15, 20   // Larger at zoom 15
-        ],
-        'circle-color': '#ffffff',
-        'circle-opacity': 0.2,
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-opacity': 0.8
-      }
-    });
-
-    // Handle mouse move and click for place labels
     const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
       const place = getPlaceLabelAtPoint(map, e.point);
       setHoveredPlace(place);
@@ -156,25 +124,77 @@ export const PlacePOILayer: React.FC = () => {
       setSelectedPlace(placeData);
     };
 
-    map.on('mousemove', handleMouseMove);
-    map.on('click', handleClick);
-
-    return () => {
-      map.off('mousemove', handleMouseMove);
-      map.off('click', handleClick);
-      if (map.getLayer(HIGHLIGHT_LAYER)) {
+    try {
+      // Safe cleanup of existing layers/sources
+      if (map.getStyle() && map.getLayer(HIGHLIGHT_LAYER)) {
         map.removeLayer(HIGHLIGHT_LAYER);
       }
-      if (map.getSource(HIGHLIGHT_SOURCE)) {
+      if (map.getStyle() && map.getSource(HIGHLIGHT_SOURCE)) {
         map.removeSource(HIGHLIGHT_SOURCE);
       }
-      map.getCanvas().style.cursor = '';
+
+      // Add highlight source and layer
+      map.addSource(HIGHLIGHT_SOURCE, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [0, 0]
+          },
+          properties: {}
+        }
+      });
+
+      map.addLayer({
+        id: HIGHLIGHT_LAYER,
+        type: 'circle',
+        source: HIGHLIGHT_SOURCE,
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 10,  // Smaller at zoom 10
+            15, 20   // Larger at zoom 15
+          ],
+          'circle-color': '#ffffff',
+          'circle-opacity': 0.2,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-opacity': 0.8
+        }
+      });
+
+      // Add event listeners
+      map.on('mousemove', handleMouseMove);
+      map.on('click', handleClick);
+    } catch (error) {
+      console.error('[PlacePOILayer] Error setting up layer:', error);
+    }
+
+    return () => {
+      if (map.getStyle()) {
+        try {
+          map.off('mousemove', handleMouseMove);
+          map.off('click', handleClick);
+          if (map.getLayer(HIGHLIGHT_LAYER)) {
+            map.removeLayer(HIGHLIGHT_LAYER);
+          }
+          if (map.getSource(HIGHLIGHT_SOURCE)) {
+            map.removeSource(HIGHLIGHT_SOURCE);
+          }
+          map.getCanvas().style.cursor = '';
+        } catch (error) {
+          console.error('[PlacePOILayer] Error cleaning up:', error);
+        }
+      }
     };
-  }, [map, isPoiPlacementMode, places]);
+  }, [map, isStyleLoaded, isPoiPlacementMode, places, pois]);
 
   // Handle POI markers
   useEffect(() => {
-    if (!map) return;
+    if (!map || !isStyleLoaded) return;
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
@@ -225,7 +245,7 @@ export const PlacePOILayer: React.FC = () => {
         // Create marker element
         const el = document.createElement('div');
         el.className = 'place-poi-marker';
-        const category = POI_CATEGORIES[poi.category];
+        const category = POI_CATEGORIES[poi.category as POICategory];
         const backgroundColor = poi.style?.color || category.color;
         el.style.width = '20px';
         el.style.height = '20px';
@@ -272,7 +292,7 @@ export const PlacePOILayer: React.FC = () => {
       markersRef.current.forEach(({ marker }) => marker.remove());
       markersRef.current = [];
     };
-  }, [map, pois, zoom, places]); // Add places to dependencies
+  }, [map, isStyleLoaded, pois, zoom, places]);
 
   return (
     <PlacePOIDetailsDrawer
