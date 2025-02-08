@@ -23,9 +23,10 @@ import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { Feature, LineString } from 'geojson';
-import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+import { ProcessedRoute } from '../../types/route.types';
 import { addSurfaceOverlay } from '../../../gpx/services/surfaceService';
 import { RouteLayer } from '../RouteLayer';
+import { normalizeRoute } from '../../utils/routeUtils';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -358,10 +359,11 @@ function MapViewContent() {
     }
 
     try {
-      const result = processedRoute || (file ? await processGpx(file) : null);
-      if (result) {
-        addRoute(result);
-        setCurrentRoute(result);
+      const gpxResult = processedRoute || (file ? await processGpx(file) : null);
+      if (gpxResult) {
+        const normalizedRoute = normalizeRoute(gpxResult);
+        addRoute(normalizedRoute);
+        setCurrentRoute(normalizedRoute);
         setIsGpxDrawerOpen(false);
       }
     } catch (error) {

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { ProcessedRoute } from "../../gpx/types/gpx.types";
 import { useRouteService } from "../services/routeService";
-import { SavedRouteState, RouteListItem } from "../types/route.types";
+import { SavedRouteState, RouteListItem, ProcessedRoute, SerializedPhoto, serializePhoto, deserializePhoto } from "../types/route.types";
 import { useMapContext } from "./MapContext";
 import { DraggablePOI, PlaceNamePOI } from "../../poi/types/poi.types";
 import { usePOIContext } from "../../poi/context/POIContext";
@@ -131,17 +130,7 @@ const saveCurrentState = useCallback(
             pitch: 0
           },
           routes,
-          photos: photos.map(photo => ({
-            id: photo.id,
-            name: photo.name,
-            url: photo.url,
-            thumbnailUrl: photo.thumbnailUrl,
-            dateAdded: photo.dateAdded.toISOString(),
-            coordinates: photo.coordinates,
-            rotation: photo.rotation,
-            altitude: photo.altitude,
-            hasGps: !!photo.coordinates
-          })),
+          photos: photos.map(serializePhoto),
           pois: pois, // Use the POIs we already retrieved with the correct routeId
           places: Object.values(places),
         };
@@ -211,13 +200,8 @@ const saveCurrentState = useCallback(
 
           // Update photos context
           if (route.photos) {
-            const processedPhotos = route.photos.map(photo => ({
-              ...photo,
-              dateAdded: new Date(photo.dateAdded),
-              hasGps: !!photo.coordinates // Set hasGps based on coordinates presence
-            }));
             photos.forEach(photo => URL.revokeObjectURL(photo.url)); // Clean up old URLs
-            addPhoto(processedPhotos);
+            addPhoto(route.photos.map(deserializePhoto));
           }
 
           // Update POIs context

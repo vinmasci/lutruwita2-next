@@ -1,4 +1,4 @@
-import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+import { ProcessedRoute } from '../../types/route.types';
 import { POIIconName, POICategory } from '../../../poi/types/poi.types';
 
 interface POIDetailsDrawerProps {

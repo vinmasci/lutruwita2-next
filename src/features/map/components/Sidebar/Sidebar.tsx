@@ -1,6 +1,6 @@
 import { useMemo, lazy, Suspense } from 'react';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
-import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+import { ProcessedRoute as GpxProcessedRoute } from '../../../gpx/types/gpx.types';
 import { NestedDrawer, StyledDrawer } from './Sidebar.styles';
 import { SidebarListItems } from './SidebarListItems';
 import { SidebarProps } from './types';
@@ -13,6 +13,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { POIDrawer } from '../../../poi/components/POIDrawer';
 import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
 import { POIIconName, POICategory } from '../../../poi/types/poi.types';
+import { normalizeRoute } from '../../utils/routeUtils';
 
 const StyledUploadBox = styled(Paper)(({ theme }) => ({
   width: 264,
@@ -52,9 +53,11 @@ export const Sidebar = (props: SidebarProps) => {
   } = useSidebar(props);
   const { addPhoto, deletePhoto } = usePhotoContext();
 
-  const handleUploadComplete = async (result: ProcessedRoute) => {
+  const handleUploadComplete = async (result: GpxProcessedRoute) => {
+    // Normalize the route before passing it to MapView
+    const normalizedRoute = normalizeRoute(result);
     // Pass the processed route to MapView
-    await props.onUploadGpx(undefined, result);
+    await props.onUploadGpx(undefined, normalizedRoute);
   };
 
   const activeDrawerContent = useMemo(() => {
