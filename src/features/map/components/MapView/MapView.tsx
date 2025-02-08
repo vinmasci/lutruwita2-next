@@ -23,7 +23,7 @@ import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { Feature, LineString } from 'geojson';
-import { ProcessedRoute } from '../../types/route.types';
+import { ProcessedRoute, UnpavedSection } from '../../types/route.types';
 import { addSurfaceOverlay } from '../../../gpx/services/surfaceService';
 import { RouteLayer } from '../RouteLayer';
 import { normalizeRoute } from '../../utils/routeUtils';
@@ -228,8 +228,8 @@ function MapViewContent() {
           }
     });
 
-    // For new routes, detect and save unpaved sections
-    if (!route.unpavedSections || route.unpavedSections.length === 0) {
+    // Handle surface data based on route type
+    if (route._type === 'fresh' && (!route.unpavedSections || route.unpavedSections.length === 0)) {
       const feature = route.geojson.features[0] as Feature<LineString>;
       try {
         const featureWithRouteId = {
@@ -242,14 +242,19 @@ function MapViewContent() {
         // Detect and save unpaved sections
         const sections = await addSurfaceOverlay(map, featureWithRouteId);
         // Update route with unpaved sections
-        route.unpavedSections = sections;
-        // If this is a save operation, the sections will be saved to MongoDB
+        route.unpavedSections = sections.map(section => ({
+          startIndex: section.startIndex,
+          endIndex: section.endIndex,
+          coordinates: section.coordinates,
+          surfaceType: section.surfaceType === 'unpaved' ? 'unpaved' :
+                      section.surfaceType === 'gravel' ? 'gravel' : 'trail'
+        }));
       } catch (error) {
         console.error('[MapView] Surface detection error:', error);
       }
     } else {
-      // For loaded routes, render existing unpaved sections
-      route.unpavedSections.forEach((section, index) => {
+      // For loaded routes or routes with existing sections, render them
+      route.unpavedSections?.forEach((section, index) => {
         const sourceId = `unpaved-section-${routeId}-${index}`;
         const layerId = `unpaved-section-layer-${routeId}-${index}`;
 
@@ -265,7 +270,7 @@ function MapViewContent() {
           data: {
             type: 'Feature',
             properties: {
-              surface: 'unpaved'
+              surface: section.surfaceType
             },
             geometry: {
               type: 'LineString',
@@ -316,27 +321,6 @@ function MapViewContent() {
     });
   }, [isMapReady, addRouteClickHandler]);
 
-  // Function to handle surface detection for new routes
-  const handleSurfaceDetection = useCallback(async (route: ProcessedRoute) => {
-    if (!mapInstance.current || !isMapReady) return;
-
-    const routeId = route.routeId || `route-${route.id}`;
-    const feature = route.geojson.features[0] as Feature<LineString>;
-
-    try {
-      const featureWithRouteId = {
-        ...feature,
-        properties: {
-          ...feature.properties,
-          routeId: routeId
-        }
-      };
-      await addSurfaceOverlay(mapInstance.current, featureWithRouteId);
-    } catch (error) {
-      console.error('[MapView] Surface detection error:', error);
-    }
-  }, [isMapReady]);
-
   // Effect to render current route when it changes
   useEffect(() => {
     if (!currentRoute || !mapInstance.current || !isMapReady) return;
@@ -344,7 +328,7 @@ function MapViewContent() {
     console.log('[MapView] Current route changed:', currentRoute.id);
 
     // For new routes (GPX uploads), use renderRouteOnMap
-    if (!('routes' in currentRoute)) {
+    if (currentRoute._type === 'fresh') {
       renderRouteOnMap(currentRoute).catch(error => {
         console.error('[MapView] Error rendering route:', error);
       });
@@ -373,18 +357,12 @@ function MapViewContent() {
       // Add to existing routes
       addRoute(normalizedRoute);
 
-      // Set as current route but preserve existing routes
-      const updatedRoute = {
-        ...normalizedRoute,
-        routes: routes.concat(normalizedRoute)
-      };
-      console.log('[MapView] Setting current route with preserved routes:', updatedRoute);
-      setCurrentRoute(updatedRoute);
+      // Set as current route
+      setCurrentRoute(normalizedRoute);
 
       setIsGpxDrawerOpen(false);
     } catch (error) {
       console.error('[MapView] Error processing GPX:', error);
-      // TODO: Add error notification to user
     }
   };
 
@@ -780,8 +758,8 @@ function MapViewContent() {
 
         {currentRoute && isMapReady && mapInstance.current && (
           <>
-            {/* For loaded routes, use the new RouteLayer */}
-            {currentRoute.routes && (
+            {/* For loaded routes, use the RouteLayer */}
+            {currentRoute._type === 'loaded' && (
               <RouteLayer 
                 map={mapInstance.current} 
                 route={currentRoute} 

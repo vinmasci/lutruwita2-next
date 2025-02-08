@@ -3,6 +3,7 @@ import type { ProcessedRoute as GpxProcessedRoute } from '../../gpx/types/gpx.ty
 import type { FeatureCollection } from 'geojson';
 
 const createDefaultRoute = (id: string): ProcessedRoute => ({
+  _type: 'fresh' as const,
   id,
   routeId: `route-${id}`,
   name: '',
@@ -25,9 +26,10 @@ const createDefaultRoute = (id: string): ProcessedRoute => ({
     totalTime: 0
   },
   status: {
-    processingState: 'completed',
+    processingState: 'completed' as const,
     progress: 100
-  }
+  },
+  unpavedSections: []
 });
 
 const isGpxProcessedRoute = (route: any): route is GpxProcessedRoute => {
@@ -36,6 +38,11 @@ const isGpxProcessedRoute = (route: any): route is GpxProcessedRoute => {
 
 const isSavedRouteState = (route: any): route is SavedRouteState => {
   return 'routes' in route && Array.isArray(route.routes);
+};
+
+// Type guard for surface type
+const isValidSurfaceType = (type: string): type is 'unpaved' | 'gravel' | 'trail' => {
+  return type === 'unpaved' || type === 'gravel' || type === 'trail';
 };
 
 export const normalizeRoute = (route: GpxProcessedRoute | SavedRouteState): ProcessedRoute => {
@@ -47,9 +54,18 @@ export const normalizeRoute = (route: GpxProcessedRoute | SavedRouteState): Proc
     }
 
     const defaultRoute = createDefaultRoute(firstRoute.id);
+    const unpavedSections = firstRoute.unpavedSections?.map(section => ({
+      startIndex: section.startIndex,
+      endIndex: section.endIndex,
+      coordinates: section.coordinates,
+      surfaceType: isValidSurfaceType(section.surfaceType) ? section.surfaceType : 'unpaved'
+    })) || [];
+
     return {
       ...defaultRoute,
       ...firstRoute,
+      _type: 'loaded' as const,
+      _loadedState: route,
       routeId: firstRoute.routeId || defaultRoute.routeId,
       color: firstRoute.color || defaultRoute.color,
       isVisible: firstRoute.isVisible ?? defaultRoute.isVisible,
@@ -62,17 +78,27 @@ export const normalizeRoute = (route: GpxProcessedRoute | SavedRouteState): Proc
       },
       status: {
         ...defaultRoute.status,
-        ...firstRoute.status
-      }
+        ...firstRoute.status,
+        processingState: firstRoute.status?.processingState || 'completed'
+      },
+      unpavedSections
     };
   }
 
   // Handle fresh route
   if (isGpxProcessedRoute(route)) {
     const defaultRoute = createDefaultRoute(route.id);
+    const unpavedSections = route.unpavedSections?.map(section => ({
+      startIndex: section.startIndex,
+      endIndex: section.endIndex,
+      coordinates: section.coordinates,
+      surfaceType: isValidSurfaceType(section.surfaceType) ? section.surfaceType : 'unpaved'
+    })) || [];
+
     return {
       ...defaultRoute,
       ...route,
+      _type: 'fresh' as const,
       routeId: route.routeId || defaultRoute.routeId,
       color: route.color || defaultRoute.color,
       isVisible: route.isVisible ?? defaultRoute.isVisible,
@@ -85,8 +111,10 @@ export const normalizeRoute = (route: GpxProcessedRoute | SavedRouteState): Proc
       },
       status: {
         ...defaultRoute.status,
-        ...route.status
-      }
+        ...route.status,
+        processingState: route.status?.processingState || 'completed'
+      },
+      unpavedSections
     };
   }
 

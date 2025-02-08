@@ -2,9 +2,12 @@ import { useClientGpxProcessing } from '../../hooks/useClientGpxProcessing';
 import { useMapContext } from '../../../map/context/MapContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { GpxUploaderProps } from './Uploader.types';
-import { ProcessedRoute } from '../../types/gpx.types';
+import { ProcessedRoute as GpxProcessedRoute } from '../../types/gpx.types';
+import { ProcessedRoute as MapProcessedRoute } from '../../../map/types/route.types';
 import UploaderUI from './UploaderUI';
 import { useEffect, useState } from 'react';
+import { ErrorBoundary } from '../../../../components/ErrorBoundary';
+import { Box, Typography, Button } from '@mui/material';
 
 const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   console.log('[Uploader] Component initializing');
@@ -40,9 +43,14 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
       const fileContent = await file.text();
       const result = await processGpx(file);
       if (result) {
-        addRoute(result);
-        setCurrentRoute(result);
-        onUploadComplete(result);
+        // Ensure routeId is defined
+        const processedRoute: MapProcessedRoute = {
+          ...result,
+          routeId: result.routeId || result.id // Fallback to id if routeId is undefined
+        };
+        addRoute(processedRoute);
+        setCurrentRoute(processedRoute);
+        onUploadComplete(processedRoute);
       }
     } catch (error) {
       console.error('[Uploader] Error processing file:', error);
@@ -67,7 +75,7 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   const handleFileRename = async (fileId: string, newName: string) => {
     try {
       // Find the existing route in context
-      const existingRoute = routes.find((r: ProcessedRoute) => r.id === fileId);
+      const existingRoute = routes.find((r: MapProcessedRoute) => r.id === fileId);
       if (!existingRoute) {
         console.error('[Uploader] Route not found for rename:', fileId);
         return;
@@ -78,10 +86,10 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
       const result = await processGpx(file);
       
       if (result) {
-        const updatedRoute = {
+        const updatedRoute: MapProcessedRoute = {
           ...result,
           id: existingRoute.id,
-          routeId: existingRoute.routeId,
+          routeId: existingRoute.routeId || existingRoute.id,
           name: newName
         };
         addRoute(updatedRoute);
@@ -94,13 +102,30 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   };
 
   return (
-    <UploaderUI 
-      isLoading={isLoading}
-      error={error}
-      onFileAdd={handleFileAdd}
-      onFileDelete={handleFileDelete}
-      onFileRename={handleFileRename}
-    />
+    <ErrorBoundary
+      fallback={
+        <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Typography color="error" gutterBottom>
+            Something went wrong with the GPX uploader.
+          </Typography>
+          <Button 
+            variant="contained" 
+            onClick={() => window.location.reload()}
+            sx={{ mt: 1 }}
+          >
+            Reload Page
+          </Button>
+        </Box>
+      }
+    >
+      <UploaderUI 
+        isLoading={isLoading}
+        error={error}
+        onFileAdd={handleFileAdd}
+        onFileDelete={handleFileDelete}
+        onFileRename={handleFileRename}
+      />
+    </ErrorBoundary>
   );
 };
 

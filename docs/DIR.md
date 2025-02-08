@@ -188,10 +188,10 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   │   ├── types.ts    # Type definitions
 │   │       │   │   └── index.ts    # Public exports
 │   │       │   ├── POIMarker/   # Generic markers
-│   │       │   │   ├── POIMarker.tsx # Base marker with improved styling
-│   │       │   │   ├── POIMarker.styles.ts # Enhanced marker styling
-│   │       │   │   ├── types.ts    # Extended type definitions
-│   │       │   │   └── index.ts    # Public exports with type safety
+│   │       │   │   ├── POIMarker.tsx # Base marker
+│   │       │   │   ├── POIMarker.styles.ts # Styling
+│   │       │   │   ├── types.ts    # Type definitions
+│   │       │   │   └── index.ts    # Public exports
 │   │       │   └── POIViewer/   # POI display
 │   │       │       └── POIViewer.tsx # Viewer component
 │   │       ├── constants/  # POI configuration

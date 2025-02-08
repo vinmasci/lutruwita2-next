@@ -19,6 +19,8 @@ interface RouteContextType {
   savedRoutes: RouteListItem[];
   isSaving: boolean;
   isLoading: boolean;
+  isLoadedMap: boolean;
+  currentLoadedState: SavedRouteState | null;
   
   // Save/Load operations
   saveCurrentState: (name: string, type: "tourism" | "event" | "bikepacking" | "single", isPublic: boolean) => Promise<void>;
@@ -40,6 +42,8 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
   const [savedRoutes, setSavedRoutes] = useState<RouteListItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadedMap, setIsLoadedMap] = useState(false);
+  const [currentLoadedState, setCurrentLoadedState] = useState<SavedRouteState | null>(null);
 
   // Context hooks
   const routeService = useRouteService();
@@ -50,10 +54,19 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const addRoute = useCallback((route: ProcessedRoute) => {
     setRoutes((prev) => {
+      // Filter out any existing route with the same ID
       const filtered = prev.filter((r) => r.id !== route.id);
-      return [...filtered, route];
+      
+      // If we have a loaded state, mark the route as loaded
+      const processedRoute = currentLoadedState ? {
+        ...route,
+        _type: 'loaded' as const,
+        _loadedState: currentLoadedState
+      } : route;
+      
+      return [...filtered, processedRoute];
     });
-  }, []);
+  }, [currentLoadedState]);
 
   const deleteRoute = useCallback((routeId: string) => {
     setRoutes((prev) => prev.filter((route) => route.routeId !== routeId));
@@ -164,6 +177,10 @@ const saveCurrentState = useCallback(
         console.log('[RouteContext] Route loaded from DB:', route);
         console.log('[RouteContext] Route.routes:', route.routes);
 
+        // Set loaded state
+        setIsLoadedMap(true);
+        setCurrentLoadedState(route);
+
         // Update route state - preserve structure for future additions
         console.log('[RouteContext] Setting routes state');
         setRoutes(prevRoutes => {
@@ -171,7 +188,15 @@ const saveCurrentState = useCallback(
           const nonConflicting = prevRoutes.filter(r => 
             !route.routes.some(loadedRoute => loadedRoute.id === r.id)
           );
-          return [...nonConflicting, ...route.routes];
+          
+          // Mark routes as loaded
+          const loadedRoutes = route.routes.map(r => ({
+            ...r,
+            _type: 'loaded' as const,
+            _loadedState: route
+          }));
+          
+          return [...nonConflicting, ...loadedRoutes];
         });
         
         // Set current route while maintaining loaded state
@@ -179,6 +204,8 @@ const saveCurrentState = useCallback(
         if (route.routes[0]) {
           setCurrentRoute({
             ...route.routes[0],
+            _type: 'loaded',
+            _loadedState: route,
             routes: route.routes // Preserve full route collection reference
           });
         } else {
@@ -269,6 +296,8 @@ const saveCurrentState = useCallback(
         savedRoutes,
         isSaving,
         isLoading,
+        isLoadedMap,
+        currentLoadedState,
         
         // Save/Load operations
         saveCurrentState,

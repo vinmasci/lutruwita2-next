@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Feature, LineString } from 'geojson';
 import { RouteLayerProps } from './types';
+import { LoadedRoute, UnpavedSection } from '../../types/route.types';
 
 export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
   useEffect(() => {
@@ -20,6 +21,16 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
         if (map.getLayer(mainLayerId)) map.removeLayer(mainLayerId);
         if (map.getLayer(borderLayerId)) map.removeLayer(borderLayerId);
         if (map.getSource(mainSourceId)) map.removeSource(mainSourceId);
+
+        // Clean up surface layers
+        if (route.unpavedSections) {
+          route.unpavedSections.forEach((_, index) => {
+            const surfaceLayerId = `unpaved-section-layer-${routeId}-${index}`;
+            const surfaceSourceId = `unpaved-section-${routeId}-${index}`;
+            if (map.getLayer(surfaceLayerId)) map.removeLayer(surfaceLayerId);
+            if (map.getSource(surfaceSourceId)) map.removeSource(surfaceSourceId);
+          });
+        }
       };
 
       cleanup();
@@ -85,6 +96,45 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
           'line-opacity': 1
         }
       });
+
+      // Add surface layers for loaded routes
+      if (route._type === 'loaded' && route.unpavedSections) {
+        route.unpavedSections.forEach((section, index) => {
+          const surfaceSourceId = `unpaved-section-${routeId}-${index}`;
+          const surfaceLayerId = `unpaved-section-layer-${routeId}-${index}`;
+
+          // Add source with surface property
+          map.addSource(surfaceSourceId, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {
+                surface: section.surfaceType
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: section.coordinates
+              }
+            }
+          });
+
+          // Add white dashed line for unpaved segments
+          map.addLayer({
+            id: surfaceLayerId,
+            type: 'line',
+            source: surfaceSourceId,
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 2,
+              'line-dasharray': [1, 3]
+            }
+          });
+        });
+      }
 
       // Add hover handlers
       const mouseHandler = () => {

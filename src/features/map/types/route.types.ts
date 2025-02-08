@@ -1,18 +1,36 @@
 import type { ProcessedRoute as GpxProcessedRoute } from '../../gpx/types/gpx.types';
 import type { ProcessedPhoto } from '../../photo/components/Uploader/PhotoUploader.types';
 import type { Place } from '../../place/types/place.types';
-import type { GeoJSON } from 'geojson';
+import type { GeoJSON, LineString } from 'geojson';
 
-// Omit routeId from GpxProcessedRoute since we'll redefine it as required
-export interface ProcessedRoute extends Omit<GpxProcessedRoute, 'routeId'> {
+// Re-export and extend the GPX types
+export interface UnpavedSection {
+  startIndex: number;
+  endIndex: number;
+  coordinates: [number, number][];
+  surfaceType: 'unpaved' | 'gravel' | 'trail';
+}
+
+// Base route interface with common properties
+interface BaseRoute extends Omit<GpxProcessedRoute, 'routeId' | 'unpavedSections' | 'status'> {
   id: string;
-  routeId: string; // Make this required
+  routeId: string;
   name: string;
   color: string;
   isVisible: boolean;
   gpxData: string;
   rawGpx: string;
   geojson: GeoJSON.FeatureCollection;
+  unpavedSections?: UnpavedSection[];
+  status: {
+    processingState: 'pending' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    error?: {
+      code: string;
+      message: string;
+      details?: string;
+    };
+  };
   statistics: {
     totalDistance: number;
     elevationGain: number;
@@ -110,9 +128,25 @@ export interface ListRoutesResponse {
   message?: string;
 }
 
+// Loaded route from saved state
+export interface LoadedRoute extends BaseRoute {
+  _type: 'loaded';
+  _loadedState?: SavedRouteState;
+}
+
+// Fresh route from GPX upload
+export interface FreshRoute extends BaseRoute {
+  _type: 'fresh';
+}
+
+// Union type for all route types
+export type ProcessedRoute = LoadedRoute | FreshRoute;
+
 export interface RouteContextType {
   routes: ProcessedRoute[];
   isInitialized: boolean;
+  isLoadedMap: boolean;
+  currentLoadedState: SavedRouteState | null;
   loadRoute: (savedRoute: SavedRouteState) => Promise<void>;
   addRoute: (newRoute: ProcessedRoute) => void;
 }
@@ -143,16 +177,48 @@ export const deserializePhoto = (photo: SerializedPhoto): ProcessedPhoto => ({
   altitude: photo.altitude
 });
 
-// Helper function to ensure a route has a routeId
-export const normalizeRoute = (route: GpxProcessedRoute): ProcessedRoute => ({
-  ...route,
-  routeId: route.routeId || `route-${route.id}`,
-  id: route.id,
-  name: route.name,
-  color: route.color || '#000000',
-  isVisible: route.isVisible || true,
-  gpxData: route.gpxData,
-  rawGpx: route.rawGpx,
-  geojson: route.geojson,
-  statistics: route.statistics
-});
+// Type guard for surface type
+const isValidSurfaceType = (type: string): type is UnpavedSection['surfaceType'] => {
+  return type === 'unpaved' || type === 'gravel' || type === 'trail';
+};
+
+// Helper function to ensure a route has a routeId and proper type
+export const normalizeRoute = (route: GpxProcessedRoute): FreshRoute => {
+  // Ensure we have a valid status
+  const status = route.status || {
+    processingState: 'completed' as const,
+    progress: 100,
+  };
+
+  // Convert unpaved sections with type guard
+  const unpavedSections = route.unpavedSections?.map(section => {
+    const surfaceType = isValidSurfaceType(section.surfaceType) 
+      ? section.surfaceType 
+      : 'unpaved';
+
+    return {
+      startIndex: section.startIndex,
+      endIndex: section.endIndex,
+      coordinates: section.coordinates,
+      surfaceType
+    };
+  }) || [];
+
+  const normalized: FreshRoute = {
+    ...route,
+    _type: 'fresh',
+    routeId: route.routeId || `route-${route.id}`,
+    id: route.id,
+    name: route.name,
+    color: route.color || '#000000',
+    isVisible: route.isVisible || true,
+    gpxData: route.gpxData,
+    rawGpx: route.rawGpx,
+    geojson: route.geojson,
+    statistics: route.statistics,
+    status,
+    unpavedSections
+  };
+
+  return normalized;
+};

@@ -1,5 +1,5 @@
 import mapboxgl from 'mapbox-gl';
-import { ProcessedRoute } from '../../../gpx/types/gpx.types';
+import { ProcessedRoute } from '../../types/route.types';
 
 export interface RouteLayerProps {
   map: mapboxgl.Map;

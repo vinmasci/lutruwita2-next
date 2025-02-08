@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UploaderUIProps } from './Uploader.types';
 import { Alert, Box, CircularProgress, Typography, IconButton, TextField, List, ListItem, ListItemText, ListItemSecondaryAction, Paper, Divider } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
+import { getRouteDistance } from '../../utils/routeUtils';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useDropzone, FileWithPath } from 'react-dropzone';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -36,21 +37,32 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
     },
   });
 
+  // Safe editing handlers with proper event handling and type safety
   const handleStartEditing = (e: React.MouseEvent, fileId: string, currentName: string) => {
+    e.preventDefault();
     e.stopPropagation();
     setEditing({ fileId, newName: currentName });
   };
 
   const handleCancelEditing = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     setEditing(null);
   };
 
   const handleSaveEditing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (editing?.fileId && editing.newName.trim()) {
+      onFileRename(editing.fileId, editing.newName.trim());
+      setEditing(null);
+    }
+  };
+
+  const handleEditingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     if (editing) {
-      onFileRename(editing.fileId, editing.newName);
-      setEditing(null);
+      setEditing({ ...editing, newName: e.target.value });
     }
   };
 
@@ -170,9 +182,16 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                   <TextField
                     size="small"
                     value={editing.newName}
-                    onChange={(e) => setEditing({ ...editing, newName: e.target.value })}
+                    onChange={handleEditingChange}
                     onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter') {
+                        handleSaveEditing(e as unknown as React.MouseEvent);
+                      } else if (e.key === 'Escape') {
+                        handleCancelEditing(e as unknown as React.MouseEvent);
+                      }
+                    }}
                     sx={{ flex: 1 }}
                   />
                   <IconButton size="small" onClick={handleSaveEditing}>
@@ -186,7 +205,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 <>
                   <ListItemText 
                     primary={route.name}
-                    secondary={`${(route.statistics.totalDistance / 1000).toFixed(1)}km`}
+                    secondary={`${(getRouteDistance(route) / 1000).toFixed(1)}km`}
                     sx={{ 
                       '& .MuiTypography-root': { 
                         fontSize: '0.875rem',
