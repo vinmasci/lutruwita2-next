@@ -82,8 +82,12 @@ const transformedData = {
   }
 };
 
-const response = await fetch(`${API_BASE}/save`, {
-  method: 'POST',
+// If routeData has an id, it's an update to an existing route
+const endpoint = routeData.id ? `${API_BASE}/${routeData.id}` : `${API_BASE}/save`;
+const method = routeData.id ? 'PUT' : 'POST';
+
+const response = await fetch(endpoint, {
+  method,
   headers,
   body: JSON.stringify(transformedData),
   credentials: 'include'

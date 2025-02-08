@@ -17,7 +17,6 @@ import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetail
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
 import PlacePOILayer from '../../../poi/components/PlacePOILayer/PlacePOILayer';
-import '../../../poi/components/PlacePOILayer/PlacePOILayer.css';
 import './MapView.css';
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
@@ -382,7 +381,7 @@ function MapViewContent() {
     const canvas = map.getCanvas();
     if (!canvas) return;
 
-    canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
+    canvas.style.cursor = '';
 
     if (isPoiPlacementMode) {
       const clickHandler = (e: mapboxgl.MapMouseEvent) => {
@@ -406,9 +405,10 @@ function MapViewContent() {
   }, [isPoiPlacementMode, onPoiPlacementClick, isMapReady]);
 
   const handleAddPOI = () => {
-    setIsPOIDrawerOpen(!isPOIDrawerOpen);
-    if (isPOIDrawerOpen) {
-      setPoiPlacementMode(false);
+    const newIsOpen = !isPOIDrawerOpen;
+    setIsPOIDrawerOpen(newIsOpen);
+    setPoiPlacementMode(newIsOpen);
+    if (!newIsOpen) {
       setPoiPlacementClick(undefined);
     }
   };
@@ -428,6 +428,8 @@ function MapViewContent() {
   const handlePOICreation = (icon: POIIconName, category: POICategory, position: POIPosition) => {
     setSelectedPOIDetails({ iconName: icon, category, position });
     setDetailsDrawerOpen(true);
+    setPoiPlacementMode(false);
+    setIsPOIDrawerOpen(false);
   };
 
   const handlePOIDetailsSave = async (details: { name: string; description: string; photos: File[] }) => {
@@ -777,6 +779,8 @@ function MapViewContent() {
             onClose={() => {
               setDetailsDrawerOpen(false);
               setSelectedPOIDetails(null);
+              setPoiPlacementMode(false);
+              setIsPOIDrawerOpen(false);
             }}
             iconName={selectedPOIDetails.iconName}
             category={selectedPOIDetails.category}

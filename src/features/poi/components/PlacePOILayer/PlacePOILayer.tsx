@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import './PlacePOILayer.css';
 import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from '../../context/POIContext';
 import { useMapContext } from '../../../map/context/MapContext';
@@ -77,10 +78,9 @@ export const PlacePOILayer: React.FC = () => {
       // or when hovering over a place that has POIs
       const hasData = place && (
         isPoiPlacementMode || 
-        pois.some(
-          (poi): poi is PlaceNamePOI => 
-            poi.type === 'place' && 
-            poi.placeId === place.id
+        pois.some(poi => 
+          poi.position.lng === place.coordinates[0] && 
+          poi.position.lat === place.coordinates[1]
         )
       );
 
@@ -99,13 +99,12 @@ export const PlacePOILayer: React.FC = () => {
       if (!place) return;
 
       // Only handle click if place has POIs
-      const hasPOIs = pois.some(
-        (poi): poi is PlaceNamePOI => 
-          poi.type === 'place' && 
-          poi.placeId === place.id
+      const hasPOIs = pois.some(poi => 
+        poi.position.lng === place.coordinates[0] && 
+        poi.position.lat === place.coordinates[1]
       );
 
-      if (!hasPOIs) return;
+      if (!hasPOIs && !isPoiPlacementMode) return;
 
       // Get place data if it exists, or create and save new place
       const placeData = places[place.id] || {
@@ -194,19 +193,28 @@ export const PlacePOILayer: React.FC = () => {
 
   // Handle POI markers
   useEffect(() => {
-    if (!map || !isStyleLoaded) return;
+    if (!map || !isStyleLoaded || !document.querySelector('[class*="fa-"]')) {
+      // Wait for Font Awesome to load
+      const checkFontAwesome = setInterval(() => {
+        if (document.querySelector('[class*="fa-"]')) {
+          clearInterval(checkFontAwesome);
+          setZoom(map?.getZoom() || null); // Trigger re-render
+        }
+      }, 100);
+      return () => clearInterval(checkFontAwesome);
+    }
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
     markersRef.current = [];
 
-    // Group POIs by placeId
-    const placePOIs = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
-    const poiGroups = placePOIs.reduce<Record<string, PlaceNamePOI[]>>((acc, poi) => {
-      if (!acc[poi.placeId]) {
-        acc[poi.placeId] = [];
+    // Group POIs by coordinates
+    const poiGroups = pois.reduce<Record<string, typeof pois>>((acc, poi) => {
+      const key = `${poi.position.lng},${poi.position.lat}`;
+      if (!acc[key]) {
+        acc[key] = [];
       }
-      acc[poi.placeId].push(poi);
+      acc[key].push(poi);
       return acc;
     }, {});
 
@@ -218,18 +226,19 @@ export const PlacePOILayer: React.FC = () => {
       return;
     }
 
-    // Create markers for each place's POIs
-    Object.entries(poiGroups).forEach(([placeId, pois]) => {
+    // Create markers for each location's POIs
+    Object.entries(poiGroups).forEach(([coordKey, locationPois]) => {
+      const [lng, lat] = coordKey.split(',').map(Number);
       // Adjust baseOffset based on zoom level
-      const baseOffset = currentZoom <= 8.06 ? -15 : 9; // Move icons up by 10px when zoomed out
+      const baseOffset = currentZoom <= 8.06 ? -15 : 9;
 
       const positions = calculatePOIPositions(
         {
-          id: placeId,
-          name: pois[0].name,
-          coordinates: [pois[0].position.lng, pois[0].position.lat]
+          id: coordKey,
+          name: locationPois[0].name,
+          coordinates: [lng, lat]
         },
-        pois.length,
+        locationPois.length,
         {
           iconSize: 16,
           spacing: 5.5,
@@ -238,7 +247,7 @@ export const PlacePOILayer: React.FC = () => {
         }
       );
 
-      pois.forEach((poi, index) => {
+      locationPois.forEach((poi, index) => {
         const position = positions[index];
         if (!position) return;
 
@@ -252,22 +261,23 @@ export const PlacePOILayer: React.FC = () => {
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
-        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px;"></i>`;
+        el.style.backgroundColor = backgroundColor;
+        el.style.borderRadius = '100%';
+        el.style.cursor = 'pointer';
+        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"></i>`;
         
         // Add click handler to open drawer
         el.addEventListener('click', async () => {
-          const placeData = places[placeId] || {
-            id: placeId,
+          const placeData: Place = {
+            id: coordKey,
             name: poi.name,
-            coordinates: [poi.position.lng, poi.position.lat],
+            coordinates: [lng, lat] as [number, number],
             description: '',
             photos: []
           };
 
-          // If this is a new place, save it first
-          if (!places[placeId]) {
-            await updatePlace(placeId, placeData);
-          }
+          // Save place data
+          await updatePlace(coordKey, placeData);
 
           setSelectedPlace(placeData);
         });
@@ -289,6 +299,11 @@ export const PlacePOILayer: React.FC = () => {
     });
 
     return () => {
+      // Clear interval if it exists
+      if (!document.querySelector('[class*="fa-"]')) {
+        return;
+      }
+      // Clean up markers
       markersRef.current.forEach(({ marker }) => marker.remove());
       markersRef.current = [];
     };

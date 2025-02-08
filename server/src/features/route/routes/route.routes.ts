@@ -22,6 +22,12 @@ router.post('/save',
   asyncHandler(controller.saveRoute.bind(controller))
 );
 
+// Update an existing route
+router.put('/:id',
+  validateRouteData,
+  asyncHandler(controller.updateRoute.bind(controller))
+);
+
 // Get a specific route
 router.get('/:id', asyncHandler(controller.loadRoute.bind(controller)));
 

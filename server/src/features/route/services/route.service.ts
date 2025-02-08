@@ -11,7 +11,7 @@ export class RouteService {
     this.poiService = new POIService();
   }
 
-  async saveRoute(userId: string, data: SaveRouteRequest & Partial<SavedRouteState>): Promise<SaveRouteResponse> {
+  async saveRoute(userId: string, data: SaveRouteRequest & Partial<SavedRouteState>, routeId?: string): Promise<SaveRouteResponse> {
     try {
       console.log('[RouteService] Starting route save process...');
 
@@ -25,8 +25,7 @@ export class RouteService {
         });
       }
 
-      // Create route with saved POIs that have MongoDB IDs
-      const route = new RouteModel({
+      const routeData = {
         userId,
         name: data.name,
         type: data.type,
@@ -36,9 +35,25 @@ export class RouteService {
         photos: data.photos || [],
         pois: savedPois || { draggable: [], places: [] },
         places: data.places || []
-      });
+      };
 
-      await route.save();
+      let route;
+      if (routeId) {
+        // Update existing route
+        route = await RouteModel.findOneAndUpdate(
+          { _id: routeId, userId }, // Only update if user owns the route
+          routeData,
+          { new: true } // Return updated document
+        );
+        
+        if (!route) {
+          throw new Error('Route not found or access denied');
+        }
+      } else {
+        // Create new route
+        route = new RouteModel(routeData);
+        await route.save();
+      }
       console.log('[RouteService] Route saved successfully');
 
       return {
