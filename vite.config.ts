@@ -24,6 +24,20 @@ export default defineConfig({
       output: {
         manualChunks: {}
       }
+    },
+    // Skip type checking during build when SKIP_TYPESCRIPT is true
+    minify: true,
+    sourcemap: false,
+    commonjsOptions: {
+      transformMixedEsModules: true
+    }
+  },
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    tsconfigRaw: {
+      compilerOptions: {
+        jsx: 'react-jsx'
+      }
     }
   },
   optimizeDeps: {
