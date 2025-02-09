@@ -144,8 +144,31 @@ class StyleControl {
       }
     });
 
+    console.debug('[StyleControl] Switching to style:', {
+      style,
+      url: MAP_STYLES[style].url,
+      currentLayers: this.map.getStyle()?.layers?.map(l => ({
+        id: l.id,
+        type: l.type,
+        source: l.source
+      }))
+    });
+
     // Switch map style
     this.map.setStyle(MAP_STYLES[style].url);
+
+    // Log layers after style load
+    this.map.once('style.load', () => {
+      console.debug('[StyleControl] New style loaded:', {
+        style,
+        layers: this.map.getStyle()?.layers?.map(l => ({
+          id: l.id,
+          type: l.type,
+          source: l.source
+        }))
+      });
+    });
+
     this.recreateCustomLayers();
   }
 

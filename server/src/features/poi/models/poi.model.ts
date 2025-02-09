@@ -11,9 +11,15 @@ const poiStyleSchema = new mongoose.Schema({
 });
 
 const poiSchema = new mongoose.Schema({
-  position: {
-    lat: { type: Number, required: true },
-    lng: { type: Number, required: true }
+  coordinates: {
+    type: [Number],
+    required: true,
+    validate: {
+      validator: function(v: number[]) {
+        return Array.isArray(v) && v.length === 2;
+      },
+      message: 'Coordinates must be [longitude, latitude]'
+    }
   },
   name: { type: String, required: true },
   description: { type: String },

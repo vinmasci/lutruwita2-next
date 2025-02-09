@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ProcessedRoute } from '@/types';
+import { ProcessedRoute, normalizeRoute } from '../types/route.types';
 import { parseGpx } from '@/utils/gpx/parsing';
 
 export const useGpxProcessing = () => {
@@ -11,7 +11,7 @@ export const useGpxProcessing = () => {
       const text = await file.text();
       const parsed = parseGpx(text);
       
-      const route: ProcessedRoute = {
+      const route = normalizeRoute({
         id: crypto.randomUUID(),
         name: file.name.replace('.gpx', ''),
         color: '#3b82f6',
@@ -19,7 +19,7 @@ export const useGpxProcessing = () => {
         gpxData: text,
         segments: parsed.segments,
         geojson: parsed.geojson
-      };
+      });
 
       return route;
     } catch (error) {

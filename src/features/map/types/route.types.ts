@@ -84,7 +84,7 @@ export interface SavedRouteState {
     places: any[];
   };
   photos: SerializedPhoto[];
-  places: Place[];
+  places?: Place[]; // Made optional as part of migration
 }
 
 export interface RouteListItem {
@@ -104,7 +104,7 @@ export interface SaveRouteRequest {
   mapState: SavedRouteState['mapState'];
   pois: SavedRouteState['pois'];
   photos: SerializedPhoto[];
-  places: Place[];
+  places?: Place[]; // Made optional as part of migration
   name: string;
   type: SavedRouteState['type'];
   isPublic: boolean;

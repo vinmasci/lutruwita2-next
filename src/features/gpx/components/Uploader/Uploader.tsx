@@ -3,7 +3,7 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { GpxUploaderProps } from './Uploader.types';
 import { ProcessedRoute as GpxProcessedRoute } from '../../types/gpx.types';
-import { ProcessedRoute as MapProcessedRoute } from '../../../map/types/route.types';
+import { ProcessedRoute as MapProcessedRoute, normalizeRoute } from '../../../map/types/route.types';
 import UploaderUI from './UploaderUI';
 import { useEffect, useState } from 'react';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
@@ -43,11 +43,8 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
       const fileContent = await file.text();
       const result = await processGpx(file);
       if (result) {
-        // Ensure routeId is defined
-        const processedRoute: MapProcessedRoute = {
-          ...result,
-          routeId: result.routeId || result.id // Fallback to id if routeId is undefined
-        };
+        // Use normalizeRoute to ensure proper type and structure
+        const processedRoute = normalizeRoute(result);
         addRoute(processedRoute);
         setCurrentRoute(processedRoute);
         onUploadComplete(processedRoute);
@@ -86,8 +83,9 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
       const result = await processGpx(file);
       
       if (result) {
-        const updatedRoute: MapProcessedRoute = {
-          ...result,
+        // Use normalizeRoute and override specific fields
+        const updatedRoute = {
+          ...normalizeRoute(result),
           id: existingRoute.id,
           routeId: existingRoute.routeId || existingRoute.id,
           name: newName

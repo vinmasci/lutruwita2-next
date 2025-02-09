@@ -3,20 +3,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { 
   POIContextType, 
   POIType, 
-  POIPosition, 
+  POICoordinates, 
   StoredPOIs,
   DraggablePOI,
   PlaceNamePOI,
-  NewPOIInput
+  NewPOIInput,
+  POIMode
 } from '../types/poi.types';
 import { SavedRouteState } from '../../map/types/route.types';
-
 // Action types
 type POIAction =
   | { type: 'ADD_POI'; payload: { poi: NewPOIInput } }
   | { type: 'REMOVE_POI'; payload: string }
   | { type: 'UPDATE_POI'; payload: { id: string; updates: Partial<Omit<POIType, 'id'>> } }
-  | { type: 'UPDATE_POSITION'; payload: { id: string; position: POIPosition } }
+  | { type: 'UPDATE_POSITION'; payload: { id: string; coordinates: POICoordinates } }
   | { type: 'LOAD_POIS'; payload: POIType[] };
 
 // Reducer
@@ -80,21 +80,11 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
       });
     case 'UPDATE_POSITION':
       console.log('[POIReducer] Updating POI position:', action.payload);
-      return state.map((poi) => {
-        if (poi.id !== action.payload.id) return poi;
-        
-        if (poi.type === 'place') {
-          return {
-            ...poi,
-            position: action.payload.position,
-          } as PlaceNamePOI;
-        } else {
-          return {
-            ...poi,
-            position: action.payload.position,
-          } as DraggablePOI;
-        }
-      });
+      return state.map((poi) => 
+        poi.id === action.payload.id 
+          ? { ...poi, coordinates: action.payload.coordinates }
+          : poi
+      );
     case 'LOAD_POIS':
       console.log('[POIReducer] Loading POIs:', action.payload);
       return action.payload;
@@ -111,6 +101,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pois, dispatch] = useReducer(poiReducer, []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [poiMode, setPoiMode] = useState<POIMode>('none');
 
   // Monitor POI state changes
   useEffect(() => {
@@ -119,39 +110,44 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [pois]);
 
-  const addPOI = (poi: NewPOIInput) => {
-    // Add POI to state
-    dispatch({ type: 'ADD_POI', payload: { poi } });
-    
-    // Add POI data to the drawer for MongoDB
-    const poiDataDiv = document.getElementById('poi-data-for-mongo');
-    if (poiDataDiv) {
-      const currentData = poiDataDiv.textContent ? JSON.parse(poiDataDiv.textContent) : [];
-      const newData = [...currentData, {
-        type: poi.type,
-        name: poi.name,
-        position: poi.position,
-        category: poi.category,
-        icon: poi.icon,
-        ...(poi.type === 'place' ? { placeId: poi.placeId } : {})
-      }];
-      poiDataDiv.textContent = JSON.stringify(newData, null, 2);
+  const addPOI = async (poi: NewPOIInput) => {
+    try {
+      // Add POI to local state only
+      dispatch({ type: 'ADD_POI', payload: { poi } });
+    } catch (error) {
+      console.error('[POIContext] Error saving POI:', error);
+      setError(error instanceof Error ? error : new Error('Failed to save POI'));
     }
   };
 
   const removePOI = (id: string) => {
-    console.log('[POIContext] Removing POI:', id);
-    dispatch({ type: 'REMOVE_POI', payload: id });
+    try {
+      console.log('[POIContext] Removing POI:', id);
+      dispatch({ type: 'REMOVE_POI', payload: id });
+    } catch (error) {
+      console.error('[POIContext] Error removing POI:', error);
+      setError(error instanceof Error ? error : new Error('Failed to remove POI'));
+    }
   };
 
   const updatePOI = (id: string, updates: Partial<Omit<POIType, 'id'>>) => {
-    console.log('[POIContext] Updating POI:', { id, updates });
-    dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
+    try {
+      console.log('[POIContext] Updating POI:', { id, updates });
+      dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
+    } catch (error) {
+      console.error('[POIContext] Error updating POI:', error);
+      setError(error instanceof Error ? error : new Error('Failed to update POI'));
+    }
   };
 
-  const updatePOIPosition = (id: string, position: POIPosition) => {
-    console.log('[POIContext] Updating POI position:', { id, position });
-    dispatch({ type: 'UPDATE_POSITION', payload: { id, position } });
+  const updatePOIPosition = (id: string, coordinates: POICoordinates) => {
+    try {
+      console.log('[POIContext] Updating POI position:', { id, coordinates });
+      dispatch({ type: 'UPDATE_POSITION', payload: { id, coordinates } });
+    } catch (error) {
+      console.error('[POIContext] Error updating POI position:', error);
+      setError(error instanceof Error ? error : new Error('Failed to update POI position'));
+    }
   };
 
   // Get POIs in route format - all POIs are for the current route by default
@@ -163,10 +159,10 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (poi.type !== 'draggable') return false;
       
       // Validate required fields
-      if (!poi.id || !poi.position || !poi.name || !poi.category || !poi.icon) {
+      if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon) {
         console.warn('[POIContext] Invalid draggable POI missing required fields:', {
           id: !!poi.id,
-          position: !!poi.position,
+          coordinates: !!poi.coordinates,
           name: !!poi.name,
           category: !!poi.category,
           icon: !!poi.icon,
@@ -181,10 +177,10 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (poi.type !== 'place') return false;
       
       // Validate required fields
-      if (!poi.id || !poi.position || !poi.name || !poi.category || !poi.icon || !poi.placeId) {
+      if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon || !poi.placeId) {
         console.warn('[POIContext] Invalid place POI missing required fields:', {
           id: !!poi.id,
-          position: !!poi.position,
+          coordinates: !!poi.coordinates,
           name: !!poi.name,
           category: !!poi.category,
           icon: !!poi.icon,
@@ -216,11 +212,11 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
-      // Process new POIs
+      // Process new POIs - they should all be full POI objects now
       const newPOIs: POIType[] = [
-        ...routePOIs.draggable.map(poi => typeof poi === 'string' ? null : poi),
-        ...routePOIs.places.map(poi => typeof poi === 'string' ? null : poi)
-      ].filter((poi): poi is POIType => poi !== null);
+        ...routePOIs.draggable,
+        ...routePOIs.places
+      ];
 
       // Merge with existing POIs, avoiding duplicates
       const mergedPOIs = [...pois];
@@ -234,7 +230,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...mergedPOIs[existingIndex],
             ...newPoi,
             // Preserve position if it was locally modified
-            position: mergedPOIs[existingIndex].position
+            coordinates: mergedPOIs[existingIndex].coordinates
           };
         }
       });
@@ -253,6 +249,8 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pois,
         isLoading,
         error,
+        poiMode,
+        setPoiMode,
         addPOI,
         removePOI,
         updatePOI,

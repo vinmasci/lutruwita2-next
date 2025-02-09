@@ -2,14 +2,22 @@ import React from 'react';
 import { Button, Typography } from '@mui/material';
 import { MousePointer2, MapPin } from 'lucide-react';
 import { POILocationInstructionsProps } from './types';
+import { POIMode } from '../../types/poi.types';
 import { InstructionsBox, InstructionsText } from './POIDrawer.styles';
 
 import { useMapContext } from '../../../map/context/MapContext';
+import { usePOIContext } from '../../context/POIContext';
 
 const POILocationInstructions: React.FC<POILocationInstructionsProps> = ({ mode, onCancel }) => {
-  const { isPoiPlacementMode } = useMapContext();
-  const instructions = {
-    map: {
+  // Ensure mode is not 'none'
+  if (mode === 'none') return null;
+  const { poiMode } = usePOIContext();
+  const instructions: Record<Exclude<POIMode, 'none'>, {
+    title: string;
+    icon: JSX.Element;
+    steps: string[];
+  }> = {
+    regular: {
       title: 'Select Location',
       icon: <MousePointer2 size={24} />,
       steps: [
@@ -39,7 +47,7 @@ const POILocationInstructions: React.FC<POILocationInstructionsProps> = ({ mode,
       </Typography>
 
       <InstructionsBox>
-        {currentInstructions.steps.map((step, index) => (
+        {currentInstructions.steps.map((step: string, index: number) => (
           <InstructionsText key={index} variant="body2">
             {index + 1}. {step}
           </InstructionsText>
@@ -47,8 +55,8 @@ const POILocationInstructions: React.FC<POILocationInstructionsProps> = ({ mode,
       </InstructionsBox>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {mode === 'map' 
-          ? isPoiPlacementMode
+        {mode === 'regular' 
+          ? poiMode === 'regular'
             ? 'Click anywhere on the map to place your point of interest.'
             : 'Choose a precise location on the map for your point of interest.'
           : 'Select a place name to attach one or more points of interest.'}

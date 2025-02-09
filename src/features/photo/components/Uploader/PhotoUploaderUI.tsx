@@ -100,12 +100,12 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
             mb: 2 
           }}>
             <Typography variant="h6">
-              {selectedPhotos.size} photo(s) selected
+              {photos.filter(p => p.hasGps).length} photo(s) with GPS data
             </Typography>
             <Button
               variant="contained"
               startIcon={<MapIcon />}
-              disabled={selectedPhotos.size === 0}
+              disabled={!photos.some(p => p.hasGps)}
               onClick={onAddToMap}
             >
               Add to Map

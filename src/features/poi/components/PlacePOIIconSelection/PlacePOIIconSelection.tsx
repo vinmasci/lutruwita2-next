@@ -16,42 +16,57 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
   const { addPOI, removePOI, pois } = usePOIContext();
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
   
-  const [selectedIcons, setSelectedIcons] = useState<Set<POIIconName>>(new Set());
+  // Initialize selectedIcons with existing icons for this place
+  const [selectedIcons, setSelectedIcons] = useState<Set<POIIconName>>(() => {
+    const existingIcons = pois
+      .filter(poi => 
+        poi.type === 'place' && 
+        poi.placeId === place.id
+      )
+      .map(poi => poi.icon);
+    return new Set(existingIcons);
+  });
+
+  // Update selectedIcons when place changes
+  useEffect(() => {
+    const existingIcons = pois
+      .filter(poi => 
+        poi.type === 'place' && 
+        poi.placeId === place.id
+      )
+      .map(poi => poi.icon);
+    setSelectedIcons(new Set(existingIcons));
+  }, [place.id, pois]);
 
   const handleIconClick = (iconName: POIIconName, category: POICategory) => {
+    // Find existing POI with this icon
+    const existingPOI = pois.find(
+      poi => 
+        poi.type === 'place' && 
+        poi.placeId === place.id && 
+        poi.icon === iconName
+    );
+
     const newSelectedIcons = new Set(selectedIcons);
-    if (selectedIcons.has(iconName)) {
+
+    if (existingPOI) {
+      // If POI exists, remove it
+      removePOI(existingPOI.id);
       newSelectedIcons.delete(iconName);
     } else {
-      newSelectedIcons.add(iconName);
-    }
-    setSelectedIcons(newSelectedIcons);
-
-    if (newSelectedIcons.has(iconName)) {
-      // Add POI
+      // If POI doesn't exist, add it
       addPOI({
         type: 'place',
         placeId: place.id,
         name: place.name,
-        position: {
-          lat: place.coordinates[1],
-          lng: place.coordinates[0]
-        },
+        coordinates: place.coordinates,
         category,
         icon: iconName,
       });
-    } else {
-      // Remove POI
-      const existingPOI = pois.find(
-        poi => 
-          poi.type === 'place' && 
-          poi.placeId === place.id && 
-          poi.icon === iconName
-      );
-      if (existingPOI) {
-        removePOI(existingPOI.id);
-      }
+      newSelectedIcons.add(iconName);
     }
+
+    setSelectedIcons(newSelectedIcons);
   };
 
   return (
@@ -106,11 +121,12 @@ const PlacePOIIconSelection: React.FC<PlacePOIIconSelectionProps> = ({ place, on
               }}
             >
               {icons.map((iconName) => {
-              const icon = POI_ICONS.find(i => i.name === iconName);
-              if (!icon) return null;
-              const category = POI_CATEGORIES[icon.category];
-              const iconColor = icon.style?.color || category.color;
-              return (
+                const icon = POI_ICONS.find(i => i.name === iconName);
+                if (!icon) return null;
+                const category = POI_CATEGORIES[icon.category];
+                const iconColor = icon.style?.color || category.color;
+                
+                return (
                 <IconGridItem
                   key={icon.name}
                   selected={selectedIcons.has(icon.name)}

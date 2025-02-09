@@ -130,12 +130,13 @@ const PhotoUploader = ({
   };
 
   const handleAddToMap = () => {
-    const selectedPhotosList = photos.filter(p => selectedPhotos.has(p.id));
-    if (selectedPhotosList.length > 0) {
+    // Get all photos that have GPS coordinates
+    const photosToAdd = photos.filter(p => p.hasGps);
+    if (photosToAdd.length > 0) {
       // Only call onUploadComplete when actually adding to map
-      onUploadComplete(selectedPhotosList);
+      onUploadComplete(photosToAdd);
       if (onAddToMap) {
-        onAddToMap(selectedPhotosList);
+        onAddToMap(photosToAdd);
       }
       // Clear photos and selection after adding to map
       setPhotos([]);

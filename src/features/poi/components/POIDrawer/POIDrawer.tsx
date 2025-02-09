@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Drawer } from '@mui/material';
 import { usePOIContext } from '../../context/POIContext';
+import { POIType, POIMode } from '../../types/poi.types';
 import { useMapContext } from '../../../map/context/MapContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { POIDrawerProps, POIDrawerState, POIFormData } from './types';
@@ -14,11 +15,10 @@ import PlacePOIInstructions from './PlacePOIInstructions';
 import { PlaceLabel, getPlaceLabelAtPoint } from '../../utils/placeDetection';
 
 const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
-  const { addPOI } = usePOIContext();
+  const { addPOI, poiMode, setPoiMode, pois } = usePOIContext();
   const { currentRoute } = useRouteContext();
   const [selectedPlace, setSelectedPlace] = useState<PlaceLabel | null>(null);
-  const [state, setState] = React.useState<POIDrawerState>({
-    mode: null,
+  const [state, setState] = React.useState<Omit<POIDrawerState, 'mode'>>({
     step: 'mode-select',
     selectedCategory: null,
     selectedIcon: null,
@@ -36,7 +36,6 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   React.useEffect(() => {
     if (!isOpen) {
       setState({
-        mode: null,
         step: 'mode-select',
         selectedCategory: null,
         selectedIcon: null,
@@ -46,21 +45,54 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
         isSubmitting: false,
         error: null,
       });
+      setPoiMode('none');
     }
   }, [isOpen]);
 
-  const { map, setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
+  const { map } = useMapContext();
 
   // Handle map click events for place selection
   useEffect(() => {
-    if (!map || state.mode !== 'place') {
+    if (!map || poiMode !== 'place') {
       setSelectedPlace(null);
       return;
     }
 
     const handleClick = (e: mapboxgl.MapMouseEvent) => {
       const place = getPlaceLabelAtPoint(map, e.point);
-      setSelectedPlace(place);
+      if (place) {
+        // Get existing icons for this place
+        const placeIcons = pois
+          .filter((poi: POIType) => 
+            poi.type === 'place' && 
+            poi.placeId === place.id
+          )
+          .map((poi: POIType) => poi.icon);
+
+        // Add icons to place object
+        const placeWithIcons = {
+          ...place,
+          icons: placeIcons.length > 0 ? placeIcons : undefined
+        };
+
+        // If place has icons and we're in place mode, don't open drawer
+        if (poiMode === 'place' && placeIcons.length > 0) {
+          setSelectedPlace(placeWithIcons);
+          // Open PlacePOIIconSelection directly
+          setState(prev => ({
+            ...prev,
+            step: 'icon-select'
+          }));
+        } else {
+          setSelectedPlace(placeWithIcons);
+          setState(prev => ({
+            ...prev,
+            step: 'icon-select'
+          }));
+        }
+      } else {
+        setSelectedPlace(null);
+      }
     };
 
     map.on('click', handleClick);
@@ -68,30 +100,35 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
     return () => {
       map.off('click', handleClick);
     };
-  }, [map, state.mode]);
+  }, [map, poiMode, pois]);
 
   // Reset state when drawer closes
   useEffect(() => {
     if (!isOpen) {
-      setPoiPlacementMode(false);
-      setPoiPlacementClick(undefined);
       setSelectedPlace(null);
     }
-  }, [isOpen, setPoiPlacementMode, setPoiPlacementClick]);
+  }, [isOpen]);
 
-  const handleModeSelect = (mode: POIDrawerState['mode']) => {
+  const handleModeSelect = (newMode: POIMode) => {
     setState(prev => ({
       ...prev,
-      mode,
-      // Skip location-select, go straight to icon selection
       step: 'icon-select'
     }));
     
-    // Enable place mode highlighting when "Add POI to Place" is selected
-    setPoiPlacementMode(mode === 'place');
+    // Update POI mode in context
+    setPoiMode(newMode);
   };
 
   const handlePlaceSelect = (placeId: string) => {
+    // In place mode, check if place has icons
+    if (poiMode === 'place') {
+      const place = selectedPlace;
+      if (place?.icons && place.icons.length > 0) {
+        // Don't open drawer if place has icons
+        return;
+      }
+    }
+    
     setState(prev => ({
       ...prev,
       selectedPlaceId: placeId,
@@ -105,7 +142,11 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
 
     console.log('[POIDrawer] Handling icon select:', { icon, category });
 
-    if (state.mode === 'place' && selectedPlace) {
+    if (poiMode === 'place' && selectedPlace) {
+      // If place has icons, don't handle icon selection here
+      if (selectedPlace.icons && selectedPlace.icons.length > 0) {
+        return;
+      }
       // Place POIs are handled by PlacePOIDetailsDrawer
       return;
     } else {
@@ -141,7 +182,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
         // Update the last POI with its final position
         const updatedPoi = {
           ...lastPoi,
-          position: { lat, lng }
+          coordinates: [lng, lat] as [number, number]
         };
         setDraggablePoiData(prev => [...prev.slice(0, -1), updatedPoi]);
         addPOI(updatedPoi);
@@ -161,8 +202,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       selectedCategory: null,
       selectedIcon: null
     }));
-    // Reset place mode when going back to mode selection
-    setPoiPlacementMode(false);
+    setPoiMode('none');
   };
 
   const renderContent = () => {
@@ -170,7 +210,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       case 'mode-select':
         return <POIModeSelection onModeSelect={handleModeSelect} />;
       case 'icon-select':
-        if (state.mode === 'place') {
+        if (poiMode === 'place') {
           return selectedPlace ? (
             <PlacePOIIconSelection
               place={selectedPlace}
@@ -180,9 +220,9 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
             <PlacePOIInstructions />
           );
         }
-        return state.mode && (
+        return poiMode !== 'none' && (
           <POIIconSelection
-            mode={state.mode}
+            mode={poiMode}
             selectedIcon={state.selectedIcon}
             onIconSelect={handleIconSelect}
             onBack={handleIconBack}

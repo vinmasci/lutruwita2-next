@@ -1,7 +1,4 @@
-export interface POIPosition {
-  lat: number;
-  lng: number;
-}
+export type POICoordinates = [number, number]; // [longitude, latitude]
 
 export type POICategory = 
   | 'road-information'
@@ -27,7 +24,7 @@ export interface POIStyle {
 export interface BasePOI {
   id: string;
   routeId?: string;
-  position: POIPosition;
+  coordinates: POICoordinates;
   name: string;
   description?: string;
   category: POICategory;

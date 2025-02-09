@@ -5,25 +5,9 @@ import { POIService } from '../../poi/services/poi.service';
 import { DraggablePOI, PlaceNamePOI } from '../../../shared/types/poi.types';
 
 export class RouteService {
-  private poiService: POIService;
-
-  constructor() {
-    this.poiService = new POIService();
-  }
-
   async saveRoute(userId: string, data: SaveRouteRequest & Partial<SavedRouteState>, routeId?: string): Promise<SaveRouteResponse> {
     try {
       console.log('[RouteService] Starting route save process...');
-
-      let savedPois;
-      // Save POIs first
-      if (data.pois) {
-        console.log('[RouteService] Saving POIs...');
-        savedPois = await this.poiService.savePOIs({
-          draggable: data.pois.draggable || [],
-          places: data.pois.places || []
-        });
-      }
 
       const routeData = {
         userId,
@@ -33,8 +17,7 @@ export class RouteService {
         mapState: data.mapState,
         routes: data.routes || [],
         photos: data.photos || [],
-        pois: savedPois || { draggable: [], places: [] },
-        places: data.places || []
+        pois: data.pois || { draggable: [], places: [] }
       };
 
       let route;
@@ -142,10 +125,7 @@ export class RouteService {
         throw new Error('Access denied');
       }
 
-      // Delete all POIs
-      await this.poiService.deleteAllPOIs();
-
-      // Delete the route
+      // Delete the route only
       await RouteModel.deleteOne({ _id: routeId });
       console.log('[RouteService] Route and associated POIs deleted successfully');
     } catch (error) {

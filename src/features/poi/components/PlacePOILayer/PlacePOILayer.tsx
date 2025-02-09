@@ -20,8 +20,8 @@ interface MarkerRef {
 }
 
 export const PlacePOILayer: React.FC = () => {
-  const { map, isPoiPlacementMode } = useMapContext();
-  const { pois } = usePOIContext();
+  const { map } = useMapContext();
+  const { pois, poiMode } = usePOIContext();
   const { places, updatePlace } = usePlaceContext();
   const markersRef = useRef<MarkerRef[]>([]);
   const [hoveredPlace, setHoveredPlace] = useState<PlaceLabel | null>(null);
@@ -29,7 +29,62 @@ export const PlacePOILayer: React.FC = () => {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   const isDrawerOpen = selectedPlace !== null;
+  // Custom hook to track map style loading
   const isStyleLoaded = useMapStyle(map);
+  const [isLayerReady, setIsLayerReady] = useState(false);
+
+  // Effect to track when both map and style are ready
+  useEffect(() => {
+    if (!map || !isStyleLoaded) {
+      console.debug('[PlacePOILayer] Map or style not ready:', { 
+        hasMap: !!map, 
+        isStyleLoaded,
+        poiMode,
+        mapLoaded: map?.loaded(),
+        mapStyle: map?.getStyle()?.name
+      });
+      return;
+    }
+
+    // Wait for layers to be fully loaded
+    const checkLayers = () => {
+      const settlementLayers = [
+        'settlement-major-label',
+        'settlement-minor-label',
+        'settlement-subdivision-label'
+      ];
+      
+      const availableLayers = settlementLayers.filter(layer => {
+        const hasLayer = map.getLayer(layer);
+        const isVisible = map.getLayoutProperty(layer, 'visibility') !== 'none';
+        console.debug(`[PlacePOILayer] Checking layer ${layer}:`, { hasLayer, isVisible });
+        return hasLayer;
+      });
+
+      console.debug('[PlacePOILayer] Available settlement layers:', {
+        expected: settlementLayers,
+        found: availableLayers,
+        allStyles: map.getStyle()?.layers?.map(l => ({
+          id: l.id,
+          type: l.type,
+          visibility: map.getLayoutProperty(l.id, 'visibility')
+        }))
+      });
+
+      const hasSettlementLayers = settlementLayers.every(layer => map.getLayer(layer));
+
+      if (hasSettlementLayers) {
+        console.debug('[PlacePOILayer] All settlement layers found, setting ready');
+        setIsLayerReady(true);
+      } else {
+        console.debug('[PlacePOILayer] Missing some settlement layers, retrying');
+        setTimeout(checkLayers, 100);
+      }
+    };
+
+    // Start checking for layers
+    checkLayers();
+  }, [map, isStyleLoaded, poiMode]);
 
   // Handle zoom changes
   useEffect(() => {
@@ -47,47 +102,81 @@ export const PlacePOILayer: React.FC = () => {
     };
   }, [map]);
 
-  // Clear selected place when POI placement mode changes
+  // Clear selected place when POI mode changes
   useEffect(() => {
     setSelectedPlace(null);
-  }, [isPoiPlacementMode]);
+  }, [poiMode]);
 
-  // Setup highlight layer
+  // Setup highlight layer - now dependent on isLayerReady
   useEffect(() => {
-    if (!map || !isStyleLoaded) return;
+    if (!map || !isLayerReady) {
+      console.debug('[PlacePOILayer] Not ready:', { map: !!map, isLayerReady });
+      return;
+    }
+    console.debug('[PlacePOILayer] Setting up highlight layer');
 
     const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
+      console.debug('[PlacePOILayer] Mouse move event:', { 
+        point: e.point,
+        mode: poiMode,
+        isLayerReady,
+        zoom: map.getZoom(),
+        center: map.getCenter(),
+        hoveredPlace: hoveredPlace?.name
+      });
+
       const place = getPlaceLabelAtPoint(map, e.point);
-      setHoveredPlace(place);
+      console.debug('[PlacePOILayer] Place detection result:', { 
+        place,
+        hasExistingPOIs: place ? pois.some(poi => 
+          poi.coordinates[0] === place.coordinates[0] && 
+          poi.coordinates[1] === place.coordinates[1]
+        ) : false
+      });
+      
+      if (place?.name !== hoveredPlace?.name) {
+        console.debug('[PlacePOILayer] Updating hovered place:', {
+          from: hoveredPlace?.name,
+          to: place?.name
+        });
+        setHoveredPlace(place);
+      }
       
       // Update highlight
       const source = map.getSource(HIGHLIGHT_SOURCE) as mapboxgl.GeoJSONSource;
       if (source) {
+        const coordinates = place?.coordinates || [0, 0];
+        console.debug('[PlacePOILayer] Updating highlight source:', { coordinates });
+        
         source.setData({
           type: 'Feature',
           geometry: {
             type: 'Point',
-            coordinates: place?.coordinates || [0, 0]
+            coordinates
           },
           properties: {}
         });
+      } else {
+        console.debug('[PlacePOILayer] Highlight source not found');
       }
 
-      // Show highlight when in POI placement mode and hovering over a place,
-      // or when hovering over a place that has POIs
-      const hasData = place && (
-        isPoiPlacementMode || 
-        pois.some(poi => 
-          poi.position.lng === place.coordinates[0] && 
-          poi.position.lat === place.coordinates[1]
-        )
-      );
+      // Show highlight whenever we're in place mode and hovering over a place
+      const hasData = place && poiMode === 'place';
+      console.debug('[PlacePOILayer] Highlight visibility:', { 
+        hasPlace: !!place, 
+        poiMode, 
+        shouldShow: hasData 
+      });
 
-      map.setLayoutProperty(
-        HIGHLIGHT_LAYER,
-        'visibility',
-        hasData ? 'visible' : 'none'
-      );
+      try {
+        map.setLayoutProperty(
+          HIGHLIGHT_LAYER,
+          'visibility',
+          hasData ? 'visible' : 'none'
+        );
+      } catch (error) {
+        console.error('[PlacePOILayer] Error setting highlight visibility:', error);
+      }
 
       // Update cursor
       map.getCanvas().style.cursor = hasData ? 'pointer' : '';
@@ -97,13 +186,11 @@ export const PlacePOILayer: React.FC = () => {
       const place = getPlaceLabelAtPoint(map, e.point);
       if (!place) return;
 
-      // Only handle click if place has POIs
+      // Check if place already has POIs
       const hasPOIs = pois.some(poi => 
-        poi.position.lng === place.coordinates[0] && 
-        poi.position.lat === place.coordinates[1]
+        poi.coordinates[0] === place.coordinates[0] && 
+        poi.coordinates[1] === place.coordinates[1]
       );
-
-      if (!hasPOIs && !isPoiPlacementMode) return;
 
       // Get place data if it exists, or create and save new place
       const placeData = places[place.id] || {
@@ -114,12 +201,15 @@ export const PlacePOILayer: React.FC = () => {
         photos: []
       };
 
-      // If this is a new place, save it first
-      if (!places[place.id]) {
-        await updatePlace(place.id, placeData);
+      // Only show details drawer if we're not in place mode or if the place has POIs
+      if (poiMode !== 'place' || hasPOIs) {
+        // If this is a new place, save it first
+        if (!places[place.id]) {
+          await updatePlace(place.id, placeData);
+        }
+        setSelectedPlace(placeData);
       }
-
-      setSelectedPlace(placeData);
+      // In place mode without POIs, we don't set selectedPlace because we want the icon selection drawer
     };
 
     try {
@@ -131,38 +221,53 @@ export const PlacePOILayer: React.FC = () => {
         map.removeSource(HIGHLIGHT_SOURCE);
       }
 
+      console.debug('[PlacePOILayer] Setting up highlight source and layer');
+      
       // Add highlight source and layer
-      map.addSource(HIGHLIGHT_SOURCE, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [0, 0]
-          },
-          properties: {}
-        }
-      });
+      try {
+        map.addSource(HIGHLIGHT_SOURCE, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [0, 0]
+            },
+            properties: {}
+          }
+        });
+        console.debug('[PlacePOILayer] Added highlight source');
+      } catch (error) {
+        console.error('[PlacePOILayer] Error adding highlight source:', error);
+      }
 
-      map.addLayer({
+      try {
+        map.addLayer({
         id: HIGHLIGHT_LAYER,
         type: 'circle',
         source: HIGHLIGHT_SOURCE,
+        layout: {
+          'visibility': 'none'
+        },
         paint: {
           'circle-radius': [
             'interpolate',
             ['linear'],
             ['zoom'],
-            10, 10,  // Smaller at zoom 10
-            15, 20   // Larger at zoom 15
+            10, 20,  // Larger at zoom 10
+            15, 30   // Larger at zoom 15
           ],
           'circle-color': '#ffffff',
-          'circle-opacity': 0.2,
-          'circle-stroke-width': 2,
+          'circle-opacity': 0.3,
+          'circle-stroke-width': 3,
           'circle-stroke-color': '#ffffff',
           'circle-stroke-opacity': 0.8
         }
-      });
+        });
+        console.debug('[PlacePOILayer] Added highlight layer');
+      } catch (error) {
+        console.error('[PlacePOILayer] Error adding highlight layer:', error);
+      }
 
       // Add event listeners
       map.on('mousemove', handleMouseMove);
@@ -188,25 +293,27 @@ export const PlacePOILayer: React.FC = () => {
         }
       }
     };
-  }, [map, isStyleLoaded, isPoiPlacementMode, places, pois]);
+  }, [map, isStyleLoaded, poiMode, places, pois]);
 
-  // Handle POI markers
+  // Handle POI markers - now dependent on isLayerReady
   useEffect(() => {
-    if (!map || !isStyleLoaded) return;
+    if (!map || !isLayerReady) return;
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
     markersRef.current = [];
 
-    // Group POIs by coordinates
-    const poiGroups = pois.reduce<Record<string, typeof pois>>((acc, poi) => {
-      const key = `${poi.position.lng},${poi.position.lat}`;
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(poi);
-      return acc;
-    }, {});
+    // Group only place POIs by coordinates
+    const poiGroups = pois
+      .filter((poi): poi is PlaceNamePOI => poi.type === 'place') // Only include place POIs
+      .reduce<Record<string, PlaceNamePOI[]>>((acc, poi) => {
+        const key = `${poi.coordinates[0]},${poi.coordinates[1]}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(poi);
+        return acc;
+      }, {});
 
     // Get current zoom level
     const currentZoom = map.getZoom();
@@ -222,36 +329,47 @@ export const PlacePOILayer: React.FC = () => {
       // Adjust baseOffset based on zoom level
       const baseOffset = currentZoom <= 8.06 ? -15 : 9;
 
+      // Calculate positions for all icons including plus badge if needed
+      const totalPositions = locationPois.length > 3 ? 4 : locationPois.length;
       const positions = calculatePOIPositions(
         {
           id: coordKey,
           name: locationPois[0].name,
           coordinates: [lng, lat]
         },
-        locationPois.length,
+        totalPositions,
         {
           iconSize: 16,
           spacing: 5.5,
-          maxPerRow: 3,
+          maxPerRow: 4, // Always use 4 to ensure space for plus badge
           baseOffset
         }
       );
 
-      locationPois.forEach((poi, index) => {
+      // Only show first 3 POIs
+      const visiblePois = locationPois.slice(0, 3);
+      const remainingCount = locationPois.length - 3;
+
+      // Create markers for visible POIs
+      visiblePois.forEach((poi, index) => {
         const position = positions[index];
         if (!position) return;
 
         // Create marker element
         const el = document.createElement('div');
-        el.className = 'place-poi-marker';
-        const category = POI_CATEGORIES[poi.category as POICategory];
-        const backgroundColor = poi.style?.color || category.color;
-        el.style.width = '20px';
-        el.style.height = '20px';
-        el.style.display = 'flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-        el.innerHTML = `<i class="poi-icon ${ICON_PATHS[poi.icon]}" style="color: white; font-size: 12px;"></i>`;
+        el.className = 'mapboxgl-marker place-poi-marker';
+        
+        // Create inner container for marker content
+        const container = document.createElement('div');
+        container.className = 'place-poi-marker';
+        
+        // Create icon element
+        const icon = document.createElement('i');
+        icon.className = `poi-icon ${ICON_PATHS[poi.icon]}`;
+        
+        // Assemble the marker
+        container.appendChild(icon);
+        el.appendChild(container);
         
         // Add click handler to open drawer
         el.addEventListener('click', async () => {
@@ -283,6 +401,51 @@ export const PlacePOILayer: React.FC = () => {
 
         markersRef.current.push({ marker, poiId: poi.id });
       });
+
+      // Add plus badge if there are more POIs
+      if (remainingCount > 0) {
+        const plusPosition = positions[3]; // Plus badge will always be at position 3
+        if (plusPosition) {
+          const el = document.createElement('div');
+          el.className = 'mapboxgl-marker place-poi-marker';
+          
+          const container = document.createElement('div');
+          container.className = 'place-poi-marker plus-badge';
+          container.textContent = `+${remainingCount}`;
+          
+          el.appendChild(container);
+          
+          // Add click handler to open drawer
+          el.addEventListener('click', async () => {
+            const placeData: Place = {
+              id: coordKey,
+              name: locationPois[0].name,
+              coordinates: [lng, lat] as [number, number],
+              description: '',
+              photos: []
+            };
+
+            // Save place data
+            await updatePlace(coordKey, placeData);
+
+            setSelectedPlace(placeData);
+          });
+
+          // Create and add marker
+          const marker = new mapboxgl.Marker({
+            element: el,
+            anchor: 'bottom',
+            offset: plusPosition.offset,
+            rotation: 0,
+            rotationAlignment: 'viewport',
+            pitchAlignment: 'viewport'
+          })
+            .setLngLat(plusPosition.coordinates)
+            .addTo(map);
+
+          markersRef.current.push({ marker, poiId: 'plus-badge' });
+        }
+      }
     });
 
     return () => {

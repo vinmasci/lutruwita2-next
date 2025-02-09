@@ -3,7 +3,8 @@ import { useMapContext } from '../../map/context/MapContext';
 import mapboxgl from 'mapbox-gl';
 import { parseGpx, GpxParseResult } from '../utils/gpxParser';
 import { matchTrackToRoads } from '../services/mapMatchingService';
-import { ProcessedRoute, GPXProcessingError } from '../types/gpx.types';
+import { ProcessedRoute as GpxProcessedRoute, GPXProcessingError } from '../types/gpx.types';
+import { normalizeRoute, ProcessedRoute } from '../../map/types/route.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { FeatureCollection, Feature, LineString } from 'geojson';
 
@@ -104,7 +105,7 @@ export const useClientGpxProcessing = () => {
       };
 
       const id = uuidv4();
-      const processedRoute: ProcessedRoute = {
+      const processedRoute = normalizeRoute({
         id,
         routeId: `route-${id}`,
         name: parsed.properties.name || file.name.replace(/\.gpx$/i, ''),
@@ -118,7 +119,7 @@ export const useClientGpxProcessing = () => {
           processingState: 'completed',
           progress: 100
         }
-      };
+      });
 
       console.log('[useClientGpxProcessing] Processing complete', { routeId: processedRoute.id });
       return processedRoute;

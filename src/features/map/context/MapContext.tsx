@@ -15,10 +15,10 @@ type MapContextType = {
   isInitializing: boolean;
   hoverCoordinates: [number, number] | null;
   setHoverCoordinates: (coords: [number, number] | null) => void;
-  isPoiPlacementMode: boolean;
-  setPoiPlacementMode: (mode: boolean) => void;
   onPoiPlacementClick?: (coords: [number, number]) => void;
   setPoiPlacementClick: (handler: ((coords: [number, number]) => void) | undefined) => void;
+  poiPlacementMode: boolean;
+  setPoiPlacementMode: (mode: boolean) => void;
 };
 
 const MapContext = createContext<MapContextType>({
@@ -29,10 +29,10 @@ const MapContext = createContext<MapContextType>({
   isInitializing: true,
   hoverCoordinates: null,
   setHoverCoordinates: () => {},
-  isPoiPlacementMode: false,
-  setPoiPlacementMode: () => {},
   onPoiPlacementClick: undefined,
-  setPoiPlacementClick: () => {}
+  setPoiPlacementClick: () => {},
+  poiPlacementMode: false,
+  setPoiPlacementMode: () => {}
 });
 
 export const MapProvider = MapContext.Provider;

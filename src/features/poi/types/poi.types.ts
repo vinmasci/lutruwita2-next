@@ -1,9 +1,6 @@
 import { SavedRouteState } from '../../map/types/route.types';
 
-export interface POIPosition {
-  lat: number;
-  lng: number;
-}
+export type POICoordinates = [number, number]; // [lng, lat]
 
 export type POICategory = 
   | 'road-information'
@@ -43,7 +40,7 @@ export interface POIPhoto {
 
 export interface BasePOI {
   id: string;
-  position: POIPosition;
+  coordinates: POICoordinates;
   name: string;
   description?: string;
   category: POICategory;
@@ -68,10 +65,14 @@ export type POIType = DraggablePOI | PlaceNamePOI;
 
 export type NewPOIInput = Omit<DraggablePOI, 'id'> | Omit<PlaceNamePOI, 'id'>;
 
+export type POIMode = 'none' | 'regular' | 'place';
+
 export interface POIContextType {
   pois: POIType[];
   isLoading: boolean;
   error: Error | null;
+  poiMode: POIMode;
+  setPoiMode: (mode: POIMode) => void;
   addPOI: (poi: NewPOIInput) => void;
   removePOI: (id: string) => void;
   updatePOI: (id: string, updates: Partial<Omit<POIType, 'id'>>) => void;

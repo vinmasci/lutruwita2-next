@@ -51,3 +51,18 @@
   pointer-events: none;
   z-index: 1;
 }
+
+/* Route filename heading */
+.route-filename {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  color: white;
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+  padding: 8px 16px;
+  pointer-events: none;
+}

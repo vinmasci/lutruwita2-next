@@ -1,6 +1,4 @@
-import { POICategory, POIIconName, POIType, NewPOIInput } from '../../types/poi.types';
-
-export type POICreationMode = 'map' | 'place';
+import { POICategory, POIIconName, POIType, NewPOIInput, POIMode } from '../../types/poi.types';
 
 export interface POIFormData {
   name: string;
@@ -16,7 +14,6 @@ export interface POIDrawerProps {
 }
 
 export interface POIDrawerState {
-  mode: POICreationMode | null;
   step: 'mode-select' | 'location-select' | 'icon-select' | 'details';
   selectedCategory: POICategory | null;
   selectedIcon: POIIconName | null;
@@ -28,16 +25,16 @@ export interface POIDrawerState {
 }
 
 export interface POIModeSelectionProps {
-  onModeSelect: (mode: POICreationMode) => void;
+  onModeSelect: (mode: POIMode) => void;
 }
 
 export interface POILocationInstructionsProps {
-  mode: POICreationMode;
+  mode: POIMode;
   onCancel: () => void;
 }
 
 export interface POIIconSelectionProps {
-  mode: POIDrawerState['mode'];
+  mode: POIMode;
   selectedIcon: POIDrawerState['selectedIcon'];
   onIconSelect: (icon: POIDrawerState['selectedIcon']) => void;
   onBack: () => void;
@@ -45,7 +42,7 @@ export interface POIIconSelectionProps {
 }
 
 export interface POIDetailsFormProps {
-  mode: POICreationMode;
+  mode: POIMode;
   initialData?: POIFormData;
   onSubmit: (data: POIFormData) => void;
   onBack: () => void;
@@ -54,13 +51,13 @@ export interface POIDetailsFormProps {
 
 export interface POIDrawerHeaderProps {
   step: POIDrawerState['step'];
-  mode: POICreationMode | null;
+  mode: POIMode;
   onClose: () => void;
 }
 
 export interface POIDrawerFooterProps {
   step: POIDrawerState['step'];
-  mode: POICreationMode | null;
+  mode: POIMode;
   onBack?: () => void;
   onNext?: () => void;
   isSubmitting?: boolean;

@@ -34,7 +34,7 @@ export class RouteController {
       }
 
       console.log('[RouteController] Starting route update...');
-      const { name, type, isPublic, mapState, routes, photos, pois, places } = req.body;
+      const { name, type, isPublic, mapState, routes, photos, pois } = req.body;
 
       // Validate mapState if provided
       if (mapState) {
@@ -58,7 +58,6 @@ export class RouteController {
         routes,
         photos,
         pois,
-        places
       };
 
       console.log('[RouteController] Updating route in database...');
@@ -87,7 +86,7 @@ export class RouteController {
       }
 
       console.log('[RouteController] Starting save route...');
-      const { name, type, isPublic, mapState, routes, photos, pois, places } = req.body;
+      const { name, type, isPublic, mapState, routes, photos, pois } = req.body;
 
       console.log('[RouteController] POIs received:', {
         draggable: pois?.draggable?.length || 0,
@@ -119,7 +118,6 @@ export class RouteController {
         routes,
         photos,
         pois,
-        places
       };
 
       console.log('[RouteController] Saving route to database...');

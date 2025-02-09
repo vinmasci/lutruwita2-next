@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { POIPosition, POICategory, POIIconName } from '../../types/poi.types';
+import { POICoordinates, POICategory, POIIconName } from '../../types/poi.types';
 import { useMapContext } from '../../../map/context/MapContext';
 import { ICON_PATHS } from '../../constants/icon-paths';
 import { POI_CATEGORIES } from '../../types/poi.types';
@@ -9,7 +9,7 @@ import '../MapboxPOIMarker/MapboxPOIMarker.styles.css';
 interface POIDragPreviewProps {
   icon: POIIconName;
   category: POICategory;
-  onPlace: (position: POIPosition) => void;
+  onPlace: (coordinates: POICoordinates) => void;
 }
 
 const POIDragPreview: React.FC<POIDragPreviewProps> = ({
@@ -41,7 +41,7 @@ const POIDragPreview: React.FC<POIDragPreviewProps> = ({
 
       // Convert screen coordinates to map coordinates
       const point = map.unproject([e.clientX, e.clientY]);
-      onPlace({ lat: point.lat, lng: point.lng });
+      onPlace([point.lng, point.lat]);
 
       // Clean up
       document.removeEventListener('mousemove', handleMouseMove);

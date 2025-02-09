@@ -27,10 +27,16 @@ const photoSchema = new mongoose.Schema({
 
 // POI base schema - for points of interest along routes
 const poiSchema = new mongoose.Schema({
-  _id: { type: String, required: true }, // Allow string IDs for POIs
-  position: {
-    lat: { type: Number, required: true },
-    lng: { type: Number, required: true }
+  id: { type: String, required: true }, // Use temporary IDs
+  coordinates: {
+    type: [Number],
+    required: true,
+    validate: {
+      validator: function(v: number[]) {
+        return v.length === 2;
+      },
+      message: 'Coordinates must be [longitude, latitude]'
+    }
   },
   name: { type: String, required: true },
   description: String,
@@ -68,17 +74,6 @@ const placeNamePOISchema = poiSchema.clone();
 placeNamePOISchema.add({
   type: { type: String, enum: ['place'], required: true },
   placeId: { type: String, required: true }
-});
-
-// Places schema - for named locations
-const placeSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  photos: [{
-    url: { type: String, required: true },
-    caption: String
-  }],
-  coordinates: { type: [Number], required: true },
-  description: String
 });
 
 // Main route schema
@@ -205,7 +200,6 @@ const routeSchema = new mongoose.Schema({
     draggable: [draggablePOISchema],
     places: [placeNamePOISchema]
   },
-  places: [placeSchema]
 // At the end of the schema definition
 }, {
   timestamps: true,

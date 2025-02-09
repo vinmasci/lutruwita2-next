@@ -96,7 +96,7 @@ const saveCurrentState = useCallback(
         // Now TypeScript knows poi is a DraggablePOI | PlaceNamePOI
         const missing = {
           id: !poi.id,
-          position: !poi.position,
+          coordinates: !poi.coordinates || !Array.isArray(poi.coordinates) || poi.coordinates.length !== 2,
           name: !poi.name,
           category: !poi.category,
           icon: !poi.icon,
@@ -145,7 +145,6 @@ const saveCurrentState = useCallback(
           routes,
           photos: photos.map(serializePhoto),
           pois: pois, // Use the POIs we already retrieved with the correct routeId
-          places: Object.values(places),
         };
 
         console.log('[RouteContext] Full route state to save:', JSON.stringify(routeState, null, 2));

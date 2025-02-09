@@ -22,11 +22,11 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
   return (
     <>
       <Typography variant="h6" gutterBottom>
-        {mode === 'map' ? 'Choose POI Type' : 'Select POI Types'}
+        {mode === 'regular' ? 'Choose POI Type' : 'Select POI Types'}
       </Typography>
 
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        {mode === 'map'
+        {mode === 'regular'
           ? 'Choose an icon for your point of interest.'
           : 'Select one or more icons to attach to the selected place.'}
       </Typography>

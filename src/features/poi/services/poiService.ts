@@ -39,7 +39,7 @@ export const usePOIService = () => {
     return response.text();
   };
 
-  const getAllPOIs = async (): Promise<POIType[]> => {
+  const getAllPOIs = async (): Promise<{ draggable: POIType[]; places: POIType[] }> => {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(API_BASE, {
@@ -53,57 +53,40 @@ export const usePOIService = () => {
     }
   };
 
-  const createPOI = async (poi: POIType): Promise<POIType> => {
+  const savePOIs = async (pois: { draggable: POIType[]; places: POIType[] }): Promise<{ draggable: POIType[]; places: POIType[] }> => {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(API_BASE, {
         method: 'POST',
         headers,
-        body: JSON.stringify(poi),
+        body: JSON.stringify(pois),
         credentials: 'include'
       });
       return handleResponse(response);
     } catch (error) {
-      console.error('Create POI error:', error);
+      console.error('Save POIs error:', error);
       throw error;
     }
   };
 
-  const updatePOI = async (id: string, updates: Partial<POIType>): Promise<POIType> => {
+  const deleteAllPOIs = async (): Promise<void> => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE}/${id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(updates),
-        credentials: 'include'
-      });
-      return handleResponse(response);
-    } catch (error) {
-      console.error('Update POI error:', error);
-      throw error;
-    }
-  };
-
-  const deletePOI = async (id: string): Promise<void> => {
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE}/${id}`, {
+      const response = await fetch(API_BASE, {
         method: 'DELETE',
         headers,
         credentials: 'include'
       });
       await handleResponse(response);
     } catch (error) {
-      console.error('Delete POI error:', error);
+      console.error('Delete POIs error:', error);
       throw error;
     }
   };
 
   return {
     getAllPOIs,
-    createPOI,
-    updatePOI,
-    deletePOI
+    savePOIs,
+    deleteAllPOIs
   };
 };

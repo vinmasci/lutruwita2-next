@@ -10,7 +10,7 @@ import { POIProvider, usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext, PhotoProvider } from '../../../photo/context/PhotoContext';
 import { PlaceProvider } from '../../../place/context/PlaceContext';
 import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
-import { POIType, POIPosition, POICategory, POIIconName } from '../../../poi/types/poi.types';
+import { POIType, POICoordinates, POICategory, POIIconName } from '../../../poi/types/poi.types';
 import { POIViewer } from '../../../poi/components/POIViewer/POIViewer';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
@@ -84,7 +84,7 @@ function MapViewContent() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
-  const { pois, updatePOIPosition, addPOI, updatePOI } = usePOIContext();
+  const { pois, updatePOIPosition, addPOI, updatePOI, poiMode, setPoiMode } = usePOIContext();
   const [mapReady, setMapReady] = useState(false);
   const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
   const currentRouteId = useRef<string | null>(null);
@@ -371,10 +371,9 @@ function MapViewContent() {
     icon: POIIconName;
     category: POICategory;
   } | null>(null);
-  const [isPoiPlacementMode, setPoiPlacementMode] = useState(false);
   const [onPoiPlacementClick, setPoiPlacementClick] = useState<((coords: [number, number]) => void) | undefined>(undefined);
 
-  // Update cursor style and click handler when in POI placement mode
+  // Update cursor style and click handler based on POI mode
   useEffect(() => {
     if (!mapInstance.current || !isMapReady) return;
     
@@ -382,12 +381,13 @@ function MapViewContent() {
     const canvas = map.getCanvas();
     if (!canvas) return;
 
-    canvas.style.cursor = isPoiPlacementMode ? 'crosshair' : '';
+    // Set cursor style based on POI mode
+    canvas.style.cursor = poiMode === 'regular' ? 'crosshair' : '';
 
-    if (isPoiPlacementMode) {
+    // Handle clicks only in regular POI mode
+    if (poiMode === 'regular') {
       const clickHandler = (e: mapboxgl.MapMouseEvent) => {
-        console.log('[MapView] Map clicked:', e.lngLat);
-        console.log('[MapView] onPoiPlacementClick handler exists:', !!onPoiPlacementClick);
+        console.log('[MapView] Map clicked in regular mode:', e.lngLat);
         
         if (onPoiPlacementClick) {
           const coords: [number, number] = [e.lngLat.lng, e.lngLat.lat];
@@ -403,12 +403,12 @@ function MapViewContent() {
         canvas.style.cursor = '';
       };
     }
-  }, [isPoiPlacementMode, onPoiPlacementClick, isMapReady]);
+  }, [poiMode, onPoiPlacementClick, isMapReady, dragPreview]);
 
   const handleAddPOI = () => {
     const newIsOpen = !isPOIDrawerOpen;
     setIsPOIDrawerOpen(newIsOpen);
-    setPoiPlacementMode(newIsOpen);
+    setPoiMode(newIsOpen ? 'regular' : 'none');
     if (!newIsOpen) {
       setPoiPlacementClick(undefined);
     }
@@ -418,7 +418,7 @@ function MapViewContent() {
   const [selectedPOIDetails, setSelectedPOIDetails] = useState<{
     iconName: POIIconName;
     category: POICategory;
-    position: POIPosition;
+    coordinates: POICoordinates;
   } | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<POIType | null>(null);
 
@@ -426,10 +426,10 @@ function MapViewContent() {
     setSelectedPOI(poi);
   };
 
-  const handlePOICreation = (icon: POIIconName, category: POICategory, position: POIPosition) => {
-    setSelectedPOIDetails({ iconName: icon, category, position });
+  const handlePOICreation = (icon: POIIconName, category: POICategory, coordinates: POICoordinates) => {
+    setSelectedPOIDetails({ iconName: icon, category, coordinates });
     setDetailsDrawerOpen(true);
-    setPoiPlacementMode(false);
+    setPoiMode('none');
     setIsPOIDrawerOpen(false);
   };
 
@@ -443,7 +443,7 @@ function MapViewContent() {
       // Create POI with all details
       const poiDetails = {
         type: 'draggable' as const,
-        position: selectedPOIDetails.position,
+        coordinates: selectedPOIDetails.coordinates,
         name: details.name,
         description: details.description,
         category: selectedPOIDetails.category,
@@ -661,8 +661,8 @@ function MapViewContent() {
   }, []);
 
   // Handle POI drag end
-  const handlePOIDragEnd = useCallback((poi: POIType, newPosition: POIPosition) => {
-    updatePOIPosition(poi.id, newPosition);
+  const handlePOIDragEnd = useCallback((poi: POIType, newCoordinates: POICoordinates) => {
+    updatePOIPosition(poi.id, newCoordinates);
   }, [updatePOIPosition]);
 
   return (
@@ -672,12 +672,12 @@ function MapViewContent() {
       isInitializing,
       hoverCoordinates,
       setHoverCoordinates,
-      isPoiPlacementMode,
-      setPoiPlacementMode,
       onPoiPlacementClick,
       setPoiPlacementClick,
       dragPreview,
-      setDragPreview
+      setDragPreview,
+      poiPlacementMode: poiMode === 'regular',
+      setPoiPlacementMode: (mode: boolean) => setPoiMode(mode ? 'regular' : 'none')
     }}>
       <div className="w-full h-full relative">
         <div 
@@ -724,14 +724,18 @@ function MapViewContent() {
           <>
             <PhotoLayer />
             <PlacePOILayer />
-            {pois.filter(poi => poi.type === 'draggable').map(poi => (
-              <MapboxPOIMarker
-                key={poi.id}
-                poi={poi}
-                onDragEnd={handlePOIDragEnd}
-                onClick={() => handlePOIClick(poi)}
-              />
-            ))}
+            {/* Only render draggable POIs that aren't already being rendered by PlacePOILayer */}
+            {pois
+              .filter(poi => poi.type === 'draggable')
+              .map(poi => (
+                <MapboxPOIMarker
+                  key={poi.id}
+                  poi={poi}
+                  onDragEnd={handlePOIDragEnd}
+                  onClick={() => handlePOIClick(poi)}
+                />
+              ))
+            }
           </>
         )}
 
@@ -739,8 +743,8 @@ function MapViewContent() {
           <POIDragPreview
             icon={dragPreview.icon}
             category={dragPreview.category}
-            onPlace={(position) => {
-              handlePOICreation(dragPreview.icon, dragPreview.category, position);
+            onPlace={(coordinates) => {
+              handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
               setDragPreview(null);
             }}
           />
@@ -751,7 +755,7 @@ function MapViewContent() {
             poi={{
               id: 'temp-poi',
               type: 'draggable',
-              position: selectedPOIDetails.position,
+              coordinates: selectedPOIDetails.coordinates,
               name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
               category: selectedPOIDetails.category,
               icon: selectedPOIDetails.iconName
@@ -761,6 +765,9 @@ function MapViewContent() {
 
         {currentRoute && isMapReady && mapInstance.current && (
           <>
+            <div className="route-filename">
+              {currentRoute._type === 'loaded' && currentRoute._loadedState ? currentRoute._loadedState.name : currentRoute.name || 'Untitled Route'}
+            </div>
             {/* For loaded routes, use the RouteLayer */}
             {currentRoute._type === 'loaded' && (
               <RouteLayer 
@@ -780,7 +787,7 @@ function MapViewContent() {
             onClose={() => {
               setDetailsDrawerOpen(false);
               setSelectedPOIDetails(null);
-              setPoiPlacementMode(false);
+              setPoiMode('none');
               setIsPOIDrawerOpen(false);
             }}
             iconName={selectedPOIDetails.iconName}

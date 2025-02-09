@@ -81,7 +81,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
         anchor: 'center',
         offset: [0, -14] // Half the height of marker-bubble to center it
       })
-        .setLngLat(poi.position)
+        .setLngLat({ lng: poi.coordinates[0], lat: poi.coordinates[1] })
         .addTo(map);
 
     } catch (error) {
@@ -135,7 +135,7 @@ const MapboxPOIMarker: React.FC<POIMarkerProps> = ({
                   lat: lngLat.lat - dragStartPos.lat
                 } : null
               });
-              onDragEnd(poi, { lat: lngLat.lat, lng: lngLat.lng });
+              onDragEnd(poi, [lngLat.lng, lngLat.lat]);
             }
           }
         });

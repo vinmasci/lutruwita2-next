@@ -65,23 +65,6 @@ export const useRouteService = () => {
       console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
       console.log('[routeService] Full route data:', JSON.stringify(routeData, null, 2));
       
-// Transform frontend IDs to MongoDB _ids for POIs
-const transformedData = {
-  ...routeData,
-  pois: {
-    draggable: routeData.pois.draggable.map(poi => ({
-      ...poi,
-      _id: poi.id,
-      id: undefined
-    })),
-    places: routeData.pois.places.map(poi => ({
-      ...poi,
-      _id: poi.id,
-      id: undefined
-    }))
-  }
-};
-
 // If routeData has an id, it's an update to an existing route
 const endpoint = routeData.id ? `${API_BASE}/${routeData.id}` : `${API_BASE}/save`;
 const method = routeData.id ? 'PUT' : 'POST';
@@ -89,7 +72,7 @@ const method = routeData.id ? 'PUT' : 'POST';
 const response = await fetch(endpoint, {
   method,
   headers,
-  body: JSON.stringify(transformedData),
+  body: JSON.stringify(routeData),
   credentials: 'include'
 });
 

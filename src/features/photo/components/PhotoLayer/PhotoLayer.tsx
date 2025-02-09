@@ -9,7 +9,7 @@ import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
 import './PhotoLayer.css';
 
 const CLUSTER_RADIUS = 50; // pixels
-const CLUSTER_MAX_ZOOM = 14;
+const CLUSTER_MAX_ZOOM = 0; // Set to 0 to always show individual photos
 
 interface PhotoClusterType {
   photos: ProcessedPhoto[];
@@ -81,6 +81,7 @@ export const PhotoLayer: React.FC = () => {
 
   // Cluster photos based on distance with improved performance and error handling
   const { clusters, singlePhotos } = useMemo(() => {
+    // Always show single photos if zoom is high enough
     if (!map || zoom >= CLUSTER_MAX_ZOOM) {
       return { 
         clusters: [], 
@@ -90,6 +91,8 @@ export const PhotoLayer: React.FC = () => {
         ) 
       };
     }
+
+    // Only cluster photos when zoomed out
 
     try {
       // Create spatial index for better performance with coordinate normalization

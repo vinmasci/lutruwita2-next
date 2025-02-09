@@ -11,7 +11,7 @@ const POIModeSelection: React.FC<POIModeSelectionProps> = ({ onModeSelect }) => 
         Add Point of Interest
       </Typography>
       
-      <ModeSelectionCard onClick={() => onModeSelect('map')}>
+      <ModeSelectionCard onClick={() => onModeSelect('regular')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <MapPin size={24} />
           <div>

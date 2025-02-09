@@ -1,6 +1,5 @@
 import { ProcessedRoute } from '../../../shared/types/gpx.types.js';
 import { DraggablePOI, PlaceNamePOI } from '../../../shared/types/poi.types.js';
-import { Place } from '../../../shared/types/place.types.js';
 
 export interface SavedRouteState {
   id: string;
@@ -43,7 +42,6 @@ export interface SavedRouteState {
     draggable: DraggablePOI[];
     places: PlaceNamePOI[];
   };
-  places: Place[];
 }
 
 export interface SaveRouteRequest {
