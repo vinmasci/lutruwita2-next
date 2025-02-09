@@ -7,7 +7,7 @@
     "dev": "vite --port 3000",
     "dev:server": "NODE_OPTIONS='--import ts-node/esm --require tsconfig-paths/register' node -r tsconfig-paths/register src/features/server/server.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
-    "build": "tsc -b --noEmit false || true && SKIP_TYPESCRIPT=true vite build",
+    "build": "npm install --legacy-peer-deps && tsc -b --noEmit false || true && SKIP_TYPESCRIPT=true vite build",
     "build:server": "tsc -p tsconfig.server.json --outDir dist/server",
     "clean": "rm -rf dist",
     "lint": "eslint .",
