@@ -7,9 +7,12 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Typography
+  Typography,
+  Button,
+  DialogActions
 } from '@mui/material';
 import { Delete } from '@mui/icons-material';
+import { useState } from 'react';
 import { RouteListItem } from '../../types/route.types';
 
 interface LoadDialogProps {
@@ -18,15 +21,76 @@ interface LoadDialogProps {
   routes: RouteListItem[];
   onLoad: (id: string) => void;
   onDelete?: (id: string) => void;
+  hasUnsavedChanges?: boolean;
 }
+
+interface ConfirmDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const ConfirmDialog = ({ open, onClose, onConfirm }: ConfirmDialogProps) => (
+  <Dialog 
+    open={open} 
+    onClose={onClose}
+    PaperProps={{
+      sx: { 
+        backgroundColor: 'rgb(35, 35, 35)',
+        color: 'white'
+      }
+    }}
+  >
+    <DialogTitle>Unsaved Changes</DialogTitle>
+    <DialogContent>
+      <Typography>
+        You have unsaved changes that will be lost. Do you want to continue?
+      </Typography>
+    </DialogContent>
+    <DialogActions>
+      <Button 
+        onClick={onClose}
+        sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+      >
+        Cancel
+      </Button>
+      <Button 
+        onClick={onConfirm}
+        sx={{ color: '#f44336' }}
+      >
+        Discard Changes
+      </Button>
+    </DialogActions>
+  </Dialog>
+);
 
 export const LoadDialog = ({ 
   open, 
   onClose, 
   routes, 
   onLoad,
-  onDelete 
+  onDelete,
+  hasUnsavedChanges = false
 }: LoadDialogProps) => {
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingLoadId, setPendingLoadId] = useState<string | null>(null);
+
+  const handleLoadClick = (id: string) => {
+    if (hasUnsavedChanges) {
+      setPendingLoadId(id);
+      setConfirmDialogOpen(true);
+    } else {
+      onLoad(id);
+    }
+  };
+
+  const handleConfirmLoad = () => {
+    if (pendingLoadId) {
+      onLoad(pendingLoadId);
+      setConfirmDialogOpen(false);
+      setPendingLoadId(null);
+    }
+  };
   return (
     <Dialog 
       open={open} 
@@ -58,7 +122,7 @@ export const LoadDialog = ({
               <ListItem
                 key={route.id}
                 component="div"
-                onClick={() => onLoad(route.id)}
+                onClick={() => handleLoadClick(route.id)}
                 sx={{
                   width: '100%',
                   py: 1.5,
@@ -134,6 +198,14 @@ export const LoadDialog = ({
           </List>
         )}
       </DialogContent>
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        onClose={() => {
+          setConfirmDialogOpen(false);
+          setPendingLoadId(null);
+        }}
+        onConfirm={handleConfirmLoad}
+      />
     </Dialog>
   );
 };

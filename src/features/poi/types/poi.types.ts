@@ -76,7 +76,7 @@ export interface POIContextType {
   addPOI: (poi: NewPOIInput) => void;
   removePOI: (id: string) => void;
   updatePOI: (id: string, updates: Partial<Omit<POIType, 'id'>>) => void;
-  updatePOIPosition: (id: string, position: POIPosition) => void;
+  updatePOIPosition: (id: string, position: POICoordinates) => void;
   getPOIsForRoute: (routeId?: string) => SavedRouteState['pois'];
   loadPOIsFromRoute: (routePOIs: SavedRouteState['pois']) => void;
 }

@@ -3,6 +3,11 @@ import { Feature, LineString, MultiLineString, Geometry } from 'geojson';
 import { RoadConfidence, RoadSegment, UnpavedSection } from '../types/gpx.types';
 import { getBearing, getDistanceToRoad, getVariance, getConsecutiveMatches } from '../utils/roadUtils';
 
+// Helper function to round coordinates to 5 decimal places
+const roundCoordinate = (value: number): number => {
+  return Number(value.toFixed(5));
+};
+
 // Constants
 const ROAD_LAYER_ID = 'custom-roads';
 const SOURCE_LAYER = 'lutruwita';
@@ -472,12 +477,12 @@ export const addSurfaceOverlay = async (
           currentSection = {
             startIndex: i,
             endIndex: i,
-            coordinates: [[point.lon, point.lat]],
+            coordinates: [[roundCoordinate(point.lon), roundCoordinate(point.lat)]],
             surfaceType: 'unpaved'
           };
         } else {
           currentSection.endIndex = i;
-          currentSection.coordinates.push([point.lon, point.lat]);
+          currentSection.coordinates.push([roundCoordinate(point.lon), roundCoordinate(point.lat)]);
         }
       } else if (currentSection) {
         sections.push(currentSection);

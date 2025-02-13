@@ -1,4 +1,4 @@
-import { ProcessedRoute, RouteSegment } from '@/types';
+import { RouteSegment } from '@/types';
 import { FeatureCollection } from 'geojson';
 
 export interface ParsedGpx {

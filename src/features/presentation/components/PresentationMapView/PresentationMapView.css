@@ -1,0 +1,39 @@
+.route-filename {
+  position: absolute;
+  top: 20px;
+  left: 76px; /* 56px sidebar + 20px margin */
+  background-color: rgba(35, 35, 35, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  z-index: 1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.mapboxgl-ctrl-group {
+  background-color: rgba(35, 35, 35, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.mapboxgl-ctrl-group button {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.mapboxgl-ctrl-icon {
+  filter: invert(1);
+}
+
+.mapboxgl-ctrl-group button + button {
+  border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Position the elevation profile to account for the sidebar */
+.elevation-profile {
+  position: absolute;
+  bottom: 20px;
+  left: 76px; /* 56px sidebar + 20px margin */
+  right: 20px;
+  z-index: 1;
+}

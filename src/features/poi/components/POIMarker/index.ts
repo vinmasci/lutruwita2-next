@@ -1,3 +1,3 @@
-export { default as POIMarker } from './POIMarker.tsx';
-export { markerStyles as poiMarkerStyles } from './POIMarker.styles.ts';
-export type { POIMarkerProps } from './types.ts';
+export { default as POIMarker } from './POIMarker';
+export { markerStyles as poiMarkerStyles } from './POIMarker.styles';
+export type { POIMarkerProps } from './types';

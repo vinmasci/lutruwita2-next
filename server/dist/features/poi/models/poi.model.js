@@ -3,53 +3,53 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.POI = void 0;
+exports.POIModel = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
+const poiPhotoSchema = new mongoose_1.default.Schema({
+    url: { type: String, required: true },
+    caption: { type: String }
+});
+const poiStyleSchema = new mongoose_1.default.Schema({
+    color: { type: String },
+    size: { type: Number }
+});
 const poiSchema = new mongoose_1.default.Schema({
-    _id: { type: String, required: true, get: (v) => v }, // Use client-generated UUID as _id and prevent casting
-    userId: { type: String, required: true },
-    position: {
-        lat: { type: Number, required: true },
-        lng: { type: Number, required: true }
-    },
-    name: { type: String, required: true },
-    type: { type: String, required: true, enum: ['draggable', 'place'] },
-    category: { type: String, required: true },
-    icon: { type: String, required: true },
-    placeId: {
-        type: String,
+    coordinates: {
+        type: [Number],
+        required: true,
         validate: {
             validator: function (v) {
-                if (this.type === 'place') {
-                    return typeof v === 'string' && v.length > 0;
-                }
-                return true;
+                return Array.isArray(v) && v.length === 2;
             },
-            message: 'placeId is required for place type POIs'
+            message: 'Coordinates must be [longitude, latitude]'
         }
     },
-    // Optional fields
-    description: String,
-    photos: [{
-            url: String,
-            caption: String
-        }],
-    style: {
-        color: String,
-        size: Number
-    }
-}, {
-    toJSON: {
-        virtuals: true,
-        transform: function (doc, ret) {
-            ret.id = ret._id.toString();
-            delete ret._id;
-            delete ret.__v;
-            return ret;
-        }
+    name: { type: String, required: true },
+    description: { type: String },
+    category: {
+        type: String,
+        required: true,
+        enum: [
+            'road-information',
+            'accommodation',
+            'food-drink',
+            'natural-features',
+            'town-services',
+            'transportation',
+            'event-information'
+        ]
     },
-    _id: false // Disable Mongoose's automatic _id handling
+    icon: {
+        type: String,
+        required: true
+    },
+    photos: [poiPhotoSchema],
+    style: poiStyleSchema,
+    type: {
+        type: String,
+        required: true,
+        enum: ['draggable', 'place']
+    },
+    placeId: { type: String } // Only for place type POIs
 });
-// Add index for geospatial queries
-poiSchema.index({ 'position.lat': 1, 'position.lng': 1 });
-exports.POI = mongoose_1.default.model('POI', poiSchema);
+exports.POIModel = mongoose_1.default.model('POI', poiSchema);

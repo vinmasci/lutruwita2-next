@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import exifr from 'exifr';
 import { PhotoUploaderProps, ProcessedPhoto } from './PhotoUploader.types';
 import PhotoUploaderUI from './PhotoUploaderUI';
+import { usePhotoService } from '../../services/photoService';
 
 const PhotoUploader = ({
   onUploadComplete,
@@ -13,48 +14,7 @@ const PhotoUploader = ({
   const [photos, setPhotos] = useState<ProcessedPhoto[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 
-  const processPhoto = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const createThumbnail = async (url: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        const maxSize = 800;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > height) {
-          if (width > maxSize) {
-            height *= maxSize / width;
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width *= maxSize / height;
-            height = maxSize;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
-      };
-      img.onerror = () => reject(new Error('Failed to create thumbnail'));
-      img.src = url;
-    });
-  };
+  const photoService = usePhotoService();
 
   const handleFileAdd = async (files: File[]) => {
     if (files.length === 0) return;
@@ -69,9 +29,10 @@ const PhotoUploader = ({
             throw new Error(`Invalid file type for ${file.name}`);
           }
 
-          const url = await processPhoto(file);
-          const thumbnailUrl = await createThumbnail(url);
+          // Upload to S3 first
+          const { url, thumbnailUrl } = await photoService.uploadPhoto(file);
           
+          // Then extract GPS data
           const exif = await exifr.parse(file, { gps: true });
           const hasGps = Boolean(exif?.latitude && exif?.longitude);
 
@@ -144,15 +105,31 @@ const PhotoUploader = ({
     }
   };
 
-  const handleFileDelete = (photoId: string) => {
-    setPhotos(prev => prev.filter(p => p.id !== photoId));
-    setSelectedPhotos(prev => {
-      const next = new Set(prev);
-      next.delete(photoId);
-      return next;
-    });
-    if (onDeletePhoto) {
-      onDeletePhoto(photoId);
+  const handleFileDelete = async (photoId: string) => {
+    try {
+      const photo = photos.find(p => p.id === photoId);
+      if (!photo) return;
+
+      // Delete from S3 first
+      await photoService.deletePhoto(photo.url);
+
+      // Then update local state
+      setPhotos(prev => prev.filter(p => p.id !== photoId));
+      setSelectedPhotos(prev => {
+        const next = new Set(prev);
+        next.delete(photoId);
+        return next;
+      });
+
+      if (onDeletePhoto) {
+        onDeletePhoto(photoId);
+      }
+    } catch (error) {
+      console.error('[PhotoUploader] Delete error:', error);
+      setError({
+        message: 'Failed to delete photo',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   };
 

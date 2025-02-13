@@ -1,6 +1,4 @@
 import { DOMParser, Element } from '@xmldom/xmldom';
-import { matchTrackToRoads } from '../services/mapMatchingService';
-
 export interface GpxPoint {
   coordinates: [number, number];
   elevation?: number;
@@ -20,10 +18,6 @@ export interface GpxParseResult {
     type: 'LineString';
     coordinates: [number, number][];
   };
-  matched?: {
-    type: 'LineString';
-    coordinates: [number, number][];
-  };
 }
 
 const extractPoints = (gpx: ReturnType<DOMParser['parseFromString']>): GpxPoint[] => {
@@ -40,34 +34,6 @@ const extractPoints = (gpx: ReturnType<DOMParser['parseFromString']>): GpxPoint[
       time: timeElement?.textContent || undefined
     };
   });
-};
-
-export const parseAndMatchGpx = async (
-  file: File,
-  options?: { confidenceThreshold?: number; radiusMultiplier?: number }
-): Promise<GpxParseResult> => {
-  // First parse the GPX as before
-  const result = await parseGpx(file);
-  
-  try {
-    // Then match to roads
-    const matchedTrack = await matchTrackToRoads(
-      result.geometry.coordinates,
-      options
-    );
-    
-    return {
-      ...result,
-      matched: {
-        type: 'LineString',
-        coordinates: matchedTrack
-      }
-    };
-  } catch (error) {
-    console.error('Map matching failed:', error);
-    // Return original parse result if matching fails
-    return result;
-  }
 };
 
 export const parseGpx = async (file: File): Promise<GpxParseResult> => {

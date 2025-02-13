@@ -26,18 +26,6 @@ export interface UnpavedSection {
   surfaceType: string | 'unpaved';
 }
 
-export interface MapboxMatchResult {
-  geojson: GeoJSON.FeatureCollection;
-  confidence: number;
-  matchingStatus: 'matched' | 'partial' | 'failed';
-  debugData?: {
-    rawTrace: GeoJSON.FeatureCollection;
-    matchedTrace: GeoJSON.FeatureCollection;
-    matchingPoints: number;
-    distanceDeviation: number;
-  };
-}
-
 export interface SurfaceAnalysis {
   surfaceTypes: Array<{
     type: 'road' | 'trail' | 'water' | 'unknown';
@@ -58,15 +46,11 @@ export interface SurfaceAnalysis {
 export interface ProcessedRoute {
   id: string;
   routeId?: string;
-  matchedIndices?: number[];
   name: string;
   color: string;
   isVisible: boolean;
-  gpxData: string;
-  rawGpx: string;
   geojson: GeoJSON.FeatureCollection;
   surface?: SurfaceAnalysis;
-  mapboxMatch?: MapboxMatchResult;
   unpavedSections?: UnpavedSection[];
   statistics: {
     totalDistance: number;
@@ -86,12 +70,6 @@ export interface ProcessedRoute {
       message: string;
       details?: string;
     };
-  };
-  debug?: {
-    rawTrace: GeoJSON.FeatureCollection;
-    matchedTrace: GeoJSON.FeatureCollection;
-    timings: Record<string, number>;
-    warnings: string[];
   };
 }
 

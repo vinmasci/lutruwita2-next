@@ -9,6 +9,8 @@ export interface SavedRouteState {
   createdAt: string;
   updatedAt: string;
   userId: string; // Auth0 user ID
+  viewCount: number;
+  lastViewed?: string;
   
   // Map state
   mapState: {
@@ -52,6 +54,7 @@ export interface SaveRouteRequest {
 
 export interface SaveRouteResponse {
   message: string;
+  id: string;  // Add route ID to response
 }
 
 export interface LoadRouteResponse {
@@ -65,6 +68,20 @@ export interface ListRoutesResponse {
     name: string;
     type: string;
     isPublic: boolean;
+    createdAt: string;
+    updatedAt: string;
+    viewCount: number;
+    lastViewed?: string;
+  }>;
+}
+
+export interface ListPublicRoutesResponse {
+  routes: Array<{
+    id: string;
+    name: string;
+    type: string;
+    viewCount: number;
+    lastViewed?: string;
     createdAt: string;
     updatedAt: string;
   }>;

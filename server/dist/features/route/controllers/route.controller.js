@@ -6,6 +6,61 @@ class RouteController {
     constructor() {
         this.routeService = new route_service_1.RouteService();
     }
+    async updateRoute(req, res) {
+        try {
+            const userId = req.user?.sub;
+            if (!userId) {
+                return res.status(401).json({
+                    error: 'Unauthorized',
+                    details: 'User ID not found'
+                });
+            }
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({
+                    error: 'Invalid request',
+                    details: 'Route ID is required'
+                });
+            }
+            console.log('[RouteController] Starting route update...');
+            const { name, type, isPublic, mapState, routes, photos, pois } = req.body;
+            // Validate mapState if provided
+            if (mapState) {
+                const { zoom, center, bearing, pitch } = mapState;
+                if (typeof zoom !== 'number' || !Array.isArray(center) ||
+                    typeof bearing !== 'number' || typeof pitch !== 'number') {
+                    return res.status(400).json({
+                        error: 'Invalid route data',
+                        details: 'mapState must include valid zoom, center, bearing, and pitch values'
+                    });
+                }
+            }
+            const routeToUpdate = {
+                name,
+                type,
+                isPublic,
+                userId,
+                updatedAt: new Date().toISOString(),
+                mapState,
+                routes,
+                photos,
+                pois,
+            };
+            console.log('[RouteController] Updating route in database...');
+            const result = await this.routeService.saveRoute(userId, routeToUpdate, id);
+            console.log('[RouteController] Route updated successfully');
+            res.json(result);
+        }
+        catch (error) {
+            console.error('[RouteController] Update route error:', error);
+            const routeError = error;
+            const status = routeError.message === 'Route not found or access denied' ? 404 : 500;
+            res.status(status).json({
+                error: 'Failed to update route',
+                details: routeError.message || 'Unknown error'
+            });
+        }
+    }
     async saveRoute(req, res) {
         try {
             const userId = req.user?.sub;
@@ -15,7 +70,13 @@ class RouteController {
                     details: 'User ID not found'
                 });
             }
-            const { name, type, isPublic, mapState, routes, photos, pois, places } = req.body;
+            console.log('[RouteController] Starting save route...');
+            const { name, type, isPublic, mapState, routes, photos, pois } = req.body;
+            console.log('[RouteController] POIs received:', {
+                draggable: pois?.draggable?.length || 0,
+                places: pois?.places?.length || 0
+            });
+            console.log('[RouteController] Full POI data:', pois);
             // Validate mapState if provided
             if (mapState) {
                 const { zoom, center, bearing, pitch } = mapState;
@@ -39,13 +100,16 @@ class RouteController {
                 routes,
                 photos,
                 pois,
-                places
             };
+            console.log('[RouteController] Saving route to database...');
             const result = await this.routeService.saveRoute(userId, routeToSave);
+            console.log('[RouteController] Route saved successfully. Result:', result);
+            console.log('[RouteController] POIs have been saved to MongoDB');
             res.status(201).json(result);
         }
         catch (error) {
-            console.error('Save route error:', error);
+            console.error('[RouteController] Save route error:', error);
+            console.error('[RouteController] Error details:', error instanceof Error ? error.stack : 'Unknown error');
             res.status(500).json({
                 error: 'Failed to save route',
                 details: error instanceof Error ? error.message : 'Unknown error'

@@ -18,6 +18,7 @@ interface BaseRoute extends Omit<GpxProcessedRoute, 'routeId' | 'unpavedSections
   name: string;
   color: string;
   isVisible: boolean;
+  isFocused?: boolean;
   gpxData: string;
   rawGpx: string;
   geojson: GeoJSON.FeatureCollection;
@@ -58,7 +59,10 @@ export interface SerializedPhoto {
   thumbnailUrl: string;
   dateAdded: string; // Store as ISO string
   hasGps: boolean;
-  location?: [number, number]; // Normalized from coordinates
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   rotation?: number;
   altitude?: number;
 }
@@ -71,6 +75,7 @@ export interface SavedRouteState {
   createdAt: string;
   updatedAt: string;
   userId: string;
+  viewCount?: number;
   routes: ProcessedRoute[];
   mapState: {
     zoom: number;
@@ -159,7 +164,7 @@ export const serializePhoto = (photo: ProcessedPhoto): SerializedPhoto => ({
   thumbnailUrl: photo.thumbnailUrl,
   dateAdded: photo.dateAdded.toISOString(),
   hasGps: photo.hasGps,
-  location: photo.coordinates ? [photo.coordinates.lat, photo.coordinates.lng] : undefined,
+  coordinates: photo.coordinates ? { lat: photo.coordinates.lat, lng: photo.coordinates.lng } : undefined,
   rotation: photo.rotation,
   altitude: photo.altitude
 });
@@ -172,7 +177,7 @@ export const deserializePhoto = (photo: SerializedPhoto): ProcessedPhoto => ({
   thumbnailUrl: photo.thumbnailUrl,
   dateAdded: new Date(photo.dateAdded),
   hasGps: photo.hasGps,
-  coordinates: photo.location ? { lat: photo.location[0], lng: photo.location[1] } : undefined,
+  coordinates: photo.coordinates,
   rotation: photo.rotation,
   altitude: photo.altitude
 });

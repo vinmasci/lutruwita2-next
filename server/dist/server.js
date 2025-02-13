@@ -11,7 +11,8 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const server_config_1 = require("./shared/config/server.config");
 const gpx_routes_1 = require("./features/gpx/routes/gpx.routes");
 const route_routes_1 = __importDefault(require("./features/route/routes/route.routes"));
-const poi_routes_1 = __importDefault(require("./features/poi/routes/poi.routes"));
+const public_route_routes_1 = __importDefault(require("./features/route/routes/public-route.routes"));
+const photo_routes_1 = require("./features/photo/routes/photo.routes");
 const error_handling_1 = require("./shared/middlewares/error-handling");
 require("dotenv/config");
 const logger_config_1 = require("./shared/config/logger.config");
@@ -78,7 +79,8 @@ app.use((req, res, next) => {
 // Feature Routes
 app.use('/api/gpx', gpx_routes_1.gpxRoutes);
 app.use('/api/routes', route_routes_1.default);
-app.use('/api/pois', poi_routes_1.default);
+app.use('/api/routes/public', public_route_routes_1.default);
+app.use('/api/photos', photo_routes_1.photoRoutes);
 // Error handling
 app.use(error_handling_1.errorHandler);
 // Start server

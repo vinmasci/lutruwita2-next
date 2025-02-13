@@ -18,8 +18,8 @@ const photoSchema = new mongoose.Schema({
   thumbnailUrl: { type: String, required: true },
   dateAdded: String,
   coordinates: {
-    lat: Number,
-    lng: Number
+    lat: { type: Number },
+    lng: { type: Number }
   },
   rotation: Number,
   altitude: Number
@@ -31,12 +31,14 @@ const poiSchema = new mongoose.Schema({
   coordinates: {
     type: [Number],
     required: true,
-    validate: {
-      validator: function(v: number[]) {
-        return v.length === 2;
-      },
-      message: 'Coordinates must be [longitude, latitude]'
-    }
+    validate: [
+      {
+        validator: function(v: number[]) {
+          return v.length === 2;
+        },
+        message: 'Coordinates must be [longitude, latitude]'
+      }
+    ]
   },
   name: { type: String, required: true },
   description: String,
@@ -86,11 +88,16 @@ const routeSchema = new mongoose.Schema({
   },
   isPublic: { type: Boolean, required: true },
   userId: { type: String, required: true },
+  viewCount: { type: Number, default: 0 },
+  lastViewed: { type: Date },
   
   // Map view state
   mapState: {
     zoom: { type: Number, required: true },
-    center: { type: [Number], required: true },
+    center: { 
+      type: [Number],
+      required: true
+    },
     bearing: { type: Number, required: true },
     pitch: { type: Number, required: true },
     style: String
@@ -99,12 +106,9 @@ const routeSchema = new mongoose.Schema({
   // Route data array - can contain multiple routes
   routes: [{
     routeId: String,
-    matchedIndices: [Number],
     name: { type: String, required: true },
     color: { type: String, required: true },
     isVisible: { type: Boolean, required: true },
-    gpxData: { type: String, required: true },
-    rawGpx: { type: String, required: true },
     geojson: { type: mongoose.Schema.Types.Mixed, required: true },
 
     // Surface information - core part of route analysis
@@ -119,7 +123,18 @@ const routeSchema = new mongoose.Schema({
         distance: { type: Number, required: true }
       }],
       elevationProfile: [{
-        elevation: { type: Number, required: true },
+        elevation: { 
+          type: Number,
+          required: true,
+          validate: [
+            {
+              validator: function(v: number) {
+                return Number.isInteger(v * 10); // Ensures 1 decimal place
+              },
+              message: 'Elevation must not exceed 1 decimal place'
+            }
+          ]
+        },
         distance: { type: Number, required: true },
         grade: { type: Number, required: true }
       }],
@@ -130,31 +145,14 @@ const routeSchema = new mongoose.Schema({
       surfaceQuality: { type: Number, required: false }
     },
 
-    // Made entirely optional
-    mapboxMatch: {
-      type: {
-        geojson: { type: mongoose.Schema.Types.Mixed, required: false },
-        confidence: { type: Number, required: false },
-        matchingStatus: { 
-          type: String, 
-          enum: ['matched', 'partial', 'failed'],
-          required: false
-        },
-        debugData: {
-          rawTrace: mongoose.Schema.Types.Mixed,
-          matchedTrace: mongoose.Schema.Types.Mixed,
-          matchingPoints: Number,
-          distanceDeviation: Number
-        }
-      },
-      required: false  // Makes the entire mapboxMatch object optional
-    },
-
     // Unpaved section markers
     unpavedSections: [{
       startIndex: { type: Number, required: true },
       endIndex: { type: Number, required: true },
-      coordinates: { type: [[Number]], required: true },
+      coordinates: { 
+        type: [[Number]],
+        required: true
+      },
       surfaceType: { 
         type: String, 
         enum: VALID_SURFACE_TYPES,
@@ -185,20 +183,16 @@ const routeSchema = new mongoose.Schema({
       }
     },
 
-    // Debug information
-    debug: {
-      rawTrace: mongoose.Schema.Types.Mixed,
-      matchedTrace: mongoose.Schema.Types.Mixed,
-      timings: { type: Map, of: Number },
-      warnings: [String]
-    }
   }],
 
-  // Associated data
-  photos: [photoSchema],
+  // Associated data (optional)
+  photos: { type: [photoSchema], required: false },
   pois: {
-    draggable: [draggablePOISchema],
-    places: [placeNamePOISchema]
+    type: {
+      draggable: { type: [draggablePOISchema], required: false },
+      places: { type: [placeNamePOISchema], required: false }
+    },
+    required: false
   },
 // At the end of the schema definition
 }, {

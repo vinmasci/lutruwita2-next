@@ -31,19 +31,34 @@ export const useRouteService = () => {
     const isJson = contentType && contentType.includes('application/json');
     
     if (!response.ok) {
-      if (isJson) {
-        const error = await response.json();
-        throw new Error(error.details || error.error || 'An error occurred');
-      } else {
-        const text = await response.text();
-        throw new Error(text || `HTTP error! status: ${response.status}`);
+      // Clone the response before reading it
+      const responseClone = response.clone();
+      
+      try {
+        if (isJson) {
+          const error = await responseClone.json();
+          console.error('[routeService] Error details:', error);
+          throw new Error(error.details || error.error || 'An error occurred');
+        } else {
+          const text = await responseClone.text();
+          console.error('[routeService] Error details:', text);
+          throw new Error(text || `HTTP error! status: ${response.status}`);
+        }
+      } catch (parseError) {
+        console.error('[routeService] Failed to parse error response:', parseError);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
     }
     
-    if (isJson) {
-      return response.json();
+    try {
+      if (isJson) {
+        return await response.json();
+      }
+      return await response.text();
+    } catch (parseError) {
+      console.error('[routeService] Failed to parse response:', parseError);
+      throw new Error('Failed to parse server response');
     }
-    return response.text();
   };
 
   const saveRoute = async (
@@ -77,6 +92,7 @@ const response = await fetch(endpoint, {
 });
 
       console.log('[routeService] Save response status:', response.status);
+      
       const result = await handleResponse(response);
       console.log('[routeService] Server response:', result);
       console.log('[routeService] POIs have been saved to MongoDB');
@@ -99,6 +115,23 @@ const response = await fetch(endpoint, {
       console.log('[routeService] Load response status:', response.status);
       const data = await handleResponse(response);
       console.log('[routeService] Loaded route data:', data);
+      
+      // Add detailed logging for route data
+      if (data.route && data.route.routes && data.route.routes.length > 0) {
+        console.log('[routeService] First route details:', {
+          id: data.route.routes[0].id,
+          routeId: data.route.routes[0].routeId,
+          hasGeojson: Boolean(data.route.routes[0].geojson),
+          geojsonFeatures: data.route.routes[0].geojson?.features?.length || 0
+        });
+        
+        if (!data.route.routes[0].geojson) {
+          console.error('[routeService] Missing GeoJSON data in route');
+        }
+      } else {
+        console.error('[routeService] No routes found in response');
+      }
+      
       return data;
     } catch (error) {
       console.error('Load route error:', error);

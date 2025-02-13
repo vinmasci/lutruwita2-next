@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -22,14 +22,31 @@ interface SaveDialogProps {
     type: 'tourism' | 'event' | 'bikepacking' | 'single';
     isPublic: boolean;
   }) => void;
+  initialValues?: {
+    name: string;
+    type: 'tourism' | 'event' | 'bikepacking' | 'single';
+    isPublic: boolean;
+  };
+  isEditing?: boolean;
 }
 
-export const SaveDialog = ({ open, onClose, onSave }: SaveDialogProps) => {
+export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing }: SaveDialogProps) => {
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'tourism' as const,
-    isPublic: false
+    name: initialValues?.name || '',
+    type: initialValues?.type || 'tourism' as const,
+    isPublic: initialValues?.isPublic || false
   });
+
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        name: initialValues?.name || '',
+        type: initialValues?.type || 'tourism',
+        isPublic: initialValues?.isPublic || false
+      });
+    }
+  }, [open, initialValues]);
 
   return (
     <Dialog 
@@ -42,7 +59,7 @@ export const SaveDialog = ({ open, onClose, onSave }: SaveDialogProps) => {
         }
       }}
     >
-      <DialogTitle>Save Route</DialogTitle>
+      <DialogTitle>{isEditing ? 'Edit Route' : 'Save Route'}</DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
@@ -142,7 +159,7 @@ export const SaveDialog = ({ open, onClose, onSave }: SaveDialogProps) => {
             color: formData.name ? '#90caf9' : 'rgba(255, 255, 255, 0.3)'
           }}
         >
-          Save
+          {isEditing ? 'Update' : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

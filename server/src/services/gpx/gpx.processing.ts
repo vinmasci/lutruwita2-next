@@ -1,6 +1,5 @@
 import { DOMParser } from '@xmldom/xmldom';
-import { ProcessedRoute } from '@shared/types/gpx.types';
-import type { MapboxMatchResult, SurfaceAnalysis } from '@shared/types/gpx.types';
+import type { ProcessedRoute, SurfaceAnalysis } from '../../shared/types/gpx.types';
 
 interface ProcessingOptions {
   onProgress?: (progress: number) => void;
@@ -11,6 +10,14 @@ export class GPXProcessingService {
 
   constructor(mapboxToken: string) {
     this.mapboxToken = mapboxToken;
+  }
+
+  private roundCoordinate(value: number): number {
+    return Number(value.toFixed(5));
+  }
+
+  private roundElevation(value: number): number {
+    return Number(value.toFixed(1));
   }
 
   async processGPXFile(
@@ -28,12 +35,22 @@ export class GPXProcessingService {
       const trackPoints = this.extractTrackPoints(gpxDoc);
       onProgress?.(40);
 
-      // Match to Mapbox roads
-      const mapboxMatch = await this.matchToMapbox(trackPoints);
+      // Create GeoJSON from track points
+      const geojson: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: trackPoints
+          }
+        }]
+      };
       onProgress?.(60);
 
-      // Analyze surface types
-      const surfaceAnalysis = await this.analyzeSurfaces(mapboxMatch);
+      // Analyze surface types using raw track
+      const surfaceAnalysis = await this.analyzeSurfaces({ geojson });
       onProgress?.(80);
 
       const elevations = await this.calculateElevation(trackPoints);
@@ -45,11 +62,8 @@ export class GPXProcessingService {
         name: this.extractTrackName(gpxDoc) || 'Unnamed Track',
         color: '#FF0000', // Default red color
         isVisible: true,
-        gpxData: fileContent,
-        rawGpx: fileContent,
-        geojson: mapboxMatch.geojson,
+        geojson: geojson,
         surface: surfaceAnalysis,
-        mapboxMatch,
         statistics: {
           totalDistance,
           elevationGain: 0, // Calculate from elevations
@@ -91,7 +105,10 @@ export class GPXProcessingService {
       const lon = parseFloat(point.getAttribute('lon') || '0');
       
       if (lat && lon) {
-        trackPoints.push([lon, lat]);
+        trackPoints.push([
+          this.roundCoordinate(lon),
+          this.roundCoordinate(lat)
+        ]);
       }
     }
 
@@ -120,89 +137,6 @@ export class GPXProcessingService {
       totalDistance += d;
     }
     return totalDistance;
-  }
-
-  private async matchToMapbox(
-    points: Array<[number, number]>
-  ): Promise<MapboxMatchResult> {
-    if (points.length === 0) {
-      throw new Error('No valid track points found in GPX file');
-    }
-
-    if (points.length < 2) {
-      throw new Error('GPX file must contain at least 2 track points');
-    }
-
-    // Validate coordinates
-    points.forEach(([lon, lat], index) => {
-      if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
-        throw new Error(`Invalid coordinates at point ${index}: [${lon}, ${lat}]`);
-      }
-    });
-
-    const coordinates = points
-      .map(([lon, lat]) => `${lon},${lat}`)
-      .join(';');
-
-    // Calculate dynamic radius based on point density
-    const calculateRadius = (index: number) => {
-      if (index === 0 || index === points.length - 1) return '25'; // Fixed radius for start/end points
-      
-      const prev = points[index - 1];
-      const curr = points[index];
-      const next = points[index + 1];
-      
-      // Calculate distances to neighboring points
-      const distToPrev = Math.sqrt(Math.pow(curr[0] - prev[0], 2) + Math.pow(curr[1] - prev[1], 2));
-      const distToNext = Math.sqrt(Math.pow(curr[0] - next[0], 2) + Math.pow(curr[1] - next[1], 2));
-      
-      // Use larger distance to determine search radius, with minimum of 25m and maximum of 100m
-      const radius = Math.max(25, Math.min(100, Math.max(distToPrev, distToNext) * 10000));
-      return radius.toString();
-    };
-
-    const radiuses = points.map((_, index) => calculateRadius(index)).join(';');
-
-    const response = await fetch(
-      `https://api.mapbox.com/matching/v5/mapbox/cycling/${coordinates}?access_token=${this.mapboxToken}&geometries=geojson&radiuses=${radiuses}&steps=true`
-    );
-
-    if (!response.ok) {
-      let errorMessage = `Mapbox matching failed: ${response.status} ${response.statusText}`;
-      const clonedResponse = response.clone();
-      
-      try {
-        const errorBody = await response.json();
-        if (errorBody.message) {
-          errorMessage = `Mapbox matching failed: ${errorBody.message}`;
-        }
-      } catch {
-        try {
-          const errorText = await clonedResponse.text();
-          console.error('Mapbox API Failure:', {
-            status: response.status,
-            statusText: response.statusText,
-            url: response.url,
-            errorBody: errorText
-          });
-        } catch (e) {
-          console.error('Failed to read error response:', e);
-        }
-      }
-      throw new Error(errorMessage);
-    }
-
-    try {
-      const data = await response.json();
-      return {
-        geojson: data.matchings[0].geometry,
-        confidence: data.matchings[0].confidence,
-        matchingStatus: data.matchings[0].confidence > 0.8 ? 'matched' : 'partial'
-      };
-    } catch (error) {
-      console.error('Failed to parse Mapbox response:', error);
-      throw new Error('Failed to parse Mapbox response');
-    }
   }
 
   public async analyzeSurfaces(
@@ -278,7 +212,7 @@ export class GPXProcessingService {
         const view = new Uint8Array(buffer);
         const elevation = -10000 + ((view[0] * 256 * 256 + view[1] * 256 + view[2]) * 0.1);
         
-        return Math.round(elevation);
+        return this.roundElevation(elevation);
       }));
 
       return elevations;

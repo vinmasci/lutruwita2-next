@@ -66,6 +66,9 @@ export const RouteList = () => {
     listRoutes,
     deleteRoute,
     clearError,
+    focusRoute,
+    unfocusRoute,
+    getFocusedRoute,
   } = useRouteState();
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -136,8 +139,21 @@ export const RouteList = () => {
         {routes.map((route) => (
           <StyledListItem
             key={route.id}
-            className={currentRoute?.routeId === route.routeId ? 'selected' : ''}
-            sx={{ cursor: 'pointer' }}
+            className={`${currentRoute?.routeId === route.routeId ? 'selected' : ''} ${route.isFocused ? 'focused' : ''}`}
+            sx={{ 
+              cursor: 'pointer',
+              '&.focused': {
+                backgroundColor: 'rgba(74, 158, 255, 0.15)',
+                borderLeft: '3px solid #4a9eff',
+              }
+            }}
+            onClick={() => {
+              if (route.isFocused) {
+                unfocusRoute(route.routeId);
+              } else {
+                focusRoute(route.routeId);
+              }
+            }}
           >
             <ListItemText 
               primary={route.name}

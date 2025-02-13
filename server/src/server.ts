@@ -7,6 +7,8 @@ import mongoose from 'mongoose';
 import { SERVER_CONFIG } from './shared/config/server.config';
 import { gpxRoutes } from './features/gpx/routes/gpx.routes';
 import routeRoutes from './features/route/routes/route.routes';
+import publicRouteRoutes from './features/route/routes/public-route.routes';
+import { photoRoutes } from './features/photo/routes/photo.routes';
 import { errorHandler } from './shared/middlewares/error-handling';
 import 'dotenv/config';
 
@@ -58,8 +60,8 @@ const app = express();
 
 // Middleware
 app.use(cors(SERVER_CONFIG.cors));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '300mb' }));
+app.use(express.urlencoded({ limit: '300mb', extended: true }));
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
 // Health check endpoint
@@ -80,8 +82,10 @@ app.use((req, res, next) => {
 });
 
 // Feature Routes
+app.use('/api/routes/public', publicRouteRoutes); // Register public routes first
 app.use('/api/gpx', gpxRoutes);
 app.use('/api/routes', routeRoutes);
+app.use('/api/photos', photoRoutes);
 
 // Error handling
 app.use(errorHandler);

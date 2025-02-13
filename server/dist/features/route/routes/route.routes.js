@@ -17,6 +17,8 @@ const asyncHandler = (fn) => (req, res, next) => {
 };
 // Save a new route
 router.post('/save', validateRoute_1.validateRouteData, asyncHandler(controller.saveRoute.bind(controller)));
+// Update an existing route
+router.put('/:id', validateRoute_1.validateRouteData, asyncHandler(controller.updateRoute.bind(controller)));
 // Get a specific route
 router.get('/:id', asyncHandler(controller.loadRoute.bind(controller)));
 // List routes with optional filters

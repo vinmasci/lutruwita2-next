@@ -6,7 +6,7 @@ import { useMapContext } from '../../context/MapContext';
 export const useSidebar = (props: SidebarProps) => {
   // All hooks must be called before any other code
   const { setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
-  const { processGpxFile, isProcessing } = useGpxProcessing();
+  const { isProcessing } = useGpxProcessing();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +74,6 @@ export const useSidebar = (props: SidebarProps) => {
     handleToggleGradient: props.onToggleGradient,
     handleToggleSurface: props.onToggleSurface,
     handleUploadGpx,
-    handleSaveMap: props.onSaveMap,
-    handleLoadMap: props.onLoadMap,
     handlePlacePOI: props.onPlacePOI,
     handleAddPOI,
     handleAddPhotos

@@ -1,6 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRouteContext } from "../context/RouteContext";
-import { RouteListItem } from "../types/route.types";
+import { RouteListItem, ProcessedRoute } from "../types/route.types";
+
+interface RouteVisibilityState {
+  mainRoute: boolean;
+  unpavedSections: boolean;
+}
 
 interface SaveRouteOptions {
   name: string;
@@ -19,6 +24,15 @@ interface UseRouteStateReturn {
   isLoading: boolean;
   error: string | null;
   
+  // Visibility state
+  routeVisibility: Record<string, RouteVisibilityState>;
+  toggleRouteVisibility: (routeId: string, type: keyof RouteVisibilityState) => void;
+  
+  // Focus state
+  focusRoute: (routeId: string) => void;
+  unfocusRoute: (routeId: string) => void;
+  getFocusedRoute: () => ProcessedRoute | null;
+  
   // Actions
   saveRoute: (options: SaveRouteOptions) => Promise<void>;
   loadRoute: (id: string) => Promise<void>;
@@ -28,19 +42,89 @@ interface UseRouteStateReturn {
 }
 
 export const useRouteState = (): UseRouteStateReturn => {
+  const context = useRouteContext();
   const {
     routes,
     currentRoute,
     savedRoutes,
     isSaving,
     isLoading,
+    focusRoute: contextFocusRoute,
+    unfocusRoute: contextUnfocusRoute,
     saveCurrentState,
     loadRoute: contextLoadRoute,
     listRoutes: contextListRoutes,
     deleteSavedRoute,
-  } = useRouteContext();
+  } = context;
 
   const [error, setError] = useState<string | null>(null);
+  const [routeVisibility, setRouteVisibility] = useState<Record<string, RouteVisibilityState>>({});
+
+  // Get the currently focused route
+  const getFocusedRoute = useCallback((): ProcessedRoute | null => {
+    return routes.find(route => route.isFocused) || null;
+  }, [routes]);
+
+  // Focus a route and unfocus others
+  const handleFocusRoute = useCallback((routeId: string) => {
+    contextFocusRoute(routeId);
+  }, [contextFocusRoute]);
+
+  // Unfocus a route
+  const handleUnfocusRoute = useCallback((routeId: string) => {
+    contextUnfocusRoute(routeId);
+  }, [contextUnfocusRoute]);
+
+  // Initialize visibility state for new routes
+  useEffect(() => {
+    if (!routes) return;
+    
+    setRouteVisibility(prev => {
+      const newVisibility = { ...prev };
+      routes.forEach(route => {
+        const routeId = route.routeId || route.id;
+        // Always set visibility state for loaded routes
+        if (route._type === 'loaded' || !newVisibility[routeId]) {
+          newVisibility[routeId] = {
+            mainRoute: true,
+            unpavedSections: true
+          };
+        }
+      });
+      console.debug('[useRouteState] Updated visibility state:', newVisibility);
+      return newVisibility;
+    });
+  }, [routes]);
+
+  // Only reset visibility for routes that no longer exist
+  useEffect(() => {
+    if (!routes) return;
+    
+    setRouteVisibility(prev => {
+      const newVisibility = { ...prev };
+      // Remove visibility state for routes that no longer exist
+      Object.keys(newVisibility).forEach(routeId => {
+        if (!routes.some(route => (route.routeId || route.id) === routeId)) {
+          delete newVisibility[routeId];
+        }
+      });
+      return newVisibility;
+    });
+  }, [routes]);
+
+  const toggleRouteVisibility = useCallback((routeId: string, type: keyof RouteVisibilityState) => {
+    setRouteVisibility(prev => {
+      const newState = { ...prev };
+      if (!newState[routeId]) {
+        newState[routeId] = { mainRoute: true, unpavedSections: true };
+      }
+      newState[routeId] = {
+        ...newState[routeId],
+        [type]: !newState[routeId][type]
+      };
+      return newState;
+    });
+  }, []);
 
   const saveRoute = useCallback(
     async ({ name, type, isPublic }: SaveRouteOptions) => {
@@ -112,6 +196,15 @@ export const useRouteState = (): UseRouteStateReturn => {
     isSaving,
     isLoading,
     error,
+    
+    // Visibility state
+    routeVisibility,
+    toggleRouteVisibility,
+    
+    // Focus state
+    focusRoute: handleFocusRoute,
+    unfocusRoute: handleUnfocusRoute,
+    getFocusedRoute,
     
     // Actions
     saveRoute,

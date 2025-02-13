@@ -1,12 +1,15 @@
 import { ThemeProvider } from '@mui/material/styles';
+import { Box } from '@mui/material';
 import { theme } from './theme';
 import MapView from './features/map/components/MapView/MapView';
 import { PhotoProvider } from './features/photo/context/PhotoContext';
 import { PlaceProvider } from './features/place/context/PlaceContext';
 import { POIProvider } from './features/poi/context/POIContext';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import Auth0Callback from './features/auth/components/Auth0Callback/Auth0Callback';
 import { Auth0Provider } from '@auth0/auth0-react';
+import { LandingPage } from './features/presentation/components/LandingPage/LandingPage';
+import { RoutePresentation } from './features/presentation/components/RoutePresentation/RoutePresentation';
 
 export default function App() {
   return (
@@ -35,12 +38,25 @@ export default function App() {
             <PlaceProvider>
               <POIProvider>
                 <Routes>
-                <Route path="/callback" element={<Auth0Callback />} />
-                <Route path="/" element={
-                  <div className="app">
-                    <MapView />
-                  </div>
-                } />
+                  <Route path="/callback" element={<Auth0Callback />} />
+                  <Route path="/" element={
+                    <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
+                      <MapView />
+                    </Box>
+                  } />
+                  {/* Presentation routes with different layout */}
+                  <Route path="/preview" element={<Box sx={{ 
+                    height: '100vh', 
+                    width: '100vw', 
+                    position: 'relative',
+                    bgcolor: '#1a1a1a',
+                    color: 'white'
+                  }}>
+                    <Outlet />
+                  </Box>}>
+                    <Route path="landing" element={<LandingPage />} />
+                    <Route path="route/:id" element={<RoutePresentation />} />
+                  </Route>
                 </Routes>
               </POIProvider>
             </PlaceProvider>

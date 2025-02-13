@@ -8,8 +8,7 @@ import { PhotoPreviewModal } from '../PhotoPreview/PhotoPreviewModal';
 import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
 import './PhotoLayer.css';
 
-const CLUSTER_RADIUS = 50; // pixels
-const CLUSTER_MAX_ZOOM = 0; // Set to 0 to always show individual photos
+const CLUSTER_RADIUS = 50; // pixels for clustering nearby photos
 
 interface PhotoClusterType {
   photos: ProcessedPhoto[];
@@ -20,21 +19,6 @@ export const PhotoLayer: React.FC = () => {
   const { map } = useMapContext();
   const { photos } = usePhotoContext();
   const [selectedPhoto, setSelectedPhoto] = useState<ProcessedPhoto | null>(null);
-  const [zoom, setZoom] = useState(map?.getZoom() ?? 0);
-
-  // Update zoom on map change
-  useEffect(() => {
-    if (!map) return;
-
-    const handleZoomChange = () => {
-      setZoom(map.getZoom() ?? 0);
-    };
-
-    map.on('zoom', handleZoomChange);
-    return () => {
-      map.off('zoom', handleZoomChange);
-    };
-  }, [map]);
 
   // Helper function to calculate distance between two points
   const calculateDistance = useCallback((point1: mapboxgl.Point, point2: mapboxgl.Point): number => {
@@ -79,33 +63,38 @@ export const PhotoLayer: React.FC = () => {
     );
   }, [normalizeCoordinates]);
 
-  // Cluster photos based on distance with improved performance and error handling
+  // Cluster photos based on pixel distance only
   const { clusters, singlePhotos } = useMemo(() => {
-    // Always show single photos if zoom is high enough
-    if (!map || zoom >= CLUSTER_MAX_ZOOM) {
-      return { 
-        clusters: [], 
-        singlePhotos: photos.filter(p => p.coordinates && 
-          p.coordinates.lng >= -180 && p.coordinates.lng <= 180 &&
-          p.coordinates.lat >= -90 && p.coordinates.lat <= 90
-        ) 
-      };
-    }
-
-    // Only cluster photos when zoomed out
+    if (!map) return { clusters: [], singlePhotos: [] };
 
     try {
       // Create spatial index for better performance with coordinate normalization
+      console.log('Total photos:', photos.length);
+      console.log('Photos:', photos);
+      
       const points = photos
-        .filter(p => p.coordinates)
+        .filter(p => {
+          if (!p.coordinates) {
+            console.warn('Photo missing coordinates:', p.id);
+            return false;
+          }
+          if (!p.coordinates.lng || !p.coordinates.lat) {
+            console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
+            return false;
+          }
+          return true;
+        });
+      console.log('Photos with valid coordinates:', points.length);
+      
+      const projectedPoints = points
         .map(p => {
           const normalized = normalizeCoordinates(p.coordinates!.lng, p.coordinates!.lat);
           try {
             const point = map.project([normalized.lng, normalized.lat]);
-            return point.x >= 0 && point.y >= 0 ? {
-              photo: p,
-              point
-            } : null;
+      return {
+        photo: p,
+        point
+      };
           } catch (err) {
             console.warn(`Failed to project coordinates for photo ${p.id}:`, err);
             return null;
@@ -114,51 +103,54 @@ export const PhotoLayer: React.FC = () => {
         .filter((p): p is { photo: ProcessedPhoto; point: mapboxgl.Point } => p !== null);
 
       const clusteredPhotos: PhotoClusterType[] = [];
+      const singlePhotos: ProcessedPhoto[] = [];
       const processed = new Set<string>();
 
-      for (let i = 0; i < points.length; i++) {
-        if (processed.has(points[i].photo.id)) continue;
+      console.log('Projected points:', projectedPoints.length);
 
-        const cluster: ProcessedPhoto[] = [points[i].photo];
-        processed.add(points[i].photo.id);
+      for (let i = 0; i < projectedPoints.length; i++) {
+        if (processed.has(projectedPoints[i].photo.id)) continue;
+
+        const cluster: ProcessedPhoto[] = [projectedPoints[i].photo];
+        processed.add(projectedPoints[i].photo.id);
 
         // Find nearby points using spatial index
-        for (let j = i + 1; j < points.length; j++) {
-          if (processed.has(points[j].photo.id)) continue;
+        for (let j = i + 1; j < projectedPoints.length; j++) {
+          if (processed.has(projectedPoints[j].photo.id)) continue;
 
-          const distance = calculateDistance(points[i].point, points[j].point);
+          const distance = calculateDistance(projectedPoints[i].point, projectedPoints[j].point);
           
           if (distance <= CLUSTER_RADIUS) {
-            cluster.push(points[j].photo);
-            processed.add(points[j].photo.id);
+            cluster.push(projectedPoints[j].photo);
+            processed.add(projectedPoints[j].photo.id);
           }
         }
 
         if (cluster.length > 1) {
+          console.log('Found cluster with', cluster.length, 'photos');
           try {
             const center = calculateClusterCenter(cluster);
             clusteredPhotos.push({ photos: cluster, center });
           } catch (error) {
             console.error('Failed to calculate cluster center:', error);
+            // If cluster center calculation fails, treat photos as individual
+            cluster.forEach(photo => singlePhotos.push(photo));
           }
-        } else if (!processed.has(cluster[0].id)) {
-          processed.add(cluster[0].id);
+        } else {
+          // Single photo
+          singlePhotos.push(cluster[0]);
         }
       }
 
-      const singlePhotos = points
-        .filter(p => !processed.has(p.photo.id))
-        .map(p => p.photo);
-
       return {
         clusters: clusteredPhotos,
-        singlePhotos
+        singlePhotos: singlePhotos
       };
     } catch (error) {
       console.error('Error during clustering:', error);
       return { clusters: [], singlePhotos: [] };
     }
-  }, [map, photos, zoom, calculateDistance, calculateClusterCenter]);
+  }, [map, photos, calculateDistance, calculateClusterCenter]);
 
   const handleClusterClick = useCallback((clusterPhotos: ProcessedPhoto[]) => {
     if (!map || clusterPhotos.length === 0) return;
@@ -184,7 +176,7 @@ export const PhotoLayer: React.FC = () => {
       // Zoom to fit all photos with animation
       map.fitBounds(bounds, {
         padding: 50,
-        maxZoom: CLUSTER_MAX_ZOOM,
+        maxZoom: 16, // Zoom in enough to see individual photos clearly
         duration: 500,
         essential: true
       });

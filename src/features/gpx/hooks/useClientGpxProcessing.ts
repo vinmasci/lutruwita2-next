@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useMapContext } from '../../map/context/MapContext';
 import mapboxgl from 'mapbox-gl';
 import { parseGpx, GpxParseResult } from '../utils/gpxParser';
-import { matchTrackToRoads } from '../services/mapMatchingService';
 import { ProcessedRoute as GpxProcessedRoute, GPXProcessingError } from '../types/gpx.types';
 import { normalizeRoute, ProcessedRoute } from '../../map/types/route.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { FeatureCollection, Feature, LineString } from 'geojson';
+import { addSurfaceOverlay } from '../services/surfaceService';
 
 export const useClientGpxProcessing = () => {
-  console.log('[useClientGpxProcessing] Hook initializing');
-  const {} = useMapContext(); // Keep the hook for future use
+  const { map } = useMapContext(); // Get map instance for surface detection
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<GPXProcessingError | null>(null);
 
@@ -28,14 +27,6 @@ export const useClientGpxProcessing = () => {
         throw new Error('No valid track points found in GPX file');
       }
 
-      console.log('[useClientGpxProcessing] Matching track to roads');
-      const matched = await matchTrackToRoads(parsed.geometry.coordinates, {
-        confidenceThreshold: 0.6,
-        radiusMultiplier: 3,
-        maxGapDistance: 0.0002,
-        interpolationPoints: 5
-      });
-
       console.log('[useClientGpxProcessing] Creating GeoJSON', {
         parsedElevations: parsed.properties.coordinateProperties?.elevation?.length || 0,
         elevationSample: parsed.properties.coordinateProperties?.elevation?.slice(0, 5)
@@ -52,7 +43,7 @@ export const useClientGpxProcessing = () => {
           },
           geometry: {
             type: 'LineString',
-            coordinates: matched
+            coordinates: parsed.geometry.coordinates
           }
         }]
       };
@@ -105,7 +96,7 @@ export const useClientGpxProcessing = () => {
       };
 
       const id = uuidv4();
-      const processedRoute = normalizeRoute({
+      const route = normalizeRoute({
         id,
         routeId: `route-${id}`,
         name: parsed.properties.name || file.name.replace(/\.gpx$/i, ''),
@@ -121,8 +112,33 @@ export const useClientGpxProcessing = () => {
         }
       });
 
-      console.log('[useClientGpxProcessing] Processing complete', { routeId: processedRoute.id });
-      return processedRoute;
+      // Add surface detection here
+      if (map && route.geojson.features[0]) {
+        const feature = route.geojson.features[0] as Feature<LineString>;
+        try {
+          const featureWithRouteId = {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              routeId: route.routeId || route.id
+            }
+          };
+          // Detect and save unpaved sections
+          const sections = await addSurfaceOverlay(map, featureWithRouteId);
+          route.unpavedSections = sections.map(section => ({
+            startIndex: section.startIndex,
+            endIndex: section.endIndex,
+            coordinates: section.coordinates,
+            surfaceType: section.surfaceType === 'unpaved' ? 'unpaved' :
+                        section.surfaceType === 'gravel' ? 'gravel' : 'trail'
+          }));
+        } catch (error) {
+          console.error('[useClientGpxProcessing] Surface detection error:', error);
+        }
+      }
+
+      console.log('[useClientGpxProcessing] Processing complete', { routeId: route.id });
+      return route;
     } catch (err) {
       const gpxError: GPXProcessingError = {
         code: err instanceof Error && err.message.includes('Map is not ready') ? 'MAP_NOT_READY' : 'PARSING_ERROR',

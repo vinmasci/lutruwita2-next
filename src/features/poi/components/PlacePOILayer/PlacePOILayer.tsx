@@ -19,7 +19,9 @@ interface MarkerRef {
   poiId: string;
 }
 
-export const PlacePOILayer: React.FC = () => {
+interface Props {}
+
+export const PlacePOILayer: React.FC<Props> = () => {
   const { map } = useMapContext();
   const { pois, poiMode } = usePOIContext();
   const { places, updatePlace } = usePlaceContext();
@@ -35,52 +37,24 @@ export const PlacePOILayer: React.FC = () => {
 
   // Effect to track when both map and style are ready
   useEffect(() => {
-    if (!map || !isStyleLoaded) {
-      console.debug('[PlacePOILayer] Map or style not ready:', { 
-        hasMap: !!map, 
-        isStyleLoaded,
-        poiMode,
-        mapLoaded: map?.loaded(),
-        mapStyle: map?.getStyle()?.name
-      });
-      return;
-    }
+      if (!map || !isStyleLoaded) return;
 
-    // Wait for layers to be fully loaded
-    const checkLayers = () => {
-      const settlementLayers = [
-        'settlement-major-label',
-        'settlement-minor-label',
-        'settlement-subdivision-label'
-      ];
-      
-      const availableLayers = settlementLayers.filter(layer => {
-        const hasLayer = map.getLayer(layer);
-        const isVisible = map.getLayoutProperty(layer, 'visibility') !== 'none';
-        console.debug(`[PlacePOILayer] Checking layer ${layer}:`, { hasLayer, isVisible });
-        return hasLayer;
-      });
+      // Wait for layers to be fully loaded
+      const checkLayers = () => {
+        const settlementLayers = [
+          'settlement-major-label',
+          'settlement-minor-label',
+          'settlement-subdivision-label'
+        ];
+        
+        const hasSettlementLayers = settlementLayers.every(layer => map.getLayer(layer));
 
-      console.debug('[PlacePOILayer] Available settlement layers:', {
-        expected: settlementLayers,
-        found: availableLayers,
-        allStyles: map.getStyle()?.layers?.map(l => ({
-          id: l.id,
-          type: l.type,
-          visibility: map.getLayoutProperty(l.id, 'visibility')
-        }))
-      });
-
-      const hasSettlementLayers = settlementLayers.every(layer => map.getLayer(layer));
-
-      if (hasSettlementLayers) {
-        console.debug('[PlacePOILayer] All settlement layers found, setting ready');
-        setIsLayerReady(true);
-      } else {
-        console.debug('[PlacePOILayer] Missing some settlement layers, retrying');
-        setTimeout(checkLayers, 100);
-      }
-    };
+        if (hasSettlementLayers) {
+          setIsLayerReady(true);
+        } else {
+          setTimeout(checkLayers, 100);
+        }
+      };
 
     // Start checking for layers
     checkLayers();
@@ -109,36 +83,57 @@ export const PlacePOILayer: React.FC = () => {
 
   // Setup highlight layer - now dependent on isLayerReady
   useEffect(() => {
-    if (!map || !isLayerReady) {
-      console.debug('[PlacePOILayer] Not ready:', { map: !!map, isLayerReady });
-      return;
-    }
-    console.debug('[PlacePOILayer] Setting up highlight layer');
+    if (!map || !isLayerReady) return;
 
-    const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
-      console.debug('[PlacePOILayer] Mouse move event:', { 
-        point: e.point,
-        mode: poiMode,
-        isLayerReady,
-        zoom: map.getZoom(),
-        center: map.getCenter(),
-        hoveredPlace: hoveredPlace?.name
+    try {
+      // Safe cleanup of existing layers/sources
+      if (map.getStyle() && map.getLayer(HIGHLIGHT_LAYER)) {
+        map.removeLayer(HIGHLIGHT_LAYER);
+      }
+      if (map.getStyle() && map.getSource(HIGHLIGHT_SOURCE)) {
+        map.removeSource(HIGHLIGHT_SOURCE);
+      }
+    
+      // Add highlight source and layer
+      map.addSource(HIGHLIGHT_SOURCE, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [0, 0]
+          },
+          properties: {}
+        }
       });
 
+      map.addLayer({
+      id: HIGHLIGHT_LAYER,
+      type: 'circle',
+      source: HIGHLIGHT_SOURCE,
+      layout: {
+        'visibility': 'none'
+      },
+      paint: {
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10, 20,  // Larger at zoom 10
+          15, 30   // Larger at zoom 15
+        ],
+        'circle-color': '#ffffff',
+        'circle-opacity': 0.3,
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-opacity': 0.8
+      }
+    });
+
+      const handleMouseMove = (e: mapboxgl.MapMouseEvent & { point: mapboxgl.Point }) => {
       const place = getPlaceLabelAtPoint(map, e.point);
-      console.debug('[PlacePOILayer] Place detection result:', { 
-        place,
-        hasExistingPOIs: place ? pois.some(poi => 
-          poi.coordinates[0] === place.coordinates[0] && 
-          poi.coordinates[1] === place.coordinates[1]
-        ) : false
-      });
       
       if (place?.name !== hoveredPlace?.name) {
-        console.debug('[PlacePOILayer] Updating hovered place:', {
-          from: hoveredPlace?.name,
-          to: place?.name
-        });
         setHoveredPlace(place);
       }
       
@@ -146,8 +141,6 @@ export const PlacePOILayer: React.FC = () => {
       const source = map.getSource(HIGHLIGHT_SOURCE) as mapboxgl.GeoJSONSource;
       if (source) {
         const coordinates = place?.coordinates || [0, 0];
-        console.debug('[PlacePOILayer] Updating highlight source:', { coordinates });
-        
         source.setData({
           type: 'Feature',
           geometry: {
@@ -156,33 +149,21 @@ export const PlacePOILayer: React.FC = () => {
           },
           properties: {}
         });
-      } else {
-        console.debug('[PlacePOILayer] Highlight source not found');
       }
 
       // Show highlight whenever we're in place mode and hovering over a place
       const hasData = place && poiMode === 'place';
-      console.debug('[PlacePOILayer] Highlight visibility:', { 
-        hasPlace: !!place, 
-        poiMode, 
-        shouldShow: hasData 
-      });
-
-      try {
-        map.setLayoutProperty(
-          HIGHLIGHT_LAYER,
-          'visibility',
-          hasData ? 'visible' : 'none'
-        );
-      } catch (error) {
-        console.error('[PlacePOILayer] Error setting highlight visibility:', error);
-      }
+      map.setLayoutProperty(
+        HIGHLIGHT_LAYER,
+        'visibility',
+        hasData ? 'visible' : 'none'
+      );
 
       // Update cursor
       map.getCanvas().style.cursor = hasData ? 'pointer' : '';
     };
 
-    const handleClick = async (e: mapboxgl.MapMouseEvent) => {
+      const handleClick = async (e: mapboxgl.MapMouseEvent & { point: mapboxgl.Point }) => {
       const place = getPlaceLabelAtPoint(map, e.point);
       if (!place) return;
 
@@ -209,90 +190,30 @@ export const PlacePOILayer: React.FC = () => {
         }
         setSelectedPlace(placeData);
       }
-      // In place mode without POIs, we don't set selectedPlace because we want the icon selection drawer
     };
-
-    try {
-      // Safe cleanup of existing layers/sources
-      if (map.getStyle() && map.getLayer(HIGHLIGHT_LAYER)) {
-        map.removeLayer(HIGHLIGHT_LAYER);
-      }
-      if (map.getStyle() && map.getSource(HIGHLIGHT_SOURCE)) {
-        map.removeSource(HIGHLIGHT_SOURCE);
-      }
-
-      console.debug('[PlacePOILayer] Setting up highlight source and layer');
-      
-      // Add highlight source and layer
-      try {
-        map.addSource(HIGHLIGHT_SOURCE, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [0, 0]
-            },
-            properties: {}
-          }
-        });
-        console.debug('[PlacePOILayer] Added highlight source');
-      } catch (error) {
-        console.error('[PlacePOILayer] Error adding highlight source:', error);
-      }
-
-      try {
-        map.addLayer({
-        id: HIGHLIGHT_LAYER,
-        type: 'circle',
-        source: HIGHLIGHT_SOURCE,
-        layout: {
-          'visibility': 'none'
-        },
-        paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            10, 20,  // Larger at zoom 10
-            15, 30   // Larger at zoom 15
-          ],
-          'circle-color': '#ffffff',
-          'circle-opacity': 0.3,
-          'circle-stroke-width': 3,
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-opacity': 0.8
-        }
-        });
-        console.debug('[PlacePOILayer] Added highlight layer');
-      } catch (error) {
-        console.error('[PlacePOILayer] Error adding highlight layer:', error);
-      }
 
       // Add event listeners
       map.on('mousemove', handleMouseMove);
       map.on('click', handleClick);
+
+      return () => {
+        if (!map || !map.getStyle()) return;
+        
+        map.off('mousemove', handleMouseMove);
+        map.off('click', handleClick);
+        
+        if (map.getLayer(HIGHLIGHT_LAYER)) {
+          map.removeLayer(HIGHLIGHT_LAYER);
+        }
+        if (map.getSource(HIGHLIGHT_SOURCE)) {
+          map.removeSource(HIGHLIGHT_SOURCE);
+        }
+        map.getCanvas().style.cursor = '';
+      };
     } catch (error) {
       console.error('[PlacePOILayer] Error setting up layer:', error);
+      return () => {};
     }
-
-    return () => {
-      if (map.getStyle()) {
-        try {
-          map.off('mousemove', handleMouseMove);
-          map.off('click', handleClick);
-          if (map.getLayer(HIGHLIGHT_LAYER)) {
-            map.removeLayer(HIGHLIGHT_LAYER);
-          }
-          if (map.getSource(HIGHLIGHT_SOURCE)) {
-            map.removeSource(HIGHLIGHT_SOURCE);
-          }
-          map.getCanvas().style.cursor = '';
-        } catch (error) {
-          console.error('[PlacePOILayer] Error cleaning up:', error);
-        }
-      }
-    };
   }, [map, isStyleLoaded, poiMode, places, pois]);
 
   // Handle POI markers - now dependent on isLayerReady
@@ -306,7 +227,7 @@ export const PlacePOILayer: React.FC = () => {
     // Group only place POIs by coordinates
     const poiGroups = pois
       .filter((poi): poi is PlaceNamePOI => poi.type === 'place') // Only include place POIs
-      .reduce<Record<string, PlaceNamePOI[]>>((acc, poi) => {
+      .reduce<Record<string, PlaceNamePOI[]>>((acc: Record<string, PlaceNamePOI[]>, poi: PlaceNamePOI) => {
         const key = `${poi.coordinates[0]},${poi.coordinates[1]}`;
         if (!acc[key]) {
           acc[key] = [];

@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.gpxRoutes = void 0;
+const express_1 = require("express");
+const upload_middleware_1 = require("../../../shared/middlewares/upload.middleware");
+const gpx_controller_1 = require("../controllers/gpx.controller");
+const router = (0, express_1.Router)();
+const gpxController = new gpx_controller_1.GPXController();
+router.post('/upload', upload_middleware_1.upload.single('gpxFile'), gpxController.uploadGPX);
+router.get('/progress/:uploadId', gpxController.getProgress);
+router.get('/status/:uploadId', gpxController.getStatus);
+exports.gpxRoutes = router;

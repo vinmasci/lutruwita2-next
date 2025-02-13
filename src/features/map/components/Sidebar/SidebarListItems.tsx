@@ -10,8 +10,7 @@ export const SidebarListItems = ({
   onUploadGpx,
   onAddPhotos,
   onAddPOI,
-  onItemClick,
-  mapReady
+  onItemClick
 }: SidebarProps) => {
   const { 
     routes, 
@@ -19,7 +18,10 @@ export const SidebarListItems = ({
     saveCurrentState,
     listRoutes,
     loadRoute,
-    deleteSavedRoute
+    deleteSavedRoute,
+    currentLoadedState,
+    currentLoadedRouteId,
+    hasUnsavedChanges
   } = useRouteContext();
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -112,6 +114,12 @@ export const SidebarListItems = ({
             console.error('Failed to save:', error);
           }
         }}
+        initialValues={currentLoadedState ? {
+          name: currentLoadedState.name,
+          type: currentLoadedState.type,
+          isPublic: currentLoadedState.isPublic
+        } : undefined}
+        isEditing={!!currentLoadedRouteId}
       />
 
       <LoadDialog
@@ -127,6 +135,7 @@ export const SidebarListItems = ({
           }
         }}
         onDelete={deleteSavedRoute}
+        hasUnsavedChanges={hasUnsavedChanges}
       />
     </>
   );

@@ -22,65 +22,21 @@ export const getPlaceLabelAtPoint = (
     ];
 
     const availableLayers = requiredLayers.filter(layer => map.getLayer(layer));
-    console.debug('[placeDetection] Available layers:', {
-      required: requiredLayers,
-      found: availableLayers,
-      allLayers: map.getStyle()?.layers?.map(l => l.id)
-    });
-
     if (availableLayers.length === 0) {
-      console.debug('[placeDetection] No settlement layers found in map style');
       return null;
     }
-
-    // Query map features at point
-    console.debug('[placeDetection] Querying features at point:', {
-      point,
-      availableLayers,
-      zoom: map.getZoom(),
-      center: map.getCenter(),
-      bounds: map.getBounds(),
-      pixelRatio: window.devicePixelRatio || 1
-    });
 
     const features = map.queryRenderedFeatures(point, {
       layers: availableLayers
     });
     
-    console.debug('[placeDetection] Query result:', { 
-      point,
-      featureCount: features.length,
-      queriedLayers: availableLayers,
-      features: features.map(f => ({
-        id: f.id,
-        type: f.type,
-        layer: f.layer?.id,
-        layerType: f.layer?.type,
-        source: f.source,
-        sourceLayer: f.sourceLayer,
-        properties: f.properties,
-        geometry: f.geometry,
-        state: {
-          isVisible: map.getLayoutProperty(f.layer?.id || '', 'visibility') !== 'none',
-          zoom: map.getZoom()
-        }
-      }))
-    });
-    
     if (!features.length) {
-      console.debug('[placeDetection] No features found at point');
       return null;
     }
   
     const place = features[0];
     
     if (!place.properties?.name || !place.geometry) {
-      console.debug('[placeDetection] Invalid place:', { 
-        hasName: !!place.properties?.name,
-        hasGeometry: !!place.geometry,
-        properties: place.properties,
-        geometry: place.geometry
-      });
       return null;
     }
   
@@ -98,10 +54,9 @@ export const getPlaceLabelAtPoint = (
       bbox: place.bbox as [number, number, number, number] | undefined
     };
 
-    console.debug('[placeDetection] Found place:', placeLabel);
     return placeLabel;
   } catch (error) {
-    console.error('[placeDetection] Error querying place:', error);
+    console.error('[placeDetection] Error:', error);
     return null;
   }
 };

@@ -13,7 +13,9 @@ This document outlines the project structure and describes the purpose of key fi
 ├── docs/                          # Project documentation
 │   ├── ARCHITECTURE.md            # Overall system architecture and design decisions
 │   ├── DIR.md                     # This directory structure document
-│   └── POIDIR.md                  # POI feature documentation
+│   ├── PHOTO_STORAGE.md          # Photo storage and management documentation
+│   ├── POIDIR.md                 # POI feature documentation
+│   └── POIPLACES.md              # POI places integration documentation
 ├── logs/                          # Application logging directory
 │   ├── error.log                  # General application error logs
 │   ├── exceptions.log             # Detailed exception tracking
@@ -33,6 +35,10 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── routes/      # GPX API endpoint definitions
 │   │   │   │   ├── services/    # GPX data processing services
 │   │   │   │   └── types/       # GPX type definitions
+│   │   │   ├── photo/           # Photo management feature backend
+│   │   │   │   ├── controllers/  # Photo request handlers
+│   │   │   │   ├── routes/      # Photo API endpoint definitions
+│   │   │   │   └── services/    # Photo processing services
 │   │   │   ├── poi/             # POI management feature backend
 │   │   │   │   ├── controllers/  # POI request handlers
 │   │   │   │   ├── models/      # POI data models (MongoDB schemas)
@@ -49,8 +55,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   ├── services/            # [REDUNDANT] Main services (should be moved to features)
 │   │   ├── shared/              # Shared backend utilities
 │   │   │   ├── config/         # Server configuration (logging, env vars)
-│   │   │   ├── middlewares/    # Express middlewares (error handling, file upload)
-│   │   │   └── types/         # Shared type definitions
+│   │   │   ├── middlewares/    # Express middlewares (error handling, file upload, auth, route validation)
+│   │   │   └── types/         # Shared type definitions (auth, gpx, place, poi)
 ├── src/                          # Frontend source code
 │   ├── App.tsx                   # Main React application component and routing
 │   ├── env.d.ts                 # Environment variable type definitions
@@ -91,6 +97,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   └── utils/       # GPX utilities
 │   │   │       ├── climbUtils.ts # Climb categorization
 │   │   │       ├── gpxParser.ts  # GPX file parsing
+│   │   │       ├── routeUtils.ts # Route processing
 │   │   │       └── roadUtils.ts  # Road surface analysis
 │   │   ├── map/             # Map visualization feature
 │   │   │   ├── components/  # Map components
@@ -109,6 +116,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   │   ├── SearchControl.tsx # Search component
 │   │   │   │   │   └── SearchControl.css # Search styling
 │   │   │   │   ├── StyleControl/ # Map style switcher
+│   │   │   │   │   └── StyleControl.tsx # Style control component
 │   │   │   │   └── Sidebar/    # Navigation and route management
 │   │   │   │       ├── Sidebar.tsx       # Main sidebar component
 │   │   │   │       ├── Sidebar.styles.ts # Drawer styling
@@ -129,9 +137,11 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   ├── services/   # Map-related services
 │   │   │   │   ├── mapService.ts  # Map operations
 │   │   │   │   └── routeService.ts # Route operations with state preservation
-│   │   │   └── types/     # Map type definitions
-│   │   │       ├── map.types.ts   # Map interfaces
-│   │   │       └── route.types.ts # Route interfaces with multi-route support
+│   │   │   ├── types/     # Map type definitions
+│   │   │   │   ├── map.types.ts   # Map interfaces
+│   │   │   │   └── route.types.ts # Route interfaces with multi-route support
+│   │   │   └── utils/     # Map utilities
+│   │   │       └── routeUtils.ts # Route processing utilities
 │   │   ├── photo/         # Photo management feature
 │   │   │   ├── components/ # Photo components
 │   │   │   │   ├── PhotoCluster/ # Photo grouping
@@ -149,8 +159,10 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │       ├── PhotoUploader.tsx # Upload logic
 │   │   │   │       ├── PhotoUploaderUI.tsx # Upload UI
 │   │   │   │       └── PhotoUploader.types.ts # Type defs
-│   │   │   └── context/   # Photo state management
-│   │   │       └── PhotoContext.tsx # Photo data/state
+│   │   │   ├── context/   # Photo state management
+│   │   │   │   └── PhotoContext.tsx # Photo data/state
+│   │   │   └── services/  # Photo services
+│   │   │       └── photoService.ts # Photo operations
 │   │   ├── place/         # Place management feature
 │   │   │   ├── context/   # Place state management
 │   │   │   │   └── PlaceContext.tsx # Place data/state
@@ -199,6 +211,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       │   └── poi-icons.ts  # Icon definitions
 │   │       ├── context/    # POI state management
 │   │       │   └── POIContext.tsx # POI data/state with improved merging
+│   │       ├── services/   # POI services
+│   │       │   └── poiService.ts # POI operations
 │   │       ├── types/     # POI type definitions
 │   │       │   └── poi.types.ts # POI interfaces
 │   │       └── utils/     # POI utilities
@@ -242,6 +256,8 @@ The application's features are tightly integrated while maintaining clear bounda
 - Photo clusters consider POI locations
 - Shared photo processing utilities
 - Consistent styling between features
+- Photo storage and management system
+- Photo preview and gallery functionality
 
 ### Place ↔ POI Integration
 - Places can contain multiple POIs
@@ -249,6 +265,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - Shared icon selection system
 - Consistent metadata structure
 - Improved state merging for place-based POIs
+- Place-specific POI instructions and workflows
 
 ## Key Components
 
@@ -266,7 +283,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - `routeService`: Manages route data persistence and multi-route operations
 - `poiService`: Handles POI CRUD operations with improved state management
 - `placeDetection`: Identifies and processes place-based POIs
-- `photoService`: Handles photo upload and processing operations
+- `photoService`: Handles photo upload, processing, and storage operations
 - `authService`: Manages authentication and authorization
 
 ### Utility Functions
@@ -275,6 +292,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - `photo`: Handles photo processing and optimization
 - `placeDetection`: Implements place detection algorithms
 - `gpxParser`: Provides low-level GPX file parsing
+- `routeUtils`: Handles route processing and validation
 - `useMapStyle`: Manages map style loading state
 
 ## Configuration
@@ -286,6 +304,11 @@ Multiple TypeScript configuration files target different parts of the applicatio
 - `tsconfig.client.json`: Frontend-specific settings
 - `tsconfig.server.json`: Backend-specific settings
 - `tsconfig.node.json`: Node.js runtime settings
+
+### Environment Configuration
+- `.env.local`: Local environment variables
+- `server/.env`: Server-specific environment variables
+- `server/.env.local.template`: Template for server environment setup
 
 ### Logging System
 Comprehensive logging across different concerns:

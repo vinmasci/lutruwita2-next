@@ -32,27 +32,21 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
       };
 
       if (action.payload.poi.type === 'place') {
-        const placePOI = {
+        return [...state, {
           ...base,
           type: 'place' as const,
           placeId: action.payload.poi.placeId,
-        };
-        console.log('[POIReducer] Creating place POI:', placePOI);
-        return [...state, placePOI];
+        }];
       } else {
-        const draggablePOI = {
+        return [...state, {
           ...base,
           type: 'draggable' as const,
-        };
-        console.log('[POIReducer] Creating draggable POI:', draggablePOI);
-        return [...state, draggablePOI];
+        }];
       }
     }
     case 'REMOVE_POI':
-      console.log('[POIReducer] Removing POI:', action.payload);
       return state.filter((poi) => poi.id !== action.payload);
     case 'UPDATE_POI':
-      console.log('[POIReducer] Updating POI:', action.payload);
       return state.map((poi) => {
         if (poi.id !== action.payload.id) return poi;
         
@@ -79,14 +73,12 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
         }
       });
     case 'UPDATE_POSITION':
-      console.log('[POIReducer] Updating POI position:', action.payload);
       return state.map((poi) => 
         poi.id === action.payload.id 
           ? { ...poi, coordinates: action.payload.coordinates }
           : poi
       );
     case 'LOAD_POIS':
-      console.log('[POIReducer] Loading POIs:', action.payload);
       return action.payload;
     default:
       return state;
@@ -103,26 +95,18 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [error, setError] = useState<Error | null>(null);
   const [poiMode, setPoiMode] = useState<POIMode>('none');
 
-  // Monitor POI state changes
-  useEffect(() => {
-    if (pois.length > 0) {
-      console.log('[POIContext] POI state updated:', pois);
-    }
-  }, [pois]);
-
   const addPOI = async (poi: NewPOIInput) => {
     try {
       // Add POI to local state only
       dispatch({ type: 'ADD_POI', payload: { poi } });
     } catch (error) {
-      console.error('[POIContext] Error saving POI:', error);
+      console.error('[POIContext] Error:', error);
       setError(error instanceof Error ? error : new Error('Failed to save POI'));
     }
   };
 
   const removePOI = (id: string) => {
     try {
-      console.log('[POIContext] Removing POI:', id);
       dispatch({ type: 'REMOVE_POI', payload: id });
     } catch (error) {
       console.error('[POIContext] Error removing POI:', error);
@@ -132,7 +116,6 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updatePOI = (id: string, updates: Partial<Omit<POIType, 'id'>>) => {
     try {
-      console.log('[POIContext] Updating POI:', { id, updates });
       dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
     } catch (error) {
       console.error('[POIContext] Error updating POI:', error);
@@ -142,7 +125,6 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updatePOIPosition = (id: string, coordinates: POICoordinates) => {
     try {
-      console.log('[POIContext] Updating POI position:', { id, coordinates });
       dispatch({ type: 'UPDATE_POSITION', payload: { id, coordinates } });
     } catch (error) {
       console.error('[POIContext] Error updating POI position:', error);
@@ -152,7 +134,6 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Get POIs in route format - all POIs are for the current route by default
   const getPOIsForRoute = (_routeId?: string): SavedRouteState['pois'] => {
-    console.log('[POIContext] Getting POIs from state:', JSON.stringify(pois, null, 2));
     
     // Split POIs by type and validate
     const draggablePois = pois.filter((poi): poi is DraggablePOI => {
@@ -160,14 +141,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Validate required fields
       if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon) {
-        console.warn('[POIContext] Invalid draggable POI missing required fields:', {
-          id: !!poi.id,
-          coordinates: !!poi.coordinates,
-          name: !!poi.name,
-          category: !!poi.category,
-          icon: !!poi.icon,
-          fullPoi: poi
-        });
+        console.warn('[POIContext] Invalid draggable POI:', poi.id);
         return false;
       }
       return true;
@@ -178,15 +152,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Validate required fields
       if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon || !poi.placeId) {
-        console.warn('[POIContext] Invalid place POI missing required fields:', {
-          id: !!poi.id,
-          coordinates: !!poi.coordinates,
-          name: !!poi.name,
-          category: !!poi.category,
-          icon: !!poi.icon,
-          placeId: !!poi.placeId,
-          fullPoi: poi
-        });
+        console.warn('[POIContext] Invalid place POI:', poi.id);
         return false;
       }
       return true;
@@ -197,20 +163,13 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       places: placePois
     };
     
-    console.log('[POIContext] Returning validated POIs:', JSON.stringify(result, null, 2));
     return result;
   };
 
   // Load POIs from route
   const loadPOIsFromRoute = (routePOIs?: SavedRouteState['pois']) => {
     try {
-      console.log('[POIContext] Loading POIs from route:', routePOIs);
-      
-      // Keep existing POIs if no new ones provided
-      if (!routePOIs) {
-        console.log('[POIContext] No new POIs to load, preserving current state');
-        return;
-      }
+      if (!routePOIs) return;
 
       // Process new POIs - they should all be full POI objects now
       const newPOIs: POIType[] = [
@@ -235,7 +194,6 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
 
-      console.log('[POIContext] Merged POIs:', mergedPOIs);
       dispatch({ type: 'LOAD_POIS', payload: mergedPOIs });
     } catch (error) {
       console.error('[POIContext] Error loading POIs:', error);

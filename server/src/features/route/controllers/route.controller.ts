@@ -126,11 +126,22 @@ export class RouteController {
       console.log('[RouteController] POIs have been saved to MongoDB');
       res.status(201).json(result);
     } catch (error) {
-      console.error('[RouteController] Save route error:', error);
-      console.error('[RouteController] Error details:', error instanceof Error ? error.stack : 'Unknown error');
+      console.error('[RouteController] Save route error:', {
+        error,
+        stack: error instanceof Error ? error.stack : undefined,
+        routeCount: req.body.routes?.length,
+        dataSize: JSON.stringify(req.body).length / 1024 / 1024 + 'MB'
+      });
+
+      // Log validation errors if present
+      if (error instanceof Error && 'errors' in error) {
+        console.error('[RouteController] Validation errors:', (error as any).errors);
+      }
+
       res.status(500).json({
         error: 'Failed to save route',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        validationErrors: error instanceof Error && 'errors' in error ? (error as any).errors : undefined
       });
     }
   }

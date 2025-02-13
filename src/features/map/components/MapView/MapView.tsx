@@ -228,32 +228,8 @@ function MapViewContent() {
           }
     });
 
-    // Handle surface data based on route type
-    if (route._type === 'fresh' && (!route.unpavedSections || route.unpavedSections.length === 0)) {
-      const feature = route.geojson.features[0] as Feature<LineString>;
-      try {
-        const featureWithRouteId = {
-          ...feature,
-          properties: {
-            ...feature.properties,
-            routeId: routeId
-          }
-        };
-        // Detect and save unpaved sections
-        const sections = await addSurfaceOverlay(map, featureWithRouteId);
-        // Update route with unpaved sections
-        route.unpavedSections = sections.map(section => ({
-          startIndex: section.startIndex,
-          endIndex: section.endIndex,
-          coordinates: section.coordinates,
-          surfaceType: section.surfaceType === 'unpaved' ? 'unpaved' :
-                      section.surfaceType === 'gravel' ? 'gravel' : 'trail'
-        }));
-      } catch (error) {
-        console.error('[MapView] Surface detection error:', error);
-      }
-    } else {
-      // For loaded routes or routes with existing sections, render them
+    // Render unpaved sections if they exist
+    if (route.unpavedSections?.length) {
       route.unpavedSections?.forEach((section, index) => {
         const sourceId = `unpaved-section-${routeId}-${index}`;
         const layerId = `unpaved-section-layer-${routeId}-${index}`;
@@ -462,60 +438,114 @@ function MapViewContent() {
   };
 
   const handleDeleteRoute = (routeId: string) => {
-    if (!mapInstance.current) return;
+    console.log('[MapView][DELETE] Starting deletion process for route:', routeId);
+    console.log('[MapView][DELETE] Current routes:', routes.map(r => ({ 
+      id: r.id, 
+      routeId: r.routeId, 
+      name: r.name,
+      _type: r._type
+    })));
+    
+    if (!mapInstance.current) {
+      console.error('[MapView][DELETE] Map instance not available');
+      return;
+    }
     
     const map = mapInstance.current;
+    const style = map.getStyle();
+    if (!style || !style.layers) {
+      console.error('[MapView][DELETE] Map style or layers not available');
+      return;
+    }
 
-    // Clean up layers and sources for both new and loaded routes
-    const layersToRemove = [
+    // Step 1: Find all layers associated with this route
+    console.log('[MapView][DELETE] Finding layers for route:', routeId);
+    const allLayers = style.layers
+      .map(layer => layer.id)
+      .filter(id => 
+        id.includes(routeId) || // Matches any layer containing the routeId
+        id.startsWith(`unpaved-section-layer-${routeId}`) // Matches unpaved section layers
+      );
+    console.log('[MapView][DELETE] Found map style layers:', allLayers);
+
+    // Add known layer patterns that might not be caught by the filter
+    const knownLayerPatterns = [
       `${routeId}-main-border`,
       `${routeId}-main-line`,
+      `${routeId}-hover`,
       `${routeId}-surface`,
       `${routeId}-unpaved-line`
     ];
+    console.log('[MapView][DELETE] Added known layer patterns:', knownLayerPatterns);
 
-    // Remove layers
+    // Combine all layer IDs and remove duplicates
+    const layersToRemove = [...new Set([...allLayers, ...knownLayerPatterns])];
+    console.log('[MapView][DELETE] Final layers to remove:', layersToRemove);
+
+    // Step 2: Remove all layers first
+    console.log('[MapView][DELETE] Starting layer removal process');
     layersToRemove.forEach(layerId => {
       if (map.getLayer(layerId)) {
-        map.removeLayer(layerId);
-      }
-    });
-
-    // Remove sources
-    const sourcesToRemove = [
-      `${routeId}-main`,
-      `${routeId}-unpaved`
-    ];
-
-    sourcesToRemove.forEach(sourceId => {
-      if (map.getSource(sourceId)) {
-        map.removeSource(sourceId);
-      }
-    });
-
-    // Clean up any remaining unpaved section layers and sources from old routes
-    const style = map.getStyle();
-    if (style?.layers) {
-      const layerIds = style.layers.map(layer => layer.id);
-      layerIds.forEach(layerId => {
-        if (layerId.startsWith(`unpaved-section-layer-${routeId}-`)) {
+        try {
+          console.log('[MapView][DELETE] Removing layer:', layerId);
           map.removeLayer(layerId);
-          const sectionIndex = layerId.split('-').pop();
-          const sourceId = `unpaved-section-${routeId}-${sectionIndex}`;
-          if (map.getSource(sourceId)) {
+          console.log('[MapView][DELETE] Successfully removed layer:', layerId);
+        } catch (error) {
+          console.error('[MapView][DELETE] Error removing layer:', layerId, error);
+        }
+      } else {
+        console.log('[MapView][DELETE] Layer not found:', layerId);
+      }
+    });
+
+    // Step 3: Find all sources associated with this route
+    const mainSourceId = `${routeId}-main`;
+    const unpavedSourceId = `${routeId}-unpaved`;
+    const unpavedSectionPattern = `unpaved-section-${routeId}-`;
+
+    // Get all source IDs from the style
+    const allSources = Object.keys(style.sources || {})
+      .filter(id => 
+        id === mainSourceId ||
+        id === unpavedSourceId ||
+        id.startsWith(unpavedSectionPattern)
+      );
+    console.log('[MapView][DELETE] Found sources to remove:', allSources);
+
+    // Step 4: Remove all sources after a brief delay to ensure layers are fully removed
+    setTimeout(() => {
+      console.log('[MapView][DELETE] Starting source removal process after delay');
+      allSources.forEach(sourceId => {
+        if (map.getSource(sourceId)) {
+          try {
+            console.log('[MapView][DELETE] Removing source:', sourceId);
             map.removeSource(sourceId);
+            console.log('[MapView][DELETE] Successfully removed source:', sourceId);
+          } catch (error) {
+            console.error('[MapView][DELETE] Error removing source:', sourceId, error);
           }
+        } else {
+          console.log('[MapView][DELETE] Source not found:', sourceId);
         }
       });
-    }
 
-    // Delete from context (this will also clear current route if needed)
+      // Log state after source removal
+      const currentStyle = map.getStyle();
+      console.log('[MapView][DELETE] Remaining sources:', Object.keys(currentStyle?.sources || {}));
+    }, 100); // Small delay to ensure layers are fully removed
+
+    // Step 5: Delete from context
+    console.log('[MapView][DELETE] Calling deleteRoute with ID:', routeId);
     deleteRoute(routeId);
     
     // Clear local reference
     if (currentRouteId.current === routeId) {
+      console.log('[MapView][DELETE] Clearing current route reference:', currentRouteId.current);
       currentRouteId.current = null;
     }
+
+    // Log final state
+    console.log('[MapView][DELETE] Deletion process complete for route:', routeId);
   };
 
   // Initialize map
@@ -763,21 +793,26 @@ function MapViewContent() {
           />
         )}
 
-        {currentRoute && isMapReady && mapInstance.current && (
+        {isMapReady && mapInstance.current && (
           <>
-            <div className="route-filename">
-              {currentRoute._type === 'loaded' && currentRoute._loadedState ? currentRoute._loadedState.name : currentRoute.name || 'Untitled Route'}
-            </div>
-            {/* For loaded routes, use the RouteLayer */}
-            {currentRoute._type === 'loaded' && (
+            {/* Render RouteLayer for each loaded route */}
+            {routes.filter(route => route._type === 'loaded').map(route => (
               <RouteLayer 
-                map={mapInstance.current} 
-                route={currentRoute} 
+                key={route.routeId}
+                map={mapInstance.current!} 
+                route={route} 
               />
-            )}
+            ))}
             
-            <ElevationProfilePanel route={currentRoute} />
-            <DistanceMarkers map={mapInstance.current} />
+            {currentRoute && (
+              <>
+                <div className="route-filename">
+                  {currentRoute._type === 'loaded' && currentRoute._loadedState ? currentRoute._loadedState.name : currentRoute.name || 'Untitled Route'}
+                </div>
+                <ElevationProfilePanel route={currentRoute} />
+                <DistanceMarkers map={mapInstance.current} />
+              </>
+            )}
           </>
         )}
 

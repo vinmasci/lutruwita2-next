@@ -3,37 +3,116 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.POIService = void 0;
 const poi_model_1 = require("../models/poi.model");
 class POIService {
-    async getAllPOIs(userId) {
-        return poi_model_1.POI.find({ userId });
-    }
-    async createPOI(userId, poiData) {
-        const poi = new poi_model_1.POI({
-            _id: poiData.id, // Use client-generated UUID as _id
-            ...poiData,
-            userId,
-        });
+    async getPOIs() {
         try {
-            const savedPoi = await poi.save();
-            return savedPoi;
+            console.log('[POIService] Getting all POIs...');
+            const allPois = await poi_model_1.POIModel.find({});
+            const draggablePOIs = [];
+            const placePOIs = [];
+            for (const poi of allPois) {
+                const doc = poi.toObject();
+                // Skip invalid POIs
+                if (!Array.isArray(doc.coordinates) || doc.coordinates.length !== 2 || !doc.name || !doc.category || !doc.icon) {
+                    continue;
+                }
+                const photos = (doc.photos || [])
+                    .filter(photo => photo && typeof photo.url === 'string')
+                    .map(photo => ({
+                    url: photo.url,
+                    caption: typeof photo.caption === 'string' ? photo.caption : undefined
+                }));
+                const style = doc.style ? {
+                    color: typeof doc.style.color === 'string' ? doc.style.color : undefined,
+                    size: typeof doc.style.size === 'number' ? doc.style.size : undefined
+                } : undefined;
+                const basePOI = {
+                    id: poi._id.toString(),
+                    coordinates: doc.coordinates,
+                    name: doc.name,
+                    description: typeof doc.description === 'string' ? doc.description : undefined,
+                    category: doc.category,
+                    icon: doc.icon,
+                    photos,
+                    style
+                };
+                if (doc.type === 'draggable') {
+                    draggablePOIs.push({
+                        ...basePOI,
+                        type: 'draggable'
+                    });
+                }
+                else if (doc.type === 'place' && typeof doc.placeId === 'string') {
+                    placePOIs.push({
+                        ...basePOI,
+                        type: 'place',
+                        placeId: doc.placeId
+                    });
+                }
+            }
+            return { draggable: draggablePOIs, places: placePOIs };
         }
         catch (error) {
-            console.error('Error creating POI:', error);
+            console.error('[POIService] Failed to get POIs:', error);
             throw error;
         }
     }
-    async updatePOI(userId, id, updates) {
-        const poi = await poi_model_1.POI.findOneAndUpdate({ _id: id, userId }, updates, { new: true, runValidators: true });
-        if (!poi) {
-            throw new Error('POI not found');
+    async savePOIs(pois) {
+        try {
+            console.log('[POIService] Starting POI save process...');
+            // Save and collect draggable POIs
+            const savedDraggable = await Promise.all(pois.draggable.map(async (poi) => {
+                const poiDoc = new poi_model_1.POIModel({
+                    coordinates: poi.coordinates,
+                    name: poi.name,
+                    description: poi.description,
+                    category: poi.category,
+                    icon: poi.icon,
+                    photos: poi.photos,
+                    style: poi.style,
+                    type: 'draggable'
+                });
+                const saved = await poiDoc.save();
+                return { ...poi, id: saved._id.toString() };
+            }));
+            // Save and collect place POIs
+            const savedPlaces = await Promise.all(pois.places.map(async (poi) => {
+                if (poi.type !== 'place') {
+                    throw new Error('Invalid POI type in places array');
+                }
+                const poiDoc = new poi_model_1.POIModel({
+                    coordinates: poi.coordinates,
+                    name: poi.name,
+                    description: poi.description,
+                    category: poi.category,
+                    icon: poi.icon,
+                    photos: poi.photos,
+                    style: poi.style,
+                    type: 'place',
+                    placeId: poi.placeId
+                });
+                const saved = await poiDoc.save();
+                return { ...poi, id: saved._id.toString() };
+            }));
+            console.log('[POIService] POIs saved successfully');
+            return {
+                draggable: savedDraggable,
+                places: savedPlaces
+            };
         }
-        return poi;
+        catch (error) {
+            console.error('[POIService] Failed to save POIs:', error);
+            throw error;
+        }
     }
-    async deletePOI(userId, id) {
-        const poi = await poi_model_1.POI.findOneAndDelete({ _id: id, userId });
-        if (!poi) {
-            throw new Error('POI not found');
+    async deleteAllPOIs() {
+        try {
+            await poi_model_1.POIModel.deleteMany({});
+            console.log('[POIService] All POIs deleted successfully');
         }
-        return poi;
+        catch (error) {
+            console.error('[POIService] Failed to delete POIs:', error);
+            throw error;
+        }
     }
 }
 exports.POIService = POIService;

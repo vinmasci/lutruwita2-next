@@ -3,129 +3,181 @@ import mapboxgl from 'mapbox-gl';
 import { Feature, LineString } from 'geojson';
 import { RouteLayerProps } from './types';
 import { LoadedRoute, UnpavedSection } from '../../types/route.types';
+import { useMapStyle } from '../../hooks/useMapStyle';
+import { useRouteState } from "../../hooks/useRouteState";
 
 export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
+  const isStyleLoaded = useMapStyle(map);
+  const { routeVisibility, toggleRouteVisibility } = useRouteState();
+
   useEffect(() => {
     try {
-      if (!map || !route) return;
+      console.log('[RouteLayer] Initializing with:', {
+        map: !!map,
+        routeId: route?.routeId,
+        hasGeojson: !!route?.geojson,
+        isStyleLoaded
+      });
+      
+      if (!map || !route || !isStyleLoaded || !route.geojson) {
+        console.log('[RouteLayer] Missing required props:', {
+          map: !!map,
+          route: !!route,
+          isStyleLoaded,
+          hasGeojson: !!route?.geojson
+        });
+        return;
+      }
 
-      const routeId = route.routeId || `route-${route.id}`;
+      const routeId = route.routeId;
       const mainLayerId = `${routeId}-main-line`;
       const borderLayerId = `${routeId}-main-border`;
       const hoverLayerId = `${routeId}-hover`;
       const mainSourceId = `${routeId}-main`;
+      const visibility = routeVisibility[routeId] || { mainRoute: true, unpavedSections: true };
+      
+      // Initial validation of GeoJSON data
+      if (!route.geojson.features || !route.geojson.features.length) {
+        console.error('[RouteLayer] Invalid GeoJSON data:', {
+          routeId: route.routeId,
+          geojsonType: route.geojson.type,
+          featureCount: route.geojson.features?.length
+        });
+        return;
+      }
 
-      // Clean up any existing layers
-      const cleanup = () => {
-        if (map.getLayer(hoverLayerId)) map.removeLayer(hoverLayerId);
-        if (map.getLayer(mainLayerId)) map.removeLayer(mainLayerId);
-        if (map.getLayer(borderLayerId)) map.removeLayer(borderLayerId);
-        if (map.getSource(mainSourceId)) map.removeSource(mainSourceId);
+      // Extract and validate geometry
+      const geometry = route.geojson.features[0].geometry as LineString | undefined;
+      
+      if (!geometry || geometry.type !== 'LineString') {
+        console.error('[RouteLayer] Invalid GeoJSON structure:', {
+          featureType: geometry?.type,
+          expected: 'LineString'
+        });
+        return;
+      }
 
-        // Clean up surface layers
-        if (route.unpavedSections) {
-          route.unpavedSections.forEach((_, index) => {
-            const surfaceLayerId = `unpaved-section-layer-${routeId}-${index}`;
-            const surfaceSourceId = `unpaved-section-${routeId}-${index}`;
-            if (map.getLayer(surfaceLayerId)) map.removeLayer(surfaceLayerId);
-            if (map.getSource(surfaceSourceId)) map.removeSource(surfaceSourceId);
+      // Ensure map style is loaded and source doesn't exist
+      const sourceExists = map.getSource(mainSourceId);
+      const style = map.getStyle();
+      
+      if (!style || !style.layers) {
+        console.error('[RouteLayer] Map style not fully loaded');
+        return;
+      }
+
+      console.log('[RouteLayer] Source check:', {
+        sourceId: mainSourceId,
+        exists: sourceExists,
+        mapStyle: style.name,
+        layerCount: style.layers.length,
+        terrain: !!map.getTerrain()
+      });
+      
+      // Only add layers if they don't exist
+      if (!sourceExists) {
+        console.log('[RouteLayer] Adding source:', mainSourceId);
+        try {
+          // Add main route source
+          map.addSource(mainSourceId, {
+            type: 'geojson',
+            data: route.geojson,
+            tolerance: 0.5
+          });
+          console.log('[RouteLayer] Source added successfully');
+        } catch (error) {
+          console.error('[RouteLayer] Error adding source:', error);
+          return;
+        }
+
+        // Add border layer
+        map.addLayer({
+          id: borderLayerId,
+          type: 'line',
+          source: mainSourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+            visibility: 'visible'
+          },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 5,
+            'line-opacity': 1
+          }
+        });
+
+        // Add main route layer
+        map.addLayer({
+          id: mainLayerId,
+          type: 'line',
+          source: mainSourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+            visibility: visibility.mainRoute ? 'visible' : 'none'
+          },
+          paint: {
+            'line-color': '#ee5253',
+            'line-width': 3,
+            'line-opacity': 1
+          }
+        });
+
+        // Add hover layer (initially hidden) only for focused routes
+        if (route.isFocused) {
+          map.addLayer({
+            id: hoverLayerId,
+            type: 'line',
+            source: mainSourceId,
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round',
+              visibility: 'none'
+            },
+            paint: {
+              'line-color': '#ff8f8f',
+              'line-width': 5,
+              'line-opacity': 1
+            }
           });
         }
-      };
 
-      cleanup();
+        // Add combined surface layer for all routes
+        if (route.unpavedSections && route.unpavedSections.length > 0) {
+          const surfaceSourceId = `unpaved-sections-${routeId}`;
+          const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
 
-      // Get the GeoJSON data from the correct location
-      const mainGeoJson = route.routes?.[0]?.geojson || route.geojson;
-      if (!mainGeoJson) return;
+          // Combine all unpaved sections into a single feature collection
+          const features = route.unpavedSections.map(section => ({
+            type: 'Feature' as const,
+            properties: {
+              surface: section.surfaceType
+            },
+            geometry: {
+              type: 'LineString' as const,
+              coordinates: section.coordinates
+            }
+          }));
 
-      // Add main route source
-      map.addSource(mainSourceId, {
-        type: 'geojson',
-        data: mainGeoJson,
-        tolerance: 0.5
-      });
-
-      // Add border layer for main route
-      map.addLayer({
-        id: borderLayerId,
-        type: 'line',
-        source: mainSourceId,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-          visibility: 'visible'
-        },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 5,
-          'line-opacity': 1
-        }
-      });
-
-      // Add main route layer
-      map.addLayer({
-        id: mainLayerId,
-        type: 'line',
-        source: mainSourceId,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-          visibility: 'visible'
-        },
-        paint: {
-          'line-color': '#ee5253',
-          'line-width': 3,
-          'line-opacity': 1
-        }
-      });
-
-      // Add hover layer (initially hidden)
-      map.addLayer({
-        id: hoverLayerId,
-        type: 'line',
-        source: mainSourceId,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-          visibility: 'none'
-        },
-        paint: {
-          'line-color': '#ff8f8f',
-          'line-width': 5,
-          'line-opacity': 1
-        }
-      });
-
-      // Add surface layers for loaded routes
-      if (route._type === 'loaded' && route.unpavedSections) {
-        route.unpavedSections.forEach((section, index) => {
-          const surfaceSourceId = `unpaved-section-${routeId}-${index}`;
-          const surfaceLayerId = `unpaved-section-layer-${routeId}-${index}`;
-
-          // Add source with surface property
           map.addSource(surfaceSourceId, {
             type: 'geojson',
             data: {
-              type: 'Feature',
-              properties: {
-                surface: section.surfaceType
-              },
-              geometry: {
-                type: 'LineString',
-                coordinates: section.coordinates
-              }
-            }
+              type: 'FeatureCollection',
+              features
+            },
+            tolerance: 1, // Increase simplification tolerance
+            maxzoom: 14 // Limit detail at high zoom levels
           });
 
-          // Add white dashed line for unpaved segments
           map.addLayer({
             id: surfaceLayerId,
             type: 'line',
             source: surfaceSourceId,
             layout: {
               'line-join': 'round',
-              'line-cap': 'round'
+              'line-cap': 'round',
+              visibility: visibility.unpavedSections ? 'visible' : 'none'
             },
             paint: {
               'line-color': '#ffffff',
@@ -133,57 +185,48 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
               'line-dasharray': [1, 3]
             }
           });
-        });
+        }
       }
 
-      // Add hover handlers
-      const mouseHandler = () => {
-        map.getCanvas().style.cursor = 'pointer';
-        map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
-      };
+      // Add hover handlers only for focused routes
+      if (route.isFocused) {
+        const mouseHandler = () => {
+          map.getCanvas().style.cursor = 'pointer';
+          if (visibility.mainRoute) {
+            map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
+          }
+        };
 
-      const mouseleaveHandler = () => {
-        map.getCanvas().style.cursor = '';
-        map.setLayoutProperty(hoverLayerId, 'visibility', 'none');
-      };
+        const mouseleaveHandler = () => {
+          map.getCanvas().style.cursor = '';
+          map.setLayoutProperty(hoverLayerId, 'visibility', 'none');
+        };
 
-      map.on('mouseenter', mainLayerId, mouseHandler);
-      map.on('mousemove', mainLayerId, mouseHandler);
-      map.on('mouseleave', mainLayerId, mouseleaveHandler);
+        // Add click handler for toggling visibility
+        const clickHandler = () => {
+          // Just toggle hover layer visibility, no re-rendering
+          if (visibility.mainRoute) {
+            map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
+          }
+        };
 
-      // Log layer info for debugging
-      console.log('[RouteLayer] Layer info:', {
-        layerId: mainLayerId,
-        source: map.getSource(mainSourceId),
-        layer: map.getLayer(mainLayerId)
-      });
+        map.on('click', mainLayerId, clickHandler);
+        map.on('mouseenter', mainLayerId, mouseHandler);
+        map.on('mousemove', mainLayerId, mouseHandler);
+        map.on('mouseleave', mainLayerId, mouseleaveHandler);
 
-      // Fit bounds to route
-      if (mainGeoJson?.features?.[0]) {
-        const feature = mainGeoJson.features[0] as Feature<LineString>;
-        const coordinates = feature.geometry.coordinates;
-        
-        const bounds = new mapboxgl.LngLatBounds();
-        coordinates.forEach((coord) => {
-          bounds.extend([coord[0], coord[1]] as [number, number]);
-        });
-
-        map.fitBounds(bounds, {
-          padding: 50,
-          maxZoom: 13
-        });
+        return () => {
+          // Just remove event listeners, don't cleanup layers
+          map.off('click', mainLayerId, clickHandler);
+          map.off('mouseenter', mainLayerId, mouseHandler);
+          map.off('mousemove', mainLayerId, mouseHandler);
+          map.off('mouseleave', mainLayerId, mouseleaveHandler);
+        };
       }
-
-      return () => {
-        map.off('mouseenter', mainLayerId, mouseHandler);
-        map.off('mousemove', mainLayerId, mouseHandler);
-        map.off('mouseleave', mainLayerId, mouseleaveHandler);
-        cleanup();
-      };
     } catch (error) {
       console.error('[RouteLayer] Error rendering route:', error);
     }
-  }, [map, route]);
+  }, [map, route, isStyleLoaded, routeVisibility, toggleRouteVisibility]);
 
   return null;
 };

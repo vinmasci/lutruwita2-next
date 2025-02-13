@@ -75,14 +75,14 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
         break;
       case 'ArrowUp':
         e.preventDefault();
-        const prevIndex = routes.findIndex(r => r.id === route.id) - 1;
+        const prevIndex = routes.findIndex(r => r.routeId === route.routeId) - 1;
         if (prevIndex >= 0) {
           setCurrentRoute(routes[prevIndex]);
         }
         break;
       case 'ArrowDown':
         e.preventDefault();
-        const nextIndex = routes.findIndex(r => r.id === route.id) + 1;
+        const nextIndex = routes.findIndex(r => r.routeId === route.routeId) + 1;
         if (nextIndex < routes.length) {
           setCurrentRoute(routes[nextIndex]);
         }
@@ -146,14 +146,14 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
         <List sx={{ width: '240px' }}>
           {routes.map((route) => (
             <ListItem
-              key={route.id}
+              key={route.routeId || route.id}
               onClick={() => setCurrentRoute(route)}
               onKeyDown={(e) => handleKeyDown(e, route)}
               tabIndex={0}
               role="button"
-              aria-selected={currentRoute?.id === route.id}
+              aria-selected={currentRoute?.routeId === route.routeId}
               sx={{
-                backgroundColor: currentRoute?.id === route.id ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
+                backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
                 borderRadius: '4px',
                 mb: 1,
                 padding: '8px 12px',
@@ -162,7 +162,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 position: 'relative',
                 outline: 'none',
                 '&:hover': {
-                  backgroundColor: currentRoute?.id === route.id ? 'rgba(65, 65, 65, 0.9)' : 'rgba(45, 45, 45, 0.9)',
+                  backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(65, 65, 65, 0.9)' : 'rgba(45, 45, 45, 0.9)',
                 },
                 '&:focus-visible': {
                   outline: '2px solid rgba(255, 255, 255, 0.5)',
@@ -177,7 +177,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 }
               }}
             >
-              {editing?.fileId === route.id && editing ? (
+              {editing?.fileId === (route.routeId || route.id) && editing ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <TextField
                     size="small"
@@ -219,7 +219,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                     <IconButton
                       edge="end"
                       size="small"
-                      onClick={(e) => handleStartEditing(e, route.id, route.name)}
+                      onClick={(e) => handleStartEditing(e, route.routeId || route.id, route.name)}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -228,7 +228,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                       size="small"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onFileDelete(route.id);
+                        onFileDelete(route.routeId || route.id);
                       }}
                     >
                       <DeleteIcon fontSize="small" />

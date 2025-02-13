@@ -6,6 +6,12 @@ class GPXProcessingService {
     constructor(mapboxToken) {
         this.mapboxToken = mapboxToken;
     }
+    roundCoordinate(value) {
+        return Number(value.toFixed(5));
+    }
+    roundElevation(value) {
+        return Number(value.toFixed(1));
+    }
     async processGPXFile(fileContent, options) {
         const { onProgress } = options || {};
         try {
@@ -30,7 +36,6 @@ class GPXProcessingService {
                 color: '#FF0000', // Default red color
                 isVisible: true,
                 gpxData: fileContent,
-                rawGpx: fileContent,
                 geojson: mapboxMatch.geojson,
                 surface: surfaceAnalysis,
                 mapboxMatch,
@@ -72,7 +77,10 @@ class GPXProcessingService {
             const lat = parseFloat(point.getAttribute('lat') || '0');
             const lon = parseFloat(point.getAttribute('lon') || '0');
             if (lat && lon) {
-                trackPoints.push([lon, lat]);
+                trackPoints.push([
+                    this.roundCoordinate(lon),
+                    this.roundCoordinate(lat)
+                ]);
             }
         }
         return trackPoints;
@@ -228,7 +236,7 @@ class GPXProcessingService {
                 const buffer = await response.arrayBuffer();
                 const view = new Uint8Array(buffer);
                 const elevation = -10000 + ((view[0] * 256 * 256 + view[1] * 256 + view[2]) * 0.1);
-                return Math.round(elevation);
+                return this.roundElevation(elevation);
             }));
             return elevations;
         }

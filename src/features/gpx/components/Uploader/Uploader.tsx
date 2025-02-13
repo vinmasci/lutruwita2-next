@@ -55,17 +55,56 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   };
 
   const handleFileDelete = (fileId: string) => {
-    // Find the route using the fileId (which is the route's id)
-    const route = routes.find(r => r.id === fileId);
-    if (route?.routeId) {
+    console.debug('[Uploader][DELETE] Starting deletion process for file:', fileId);
+    console.debug('[Uploader][DELETE] Current routes:', routes.map(r => ({
+      id: r.id,
+      routeId: r.routeId,
+      name: r.name,
+      type: r._type
+    })));
+    
+    // Find the route using the fileId (which could be either id or routeId)
+    const route = routes.find(r => r.id === fileId || r.routeId === fileId);
+    if (!route) {
+      console.error('[Uploader][DELETE] Could not find route with id:', fileId);
+      return;
+    }
+
+    // Get the routeId - if it's not set, use the id
+    const routeId = route.routeId || `route-${route.id}`;
+    console.debug('[Uploader][DELETE] Found route to delete:', { 
+      id: route.id, 
+      routeId, 
+      name: route.name,
+      type: route._type,
+      totalRoutes: routes.length,
+      otherRouteIds: routes.filter(r => r.id !== fileId).map(r => ({
+        id: r.id,
+        routeId: r.routeId
+      }))
+    });
+
+    try {
       // First clean up map layers
       if (onDeleteRoute) {
-        onDeleteRoute(route.routeId);
+        console.debug('[Uploader][DELETE] Calling onDeleteRoute with routeId:', routeId);
+        onDeleteRoute(routeId);
       }
-      // Then update route context state
-      deleteRoute(route.routeId);
-    } else {
-      console.error('[Uploader] Could not find route with id:', fileId);
+
+      // Brief delay to ensure map cleanup is complete
+      setTimeout(() => {
+        // Then update route context state
+        console.debug('[Uploader][DELETE] Calling deleteRoute with routeId:', routeId);
+        deleteRoute(routeId);
+        console.debug('[Uploader][DELETE] Route deletion complete for:', routeId);
+      }, 100);
+    } catch (error) {
+      console.error('[Uploader][DELETE] Error deleting route:', error);
+      console.error('[Uploader][DELETE] Error details:', {
+        fileId,
+        routeId,
+        error: error instanceof Error ? error.message : error
+      });
     }
   };
 

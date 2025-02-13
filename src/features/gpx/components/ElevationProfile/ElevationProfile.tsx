@@ -3,6 +3,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { ProcessedRoute } from '../../types/gpx.types';
 import { ElevationContent } from './ElevationProfile.styles';
 import { Box, Typography } from '@mui/material';
+import { Alert } from '@/components/ui/alert';
 import { useMapContext } from '../../../map/context/MapContext';
 import { detectClimbs } from '../../utils/climbUtils';
 import type { Climb } from '../../utils/climbUtils';
