@@ -1,31 +1,40 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import mapboxgl from 'mapbox-gl';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
 import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
 import { PhotoCluster } from '../PhotoCluster/PhotoCluster';
 import { PhotoPreviewModal } from '../PhotoPreview/PhotoPreviewModal';
 import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
+import { clusterPhotos, isCluster } from '../../utils/clustering';
 import './PhotoLayer.css';
-
-const CLUSTER_RADIUS = 50; // pixels for clustering nearby photos
-
-interface PhotoClusterType {
-  photos: ProcessedPhoto[];
-  center: { lng: number; lat: number };
-}
 
 export const PhotoLayer: React.FC = () => {
   const { map } = useMapContext();
   const { photos } = usePhotoContext();
   const [selectedPhoto, setSelectedPhoto] = useState<ProcessedPhoto | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<ProcessedPhoto[] | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
 
-  // Helper function to calculate distance between two points
-  const calculateDistance = useCallback((point1: mapboxgl.Point, point2: mapboxgl.Point): number => {
-    return Math.sqrt(Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2));
-  }, []);
+  // Listen for zoom changes
+  useEffect(() => {
+    if (!map) return;
+    
+    const handleZoom = () => {
+      const newZoom = map.getZoom();
+      console.log('[PhotoLayer] Zoom changed:', newZoom);
+      setZoom(newZoom);
+    };
 
-  // Helper function to normalize coordinates within valid bounds
+    map.on('zoom', handleZoom);
+    // Set initial zoom
+    setZoom(map.getZoom());
+
+    return () => {
+      map.off('zoom', handleZoom);
+    };
+  }, [map]);
+
+  // Helper function to normalize coordinates within valid bounds for safety
   const normalizeCoordinates = useCallback((lng: number, lat: number) => {
     // Normalize longitude to [-180, 180]
     let normalizedLng = lng;
@@ -38,178 +47,67 @@ export const PhotoLayer: React.FC = () => {
     return { lng: normalizedLng, lat: normalizedLat };
   }, []);
 
-  // Helper function to calculate cluster center with normalization
-  const calculateClusterCenter = useCallback((clusterPhotos: ProcessedPhoto[]): { lng: number; lat: number } => {
-    const validPhotos = clusterPhotos.filter(p => p.coordinates);
-
-    if (validPhotos.length === 0) {
-      console.warn('No valid coordinates in cluster, using fallback position');
-      return { lng: 0, lat: 0 }; // Fallback to null island rather than throwing
-    }
-
-    const center = validPhotos.reduce(
-      (acc, p) => {
-        const normalized = normalizeCoordinates(p.coordinates!.lng, p.coordinates!.lat);
-        acc.lng += normalized.lng;
-        acc.lat += normalized.lat;
-        return acc;
-      },
-      { lng: 0, lat: 0 }
-    );
-
-    return normalizeCoordinates(
-      center.lng / validPhotos.length,
-      center.lat / validPhotos.length
-    );
-  }, [normalizeCoordinates]);
-
-  // Cluster photos based on pixel distance only
-  const { clusters, singlePhotos } = useMemo(() => {
-    if (!map) return { clusters: [], singlePhotos: [] };
-
-    try {
-      // Create spatial index for better performance with coordinate normalization
-      console.log('Total photos:', photos.length);
-      console.log('Photos:', photos);
-      
-      const points = photos
-        .filter(p => {
-          if (!p.coordinates) {
-            console.warn('Photo missing coordinates:', p.id);
-            return false;
-          }
-          if (!p.coordinates.lng || !p.coordinates.lat) {
-            console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
-            return false;
-          }
-          return true;
-        });
-      console.log('Photos with valid coordinates:', points.length);
-      
-      const projectedPoints = points
-        .map(p => {
-          const normalized = normalizeCoordinates(p.coordinates!.lng, p.coordinates!.lat);
-          try {
-            const point = map.project([normalized.lng, normalized.lat]);
-      return {
-        photo: p,
-        point
-      };
-          } catch (err) {
-            console.warn(`Failed to project coordinates for photo ${p.id}:`, err);
-            return null;
-          }
-        })
-        .filter((p): p is { photo: ProcessedPhoto; point: mapboxgl.Point } => p !== null);
-
-      const clusteredPhotos: PhotoClusterType[] = [];
-      const singlePhotos: ProcessedPhoto[] = [];
-      const processed = new Set<string>();
-
-      console.log('Projected points:', projectedPoints.length);
-
-      for (let i = 0; i < projectedPoints.length; i++) {
-        if (processed.has(projectedPoints[i].photo.id)) continue;
-
-        const cluster: ProcessedPhoto[] = [projectedPoints[i].photo];
-        processed.add(projectedPoints[i].photo.id);
-
-        // Find nearby points using spatial index
-        for (let j = i + 1; j < projectedPoints.length; j++) {
-          if (processed.has(projectedPoints[j].photo.id)) continue;
-
-          const distance = calculateDistance(projectedPoints[i].point, projectedPoints[j].point);
-          
-          if (distance <= CLUSTER_RADIUS) {
-            cluster.push(projectedPoints[j].photo);
-            processed.add(projectedPoints[j].photo.id);
-          }
-        }
-
-        if (cluster.length > 1) {
-          console.log('Found cluster with', cluster.length, 'photos');
-          try {
-            const center = calculateClusterCenter(cluster);
-            clusteredPhotos.push({ photos: cluster, center });
-          } catch (error) {
-            console.error('Failed to calculate cluster center:', error);
-            // If cluster center calculation fails, treat photos as individual
-            cluster.forEach(photo => singlePhotos.push(photo));
-          }
-        } else {
-          // Single photo
-          singlePhotos.push(cluster[0]);
-        }
+  // Filter photos to only include those with valid coordinates
+  const validPhotos = useMemo(() => {
+    return photos.filter(p => {
+      if (!p.coordinates) {
+        console.warn('Photo missing coordinates:', p.id);
+        return false;
       }
-
-      return {
-        clusters: clusteredPhotos,
-        singlePhotos: singlePhotos
-      };
-    } catch (error) {
-      console.error('Error during clustering:', error);
-      return { clusters: [], singlePhotos: [] };
-    }
-  }, [map, photos, calculateDistance, calculateClusterCenter]);
-
-  const handleClusterClick = useCallback((clusterPhotos: ProcessedPhoto[]) => {
-    if (!map || clusterPhotos.length === 0) return;
-
-    try {
-      // Calculate bounds of all photos in cluster
-      const bounds = new mapboxgl.LngLatBounds();
-      const validPhotos = clusterPhotos.filter(photo => 
-        photo.coordinates &&
-        photo.coordinates.lng >= -180 && photo.coordinates.lng <= 180 &&
-        photo.coordinates.lat >= -90 && photo.coordinates.lat <= 90
-      );
-
-      if (validPhotos.length === 0) {
-        console.error('No valid coordinates in cluster for zooming');
-        return;
+      if (typeof p.coordinates.lat !== 'number' || typeof p.coordinates.lng !== 'number') {
+        console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
+        return false;
       }
+      // Normalize coordinates for safety
+      const normalized = normalizeCoordinates(p.coordinates.lng, p.coordinates.lat);
+      p.coordinates.lng = normalized.lng;
+      p.coordinates.lat = normalized.lat;
+      return true;
+    });
+  }, [photos, normalizeCoordinates]);
 
-      validPhotos.forEach(photo => {
-        bounds.extend([photo.coordinates!.lng, photo.coordinates!.lat]);
-      });
+  // Cluster photos based on zoom level
+  const clusteredItems = useMemo(() => {
+    if (!map || zoom === null) return [];
+    return clusterPhotos(validPhotos, 0, zoom); // radius is calculated in clustering function
+  }, [validPhotos, map, zoom]);
 
-      // Zoom to fit all photos with animation
-      map.fitBounds(bounds, {
-        padding: 50,
-        maxZoom: 16, // Zoom in enough to see individual photos clearly
-        duration: 500,
-        essential: true
-      });
-    } catch (error) {
-      console.error('Error handling cluster click:', error);
+  const handleClusterClick = useCallback((photos: ProcessedPhoto[]) => {
+    setSelectedCluster(photos);
+    if (photos.length === 1) {
+      setSelectedPhoto(photos[0]);
     }
-  }, [map]);
+  }, []);
 
   return (
-    <>
-      {singlePhotos.map(photo => (
-        <PhotoMarker
-          key={photo.id}
-          photo={photo}
-          onClick={() => setSelectedPhoto(photo)}
-        />
-      ))}
-
-      {clusters.map((cluster, index) => (
-        <PhotoCluster
-          key={`cluster-${index}`}
-          photos={cluster.photos}
-          coordinates={cluster.center}
-          onClick={() => handleClusterClick(cluster.photos)}
-        />
-      ))}
+    <div className="photo-layer">
+      {clusteredItems.map(item => 
+        isCluster(item) ? (
+          <PhotoCluster
+            key={`cluster-${item.photos[0].id}`}
+            cluster={item}
+            onClick={() => handleClusterClick(item.photos)}
+          />
+        ) : (
+          <PhotoMarker
+            key={item.id}
+            photo={item}
+            onClick={() => setSelectedPhoto(item)}
+          />
+        )
+      )}
 
       {selectedPhoto && (
         <PhotoPreviewModal
+          key={`preview-${selectedPhoto.id}`}
           photo={selectedPhoto}
-          onClose={() => setSelectedPhoto(null)}
+          onClose={() => {
+            setSelectedPhoto(null);
+            setSelectedCluster(null);
+          }}
+          additionalPhotos={selectedCluster}
         />
       )}
-    </>
+    </div>
   );
 };

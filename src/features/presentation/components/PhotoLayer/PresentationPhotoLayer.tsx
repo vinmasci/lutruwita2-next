@@ -31,12 +31,13 @@ export const PresentationPhotoLayer: React.FC<PresentationPhotoLayerProps> = ({ 
       const el = document.createElement('div');
       el.className = 'photo-marker';
       el.style.backgroundImage = `url(${photo.thumbnailUrl || '/images/photo-fallback.svg'})`;
-      el.style.width = '32px';
-      el.style.height = '32px';
+      el.style.width = '36px';
+      el.style.height = '36px';
       el.style.backgroundSize = 'cover';
-      el.style.borderRadius = '4px';
+      el.style.borderRadius = '50%';
       el.style.border = '2px solid white';
       el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+      el.style.backgroundColor = '#4AA4DE';
 
       // Add marker to map
       const marker = new mapboxgl.Marker(el)
@@ -46,7 +47,7 @@ export const PresentationPhotoLayer: React.FC<PresentationPhotoLayerProps> = ({ 
             .setHTML(`
               <div style="max-width: 200px;">
                 <img src="${photo.thumbnailUrl || '/images/photo-fallback.svg'}" 
-                     style="width: 100%; height: auto; border-radius: 4px;" />
+                     style="width: 100%; height: auto; border-radius: 8px;" />
               </div>
             `)
         )

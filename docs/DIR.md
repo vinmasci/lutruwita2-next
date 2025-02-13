@@ -12,10 +12,15 @@ This document outlines the project structure and describes the purpose of key fi
 ├── vite.config.ts                 # Vite bundler configuration for build optimization
 ├── docs/                          # Project documentation
 │   ├── ARCHITECTURE.md            # Overall system architecture and design decisions
+│   ├── DATA_OPTIMIZATION.md       # Data optimization strategies and implementation
 │   ├── DIR.md                     # This directory structure document
+│   ├── PHOTO_CLUSTERING_DEBUG.md  # Photo clustering debugging information
 │   ├── PHOTO_STORAGE.md          # Photo storage and management documentation
 │   ├── POIDIR.md                 # POI feature documentation
-│   └── POIPLACES.md              # POI places integration documentation
+│   ├── POIPLACES.md              # POI places integration documentation
+│   ├── PRESENTATION.md           # Route presentation feature documentation
+│   ├── ROUTE_FOCUS_MODE_IMPLEMENTATION.md # Route focus mode implementation details
+│   └── SAVE_LOAD_SYSTEM.md       # Save/load system documentation
 ├── logs/                          # Application logging directory
 │   ├── error.log                  # General application error logs
 │   ├── exceptions.log             # Detailed exception tracking
@@ -24,6 +29,7 @@ This document outlines the project structure and describes the purpose of key fi
 ├── public/                        # Static public assets
 │   ├── favicon.ico               # Website favicon
 │   └── images/                   # Static image assets
+│       ├── hero-background.jpeg  # Landing page hero image
 │       └── photo-fallback.svg    # Default image for failed photo loads
 ├── server/                        # Backend server code
 │   ├── src/
@@ -46,16 +52,23 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── services/    # POI data services
 │   │   │   │   └── types/       # POI type definitions
 │   │   │   └── route/           # Route management feature backend
-│   │   │       ├── controllers/  # Route request handlers
+│   │   │       ├── controllers/  # Route request handlers including public routes
 │   │   │       ├── models/      # Route data models
 │   │   │       ├── routes/      # Route API endpoint definitions
 │   │   │       ├── services/    # Route data services
 │   │   │       └── types/       # Route type definitions
 │   │   ├── routes/              # [REDUNDANT] Main routes (should be moved to features)
+│   │   ├── scripts/             # Utility scripts
+│   │   │   ├── clear-model-cache.ts # Cache clearing utility
+│   │   │   ├── clear-routes.ts     # Route cleanup utility
+│   │   │   ├── optimize-routes.ts  # Route optimization script
+│   │   │   └── update-route-schema.ts # Schema update utility
 │   │   ├── services/            # [REDUNDANT] Main services (should be moved to features)
+│   │   │   └── gpx/            # GPX processing services
+│   │   │       └── gpx.processing.ts # Core GPX processing logic
 │   │   ├── shared/              # Shared backend utilities
 │   │   │   ├── config/         # Server configuration (logging, env vars)
-│   │   │   ├── middlewares/    # Express middlewares (error handling, file upload, auth, route validation)
+│   │   │   ├── middlewares/    # Express middlewares (auth, cache, error handling, rate limiting, upload, route validation)
 │   │   │   └── types/         # Shared type definitions (auth, gpx, place, poi)
 ├── src/                          # Frontend source code
 │   ├── App.tsx                   # Main React application component and routing
@@ -65,7 +78,8 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── theme.ts                 # Global theme configuration
 │   ├── components/              # Shared UI components
 │   │   ├── ui/                 # Base UI components
-│   │   │   └── skeleton.tsx    # Loading skeleton component for content
+│   │   │   ├── alert.tsx      # Alert component
+│   │   │   └── skeleton.tsx    # Loading skeleton component
 │   │   └── ErrorBoundary.tsx   # Error boundary for component error handling
 │   ├── features/               # Feature modules
 │   │   ├── auth/               # Authentication feature
@@ -133,6 +147,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   ├── useMap.ts      # Map interactions
 │   │   │   │   ├── useMapStyle.ts # Map style loading state
 │   │   │   │   ├── useRouteState.ts # Route state management
+│   │   │   │   ├── useRouteVisibility.ts # Route visibility control
 │   │   │   │   └── useGpxProcessing.ts # Route processing
 │   │   │   ├── services/   # Map-related services
 │   │   │   │   ├── mapService.ts  # Map operations
@@ -170,6 +185,45 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   │   └── place.types.ts # Place interfaces
 │   │   │   └── utils/     # Place utilities
 │   │   │       └── migration.ts # Place data migration
+│   │   ├── presentation/  # Route presentation feature
+│   │   │   ├── components/ # Presentation components
+│   │   │   │   ├── ElevationProfile/ # Elevation display
+│   │   │   │   │   ├── PresentationElevationProfile.tsx # Profile component
+│   │   │   │   │   └── index.ts     # Public exports
+│   │   │   │   ├── LandingPage/ # Entry point
+│   │   │   │   │   └── LandingPage.tsx # Landing page component
+│   │   │   │   ├── MapBrowser/ # Map navigation
+│   │   │   │   │   └── MapBrowser.tsx # Browser component
+│   │   │   │   ├── MapPreview/ # Route preview
+│   │   │   │   │   └── MapPreview.tsx # Preview component
+│   │   │   │   ├── PhotoLayer/ # Photo visualization
+│   │   │   │   │   └── PresentationPhotoLayer.tsx # Photo layer
+│   │   │   │   ├── PhotoViewer/ # Photo display
+│   │   │   │   │   ├── PresentationPhotoViewer.tsx # Viewer component
+│   │   │   │   │   └── index.ts     # Public exports
+│   │   │   │   ├── POILayer/ # POI visualization
+│   │   │   │   │   ├── PresentationPOILayer.tsx # POI layer
+│   │   │   │   │   ├── PresentationPOILayer.css # Layer styling
+│   │   │   │   │   └── index.ts     # Public exports
+│   │   │   │   ├── POIViewer/ # POI display
+│   │   │   │   │   ├── PresentationPOIViewer.tsx # Viewer component
+│   │   │   │   │   └── index.ts     # Public exports
+│   │   │   │   ├── PresentationMapView/ # Map display
+│   │   │   │   │   ├── PresentationMapView.tsx # Map component
+│   │   │   │   │   ├── PresentationMapView.css # Map styling
+│   │   │   │   │   └── index.ts     # Public exports
+│   │   │   │   ├── PresentationSidebar/ # Navigation
+│   │   │   │   │   ├── PresentationSidebar.tsx # Sidebar component
+│   │   │   │   │   ├── PresentationSidebar.styles.ts # Styling
+│   │   │   │   │   └── index.ts     # Public exports
+│   │   │   │   └── RoutePresentation/ # Main presentation
+│   │   │   │       └── RoutePresentation.tsx # Core component
+│   │   │   ├── services/  # Presentation services
+│   │   │   │   └── publicRoute.service.ts # Public route handling
+│   │   │   ├── types/    # Presentation types
+│   │   │   │   └── route.types.ts # Route type definitions
+│   │   │   └── utils/    # Presentation utilities
+│   │   │       └── routeProcessor.ts # Route processing
 │   │   └── poi/           # Points of Interest feature
 │   │       ├── components/ # POI components
 │   │       │   ├── MapboxPOIMarker/ # Mapbox markers
@@ -267,6 +321,16 @@ The application's features are tightly integrated while maintaining clear bounda
 - Improved state merging for place-based POIs
 - Place-specific POI instructions and workflows
 
+### Presentation Feature Integration
+- Public route sharing and viewing
+- Interactive map browsing with custom controls
+- Elevation profile visualization
+- Photo and POI layer integration
+- Responsive sidebar navigation
+- Landing page with route previews
+- Optimized route processing for presentation
+- Consistent styling across presentation components
+
 ## Key Components
 
 ### Context Providers
@@ -285,6 +349,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - `placeDetection`: Identifies and processes place-based POIs
 - `photoService`: Handles photo upload, processing, and storage operations
 - `authService`: Manages authentication and authorization
+- `publicRoute.service`: Handles public route sharing and access
 
 ### Utility Functions
 - `climbUtils`: Categorizes climbs based on gradient and distance
@@ -293,6 +358,7 @@ The application's features are tightly integrated while maintaining clear bounda
 - `placeDetection`: Implements place detection algorithms
 - `gpxParser`: Provides low-level GPX file parsing
 - `routeUtils`: Handles route processing and validation
+- `routeProcessor`: Optimizes routes for presentation
 - `useMapStyle`: Manages map style loading state
 
 ## Configuration

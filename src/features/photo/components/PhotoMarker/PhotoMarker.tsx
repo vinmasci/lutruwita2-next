@@ -15,7 +15,8 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
 
   useEffect(() => {
     if (!map || !photo.coordinates || 
-        !photo.coordinates.lng || !photo.coordinates.lat ||
+        typeof photo.coordinates.lng !== 'number' || 
+        typeof photo.coordinates.lat !== 'number' ||
         photo.coordinates.lng < -180 || photo.coordinates.lng > 180 ||
         photo.coordinates.lat < -90 || photo.coordinates.lat > 90) {
       console.error('Invalid photo coordinates:', photo.coordinates);

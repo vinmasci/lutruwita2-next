@@ -580,13 +580,17 @@ function MapViewContent() {
         exaggeration: 1.5
       });
 
-      // Add event listeners for marker orientation
+      // Add event listeners for marker orientation and zoom
       map.on('pitch', () => {
         const markers = document.querySelectorAll('.marker-container');
         markers.forEach(marker => {
           const el = marker as HTMLElement;
           el.style.transform = `rotate(${-map.getPitch()}deg)`;
         });
+      });
+
+      map.on('zoom', () => {
+        console.log('[MapView] Zoom changed:', map.getZoom());
       });
 
       map.on('rotate', () => {
@@ -751,22 +755,24 @@ function MapViewContent() {
         />
 
         {isMapReady && (
-          <>
-            <PhotoLayer />
-            <PlacePOILayer />
-            {/* Only render draggable POIs that aren't already being rendered by PlacePOILayer */}
-            {pois
-              .filter(poi => poi.type === 'draggable')
-              .map(poi => (
-                <MapboxPOIMarker
-                  key={poi.id}
-                  poi={poi}
-                  onDragEnd={handlePOIDragEnd}
-                  onClick={() => handlePOIClick(poi)}
-                />
-              ))
-            }
-          </>
+          <div className="map-layers">
+            <PhotoLayer key="photo-layer" />
+            <PlacePOILayer key="place-poi-layer" />
+            <div key="draggable-pois">
+              {/* Only render draggable POIs that aren't already being rendered by PlacePOILayer */}
+              {pois
+                .filter(poi => poi.type === 'draggable')
+                .map(poi => (
+                  <MapboxPOIMarker
+                    key={poi.id}
+                    poi={poi}
+                    onDragEnd={handlePOIDragEnd}
+                    onClick={() => handlePOIClick(poi)}
+                  />
+                ))
+              }
+            </div>
+          </div>
         )}
 
         {dragPreview && (

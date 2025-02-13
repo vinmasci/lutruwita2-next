@@ -1,25 +1,20 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import './PhotoCluster.css';
+import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
 import { useMapContext } from '../../../map/context/MapContext';
+import { Cluster } from '../../utils/clustering';
+import './PhotoCluster.css';
 
 interface PhotoClusterProps {
-  photos: ProcessedPhoto[];
-  coordinates: { lng: number; lat: number };
+  cluster: Cluster;
   onClick?: () => void;
 }
 
-export const PhotoCluster: React.FC<PhotoClusterProps> = ({ 
-  photos, 
-  coordinates, 
-  onClick 
-}) => {
+export const PhotoCluster: React.FC<PhotoClusterProps> = ({ cluster, onClick }) => {
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const { map } = useMapContext();
 
   useEffect(() => {
-    if (!map || !coordinates || !coordinates.lng || !coordinates.lat || photos.length === 0) return;
+    if (!map) return;
 
     const el = document.createElement('div');
     el.className = 'photo-cluster';
@@ -47,26 +42,31 @@ export const PhotoCluster: React.FC<PhotoClusterProps> = ({
       bubble.addEventListener('click', handleClick);
     }
 
-    // Create and add image directly to bubble
-    const img = document.createElement('img');
-    img.onerror = () => {
-      img.src = '/images/photo-fallback.svg';
-      img.alt = 'Failed to load cluster preview';
-    };
-    img.src = photos[0].thumbnailUrl;
-    img.alt = `Cluster of ${photos.length} photos`;
-    bubble.appendChild(img);
+    // Add count
+    const count = document.createElement('div');
+    count.className = 'photo-cluster-count';
+    count.textContent = cluster.photos.length.toString();
+    bubble.appendChild(count);
+
+    // Add preview images (show up to 4)
+    const previewContainer = document.createElement('div');
+    previewContainer.className = 'photo-cluster-previews';
+    
+    cluster.photos.slice(0, 4).forEach(photo => {
+      const preview = document.createElement('img');
+      preview.src = photo.thumbnailUrl;
+      preview.alt = photo.name || 'Photo preview';
+      preview.onerror = () => {
+        preview.src = '/images/photo-fallback.svg';
+        preview.alt = 'Failed to load photo';
+      };
+      previewContainer.appendChild(preview);
+    });
+    
+    bubble.appendChild(previewContainer);
 
     const point = document.createElement('div');
     point.className = 'photo-cluster-point';
-
-    // Add count indicator if there's more than one photo
-    if (photos.length > 1) {
-      const count = document.createElement('div');
-      count.className = 'photo-cluster-count';
-      count.textContent = `+${photos.length - 1}`;
-      container.appendChild(count);
-    }
 
     container.appendChild(bubble);
     container.appendChild(point);
@@ -77,7 +77,7 @@ export const PhotoCluster: React.FC<PhotoClusterProps> = ({
       element: el,
       anchor: 'center'
     })
-      .setLngLat([coordinates.lng, coordinates.lat])
+      .setLngLat([cluster.center.lng, cluster.center.lat])
       .addTo(map);
 
     markerRef.current = marker;
@@ -92,9 +92,7 @@ export const PhotoCluster: React.FC<PhotoClusterProps> = ({
       }
       map.off('zoom', updateZoom);
     };
-  }, [map, coordinates, photos, onClick]);
+  }, [map, cluster, onClick]);
 
   return null;
 };
-
-export default PhotoCluster;
