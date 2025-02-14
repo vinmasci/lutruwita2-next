@@ -9,10 +9,24 @@ export const useMapStyle = (map: mapboxgl.Map | null) => {
 
     const checkStyle = () => {
       const style = map.getStyle();
+      const layerCount = style?.layers?.length ?? 0;
+      const hasLayers = layerCount > 0;
+      
+      console.debug('[useMapStyle] Checking style:', {
+        isStyleLoaded: map.isStyleLoaded(),
+        hasStyle: !!style,
+        hasLayers,
+        layerCount
+      });
+      
       // For satellite-streets style, check for both satellite and street layers
       // Check if the style is loaded and has layers
-      if (map.isStyleLoaded() && style && style.layers && style.layers.length > 0) {
+      // Only check if we have layers, since isStyleLoaded() seems unreliable
+      if (hasLayers) {
+        console.debug('[useMapStyle] Style is ready');
         setIsStyleLoaded(true);
+      } else {
+        console.debug('[useMapStyle] Style not ready yet');
       }
     };
 

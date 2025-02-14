@@ -11,6 +11,7 @@ import { PresentationSidebar } from '../PresentationSidebar';
 import { PresentationElevationProfile } from '../ElevationProfile';
 import { PresentationPOILayer } from '../POILayer/PresentationPOILayer';
 import { PresentationPhotoLayer } from '../PhotoLayer/PresentationPhotoLayer';
+import { PresentationDistanceMarkers } from '../DistanceMarkers/PresentationDistanceMarkers';
 import './PresentationMapView.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -184,6 +185,7 @@ export default function PresentationMapView() {
               
               {currentRoute && (
                 <>
+                  <PresentationDistanceMarkers map={mapInstance.current} route={currentRoute} />
                   <div className="route-filename">
                     {currentRoute.name || 'Untitled Route'}
                   </div>

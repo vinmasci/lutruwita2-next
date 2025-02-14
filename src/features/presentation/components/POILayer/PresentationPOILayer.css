@@ -85,71 +85,51 @@
   transform: translate(-50%, -50%);
 }
 
+/* Place POI styles */
+.mapboxgl-marker.poi-marker {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  position: absolute !important;
+  transform-origin: center center !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  z-index: 1 !important;
+}
+
 .poi-marker {
-  cursor: pointer;
-  position: absolute;
-  transform-origin: center center;
-  /* Prevent text selection */
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  /* Ensure proper stacking */
-  z-index: 1;
-  pointer-events: auto;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: rgba(47, 54, 64, 1) !important;
+  position: relative !important;
+  border-radius: 30% !important;
+}
+
+.poi-marker .poi-icon {
+  color: #FFFFFF !important;
+  font-size: 10px !important;
+  line-height: 1px !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.poi-marker.plus-badge {
+  background-color: rgb(235, 77, 75) !important;
+  color: #FFFFFF !important;
+  font-weight: bold !important;
+  font-size: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .selected .marker-bubble {
-  box-shadow: 0 0 0 2px white, 0 3px 6px rgba(0, 0, 0, 0.3);
-  transform: scale(1.1);
-}
-
-/* Place POI styles - no zoom-based scaling */
-.mapboxgl-marker.place-poi-marker {
-  pointer-events: auto;
-  cursor: pointer;
-  position: absolute;
-  transform: none !important; /* Prevent any transform from being applied */
-}
-
-.place-poi-marker {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(47, 54, 64, 1);
-  position: relative;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-.place-poi-marker:hover {
-  transform: scale(1.1);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-}
-
-.place-poi-marker .poi-icon {
-  color: #FFFFFF;
-  font-size: 10px;
-  line-height: 1;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.place-poi-marker.plus-badge {
-  background-color: rgb(235, 77, 75);
-  color: #FFFFFF;
-  font-weight: bold;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.place-poi-marker.plus-badge:hover {
-  background-color: rgb(245, 87, 85);
+  box-shadow: 0 0 0 2px white, 0 3px 6px rgba(0, 0, 0, 0.3) !important;
+  transform: scale(1.1) !important;
 }

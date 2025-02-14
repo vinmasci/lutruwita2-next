@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useRouteContext } from '../../../map/context/RouteContext';
-import { DraggablePOI, PlaceNamePOI, POI_CATEGORIES } from '../../../poi/types/poi.types';
+import { DraggablePOI, PlaceNamePOI, POI_CATEGORIES, POIType } from '../../../poi/types/poi.types';
 import { LoadedRoute } from '../../../map/types/route.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import { ICON_PATHS } from '../../../poi/constants/icon-paths';
 import { calculatePOIPositions } from '../../../poi/utils/placeDetection';
+import { PresentationPOIViewer } from '../POIViewer';
 import './PresentationPOILayer.css';
 
 interface PresentationPOILayerProps {
@@ -21,6 +22,7 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
   const { currentRoute } = useRouteContext();
   const markersRef = useRef<MarkerRef[]>([]);
   const placeMarkersRef = useRef<MarkerRef[]>([]);
+  const [selectedPOI, setSelectedPOI] = useState<POIType | null>(null);
 
   // Effect to handle place POIs visibility based on zoom
   useEffect(() => {
@@ -83,11 +85,12 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
         offset: [0, -14] // Half the height of marker-bubble to center it
       })
         .setLngLat(poi.coordinates)
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`<h3>${poi.name}</h3><p>${poi.description || ''}</p>`)
-        )
         .addTo(map);
+
+      // Add click handler to show drawer
+      el.addEventListener('click', () => {
+        setSelectedPOI(poi);
+      });
 
       markersRef.current.push({ marker, poiId: poi.id });
 
@@ -154,10 +157,10 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
 
         // Create marker element without any zoom-based attributes for place POIs
         const el = document.createElement('div');
-        el.className = 'mapboxgl-marker place-poi-marker';
+        el.className = 'mapboxgl-marker poi-marker';
         
         const container = document.createElement('div');
-        container.className = 'place-poi-marker';
+        container.className = 'poi-marker';
         
         const icon = document.createElement('i');
         icon.className = `poi-icon ${ICON_PATHS[poi.icon]}`;
@@ -174,11 +177,12 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
         rotationAlignment: 'viewport',
         pitchAlignment: 'viewport'
       })
-          .setLngLat(position.coordinates)
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 })
-              .setHTML(`<h3>${poi.name}</h3><p>${poi.description || ''}</p>`)
-          );
+        .setLngLat(position.coordinates);
+
+      // Add click handler to show drawer
+      el.addEventListener('click', () => {
+        setSelectedPOI(poi);
+      });
 
       if (map.getZoom() > 9) {
         marker.addTo(map);
@@ -193,10 +197,10 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
         if (plusPosition) {
           // Create plus badge marker without any zoom-based attributes
           const el = document.createElement('div');
-          el.className = 'mapboxgl-marker place-poi-marker';
+          el.className = 'mapboxgl-marker poi-marker';
           
           const container = document.createElement('div');
-          container.className = 'place-poi-marker plus-badge';
+          container.className = 'poi-marker plus-badge';
           container.textContent = `+${remainingCount}`;
           
           el.appendChild(container);
@@ -229,5 +233,10 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
     };
   }, [map, currentRoute]); // Remove zoom dependency since place POIs shouldn't move with zoom
 
-  return null;
+  return (
+    <PresentationPOIViewer
+      poi={selectedPOI}
+      onClose={() => setSelectedPOI(null)}
+    />
+  );
 };

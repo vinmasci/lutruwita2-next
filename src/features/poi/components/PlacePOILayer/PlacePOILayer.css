@@ -1,10 +1,10 @@
-.mapboxgl-marker.place-poi-marker {
+.mapboxgl-marker.poi-marker {
   pointer-events: auto !important;
   cursor: pointer !important;
   position: absolute !important;
 }
 
-.place-poi-marker {
+.poi-marker {
   width: 20px !important;
   height: 20px !important;
   display: flex !important;
@@ -15,7 +15,7 @@
   border-radius: 30% !important;
 }
 
-.place-poi-marker .poi-icon {
+.poi-marker .poi-icon {
   color: #FFFFFF !important;
   font-size: 10px !important;
   line-height: 1px !important;
@@ -25,7 +25,7 @@
   transform: translate(-50%, -50%) !important;
 }
 
-.place-poi-marker.plus-badge {
+.poi-marker.plus-badge {
   background-color: rgb(235, 77, 75) !important;
   color: #FFFFFF !important;
   font-weight: bold !important;

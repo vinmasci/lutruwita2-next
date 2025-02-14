@@ -39,7 +39,7 @@ export const PlacePOILayer: React.FC<Props> = () => {
   useEffect(() => {
       if (!map || !isStyleLoaded) return;
 
-      // Wait for layers to be fully loaded
+      // Check layers immediately and also on idle
       const checkLayers = () => {
         const settlementLayers = [
           'settlement-major-label',
@@ -48,17 +48,37 @@ export const PlacePOILayer: React.FC<Props> = () => {
         ];
         
         const hasSettlementLayers = settlementLayers.every(layer => map.getLayer(layer));
+        
+        console.debug('[PlacePOILayer] Checking settlement layers:', {
+          layers: settlementLayers,
+          hasAll: hasSettlementLayers,
+          availableLayers: map?.getStyle()?.layers?.map(l => l.id)
+        });
 
         if (hasSettlementLayers) {
+          console.debug('[PlacePOILayer] All settlement layers ready');
+          // Move settlement layers to the top
+          settlementLayers.forEach(layerId => {
+            if (map.getLayer(layerId)) {
+              map.moveLayer(layerId);
+            }
+          });
           setIsLayerReady(true);
         } else {
+          console.debug('[PlacePOILayer] Waiting for settlement layers...');
           setTimeout(checkLayers, 100);
         }
       };
 
-    // Start checking for layers
-    checkLayers();
-  }, [map, isStyleLoaded, poiMode]);
+      // Check immediately in case layers are already loaded
+      checkLayers();
+
+      // Also check when map becomes idle
+      map.once('idle', () => {
+        // Check again when idle
+        checkLayers();
+      });
+  }, [map, isStyleLoaded]); // Only check layers when map and style are ready
 
   // Handle zoom changes
   useEffect(() => {
@@ -218,15 +238,59 @@ export const PlacePOILayer: React.FC<Props> = () => {
 
   // Handle POI markers - now dependent on isLayerReady
   useEffect(() => {
-    if (!map || !isLayerReady) return;
+    const setupMarkers = async () => {
+    console.debug('[PlacePOILayer] Marker effect running:', { 
+      hasMap: !!map, 
+      isLayerReady,
+      poiCount: pois.length,
+      zoom: map?.getZoom(),
+      poiMode,
+      places: Object.keys(places).length
+    });
+
+    if (!map || !isLayerReady) {
+      return;
+    }
+
+    console.debug('[PlacePOILayer] Rendering POIs:', {
+      poiCount: pois.length,
+      zoom: map.getZoom(),
+      poiMode,
+      places: Object.keys(places).length
+    });
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
     markersRef.current = [];
 
-    // Group only place POIs by coordinates
-    const poiGroups = pois
-      .filter((poi): poi is PlaceNamePOI => poi.type === 'place') // Only include place POIs
+      // Get all place POIs and create missing places
+      const placePois = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
+      for (const poi of placePois) {
+        const placeId = `${poi.coordinates[0]},${poi.coordinates[1]}`;
+        if (!places[placeId]) {
+          await updatePlace(placeId, {
+            id: placeId,
+            name: poi.name,
+            coordinates: poi.coordinates,
+            description: '',
+            photos: []
+          });
+        }
+      }
+
+    console.debug('[PlacePOILayer] Filtering POIs:', {
+      totalPois: pois.length,
+      placePois: placePois.length,
+      allPois: pois.map(poi => ({
+        id: poi.id,
+        type: poi.type,
+        name: poi.name,
+        coordinates: poi.coordinates
+      }))
+    });
+
+    // Group POIs by location to show them together
+    const poiGroups = placePois
       .reduce<Record<string, PlaceNamePOI[]>>((acc: Record<string, PlaceNamePOI[]>, poi: PlaceNamePOI) => {
         const key = `${poi.coordinates[0]},${poi.coordinates[1]}`;
         if (!acc[key]) {
@@ -239,8 +303,10 @@ export const PlacePOILayer: React.FC<Props> = () => {
     // Get current zoom level
     const currentZoom = map.getZoom();
 
-    // Only show markers if zoom level is less than 12
-    if (currentZoom <= 9) {
+    // Only show markers when zoomed in enough
+    console.debug('[PlacePOILayer] Current zoom:', currentZoom);
+    
+    if (currentZoom <= 8.071) {
       return;
     }
 
@@ -278,11 +344,11 @@ export const PlacePOILayer: React.FC<Props> = () => {
 
         // Create marker element
         const el = document.createElement('div');
-        el.className = 'mapboxgl-marker place-poi-marker';
+        el.className = 'mapboxgl-marker poi-marker';
         
         // Create inner container for marker content
         const container = document.createElement('div');
-        container.className = 'place-poi-marker';
+        container.className = 'poi-marker';
         
         // Create icon element
         const icon = document.createElement('i');
@@ -328,10 +394,10 @@ export const PlacePOILayer: React.FC<Props> = () => {
         const plusPosition = positions[3]; // Plus badge will always be at position 3
         if (plusPosition) {
           const el = document.createElement('div');
-          el.className = 'mapboxgl-marker place-poi-marker';
+          el.className = 'mapboxgl-marker poi-marker';
           
           const container = document.createElement('div');
-          container.className = 'place-poi-marker plus-badge';
+          container.className = 'poi-marker plus-badge';
           container.textContent = `+${remainingCount}`;
           
           el.appendChild(container);
@@ -369,10 +435,13 @@ export const PlacePOILayer: React.FC<Props> = () => {
       }
     });
 
-    return () => {
-      markersRef.current.forEach(({ marker }) => marker.remove());
-      markersRef.current = [];
+      return () => {
+        markersRef.current.forEach(({ marker }) => marker.remove());
+        markersRef.current = [];
+      };
     };
+
+    setupMarkers();
   }, [map, isStyleLoaded, pois, zoom, places]);
 
   return (

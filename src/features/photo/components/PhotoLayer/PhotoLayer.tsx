@@ -5,7 +5,7 @@ import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
 import { PhotoCluster } from '../PhotoCluster/PhotoCluster';
 import { PhotoPreviewModal } from '../PhotoPreview/PhotoPreviewModal';
 import { ProcessedPhoto } from '../Uploader/PhotoUploader.types';
-import { clusterPhotos, isCluster } from '../../utils/clustering';
+import { clusterPhotos, isCluster, PhotoOrCluster, PhotoFeature, ClusterFeature, getClusterExpansionZoom } from '../../utils/clustering';
 import './PhotoLayer.css';
 
 export const PhotoLayer: React.FC = () => {
@@ -66,33 +66,50 @@ export const PhotoLayer: React.FC = () => {
     });
   }, [photos, normalizeCoordinates]);
 
-  // Cluster photos based on zoom level
   const clusteredItems = useMemo(() => {
     if (!map || zoom === null) return [];
-    return clusterPhotos(validPhotos, 0, zoom); // radius is calculated in clustering function
+    return clusterPhotos(validPhotos, 0, zoom);
   }, [validPhotos, map, zoom]);
 
-  const handleClusterClick = useCallback((photos: ProcessedPhoto[]) => {
-    setSelectedCluster(photos);
-    if (photos.length === 1) {
-      setSelectedPhoto(photos[0]);
+  const handleClusterClick = useCallback((cluster: ClusterFeature) => {
+    if (!map) return;
+
+    // Get the zoom level to expand this cluster and add additional zoom for more aggressive zooming
+    const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id);
+    const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
+    
+    // Get the cluster's coordinates
+    const [lng, lat] = cluster.geometry.coordinates;
+
+    // Zoom to the cluster's location with more aggressive zoom
+    map.easeTo({
+      center: [lng, lat],
+      zoom: targetZoom
+    });
+
+    // If it's a small cluster, show the photos
+    if (cluster.properties.point_count <= 4) {
+      setSelectedCluster(cluster.properties.photos);
+      if (cluster.properties.point_count === 1) {
+        setSelectedPhoto(cluster.properties.photos[0]);
+      }
     }
-  }, []);
+  }, [map]);
 
   return (
     <div className="photo-layer">
       {clusteredItems.map(item => 
         isCluster(item) ? (
           <PhotoCluster
-            key={`cluster-${item.photos[0].id}`}
+            key={`cluster-${item.properties.cluster_id}`}
             cluster={item}
-            onClick={() => handleClusterClick(item.photos)}
+            onClick={() => handleClusterClick(item)}
           />
         ) : (
           <PhotoMarker
-            key={item.id}
-            photo={item}
-            onClick={() => setSelectedPhoto(item)}
+            key={item.properties.id}
+            photo={item.properties.photo}
+            onClick={() => setSelectedPhoto(item.properties.photo)}
           />
         )
       )}
