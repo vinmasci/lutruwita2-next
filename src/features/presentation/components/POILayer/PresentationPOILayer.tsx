@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useRouteContext } from '../../../map/context/RouteContext';
+import { usePOIContext } from '../../../poi/context/POIContext';
 import { DraggablePOI, PlaceNamePOI, POI_CATEGORIES, POIType } from '../../../poi/types/poi.types';
 import { LoadedRoute } from '../../../map/types/route.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
@@ -20,6 +21,7 @@ interface MarkerRef {
 
 export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map }) => {
   const { currentRoute } = useRouteContext();
+  const { loadPOIsFromRoute, getPOIsForRoute } = usePOIContext();
   const markersRef = useRef<MarkerRef[]>([]);
   const placeMarkersRef = useRef<MarkerRef[]>([]);
   const [selectedPOI, setSelectedPOI] = useState<POIType | null>(null);
@@ -29,13 +31,26 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
     if (!map) return;
 
     const handleZoom = () => {
-      const currentZoom = map.getZoom();
-      placeMarkersRef.current.forEach(({ marker }) => {
-        if (currentZoom > 9) {
-          marker.addTo(map);
-        } else {
-          marker.remove();
-        }
+      const currentZoom = Math.floor(map.getZoom());
+      // Use requestAnimationFrame to batch DOM updates
+      requestAnimationFrame(() => {
+        // Update zoom level for regular POIs
+        markersRef.current.forEach(({ marker }) => {
+          const markerElement = marker.getElement();
+          const container = markerElement.querySelector('.marker-container');
+          if (container) {
+            container.setAttribute('data-zoom', currentZoom.toString());
+          }
+        });
+
+        // Show/hide place markers based on zoom level
+        placeMarkersRef.current.forEach(({ marker }) => {
+          if (currentZoom > 8.071) {
+            marker.addTo(map);
+          } else {
+            marker.remove();
+          }
+        });
       });
     };
 
@@ -46,76 +61,90 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
       map.off('zoom', handleZoom);
     };
   }, [map]);
+
+  // Load POIs when route changes
   useEffect(() => {
-    // Type guard for LoadedRoute
-    if (!map || !currentRoute || currentRoute._type !== 'loaded' || !currentRoute._loadedState?.pois) {
+    if (!currentRoute || currentRoute._type !== 'loaded' || !currentRoute._loadedState?.pois) {
       return;
     }
+    loadPOIsFromRoute(currentRoute._loadedState.pois);
+  }, [currentRoute]); // Remove loadPOIsFromRoute from deps since it's a stable context function
+
+  // Memoize POI data to prevent unnecessary recalculations
+  // Memoize POI data based on the actual POIs from context
+  const poiData = useMemo(() => getPOIsForRoute(), [getPOIsForRoute]); // Will update when POIs change since getPOIsForRoute is memoized with [pois]
+
+  // Memoize marker creation function
+  const createMarker = useCallback((poi: DraggablePOI) => {
+    const el = document.createElement('div');
+    el.className = 'poi-marker';
+    const iconDefinition = getIconDefinition(poi.icon);
+    const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
+    
+    // Set up marker HTML with bubble-pin style and initial zoom level
+    const initialZoom = Math.floor(map.getZoom());
+    el.innerHTML = `
+      <div class="marker-container" data-zoom="${initialZoom}">
+        <div class="marker-bubble" style="background-color: ${markerColor}">
+          <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
+        </div>
+        <div class="marker-point" style="border-top-color: ${markerColor}"></div>
+      </div>
+    `;
+
+    // Create marker with viewport alignment
+    const marker = new mapboxgl.Marker({
+      element: el,
+      draggable: false,
+      rotationAlignment: 'viewport',
+      pitchAlignment: 'viewport',
+      anchor: 'center',
+      offset: [0, -14] // Half the height of marker-bubble to center it
+    })
+      .setLngLat(poi.coordinates)
+      .addTo(map);
+
+    // Add click handler to show drawer
+    el.addEventListener('click', () => {
+      setSelectedPOI(poi);
+    });
+
+    // Add hover effect
+    el.addEventListener('mouseenter', () => {
+      const bubble = el.querySelector('.marker-bubble') as HTMLElement;
+      if (bubble) {
+        bubble.style.transform = 'scale(1.1)';
+        bubble.style.boxShadow = '0 3px 6px rgba(0, 0, 0, 0.3)';
+      }
+    });
+
+    el.addEventListener('mouseleave', () => {
+      const bubble = el.querySelector('.marker-bubble') as HTMLElement;
+      if (bubble) {
+        bubble.style.transform = '';
+        bubble.style.boxShadow = '';
+      }
+    });
+
+    return { marker, poiId: poi.id };
+  }, [map, setSelectedPOI]);
+
+  // Effect to update markers when POI data changes
+  useEffect(() => {
+    if (!map) return;
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
     markersRef.current = [];
 
-    const { draggable, places } = currentRoute._loadedState.pois;
-
     // Handle regular POIs
-    draggable.forEach((poi: DraggablePOI) => {
-      const el = document.createElement('div');
-      el.className = 'poi-marker';
-      const iconDefinition = getIconDefinition(poi.icon);
-      const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
-      
-      // Set up marker HTML with bubble-pin style and zoom data only for regular POIs
-      el.innerHTML = `
-        <div class="marker-container" data-zoom="${Math.floor(map.getZoom())}">
-          <div class="marker-bubble" style="background-color: ${markerColor}">
-            <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
-          </div>
-          <div class="marker-point" style="border-top-color: ${markerColor}"></div>
-        </div>
-      `;
-
-      // Create marker with viewport alignment
-      const marker = new mapboxgl.Marker({
-        element: el,
-        draggable: false,
-        rotationAlignment: 'viewport',
-        pitchAlignment: 'viewport',
-        anchor: 'center',
-        offset: [0, -14] // Half the height of marker-bubble to center it
-      })
-        .setLngLat(poi.coordinates)
-        .addTo(map);
-
-      // Add click handler to show drawer
-      el.addEventListener('click', () => {
-        setSelectedPOI(poi);
-      });
-
-      markersRef.current.push({ marker, poiId: poi.id });
-
-      // Add hover effect
-      el.addEventListener('mouseenter', () => {
-        const bubble = el.querySelector('.marker-bubble') as HTMLElement;
-        if (bubble) {
-          bubble.style.transform = 'scale(1.1)';
-          bubble.style.boxShadow = '0 3px 6px rgba(0, 0, 0, 0.3)';
-        }
-      });
-
-      el.addEventListener('mouseleave', () => {
-        const bubble = el.querySelector('.marker-bubble') as HTMLElement;
-        if (bubble) {
-          bubble.style.transform = '';
-          bubble.style.boxShadow = '';
-        }
-      });
+    poiData.draggable.forEach((poi: DraggablePOI) => {
+      const markerRef = createMarker(poi);
+      markersRef.current.push(markerRef);
     });
 
-    // Create place POIs regardless of zoom level
-
     // Group place POIs by coordinates
-    const poiGroups = places.reduce<Record<string, PlaceNamePOI[]>>((acc, poi) => {
+    const poiGroups = poiData.places.reduce<Record<string, PlaceNamePOI[]>>((acc: Record<string, PlaceNamePOI[]>, poi: PlaceNamePOI) => {
       const key = `${poi.coordinates[0]},${poi.coordinates[1]}`;
       if (!acc[key]) {
         acc[key] = [];
@@ -125,7 +154,7 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
     }, {});
 
     // Create markers for each location's POIs
-    Object.entries(poiGroups).forEach(([coordKey, locationPois]) => {
+    (Object.entries(poiGroups) as [string, PlaceNamePOI[]][]).forEach(([coordKey, locationPois]) => {
       const [lng, lat] = coordKey.split(',').map(Number);
       const baseOffset = 9; // Fixed offset for place POIs, just like in creation mode
 
@@ -151,7 +180,7 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
       const remainingCount = locationPois.length - 3;
 
       // Create markers for visible POIs
-      visiblePois.forEach((poi, index) => {
+      visiblePois.forEach((poi: PlaceNamePOI, index: number) => {
         const position = positions[index];
         if (!position) return;
 
@@ -184,7 +213,8 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
         setSelectedPOI(poi);
       });
 
-      if (map.getZoom() > 9) {
+      // Only add marker if we're zoomed in enough
+      if (map.getZoom() > 8.071) {
         marker.addTo(map);
       }
 
@@ -216,7 +246,8 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
           })
             .setLngLat(plusPosition.coordinates);
 
-          if (map.getZoom() > 9) {
+          // Only add marker if we're zoomed in enough
+          if (map.getZoom() > 8.071) {
             marker.addTo(map);
           }
 
@@ -231,7 +262,7 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
       placeMarkersRef.current.forEach(({ marker }) => marker.remove());
       placeMarkersRef.current = [];
     };
-  }, [map, currentRoute]); // Remove zoom dependency since place POIs shouldn't move with zoom
+  }, [map, poiData, createMarker]); // Use memoized poiData instead of getPOIsForRoute
 
   return (
     <PresentationPOIViewer

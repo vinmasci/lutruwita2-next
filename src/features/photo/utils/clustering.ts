@@ -21,12 +21,10 @@ export interface ClusterFeature extends Feature<Point> {
 
 export type PhotoOrCluster = PhotoFeature | ClusterFeature;
 
-let index: Supercluster<PhotoFeature['properties'], ClusterFeature['properties']> | null = null;
-
 const createIndex = () => {
-  index = new Supercluster({
-    radius: 60, // Clustering radius in pixels
-    maxZoom: 16, // Maximum zoom level to cluster points
+  return new Supercluster({
+    radius: 40, // Clustering radius in pixels (reduced for finer control)
+    maxZoom: 20, // Maximum zoom level to cluster points (increased to allow more detail)
     minZoom: 0, // Minimum zoom level to cluster points
     map: props => ({
       cluster: true as const,
@@ -60,8 +58,9 @@ const getClusteredPhotos = (photos: ProcessedPhoto[], zoom: number): PhotoOrClus
       }
     }));
 
-  if (!index) return [];
-
+  // Create a new index for each clustering operation
+  const index = createIndex();
+  
   // Load features into the index
   index.load(features);
 
@@ -70,6 +69,9 @@ const getClusteredPhotos = (photos: ProcessedPhoto[], zoom: number): PhotoOrClus
 
   // Get clusters
   const clusters = index.getClusters(bounds, Math.floor(zoom)) as PhotoOrCluster[];
+
+  // Store the index in a WeakMap for expansion zoom lookups
+  indexMap.set(clusters, index);
 
   console.log('[Clustering] Final result:', {
     totalClusters: clusters.length,
@@ -91,13 +93,14 @@ export const clusterPhotos = (
     validPhotos: photos.filter(p => p.coordinates && p.coordinates.lat && p.coordinates.lng).length
   });
 
-  if (!index) {
-    createIndex();
-  }
-  return getClusteredPhotos(photos, zoom);
+  return getClusteredPhotos(photos, Math.floor(zoom));
 };
 
-export const getClusterExpansionZoom = (clusterId: number): number => {
+// WeakMap to store the index for each set of clusters
+const indexMap = new WeakMap<PhotoOrCluster[], Supercluster>();
+
+export const getClusterExpansionZoom = (clusterId: number, clusters: PhotoOrCluster[]): number => {
+  const index = indexMap.get(clusters);
   if (!index) return 0;
   return index.getClusterExpansionZoom(clusterId);
 };

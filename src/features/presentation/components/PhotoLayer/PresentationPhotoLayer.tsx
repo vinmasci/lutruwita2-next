@@ -1,21 +1,33 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useMapContext } from '../../../map/context/MapContext';
+import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
-import { SerializedPhoto } from '../../../map/types/route.types';
-import { clusterPhotos, isCluster, getClusterExpansionZoom } from '../../../photo/utils/clustering';
+import { PhotoMarker } from '../../../photo/components/PhotoMarker/PhotoMarker';
+import { PhotoCluster } from '../../../photo/components/PhotoCluster/PhotoCluster';
 import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoPreviewModal';
-import mapboxgl from 'mapbox-gl';
+import { ProcessedPhoto } from '../../../photo/components/Uploader/PhotoUploader.types';
+import { clusterPhotosPresentation, isCluster, PhotoOrCluster, PhotoFeature, ClusterFeature, getClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
+import { BBox } from 'geojson';
 import './PresentationPhotoLayer.css';
 
-interface PresentationPhotoLayerProps {
-  map: mapboxgl.Map;
-}
-
-export const PresentationPhotoLayer: React.FC<PresentationPhotoLayerProps> = ({ map }) => {
+export const PresentationPhotoLayer: React.FC = () => {
+  const { map } = useMapContext();
   const { currentRoute } = useRouteContext();
+  const { photos, loadPhotos } = usePhotoContext();
+  // Load photos from route state
+  useEffect(() => {
+    if (!currentRoute || currentRoute._type !== 'loaded') {
+      return;
+    }
+    
+    if (currentRoute._loadedState?.photos) {
+      loadPhotos(currentRoute._loadedState.photos);
+    }
+  }, [currentRoute]); // Remove loadPhotos from deps since it's a stable context function
+
+  const [selectedPhoto, setSelectedPhoto] = useState<ProcessedPhoto | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<ProcessedPhoto[] | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
-  const markersRef = useRef<Array<mapboxgl.Marker>>([]);
-  const [selectedPhoto, setSelectedPhoto] = useState<SerializedPhoto | null>(null);
-  const [selectedCluster, setSelectedCluster] = useState<SerializedPhoto[] | null>(null);
 
   // Listen for zoom changes
   useEffect(() => {
@@ -23,6 +35,7 @@ export const PresentationPhotoLayer: React.FC<PresentationPhotoLayerProps> = ({ 
     
     const handleZoom = () => {
       const newZoom = map.getZoom();
+      console.log('[PresentationPhotoLayer] Zoom changed:', newZoom);
       setZoom(newZoom);
     };
 
@@ -50,11 +63,7 @@ export const PresentationPhotoLayer: React.FC<PresentationPhotoLayerProps> = ({ 
 
   // Filter photos to only include those with valid coordinates
   const validPhotos = useMemo(() => {
-    if (!currentRoute || currentRoute._type !== 'loaded' || !currentRoute._loadedState?.photos) {
-      return [];
-    }
-
-    return currentRoute._loadedState.photos.filter((p: SerializedPhoto) => {
+    return photos.filter(p => {
       if (!p.coordinates) {
         console.warn('Photo missing coordinates:', p.id);
         return false;
@@ -63,143 +72,75 @@ export const PresentationPhotoLayer: React.FC<PresentationPhotoLayerProps> = ({ 
         console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
         return false;
       }
-      // Normalize coordinates for safety
+      // Keep photos with valid coordinates, normalizing if needed
       const normalized = normalizeCoordinates(p.coordinates.lng, p.coordinates.lat);
-      p.coordinates.lng = normalized.lng;
-      p.coordinates.lat = normalized.lat;
-      return true;
+      // Only filter out if coordinates are way outside bounds
+      return Math.abs(normalized.lng - p.coordinates.lng) < 360 && 
+             Math.abs(normalized.lat - p.coordinates.lat) < 90;
     });
-  }, [currentRoute, normalizeCoordinates]);
+  }, [photos, normalizeCoordinates]);
 
-  useEffect(() => {
-    if (!map || zoom === null || validPhotos.length === 0) return;
-
-    // Clear existing markers
-    markersRef.current.forEach((marker: mapboxgl.Marker) => marker.remove());
-    markersRef.current = [];
-
-    // Get clustered items
-    // Convert SerializedPhoto to ProcessedPhoto
-    const processedPhotos = validPhotos.map(photo => ({
-      ...photo,
-      dateAdded: new Date(photo.dateAdded)
-    }));
+  const clusteredItems = useMemo(() => {
+    if (!map || zoom === null) return [];
     
-    const clusteredItems = clusterPhotos(processedPhotos, 0, zoom);
+    console.log('[PresentationPhotoLayer] Clustering with zoom:', zoom, 'Floor:', Math.floor(zoom));
+    return clusterPhotosPresentation(validPhotos, zoom);
+  }, [validPhotos, map, zoom]); // Remove photos.length dependency as it's already included in validPhotos
 
-    clusteredItems.forEach(item => {
-      const el = document.createElement('div');
-      
-      if (isCluster(item)) {
-        // Cluster marker
-        el.className = 'photo-cluster';
-        el.setAttribute('data-zoom', Math.floor(zoom).toString());
-        
-        const container = document.createElement('div');
-        container.className = 'photo-cluster-container';
-        
-        const bubble = document.createElement('div');
-        bubble.className = 'photo-cluster-bubble';
-        
-        const count = document.createElement('div');
-        count.className = 'photo-cluster-count';
-        count.textContent = item.properties.point_count.toString();
-        
-        // Add preview image
-        const preview = document.createElement('img');
-        preview.src = item.properties.photos[0].thumbnailUrl || '/images/photo-fallback.svg';
-        preview.alt = item.properties.photos[0].name || 'Photo preview';
-        preview.className = 'photo-cluster-preview';
-        preview.onerror = () => {
-          preview.src = '/images/photo-fallback.svg';
-          preview.alt = 'Failed to load photo';
-        };
-        
-        const point = document.createElement('div');
-        point.className = 'photo-cluster-point';
-        
-        bubble.appendChild(preview);
-        bubble.appendChild(count);
-        container.appendChild(bubble);
-        container.appendChild(point);
-        el.appendChild(container);
-        
-        // Add click handler for clusters
-        el.addEventListener('click', () => {
-          const expansionZoom = getClusterExpansionZoom(item.properties.cluster_id);
-          const targetZoom = Math.min(expansionZoom + 1.5, 20);
-          
-          const [lng, lat] = item.geometry.coordinates;
-          map.easeTo({
-            center: [lng, lat],
-            zoom: targetZoom
-          });
-        });
-      } else {
-        // Single photo marker
-        el.className = 'photo-marker';
-        el.setAttribute('data-zoom', Math.floor(zoom).toString());
-        
-        const container = document.createElement('div');
-        container.className = 'photo-marker-container';
-        
-        const bubble = document.createElement('div');
-        bubble.className = 'photo-marker-bubble';
-        
-        const img = document.createElement('img');
-        img.src = item.properties.photo.thumbnailUrl || '/images/photo-fallback.svg';
-        
-        const point = document.createElement('div');
-        point.className = 'photo-marker-point';
-        
-        bubble.appendChild(img);
-        container.appendChild(bubble);
-        container.appendChild(point);
-        el.appendChild(container);
+  const handleClusterClick = useCallback((cluster: ClusterFeature) => {
+    if (!map) return;
 
-        // Add click handler for single photos
-        el.addEventListener('click', () => {
-          const photo = {
-            ...item.properties.photo,
-            dateAdded: new Date(item.properties.photo.dateAdded)
-          };
-          setSelectedPhoto(photo as any); // Using type assertion since we know the structure matches
-        });
-      }
+    // Get the zoom level to expand this cluster and add additional zoom for more aggressive zooming
+    const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id, clusteredItems);
+    const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
+    
+    // Get the cluster's coordinates
+    const [lng, lat] = cluster.geometry.coordinates;
 
-      const coordinates = isCluster(item) 
-        ? item.geometry.coordinates.slice(0, 2) as [number, number]
-        : item.properties.photo.coordinates 
-          ? [item.properties.photo.coordinates.lng, item.properties.photo.coordinates.lat] as [number, number]
-          : undefined;
-
-      if (!coordinates) return;
-
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(coordinates)
-        .addTo(map);
-
-      markersRef.current.push(marker);
+    // Zoom to the cluster's location with more aggressive zoom
+    map.easeTo({
+      center: [lng, lat],
+      zoom: targetZoom
     });
 
-      return () => {
-        markersRef.current.forEach((marker: mapboxgl.Marker) => marker.remove());
-        markersRef.current = [];
-      };
-    }, [map, zoom, validPhotos]);
+    // If it's a small cluster, show the photos
+    if (cluster.properties.point_count <= 4) {
+      setSelectedCluster(cluster.properties.photos);
+      if (cluster.properties.point_count === 1) {
+        setSelectedPhoto(cluster.properties.photos[0]);
+      }
+    }
+  }, [map, clusteredItems]);
 
-    return (
-      <>
-        {selectedPhoto && (
-          <PhotoPreviewModal
-            photo={selectedPhoto as any}
-            onClose={() => {
-              setSelectedPhoto(null);
-              setSelectedCluster(null);
-            }}
-            additionalPhotos={selectedCluster as any}
+  return (
+    <div className="photo-layer">
+      {clusteredItems.map(item => 
+        isCluster(item) ? (
+          <PhotoCluster
+            key={`cluster-${item.properties.cluster_id}`}
+            cluster={item}
+            onClick={() => handleClusterClick(item)}
           />
-        )}
-      </>
-    );
+        ) : (
+          <PhotoMarker
+            key={item.properties.id}
+            photo={item.properties.photo}
+            onClick={() => setSelectedPhoto(item.properties.photo)}
+          />
+        )
+      )}
+
+      {selectedPhoto && (
+        <PhotoPreviewModal
+          key={`preview-${selectedPhoto.id}`}
+          photo={selectedPhoto}
+          onClose={() => {
+            setSelectedPhoto(null);
+            setSelectedCluster(null);
+          }}
+          additionalPhotos={selectedCluster}
+        />
+      )}
+    </div>
+  );
 };

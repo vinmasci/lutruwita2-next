@@ -42,16 +42,20 @@ export const PhotoCluster: React.FC<PhotoClusterProps> = ({ cluster, onClick }) 
       bubble.addEventListener('click', handleClick);
     }
 
+    // Add preview container
+    const previewsContainer = document.createElement('div');
+    previewsContainer.className = 'photo-cluster-previews';
+    
     // Add preview image
     const preview = document.createElement('img');
     preview.src = cluster.properties.photos[0].thumbnailUrl;
     preview.alt = cluster.properties.photos[0].name || 'Photo preview';
-    preview.className = 'photo-cluster-preview';
     preview.onerror = () => {
       preview.src = '/images/photo-fallback.svg';
       preview.alt = 'Failed to load photo';
     };
-    bubble.appendChild(preview);
+    previewsContainer.appendChild(preview);
+    bubble.appendChild(previewsContainer);
 
     // Add count
     const count = document.createElement('div');

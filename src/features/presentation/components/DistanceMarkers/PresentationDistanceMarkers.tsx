@@ -33,10 +33,12 @@ export const PresentationDistanceMarkers: React.FC<PresentationDistanceMarkersPr
       const zoom = map.getZoom();
       if (zoom >= 11) {
         setInterval(5); // 5km when zoomed in
-      } else if (zoom <= 9) {
+      } else if (zoom >= 9) {
+        setInterval(10); // 10km default
+      } else if (zoom >= 7) {
         setInterval(20); // 20km when zoomed out
       } else {
-        setInterval(10); // 10km default
+        setInterval(-1); // Special value to show only start/finish
       }
     };
 
@@ -75,25 +77,27 @@ export const PresentationDistanceMarkers: React.FC<PresentationDistanceMarkersPr
       .addTo(map);
     markersRef.current.push(startMarker);
 
-    // Create intermediate markers
-    points.forEach((point, index) => {
-      // Skip if point is too close to the end
-      const distanceToEnd = (totalDistanceKm - ((index + 1) * interval));
-      if (distanceToEnd > interval / 2) {
-        const el = document.createElement('div');
-        el.className = 'distance-marker';
-        el.textContent = `${(index + 1) * interval}km`;
+    // Create intermediate markers only if not at lowest zoom level
+    if (interval > 0) {
+      points.forEach((point, index) => {
+        // Skip if point is too close to the end
+        const distanceToEnd = (totalDistanceKm - ((index + 1) * interval));
+        if (distanceToEnd > interval / 2) {
+          const el = document.createElement('div');
+          el.className = 'distance-marker';
+          el.textContent = `${(index + 1) * interval}km`;
 
-        const marker = new mapboxgl.Marker({
-          element: el,
-          anchor: 'center'
-        })
-          .setLngLat(point)
-          .addTo(map);
+          const marker = new mapboxgl.Marker({
+            element: el,
+            anchor: 'center'
+          })
+            .setLngLat(point)
+            .addTo(map);
 
-        markersRef.current.push(marker);
-      }
-    });
+          markersRef.current.push(marker);
+        }
+      });
+    }
 
     // Create end marker with total distance
     const endEl = document.createElement('div');

@@ -132,9 +132,8 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Get POIs in route format - all POIs are for the current route by default
-  const getPOIsForRoute = (_routeId?: string): SavedRouteState['pois'] => {
-    
+  // Get POIs in route format - memoized to prevent unnecessary recalculations
+  const getPOIsForRoute = React.useCallback((_routeId?: string): SavedRouteState['pois'] => {
     // Split POIs by type and validate
     const draggablePois = pois.filter((poi): poi is DraggablePOI => {
       if (poi.type !== 'draggable') return false;
@@ -158,13 +157,11 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return true;
     });
     
-    const result = {
+    return {
       draggable: draggablePois,
       places: placePois
     };
-    
-    return result;
-  };
+  }, [pois]); // Only recompute when POIs change
 
   // Load POIs from route
   const loadPOIsFromRoute = (routePOIs?: SavedRouteState['pois']) => {
@@ -177,24 +174,8 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...routePOIs.places
       ];
 
-      // Merge with existing POIs, avoiding duplicates
-      const mergedPOIs = [...pois];
-      newPOIs.forEach(newPoi => {
-        const existingIndex = mergedPOIs.findIndex(p => p.id === newPoi.id);
-        if (existingIndex === -1) {
-          mergedPOIs.push(newPoi);
-        } else {
-          // Update existing POI with new data while preserving local changes
-          mergedPOIs[existingIndex] = {
-            ...mergedPOIs[existingIndex],
-            ...newPoi,
-            // Preserve position if it was locally modified
-            coordinates: mergedPOIs[existingIndex].coordinates
-          };
-        }
-      });
-
-      dispatch({ type: 'LOAD_POIS', payload: mergedPOIs });
+      // Replace existing POIs entirely
+      dispatch({ type: 'LOAD_POIS', payload: newPOIs });
     } catch (error) {
       console.error('[POIContext] Error loading POIs:', error);
       setError(error instanceof Error ? error : new Error('Failed to load POIs'));

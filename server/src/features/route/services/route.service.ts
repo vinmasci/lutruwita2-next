@@ -211,7 +211,7 @@ export class RouteService {
       }
 
       const routes = await RouteModel.find(query)
-        .select('_id name type viewCount lastViewed createdAt updatedAt mapState routes pois')
+        .select('_id name type viewCount lastViewed createdAt updatedAt mapState routes pois photos')
         .sort({ viewCount: -1, createdAt: -1 });
 
       return {
@@ -226,7 +226,8 @@ export class RouteService {
           updatedAt: route.updatedAt,
           mapState: route.mapState || { center: [-42.8821, 147.3272], zoom: 8 }, // Default to Tasmania
           routes: route.routes || [],
-          pois: route.pois || { draggable: [], places: [] }
+          pois: route.pois || { draggable: [], places: [] },
+          photos: route.photos || []
         }))
       };
     } catch (error) {

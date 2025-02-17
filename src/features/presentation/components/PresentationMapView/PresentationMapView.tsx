@@ -1,17 +1,19 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
+import { usePresentationRouteInit } from '../../hooks/usePresentationRouteInit';
 import mapboxgl from 'mapbox-gl';
+import SearchControl from '../SearchControl/SearchControl';
 import { Feature, LineString } from 'geojson';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MAP_STYLES } from '../../../map/components/StyleControl/StyleControl';
-import { useMapContext } from '../../../map/context/MapContext';
+import StyleControl, { MAP_STYLES } from '../StyleControl';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { RouteLayer } from '../../../map/components/RouteLayer';
 import { PresentationSidebar } from '../PresentationSidebar';
-import { PresentationElevationProfile } from '../ElevationProfile';
+import { PresentationElevationProfilePanel } from '../ElevationProfile/PresentationElevationProfilePanel';
 import { PresentationPOILayer } from '../POILayer/PresentationPOILayer';
 import { PresentationPhotoLayer } from '../PhotoLayer/PresentationPhotoLayer';
 import { PresentationDistanceMarkers } from '../DistanceMarkers/PresentationDistanceMarkers';
+import { MapProvider } from '../../../map/context/MapContext';
 import './PresentationMapView.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -20,29 +22,32 @@ export default function PresentationMapView() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [isTerrainReady, setIsTerrainReady] = useState(false);
-  const { currentRoute, routes } = useRouteContext();
+  const { currentRoute, routes, currentLoadedState } = useRouteContext();
+  const [hoverCoordinates, setHoverCoordinates] = useState<[number, number] | null>(null);
+
+  // Initialize routes using our presentation-specific hook
+  const { initialized: routesInitialized } = usePresentationRouteInit({
+    routes,
+    onInitialized: () => {
+      console.log('[PresentationMapView] Routes initialized');
+    }
+  });
+
+  // Store previous route reference
+  const previousRouteRef = useRef<string | null>(null);
 
   // Update map state when route changes
   useEffect(() => {
-    if (!isMapReady || !isTerrainReady || !mapInstance.current || !currentRoute?.geojson) {
-      console.log('[PresentationMapView] Waiting for map/terrain/route:', {
-        isMapReady,
-        isTerrainReady,
-        hasMap: !!mapInstance.current,
-        hasRoute: !!currentRoute,
-        hasGeojson: currentRoute?.geojson != null
-      });
-      return;
-    }
+    if (!isMapReady || !mapInstance.current || !currentRoute?.geojson) return;
 
-    console.log('[PresentationMapView] Fitting bounds to route:', {
+    console.log('[PresentationMapView] Handling route change:', {
       routeId: currentRoute.routeId,
       geojsonType: currentRoute.geojson.type,
-      featureCount: currentRoute.geojson.features?.length
+      featureCount: currentRoute.geojson.features?.length,
+      isPreviousRoute: previousRouteRef.current !== null
     });
 
-    // Fit bounds to route
+    // Get route bounds
     if (currentRoute.geojson?.features?.[0]?.geometry?.type === 'LineString') {
       const feature = currentRoute.geojson.features[0] as Feature<LineString>;
       const coordinates = feature.geometry.coordinates;
@@ -55,76 +60,123 @@ export default function PresentationMapView() {
           }
         });
 
-        mapInstance.current.fitBounds(bounds, {
-          padding: 50,
-          maxZoom: 13,
-          duration: 0 // Instant transition
-        });
+        // If this is the first route, fit bounds with zoom and animation
+        if (!previousRouteRef.current) {
+          mapInstance.current.fitBounds(bounds, {
+            padding: 50,
+            duration: 1500, // 1.5 second animation
+            essential: true // This ensures the animation runs smoothly
+          });
+        } else {
+          // For subsequent routes, maintain zoom and smoothly pan to center
+          const center = bounds.getCenter();
+          mapInstance.current.easeTo({
+            center: center,
+            duration: 1500, // 1.5 second animation
+            essential: true
+          });
+        }
+
+        // Update previous route reference
+        previousRouteRef.current = currentRoute.routeId;
       }
     }
-  }, [isMapReady, isTerrainReady, currentRoute]);
+  }, [isMapReady, currentRoute]);
+
+    // Initialize map
+    useEffect(() => {
+      if (!mapRef.current) return;
   
-  console.log('[PresentationMapView] Current route:', currentRoute);
-  console.log('[PresentationMapView] All routes:', routes);
-
-  // Initialize map
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    console.log('[PresentationMapView] Initializing map...');
-    const map = new mapboxgl.Map({
-      container: mapRef.current,
-      style: MAP_STYLES.satellite.url,
-      bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
-      fitBoundsOptions: {
-        padding: 0,
-        pitch: 45,
-        bearing: 0
-      },
-      projection: 'globe',
-      maxPitch: 85
-    });
-
-    // Log map initialization events
-    map.on('load', () => {
-      console.log('[PresentationMapView] Map loaded');
-      setIsMapReady(true);
-
-      // Add terrain after map loads
-      console.log('[PresentationMapView] Adding terrain...');
-      map.addSource('mapbox-dem', {
-        type: 'raster-dem',
-        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-        tileSize: 512,
-        maxzoom: 14
+      console.log('[PresentationMapView] Initializing map...');
+      const map = new mapboxgl.Map({
+        container: mapRef.current,
+        style: MAP_STYLES.satellite.url,
+        bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
+        fitBoundsOptions: {
+          padding: 0,
+          pitch: 45,
+          bearing: 0
+        },
+        projection: 'globe',
+        maxPitch: 85
       });
-      
-      map.setTerrain({ 
-        source: 'mapbox-dem', 
-        exaggeration: 1.5
+  
+      // Log map initialization events
+      map.on('load', () => {
+        console.log('[PresentationMapView] Map loaded');
+
+        // Add terrain synchronously
+        map.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14
+        });
+        
+        map.setTerrain({ 
+          source: 'mapbox-dem', 
+          exaggeration: 1.5
+        });
+
+        setIsMapReady(true);
+      });
+  
+      map.on('style.load', () => {
+        console.log('[PresentationMapView] Style loaded');
       });
 
-      // Wait for terrain to be ready
-      map.once('idle', () => {
-        console.log('[PresentationMapView] Terrain ready');
-        setIsTerrainReady(true);
+      map.on('zoom', () => {
+        const zoom = map.getZoom();
+        console.log('[PresentationMapView] Zoom changed:', zoom, 'Floor:', Math.floor(zoom));
       });
-    });
+  
+      map.on('error', (e) => {
+        console.error('[PresentationMapView] Map error:', e);
+      });
 
-    map.on('style.load', () => {
-      console.log('[PresentationMapView] Style loaded');
-    });
-
-    map.on('error', (e) => {
-      console.error('[PresentationMapView] Map error:', e);
-    });
-
-    // Add navigation control
+    // Add Mapbox controls first
     map.addControl(new mapboxgl.NavigationControl({
       showCompass: true,
       showZoom: true,
       visualizePitch: true
     }), 'top-right');
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+    map.addControl(
+      new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserHeading: true
+      }),
+      'top-right'
+    );
+
+    // Add custom controls after
+    map.addControl(new SearchControl(), 'top-right');
+    map.addControl(new StyleControl(), 'top-right');
+
+    // Style controls
+    const style = document.createElement('style');
+    style.textContent = `
+      .mapboxgl-ctrl-group {
+        background-color: rgba(35, 35, 35, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      }
+      .mapboxgl-ctrl-group button {
+        width: 36px !important;
+        height: 36px !important;
+      }
+      .mapboxgl-ctrl-icon {
+        filter: invert(1);
+      }
+      .mapboxgl-ctrl-geolocate {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    `;
+    document.head.appendChild(style);
 
     mapInstance.current = map;
 
@@ -133,17 +185,33 @@ export default function PresentationMapView() {
         mapInstance.current.remove();
         mapInstance.current = null;
       }
+      document.head.removeChild(style);
     };
   }, []);
 
+  const mapContextValue = useMemo(() => ({
+    map: mapInstance.current,
+    dragPreview: null,
+    setDragPreview: () => {},
+    isMapReady,
+    isInitializing: false,
+    hoverCoordinates,
+    setHoverCoordinates,
+    onPoiPlacementClick: undefined,
+    setPoiPlacementClick: () => {},
+    poiPlacementMode: false,
+    setPoiPlacementMode: () => {}
+  }), [isMapReady, hoverCoordinates]);
+
   return (
+    <MapProvider value={mapContextValue}>
       <div className="w-full h-full relative">
         <div 
           ref={mapRef}
           style={{ width: 'calc(100vw - 56px)', height: '100vh', position: 'fixed', top: 0, left: '56px' }}
         />
         
-        {(!isMapReady || !isTerrainReady) && (
+        {!isMapReady && (
           <Box
             sx={{
               position: 'absolute',
@@ -161,40 +229,43 @@ export default function PresentationMapView() {
           >
             <CircularProgress size={60} sx={{ mb: 2 }} />
             <Typography variant="h6" color="white">
-              {!isMapReady ? 'Loading map...' : 'Loading terrain...'}
+              Loading map...
             </Typography>
           </Box>
         )}
 
         <PresentationSidebar isOpen={true} />
-        <Box sx={{ ml: '56px', position: 'relative', height: '100%', width: 'calc(100% - 56px)' }}>
-          {isMapReady && isTerrainReady && mapInstance.current && (
-            <>
-              {/* Render RouteLayer for each route */}
-              {routes.map(route => (
-                <RouteLayer 
-                  key={route.routeId}
-                  map={mapInstance.current!} 
-                  route={route} 
-                />
-              ))}
+        {isMapReady && mapInstance.current && (
+          <>
+            {/* Render RouteLayer for each route */}
+            {routes.map(route => (
+              <RouteLayer 
+                key={route.routeId}
+                map={mapInstance.current!} 
+                route={route} 
+              />
+            ))}
 
-              {/* Render POIs and Photos */}
-              <PresentationPOILayer map={mapInstance.current} />
-              <PresentationPhotoLayer map={mapInstance.current} />
-              
-              {currentRoute && (
-                <>
-                  <PresentationDistanceMarkers map={mapInstance.current} route={currentRoute} />
-                  <div className="route-filename">
-                    {currentRoute.name || 'Untitled Route'}
-                  </div>
-                  <PresentationElevationProfile route={currentRoute} />
-                </>
-              )}
-            </>
-          )}
-        </Box>
+            {/* Render POIs and Photos */}
+            <PresentationPOILayer map={mapInstance.current} />
+            <PresentationPhotoLayer />
+            
+            {currentRoute && (
+              <>
+                <PresentationDistanceMarkers map={mapInstance.current} route={currentRoute} />
+                <div className="route-filename">
+                  The Lutruwita Way
+                </div>
+              </>
+            )}
+            {currentRoute && (
+              <div className="elevation-container">
+                <PresentationElevationProfilePanel route={currentRoute} />
+              </div>
+            )}
+          </>
+        )}
       </div>
+    </MapProvider>
   );
 }

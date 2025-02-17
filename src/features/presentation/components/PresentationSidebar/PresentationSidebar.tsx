@@ -14,6 +14,9 @@ import {
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { useMapContext } from '../../../map/context/MapContext';
 import { ProcessedRoute } from '../../../map/types/route.types';
+import { usePOIContext } from '../../../poi/context/POIContext';
+import { usePhotoContext } from '../../../photo/context/PhotoContext';
+import { deserializePhoto } from '../../../map/types/route.types';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
@@ -38,26 +41,38 @@ interface PresentationSidebarProps {
 export const PresentationSidebar: React.FC<PresentationSidebarProps> = ({ isOpen }) => {
   const { routes, currentRoute, setCurrentRoute } = useRouteContext();
   const { map } = useMapContext();
+  const { loadPOIsFromRoute } = usePOIContext();
+  const { addPhoto } = usePhotoContext();
   const [isNestedOpen, setIsNestedOpen] = useState(true);
 
   const currentIndex = routes.findIndex(route => route.id === currentRoute?.id);
 
-  const handleRouteClick = (route: ProcessedRoute) => {
+  const updateRouteAndMap = (route: ProcessedRoute) => {
+    if (route._type === 'loaded' && route._loadedState) {
+      // Update POIs and photos from the loaded state
+      if (route._loadedState.pois) {
+        loadPOIsFromRoute(route._loadedState.pois);
+      }
+      if (route._loadedState.photos) {
+        addPhoto(route._loadedState.photos.map(deserializePhoto));
+      }
+    }
+    
     setCurrentRoute(route);
     
-    // If we have map state with center and zoom, use that
-    if (route._type === 'loaded' && route._loadedState?.mapState) {
+    // Update map state if available
+    if (route._type === 'loaded' && route._loadedState?.mapState && map) {
       const { center, zoom } = route._loadedState.mapState;
-      map?.setCenter(center);
-      map?.setZoom(zoom);
+      map.setCenter(center);
+      map.setZoom(zoom);
     }
   };
 
   const handleNavigate = (direction: 'next' | 'prev') => {
-    if (direction === 'next' && currentIndex < routes.length - 1) {
-      handleRouteClick(routes[currentIndex + 1]);
-    } else if (direction === 'prev' && currentIndex > 0) {
-      handleRouteClick(routes[currentIndex - 1]);
+    const nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+    
+    if (nextIndex >= 0 && nextIndex < routes.length) {
+      updateRouteAndMap(routes[nextIndex]);
     }
   };
 
@@ -83,37 +98,27 @@ export const PresentationSidebar: React.FC<PresentationSidebarProps> = ({ isOpen
       >
         <Suspense fallback={<CircularProgress />}>
           <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 1, color: 'white' }}>
+            <Box sx={{ p: 3, pb: 0 }}>
+              <Typography variant="h5" component="h2" sx={{ fontWeight: 600, color: 'white' }}>
                 Routes
               </Typography>
-              {currentRoute && (
-                <>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    Currently viewing
-                  </Typography>
-                  <Typography variant="h6" sx={{ color: '#4a9eff' }}>
-                    {currentRoute.name}
-                  </Typography>
-                </>
-              )}
             </Box>
 
-            <List sx={{ flex: 1, overflowY: 'auto' }}>
+            <List sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2 }}>
               {routes.map((route) => (
                 <ListItem
                   key={route.id}
-                  onClick={() => handleRouteClick(route)}
+                  onClick={() => updateRouteAndMap(route)}
                   sx={{
-                    backgroundColor: currentRoute?.id === route.id ? 'rgba(55, 55, 55, 0.95)' : 'rgba(35, 35, 35, 0.9)',
-                    mb: 1,
+                    backgroundColor: currentRoute?.id === route.id ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
+                    mb: 1.5,
                     borderRadius: 1,
                     transition: 'all 0.2s ease-in-out',
                     cursor: 'pointer',
-                    borderLeft: currentRoute?.id === route.id ? '3px solid #4a9eff' : '1px solid transparent',
+                    border: currentRoute?.id === route.id ? '1px solid rgba(74, 158, 255, 0.5)' : '1px solid transparent',
                     '&:hover': {
-                      backgroundColor: 'rgba(45, 45, 45, 0.95)',
-                      transform: 'translateX(4px)',
+                      backgroundColor: currentRoute?.id === route.id ? 'rgba(74, 158, 255, 0.2)' : 'rgba(45, 45, 45, 0.95)',
+                      transform: 'scale(1.02)',
                     }
                   }}
                 >

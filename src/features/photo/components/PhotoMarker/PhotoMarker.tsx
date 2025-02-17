@@ -16,12 +16,12 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
   useEffect(() => {
     if (!map || !photo.coordinates || 
         typeof photo.coordinates.lng !== 'number' || 
-        typeof photo.coordinates.lat !== 'number' ||
-        photo.coordinates.lng < -180 || photo.coordinates.lng > 180 ||
-        photo.coordinates.lat < -90 || photo.coordinates.lat > 90) {
+        typeof photo.coordinates.lat !== 'number') {
       console.error('Invalid photo coordinates:', photo.coordinates);
       return;
     }
+
+    // Allow coordinates outside normal bounds - they'll be normalized by the layer
 
     const el = document.createElement('div');
     el.className = 'photo-marker';
@@ -88,7 +88,7 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
       img.onerror = null;
       map.off('zoom', updateZoom);
     };
-  }, [map, photo, onClick]);
+  }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.thumbnailUrl, photo.name, onClick]);
 
   return null;
 };

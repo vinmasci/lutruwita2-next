@@ -50,7 +50,7 @@
   justify-content: center;
   border-radius: 8px;
   background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-offset, 0 2px 4px) rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -59,7 +59,7 @@
 
 .marker-bubble:hover {
   transform: scale(1.1);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-offset-hover, 0 3px 6px) rgba(0, 0, 0, 0.3);
 }
 
 .marker-point {
@@ -69,7 +69,50 @@
   border-right: 7px solid transparent;
   border-top: 7px solid;  /* Color set in inline style */
   margin-top: -1px;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(var(--shadow-offset-point, 0 2px 2px) rgba(0, 0, 0, 0.2));
+}
+
+/* Zoom-based shadow scaling */
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="3"],
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="4"] {
+  --shadow-offset: 0 1px 2px;
+  --shadow-offset-hover: 0 1.5px 3px;
+  --shadow-offset-point: 0 1px 1px;
+}
+
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="5"],
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="6"] {
+  --shadow-offset: 0 1.2px 2.4px;
+  --shadow-offset-hover: 0 1.8px 3.6px;
+  --shadow-offset-point: 0 1.2px 1.2px;
+}
+
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="7"],
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="8"] {
+  --shadow-offset: 0 1.4px 2.8px;
+  --shadow-offset-hover: 0 2.1px 4.2px;
+  --shadow-offset-point: 0 1.4px 1.4px;
+}
+
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="9"],
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="10"] {
+  --shadow-offset: 0 1.6px 3.2px;
+  --shadow-offset-hover: 0 2.4px 4.8px;
+  --shadow-offset-point: 0 1.6px 1.6px;
+}
+
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="11"],
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="12"] {
+  --shadow-offset: 0 1.8px 3.6px;
+  --shadow-offset-hover: 0 2.7px 5.4px;
+  --shadow-offset-point: 0 1.8px 1.8px;
+}
+
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="13"],
+.poi-marker:not(.place-poi-marker) .marker-container[data-zoom="14"] {
+  --shadow-offset: 0 2px 4px;
+  --shadow-offset-hover: 0 3px 6px;
+  --shadow-offset-point: 0 2px 2px;
 }
 
 .marker-icon {

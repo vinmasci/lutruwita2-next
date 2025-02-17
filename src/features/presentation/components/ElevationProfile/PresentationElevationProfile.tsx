@@ -8,12 +8,49 @@ import type { Climb } from '../../../gpx/utils/climbUtils';
 
 const ElevationContent = styled('div')({
   width: '100%',
-  height: '300px',
-  backgroundColor: 'rgba(35, 35, 35, 0.9)',
-  borderRadius: '4px',
-  overflow: 'hidden',
-  display: 'flex',
-  flexDirection: 'column',
+  height: '220px',
+  padding: 0,
+  backgroundColor: '#1a1a1a',
+  '& .recharts-cartesian-grid-horizontal line, & .recharts-cartesian-grid-vertical line': {
+    stroke: 'rgba(255, 255, 255, 0.05)'
+  },
+  '& .recharts-text': {
+    fill: 'rgba(255, 255, 255, 0.7)'
+  },
+  '& .recharts-tooltip-wrapper': {
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderRadius: '4px',
+    '& .recharts-default-tooltip': {
+      background: 'linear-gradient(135deg, rgba(238, 82, 83, 0.15) 0%, rgba(30, 30, 30, 0.95) 100%)',
+      border: '1px solid rgba(255, 255, 255, 0.15)',
+      borderRadius: '4px',
+      padding: '6px 8px',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+      '& .recharts-tooltip-label': {
+        color: 'rgba(255, 255, 255, 0.85)',
+        fontSize: '0.75rem',
+        fontFamily: 'Futura, sans-serif',
+        marginBottom: '2px'
+      },
+      '& .recharts-tooltip-item': {
+        color: 'rgba(255, 255, 255, 0.95)',
+        fontSize: '0.75rem',
+        fontFamily: 'Futura, sans-serif',
+        padding: '1px 0'
+      },
+      '& .recharts-tooltip-item-name': {
+        color: 'rgba(255, 255, 255, 0.7)'
+      }
+    }
+  },
+  '& .recharts-area-area': {
+    fill: '#4b6584'
+  },
+  '& .recharts-area-curve': {
+    stroke: '#4b6584',
+    strokeWidth: 2
+  }
 });
 
 interface PresentationElevationProfileProps {
@@ -179,7 +216,44 @@ export const PresentationElevationProfile: React.FC<PresentationElevationProfile
             tickSize={3}
           />
           <Tooltip 
-            formatter={(value: number) => [`${value.toFixed(1)} m`, '']}
+            formatter={(value: number, name: string, props: any) => {
+              const currentIndex = data.findIndex(d => d.distance === props.payload.distance);
+              if (currentIndex > 0) {
+                const currentPoint = data[currentIndex];
+                const prevPoint = data[currentIndex - 1];
+                const elevationChange = currentPoint.elevation - prevPoint.elevation;
+                const distanceChange = (currentPoint.distance - prevPoint.distance) / 1000;
+                const gradient = ((elevationChange / (distanceChange * 1000)) * 100);
+                
+                return [
+                  <div key="tooltip">
+                    <div style={{ 
+                      fontFamily: 'Futura',
+                      color: 'white',
+                      display: 'flex',
+                      gap: '4px'
+                    }}>
+                      <span>el:</span>
+                      <span>{value.toFixed(1)} m</span>
+                    </div>
+                    <div style={{ 
+                      color: 'white', 
+                      fontSize: '0.75rem', 
+                      marginTop: '4px',
+                      fontFamily: 'Futura',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'rgba(255,255,255,0.7)' }}>
+                        {gradient > 0 ? '↗' : '↘'} {Math.abs(gradient).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                ];
+              }
+              return [`${value.toFixed(1)} m`, ''];
+            }}
             labelFormatter={(label) => `${(label / 1000).toFixed(2)} km`}
             contentStyle={{ background: 'none', border: 'none' }}
             wrapperStyle={{ outline: 'none' }}
@@ -239,8 +313,8 @@ export const PresentationElevationProfile: React.FC<PresentationElevationProfile
           <Area
             type="monotone"
             dataKey="elevation"
-            stroke="#ee5253"
-            fill="rgba(238, 82, 83, 0.2)"
+            stroke="#4b6584"
+            fill="rgba(75, 101, 132, 0.2)"
             strokeWidth={2}
           />
         </AreaChart>

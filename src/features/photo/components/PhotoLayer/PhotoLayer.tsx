@@ -75,7 +75,7 @@ export const PhotoLayer: React.FC = () => {
     if (!map) return;
 
     // Get the zoom level to expand this cluster and add additional zoom for more aggressive zooming
-    const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id);
+    const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id, clusteredItems);
     const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
     
     // Get the cluster's coordinates
@@ -94,7 +94,7 @@ export const PhotoLayer: React.FC = () => {
         setSelectedPhoto(cluster.properties.photos[0]);
       }
     }
-  }, [map]);
+  }, [map, clusteredItems]);
 
   return (
     <div className="photo-layer">

@@ -1,6 +1,11 @@
 .search-control {
   margin-top: 10px !important;
   position: relative;
+  z-index: 3000;
+}
+
+.mapboxgl-ctrl-group {
+  z-index: 3000 !important;
 }
 
 .search-control-button {
