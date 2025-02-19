@@ -92,7 +92,18 @@ export const PresentationPOIViewer: React.FC<PresentationPOIViewerProps> = ({
             </Box>
 
             {/* Description */}
-            <Box sx={{ mb: 3 }}>
+            <Box 
+              sx={{ 
+                mb: 3,
+                p: 2,
+                borderRadius: 1,
+                bgcolor: 'rgba(30, 136, 229, 0.1)',
+                border: '1px solid rgba(30, 136, 229, 0.2)'
+              }}
+            >
+              <Typography variant="overline" color="info.light" sx={{ display: 'block', mb: 1 }}>
+                Details
+              </Typography>
               <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
                 {poi.description || 'No description'}
               </Typography>

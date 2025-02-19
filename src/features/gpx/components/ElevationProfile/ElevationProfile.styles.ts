@@ -6,6 +6,7 @@ export const ElevationPanel = styled(Box)(({ theme }) => ({
   bottom: 0,
   left: '56px', // Width of the sidebar
   right: 0,
+  height: '300px',
   backgroundColor: 'rgba(26, 26, 26, 0.9)',
   borderTop: '1px solid rgba(255, 255, 255, 0.1)',
   transition: theme.transitions.create('transform', {
@@ -13,8 +14,14 @@ export const ElevationPanel = styled(Box)(({ theme }) => ({
     easing: theme.transitions.easing.easeInOut,
   }),
   zIndex: 102,
+  display: 'flex',
+  flexDirection: 'column',
   '&.collapsed': {
     transform: 'translateY(100%)'
+  },
+  '& > *': {
+    flex: 1,
+    minHeight: 0 // Important for proper scrolling
   }
 }));
 
@@ -34,9 +41,10 @@ export const ElevationHeader = styled(Box)(({ theme }) => ({
 }));
 
 export const ElevationContent = styled(Box)(({ theme }) => ({
-  height: 220,
+  height: '100%',
   padding: 0,
   backgroundColor: '#1a1a1a',
+  overflow: 'hidden',
   '& .recharts-cartesian-grid-horizontal line, & .recharts-cartesian-grid-vertical line': {
     stroke: 'rgba(255, 255, 255, 0.05)'
   },

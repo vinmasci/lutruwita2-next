@@ -9,7 +9,7 @@ import { RouteProvider, useRouteContext } from '../../../map/context/RouteContex
 import { MapProvider, useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
-import { deserializePhoto } from '../../../map/types/route.types';
+import { deserializePhoto } from '../../../photo/utils/photoUtils';
 
 export const RoutePresentation: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,17 +41,23 @@ export const RoutePresentation: React.FC = () => {
   const routes = useMemo(() => {
     if (!route) return [];
     console.log('[RoutePresentation] Using server routes:', route.name);
-    return route.routes.map(routeData => ({
-      ...routeData,
-      _type: 'loaded' as const,
-      _loadedState: route,
-      id: routeData.routeId, // Required by LoadedRoute
-      isVisible: true, // Required by LoadedRoute
-      status: {
-        processingState: 'completed' as const,
-        progress: 100
+    return route.routes.map(routeData => {
+      if (!routeData.routeId) {
+        console.error('Route data missing routeId:', routeData);
+        return null;
       }
-    }));
+      return {
+        ...routeData,
+        _type: 'loaded' as const,
+        _loadedState: route,
+        id: routeData.routeId,
+        isVisible: true,
+        status: {
+          processingState: 'completed' as const,
+          progress: 100
+        }
+      };
+    }).filter((route): route is LoadedRoute => route !== null);
   }, [route]);
 
   // Create a memoized component for route content

@@ -18,6 +18,7 @@ interface UseRouteStateReturn {
   routes: ReturnType<typeof useRouteContext>["routes"];
   currentRoute: ReturnType<typeof useRouteContext>["currentRoute"];
   savedRoutes: RouteListItem[];
+  updateRoute: ReturnType<typeof useRouteContext>["updateRoute"];
   
   // Loading states
   isSaving: boolean;
@@ -55,6 +56,7 @@ export const useRouteState = (): UseRouteStateReturn => {
     loadRoute: contextLoadRoute,
     listRoutes: contextListRoutes,
     deleteSavedRoute,
+    updateRoute: contextUpdateRoute,
   } = context;
 
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +193,7 @@ export const useRouteState = (): UseRouteStateReturn => {
     routes,
     currentRoute,
     savedRoutes,
+    updateRoute: contextUpdateRoute,
     
     // Loading states
     isSaving,

@@ -79,7 +79,7 @@ export const calculatePOIPositions = (
     
     // Calculate offsets to center the POIs above the place name
 const xOffset = (col * (config.iconSize + config.spacing)) - 
-                   ((Math.min(poiCount, config.maxPerRow) * (config.iconSize + config.spacing)) / 2) + 10; // Added 30px to move right
+                   ((Math.min(poiCount, config.maxPerRow) * (config.iconSize + config.spacing)) / 3);
 const yOffset = config.baseOffset + (row * (config.iconSize + config.spacing));
     
 positions.push({

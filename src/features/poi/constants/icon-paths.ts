@@ -2,25 +2,27 @@
 export const ICON_PATHS: Record<string, string> = {
   // Road Information
   'TrafficCone': 'fa-solid fa-traffic-cone',
-  'Octagon': 'fa-solid fa-road-circle-xmark',
+  'Octagon': 'fa-solid fa-ban',
   'AlertOctagon': 'fa-solid fa-road-circle-exclamation',
   'Lock': 'fa-solid fa-road-lock',
-  'Unlock': 'fa-regular fa-fence',
-  'WaterCrossing': 'fa-solid fa-water', // Water crossing
+  'Unlock': 'fa-solid fa-road-barrier',
+  'WaterCrossing': 'fa-solid fa-water',
   'ChevronsRightLeft': 'fa-solid fa-hill-rockslide',
   'ArrowUpRight': 'fa-solid fa-arrow-up-right-and-arrow-down-left-from-center',
   'AudioWaveform': 'fa-solid fa-xmarks-lines',
   'Route': 'fa-solid fa-sign-post',
-  'RailTrail': 'fa-solid fa-train-track', // Rail trail
+  'RailTrail': 'fa-solid fa-train-track',
   'Construction': 'fa-solid fa-triangle-person-digging',
   'HikeABike': 'fa-solid fa-person-hiking',
+  'RemoteArea': 'fa-solid fa-signal-slash',
+  'HeavyTraffic': 'fa-solid fa-cars',
   
   // Accommodation
   'Tent': 'fa-regular fa-campground',
   'Car': 'fa-solid fa-caravan',
-  'Bell': 'fa-solid fa-bell-concierge',
   'BedDouble': 'fa-solid fa-bed',
   'BedSingle': 'fa-solid fa-bed',
+  'Huts': 'fa-solid fa-cabin',
   
   // Food/Drink
   'Utensils': 'fa-solid fa-utensils',
@@ -36,7 +38,8 @@ export const ICON_PATHS: Record<string, string> = {
   'Mountain': 'fa-solid fa-mountain',
   'TreePine': 'fa-solid fa-tree',
   'Binoculars': 'fa-solid fa-binoculars',
-  'Swimming': 'fa-solid fa-person-swimming', // Swimming spot
+  'Swimming': 'fa-solid fa-person-swimming',
+  'MountainBikePark': 'fa-solid fa-person-biking-mountain',
   
   // Town Services
   'Hospital': 'fa-solid fa-hospital',

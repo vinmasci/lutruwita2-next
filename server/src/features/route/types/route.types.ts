@@ -1,8 +1,31 @@
 import { ProcessedRoute } from '../../../shared/types/gpx.types.js';
 import { DraggablePOI, PlaceNamePOI } from '../../../shared/types/poi.types.js';
 
+export interface RouteDescription {
+  title: string;
+  description: string;
+  photos: {
+    id: string;
+    name: string;
+    url: string;
+    thumbnailUrl: string;
+    dateAdded: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+    rotation?: number;
+    altitude?: number;
+  }[];
+}
+
+export interface ProcessedRouteWithDescription extends ProcessedRoute {
+  description?: RouteDescription;
+}
+
 export interface SavedRouteState {
   id: string;
+  persistentId: string;
   name: string;
   type: 'tourism' | 'event' | 'bikepacking' | 'single';
   isPublic: boolean;
@@ -22,7 +45,7 @@ export interface SavedRouteState {
   };
 
   // Route data
-  routes: ProcessedRoute[]; // From gpx.types.ts, includes all GPX data and processing results
+  routes: ProcessedRouteWithDescription[]; // From gpx.types.ts, includes all GPX data and processing results
   
   // Photos with metadata
   photos: {
@@ -54,7 +77,8 @@ export interface SaveRouteRequest {
 
 export interface SaveRouteResponse {
   message: string;
-  id: string;  // Add route ID to response
+  id: string;
+  persistentId: string;
 }
 
 export interface LoadRouteResponse {
@@ -65,6 +89,7 @@ export interface LoadRouteResponse {
 export interface ListRoutesResponse {
   routes: Array<{
     id: string;
+    persistentId: string;
     name: string;
     type: string;
     isPublic: boolean;
@@ -78,6 +103,7 @@ export interface ListRoutesResponse {
 export interface ListPublicRoutesResponse {
   routes: Array<{
     id: string;
+    persistentId: string;
     name: string;
     type: string;
     viewCount: number;

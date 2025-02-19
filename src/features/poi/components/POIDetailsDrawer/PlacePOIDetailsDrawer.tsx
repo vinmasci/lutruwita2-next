@@ -141,7 +141,7 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgb(0, 0, 0)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -162,7 +162,7 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
           sx={{ 
             color: 'white',
             '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+              backgroundColor: 'rgb(45, 45, 45)'
             }
           }}
         >
@@ -191,23 +191,23 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                   size="small"
                   disabled={isSaving}
                   sx={{ 
-                    backgroundColor: 'rgba(45, 45, 45, 0.9)',
+                    backgroundColor: 'rgb(45, 45, 45)',
                     '& .MuiOutlinedInput-root': {
                       '& fieldset': {
-                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgb(255, 255, 255)',
                       },
                       '&:hover fieldset': {
-                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderColor: 'rgb(255, 255, 255)',
                       },
                       '&.Mui-focused fieldset': {
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderColor: 'rgb(255, 255, 255)',
                       }
                     },
                     '& .MuiInputLabel-root': {
-                      color: 'rgba(255, 255, 255, 0.7)'
+                      color: 'rgb(255, 255, 255)'
                     },
                     '& .MuiOutlinedInput-input': {
-                      color: 'rgba(255, 255, 255, 0.9)'
+                      color: 'rgb(255, 255, 255)'
                     }
                   }}
                 />
@@ -285,12 +285,12 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                   fullWidth
                   disabled={isSaving}
                   sx={{ 
-                    backgroundColor: 'rgba(45, 45, 45, 0.9)',
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                    color: 'rgba(255, 255, 255, 0.9)',
+                    backgroundColor: 'rgb(45, 45, 45)',
+                    borderColor: 'rgb(255, 255, 255)',
+                    color: 'rgb(255, 255, 255)',
                     '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                      backgroundColor: 'rgba(45, 45, 45, 0.9)'
+                      borderColor: 'rgb(255, 255, 255)',
+                      backgroundColor: 'rgb(45, 45, 45)'
                     }
                   }}
                 >
@@ -335,7 +335,7 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                         display: 'block',
                         width: '100%',
                         aspectRatio: '1',
-                        backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                        backgroundColor: 'rgb(35, 35, 35)',
                         borderRadius: 1,
                         overflow: 'hidden',
                         position: 'relative'
@@ -361,9 +361,9 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                             position: 'absolute',
                             top: 4,
                             right: 4,
-                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            backgroundColor: 'rgb(0, 0, 0)',
                             '&:hover': {
-                              backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                              backgroundColor: 'rgb(0, 0, 0)'
                             }
                           }}
                         >
@@ -388,7 +388,7 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                       key={index}
                       sx={{
                         aspectRatio: '1',
-                        backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                        backgroundColor: 'rgb(35, 35, 35)',
                         borderRadius: 1,
                         overflow: 'hidden',
                         position: 'relative'
@@ -411,9 +411,9 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                             position: 'absolute',
                             top: 4,
                             right: 4,
-                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            backgroundColor: 'rgb(0, 0, 0)',
                             '&:hover': {
-                              backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                              backgroundColor: 'rgb(0, 0, 0)'
                             }
                           }}
                         >
@@ -451,9 +451,9 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                     fullWidth
                     disabled={isSaving}
                     sx={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      backgroundColor: 'rgb(255, 255, 255)',
                       '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                        backgroundColor: 'rgb(255, 255, 255)',
                       }
                     }}
                   >
@@ -469,9 +469,9 @@ const PlacePOIDetailsDrawer: React.FC<PlacePOIDetailsDrawerProps> = ({
                     startIcon={<Edit />}
                     disabled={isSaving}
                     sx={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      backgroundColor: 'rgb(255, 255, 255)',
                       '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.2)'
+                        backgroundColor: 'rgb(255, 255, 255)'
                       }
                     }}
                   >

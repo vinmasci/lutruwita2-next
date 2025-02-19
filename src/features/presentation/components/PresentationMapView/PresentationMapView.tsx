@@ -60,19 +60,22 @@ export default function PresentationMapView() {
           }
         });
 
-        // If this is the first route, fit bounds with zoom and animation
+        // Find the middle coordinate of the route
+        const middleIndex = Math.floor(coordinates.length / 2);
+        const middleCoord = coordinates[middleIndex];
+
         if (!previousRouteRef.current) {
+          // For the first route, fit bounds to set initial zoom
           mapInstance.current.fitBounds(bounds, {
             padding: 50,
-            duration: 1500, // 1.5 second animation
-            essential: true // This ensures the animation runs smoothly
+            duration: 1500
           });
         } else {
-          // For subsequent routes, maintain zoom and smoothly pan to center
-          const center = bounds.getCenter();
+          // For subsequent routes, pan to middle coordinate maintaining zoom
           mapInstance.current.easeTo({
-            center: center,
-            duration: 1500, // 1.5 second animation
+            center: [middleCoord[0], middleCoord[1]],
+            zoom: mapInstance.current.getZoom(),
+            duration: 1500,
             essential: true
           });
         }

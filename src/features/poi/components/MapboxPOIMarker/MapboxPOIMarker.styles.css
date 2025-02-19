@@ -4,6 +4,7 @@
   flex-direction: column;
   align-items: center;
   transform-style: preserve-3d;
+  transform-origin: center bottom;
   pointer-events: auto;
   z-index: 1;
 }
@@ -53,6 +54,8 @@
   position: relative;
   z-index: 1;
   transform: scale(var(--marker-scale, 1));
+  transform-origin: center top;
+  transform-origin: center bottom;
 }
 
 .marker-bubble:hover {
@@ -87,7 +90,7 @@
 .poi-marker {
   cursor: pointer;
   position: absolute;
-  transform-origin: center center;
+  transform-origin: center bottom;
   /* Prevent text selection */
   -webkit-user-select: none;
   -moz-user-select: none;

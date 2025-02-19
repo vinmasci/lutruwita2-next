@@ -16,14 +16,14 @@ export type POIIconName =
   | 'TrafficCone' | 'Octagon' | 'AlertOctagon' | 'Lock'
   | 'Unlock' | 'WaterCrossing' | 'ChevronsRightLeft'
   | 'ArrowUpRight' | 'AudioWaveform' | 'Route' | 'RailTrail' | 'Construction'
-  | 'HikeABike'
+  | 'HikeABike' | 'RemoteArea' | 'HeavyTraffic'
   // Accommodation
-  | 'Tent' | 'Car' | 'Bell' | 'BedDouble' | 'BedSingle'
+  | 'Tent' | 'Car' | 'BedDouble' | 'BedSingle' | 'Huts'
   // Food/Drink
   | 'Utensils' | 'Coffee' | 'Droplet' | 'Pizza' | 'ShoppingCart'
   | 'Store' | 'Beer' | 'Wine'
   // Natural Features
-  | 'Mountain' | 'TreePine' | 'Binoculars' | 'Swimming'
+  | 'Mountain' | 'TreePine' | 'Binoculars' | 'Swimming' | 'MountainBikePark'
   // Town Services
   | 'Hospital' | 'Toilet' | 'ShowerHead' | 'ParkingSquare'
   | 'Fuel' | 'Mail' | 'Bike'
@@ -31,7 +31,7 @@ export type POIIconName =
   | 'Bus' | 'TrainStation' | 'Plane' | 'Ship'
   // Event Information
   | 'PlayCircle' | 'StopCircle' | 'Stethoscope'
-  | 'BatteryCharging' | 'X' | 'CircleDot' | 'Wrench' | 'Flag';
+  | 'BatteryCharging' | 'X' | 'Wrench' | 'Flag';
 
 export interface POIPhoto {
   url: string;
@@ -100,7 +100,7 @@ export const POI_CATEGORIES: Record<POICategory, { label: string; color: string 
   'accommodation': { label: 'Accommodation', color: '#8e44ad' },
   'food-drink': { label: 'Food & Drink', color: '#e67e22' },
   'natural-features': { label: 'Natural Features', color: '#27ae60' },
-  'town-services': { label: 'Town Services', color: '#3dc1d3' },
+  'town-services': { label: 'Town Services', color: '#0a3d62' },
   'transportation': { label: 'Transportation', color: '#20c997' },
   'event-information': { label: 'Event Information', color: '#34495e' }
 };

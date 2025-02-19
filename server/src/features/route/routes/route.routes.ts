@@ -23,18 +23,18 @@ router.post('/save',
 );
 
 // Update an existing route
-router.put('/:id',
+router.put('/:persistentId',
   validateRouteData,
   asyncHandler(controller.updateRoute.bind(controller))
 );
 
 // Get a specific route
-router.get('/:id', asyncHandler(controller.loadRoute.bind(controller)));
+router.get('/:persistentId', asyncHandler(controller.loadRoute.bind(controller)));
 
 // List routes with optional filters
 router.get('/', asyncHandler(controller.listRoutes.bind(controller)));
 
 // Delete a route
-router.delete('/:id', asyncHandler(controller.deleteRoute.bind(controller)));
+router.delete('/:persistentId', asyncHandler(controller.deleteRoute.bind(controller)));
 
 export default router;

@@ -9,11 +9,11 @@ export const NestedDrawer = styled(MuiDrawer)(({ theme }) => ({
   zIndex: 100,
   '& .MuiDrawer-paper': {
     width: 264,
-    backgroundColor: 'rgba(35, 35, 35, 0.9)',
+    backgroundColor: 'rgb(35, 35, 35)',
     borderLeft: '1px solid #333',
     color: '#ffffff',
     marginLeft: 56,
-    padding: '16px',
+    boxSizing: 'border-box',
   },
 }));
 
@@ -42,9 +42,9 @@ export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
       bottom: 0,
       width: 8,
       cursor: 'ew-resize',
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'rgb(255, 255, 255)',
       '&:hover': {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgb(255, 255, 255)',
       }
     }
   },

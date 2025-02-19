@@ -174,7 +174,15 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
             </Box>
 
             {/* Description */}
-            <Box sx={{ mb: 3 }}>
+            <Box 
+              sx={{ 
+                mb: 3,
+                p: 2,
+                borderRadius: 1,
+                bgcolor: 'rgba(30, 136, 229, 0.1)',
+                border: '1px solid rgba(30, 136, 229, 0.2)'
+              }}
+            >
               {isEditing ? (
                 <TextField
                   fullWidth
@@ -186,6 +194,7 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       color: 'white',
+                      bgcolor: 'rgba(0, 0, 0, 0.2)',
                       '& fieldset': {
                         borderColor: 'rgba(255, 255, 255, 0.23)',
                       },
@@ -196,9 +205,14 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
                   }}
                 />
               ) : (
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {poi.description || 'No description'}
-                </Typography>
+                <>
+                  <Typography variant="overline" color="info.light" sx={{ display: 'block', mb: 1 }}>
+                    Details
+                  </Typography>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {poi.description || 'No description'}
+                  </Typography>
+                </>
               )}
             </Box>
 
@@ -342,40 +356,46 @@ export const POIViewer: React.FC<POIViewerProps> = ({ poi: initialPoi, onClose, 
               mt: 3, 
               display: 'flex', 
               gap: 1, 
-              justifyContent: 'flex-end',
+              justifyContent: 'flex-start',
               borderTop: '1px solid rgba(255, 255, 255, 0.12)',
               pt: 2
             }}>
               {!isEditing ? (
                 <>
                   <Button
-                    variant="contained"
+                    variant="outlined"
+                    startIcon={<Edit />}
+                    onClick={handleStartEditing}
+                    color="info"
+                    sx={{ 
+                      borderColor: 'info.main',
+                      color: 'info.main',
+                      '&:hover': {
+                        borderColor: 'info.dark',
+                        bgcolor: 'rgba(30, 136, 229, 0.08)'
+                      }
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outlined"
                     startIcon={<Delete />}
                     onClick={() => {
                       removePOI(poi.id);
                       onClose();
                     }}
+                    color="error"
                     sx={{ 
-                      bgcolor: 'rgba(255, 0, 0, 0.2)',
+                      borderColor: 'error.main',
+                      color: 'error.main',
                       '&:hover': {
-                        bgcolor: 'rgba(255, 0, 0, 0.3)'
+                        borderColor: 'error.dark',
+                        bgcolor: 'rgba(211, 47, 47, 0.08)'
                       }
                     }}
                   >
                     Delete
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<Edit />}
-                    onClick={handleStartEditing}
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 255, 255, 0.3)'
-                      }
-                    }}
-                  >
-                    Edit
                   </Button>
                 </>
               ) : (

@@ -580,25 +580,8 @@ function MapViewContent() {
         exaggeration: 1.5
       });
 
-      // Add event listeners for marker orientation and zoom
-      map.on('pitch', () => {
-        const markers = document.querySelectorAll('.marker-container');
-        markers.forEach(marker => {
-          const el = marker as HTMLElement;
-          el.style.transform = `rotate(${-map.getPitch()}deg)`;
-        });
-      });
-
       map.on('zoom', () => {
         console.log('[MapView] Zoom changed:', map.getZoom());
-      });
-
-      map.on('rotate', () => {
-        const markers = document.querySelectorAll('.marker-container');
-        markers.forEach(marker => {
-          const el = marker as HTMLElement;
-          el.style.transform = `rotate(${-map.getBearing()}deg)`;
-        });
       });
 
       // Add custom roads layer

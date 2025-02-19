@@ -122,7 +122,7 @@ export const LoadDialog = ({
               <ListItem
                 key={route.id}
                 component="div"
-                onClick={() => handleLoadClick(route.id)}
+                onClick={() => handleLoadClick(route.persistentId)}
                 sx={{
                   width: '100%',
                   py: 1.5,
@@ -178,7 +178,7 @@ export const LoadDialog = ({
                       edge="end"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDelete(route.id);
+                        onDelete(route.persistentId);
                       }}
                       sx={{ 
                         color: 'rgba(255, 255, 255, 0.7)',

@@ -20,7 +20,7 @@ export const SidebarListItems = ({
     loadRoute,
     deleteSavedRoute,
     currentLoadedState,
-    currentLoadedRouteId,
+    currentLoadedPersistentId,
     hasUnsavedChanges
   } = useRouteContext();
 
@@ -119,7 +119,7 @@ export const SidebarListItems = ({
           type: currentLoadedState.type,
           isPublic: currentLoadedState.isPublic
         } : undefined}
-        isEditing={!!currentLoadedRouteId}
+        isEditing={!!currentLoadedPersistentId}
       />
 
       <LoadDialog

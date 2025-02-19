@@ -14,6 +14,6 @@ const asyncHandler = (fn: (req: Request, res: Response) => Promise<any>) =>
 router.get('/', asyncHandler(controller.listPublicRoutes.bind(controller)));
 
 // Get a specific public route
-router.get('/:id', asyncHandler(controller.loadPublicRoute.bind(controller)));
+router.get('/:persistentId', asyncHandler(controller.loadPublicRoute.bind(controller)));
 
 export default router;

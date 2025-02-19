@@ -314,7 +314,7 @@ export const PlacePOILayer: React.FC<Props> = () => {
     Object.entries(poiGroups).forEach(([coordKey, locationPois]) => {
       const [lng, lat] = coordKey.split(',').map(Number);
       // Adjust baseOffset based on zoom level
-      const baseOffset = currentZoom <= 8.06 ? -15 : 9;
+      const baseOffset = currentZoom <= 8.06 ? -15 : 10;
 
       // Calculate positions for all icons including plus badge if needed
       const totalPositions = locationPois.length > 3 ? 4 : locationPois.length;
@@ -326,7 +326,7 @@ export const PlacePOILayer: React.FC<Props> = () => {
         },
         totalPositions,
         {
-          iconSize: 16,
+          iconSize: 17,
           spacing: 5.5,
           maxPerRow: 4, // Always use 4 to ensure space for plus badge
           baseOffset

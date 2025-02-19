@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouteState } from '../../hooks/useRouteState';
 import {
   List,
@@ -21,11 +21,11 @@ import {
   Select,
   FormControlLabel,
   Switch,
+  ClickAwayListener,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import { styled } from '@mui/material/styles';
-import { useState } from 'react';
 
 const StyledListItem = styled(ListItem)(({ theme }) => ({
   backgroundColor: 'rgba(35, 35, 35, 0.9)',
@@ -69,7 +69,11 @@ export const RouteList = () => {
     focusRoute,
     unfocusRoute,
     getFocusedRoute,
+    updateRoute,
   } = useRouteState();
+
+  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveForm, setSaveForm] = useState({
@@ -147,19 +151,54 @@ export const RouteList = () => {
                 borderLeft: '3px solid #4a9eff',
               }
             }}
-            onClick={() => {
-              if (route.isFocused) {
-                unfocusRoute(route.routeId);
-              } else {
-                focusRoute(route.routeId);
-              }
-            }}
           >
-            <ListItemText 
-              primary={route.name}
-              secondary={`${(route.statistics.totalDistance / 1000).toFixed(1)}km`}
-              sx={{ color: 'white' }}
-            />
+            {editingRouteId === route.routeId ? (
+              <ClickAwayListener onClickAway={() => setEditingRouteId(null)}>
+                <TextField
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateRoute(route.routeId, { name: editingName });
+                      setEditingRouteId(null);
+                    } else if (e.key === 'Escape') {
+                      setEditingRouteId(null);
+                    }
+                  }}
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      color: 'white',
+                      '& fieldset': {
+                        borderColor: 'rgba(255, 255, 255, 0.23)'
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'rgba(255, 255, 255, 0.4)'
+                      }
+                    }
+                  }}
+                />
+              </ClickAwayListener>
+            ) : (
+              <ListItemText 
+                primary={route.name}
+                secondary={`${(route.statistics.totalDistance / 1000).toFixed(1)}km`}
+                sx={{ color: 'white' }}
+                onClick={() => {
+                  if (route.isFocused) {
+                    unfocusRoute(route.routeId);
+                  } else {
+                    focusRoute(route.routeId);
+                  }
+                }}
+                onDoubleClick={() => {
+                  setEditingRouteId(route.routeId);
+                  setEditingName(route.name);
+                }}
+              />
+            )}
           </StyledListItem>
         ))}
 

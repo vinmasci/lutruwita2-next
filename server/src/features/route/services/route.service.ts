@@ -5,6 +5,7 @@ import { POIService } from '../../poi/services/poi.service';
 import { DraggablePOI, PlaceNamePOI } from '../../../shared/types/poi.types';
 import { ProcessedRoute } from '../../../shared/types/gpx.types';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
+import { v4 as uuidv4 } from 'uuid';
 
 export class RouteService {
   async saveRoute(userId: string, data: SaveRouteRequest & {
@@ -56,9 +57,21 @@ export class RouteService {
         });
       });
 
+      let persistentId: string;
+      if (routeId) {
+        const existingRoute = await RouteModel.findOne({ persistentId: routeId, userId });
+        if (!existingRoute) {
+          throw new Error('Route not found or access denied');
+        }
+        persistentId = existingRoute.persistentId;
+      } else {
+        persistentId = uuidv4();
+      }
+
       console.log('[RouteService] Preparing route data...');
       const routeData = {
         userId,
+        persistentId,
         name: data.name,
         type: data.type,
         isPublic: data.isPublic,
@@ -77,11 +90,6 @@ export class RouteService {
             userId,
             routeCount: data.routes?.length
           });
-          // Verify user owns the route before proceeding
-          const existingRoute = await RouteModel.findOne({ _id: routeId, userId });
-          if (!existingRoute) {
-            throw new Error('Route not found or access denied');
-          }
 
           // Use a MongoDB session for atomic operations
           const session = await mongoose.startSession();
@@ -110,7 +118,7 @@ export class RouteService {
               });
 
               // Delete the old route
-              await RouteModel.deleteOne({ _id: routeId, userId }, { session });
+              await RouteModel.deleteOne({ persistentId: routeId, userId }, { session });
               return saved;
             });
           } finally {
@@ -124,6 +132,7 @@ export class RouteService {
           console.log('[RouteService] Route replacement completed:', {
             oldId: routeId,
             newId: savedRoute._id.toString(),
+            persistentId,
             userId
           });
         } else {
@@ -163,7 +172,8 @@ export class RouteService {
 
       return {
         message: 'Route saved successfully',
-        id: savedRoute._id.toString()
+        id: savedRoute._id.toString(),
+        persistentId: savedRoute.persistentId
       };
     } catch (error) {
       console.error('[RouteService] Save error:', {
@@ -178,7 +188,7 @@ export class RouteService {
 
   async loadRoute(userId: string, routeId: string): Promise<LoadRouteResponse> {
     try {
-      const route = await RouteModel.findOne({ _id: routeId });
+      const route = await RouteModel.findOne({ persistentId: routeId });
 
       if (!route) {
         throw new Error('Route not found');
@@ -211,12 +221,13 @@ export class RouteService {
       }
 
       const routes = await RouteModel.find(query)
-        .select('_id name type viewCount lastViewed createdAt updatedAt mapState routes pois photos')
+        .select('_id persistentId name type viewCount lastViewed createdAt updatedAt mapState routes pois photos')
         .sort({ viewCount: -1, createdAt: -1 });
 
       return {
         routes: routes.map(route => ({
           id: route._id.toString(),
+          persistentId: route.persistentId,
           name: route.name,
           type: route.type,
           isPublic: true,
@@ -240,7 +251,7 @@ export class RouteService {
       console.log('[RouteService] Loading public route:', routeId);
       
       const route = await RouteModel.findOneAndUpdate(
-        { _id: routeId, isPublic: true },
+        { persistentId: routeId, isPublic: true },
         { 
           $inc: { viewCount: 1 },
           $set: { lastViewed: new Date() }
@@ -256,6 +267,7 @@ export class RouteService {
       const routeData = route.toJSON() as SavedRouteState;
       console.log('[RouteService] Public route data:', {
         id: routeData.id,
+        persistentId: routeData.persistentId,
         name: routeData.name,
         routeCount: routeData.routes?.length,
         hasMapState: !!routeData.mapState,
@@ -297,12 +309,13 @@ export class RouteService {
       ];
 
       const routes = await RouteModel.find(query)
-        .select('_id name type isPublic viewCount lastViewed createdAt updatedAt')
+        .select('_id persistentId name type isPublic viewCount lastViewed createdAt updatedAt')
         .sort({ createdAt: -1 });
 
       return {
         routes: routes.map(route => ({
           id: route._id.toString(),
+          persistentId: route.persistentId,
           name: route.name,
           type: route.type,
           isPublic: route.isPublic,
@@ -319,7 +332,7 @@ export class RouteService {
 
   async deleteRoute(userId: string, routeId: string): Promise<void> {
     try {
-      const route = await RouteModel.findOne({ _id: routeId });
+      const route = await RouteModel.findOne({ persistentId: routeId });
 
       if (!route) {
         throw new Error('Route not found');
@@ -331,7 +344,7 @@ export class RouteService {
       }
 
       // Delete the route only
-      await RouteModel.deleteOne({ _id: routeId });
+      await RouteModel.deleteOne({ persistentId: routeId });
       console.log('[RouteService] Route and associated POIs deleted successfully');
     } catch (error) {
       throw new Error(`Failed to delete route: ${error instanceof Error ? error.message : 'Unknown error'}`);

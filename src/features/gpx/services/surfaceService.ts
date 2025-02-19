@@ -11,8 +11,8 @@ const roundCoordinate = (value: number): number => {
 // Constants
 const ROAD_LAYER_ID = 'custom-roads';
 const SOURCE_LAYER = 'lutruwita';
-const PAVED_SURFACES = ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar', 'chipseal'];
-const UNPAVED_SURFACES = ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth', 'ground', 'sand', 'grass'];
+const PAVED_SURFACES = ['paved', 'asphalt', 'concrete', 'sealed', 'bitumen', 'tar', 'chipseal', 'paving_stones'];
+const UNPAVED_SURFACES = ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth', 'ground', 'sand', 'grass', 'compacted', 'crushed_stone', 'woodchips', 'pebblestone', 'mud', 'rock', 'stones', 'gravel;grass'];
 const UNPAVED_HIGHWAYS = ['track', 'trail', 'path'];
 
 // Constants for road detection
@@ -21,10 +21,10 @@ const BEARING_TOLERANCE = 30; // Increased for better matching
 const VARIANCE_THRESHOLD = 8; // Increased for more flexibility
 const TURN_ANGLE_THRESHOLD = 45; // Increased for sharper turns
 const MIN_SEGMENT_LENGTH = 3; // Reduced for shorter segments
-const DEFAULT_QUERY_BOX = 20; // Increased default query box
-const JUNCTION_QUERY_BOX = 40; // Increased junction query box
+const DEFAULT_QUERY_BOX = 10; // Reduced default query box
+const JUNCTION_QUERY_BOX = 5; // Reduced junction query box
 const RETRY_DELAY = 50; // Reduced delay between retries for faster processing
-const MAX_RETRIES = 5; // Reduced retries - will use previous point's surface if failed
+const MAX_RETRIES = 10; // Reduced retries - will use previous point's surface if failed
 const BATCH_SIZE = 10; // Process points in batches
 
 // Helper to convert [lon, lat] array to LngLatLike object with validation
@@ -127,12 +127,12 @@ const findNearestRoad = (map: mapboxgl.Map, point: [number, number]): RoadFeatur
   // First, do a wide scan to detect junction areas
   const wideAreaFeatures = map.queryRenderedFeatures(
     [
-      [projectedPoint.x - 50, projectedPoint.y - 50],
-      [projectedPoint.x + 50, projectedPoint.y + 50]
+      [projectedPoint.x - 25, projectedPoint.y - 25],
+      [projectedPoint.x + 25, projectedPoint.y + 25]
     ],
     {
       layers: [ROAD_LAYER_ID],
-      filter: ['in', 'highway', 'trunk', 'primary', 'secondary', 'residential']
+      filter: ['in', 'highway', 'trunk', 'primary', 'secondary', 'residential', 'path', 'track', 'trail', 'footway', 'bridleway', 'cycleway', 'service', 'unclassified']
     }
   );
 
@@ -148,13 +148,8 @@ const findNearestRoad = (map: mapboxgl.Map, point: [number, number]): RoadFeatur
         .filter(Boolean)
     );
     
-    const hasMainRoads = wideAreaFeatures.some(f => 
-      ['trunk', 'primary', 'secondary'].includes(f.properties?.highway || '')
-    );
-    
-    queryBox = uniqueRoads.size > 1 ? JUNCTION_QUERY_BOX : // Major junction
-              hasMainRoads ? JUNCTION_QUERY_BOX * 0.75 : // Main road junction
-              wideAreaFeatures.length > 2 ? JUNCTION_QUERY_BOX * 0.5 : // Minor junction
+    queryBox = uniqueRoads.size > 1 ? JUNCTION_QUERY_BOX : // Complex junction
+              wideAreaFeatures.length > 2 ? JUNCTION_QUERY_BOX * 0.5 : // Simple junction
               DEFAULT_QUERY_BOX;
   }
 
@@ -238,14 +233,7 @@ const findNearestRoad = (map: mapboxgl.Map, point: [number, number]): RoadFeatur
     return roadFeatures.reduce<RoadFeature | null>((best, current) => {
       if (!best) return current;
       
-      // Prioritize main roads
-      const bestIsMain = ['trunk', 'primary', 'secondary'].includes(best.properties?.highway || '');
-      const currentIsMain = ['trunk', 'primary', 'secondary'].includes(current.properties?.highway || '');
-      
-      if (bestIsMain && !currentIsMain) return best;
-      if (!bestIsMain && currentIsMain) return current;
-      
-      // If same road type, use the closest one
+      // Use the closest road
       let bestCoord: Coordinate | null = null;
       let currentCoord: Coordinate | null = null;
 
@@ -417,21 +405,23 @@ export const assignSurfacesViaNearest = async (
 
         const dist = getDistanceToRoad([pt.lon, pt.lat], lineCoords);
 
-        // Add a small threshold to prefer staying on main roads
-        const DISTANCE_THRESHOLD = 0.001; // 1 meter buffer
-
-        if (dist < minDist - DISTANCE_THRESHOLD ||
-          (road.properties?.highway === 'trunk' && dist < minDist + DISTANCE_THRESHOLD)) {
+        // Simple distance comparison
+        if (dist < minDist) {
           minDist = dist;
           const surfaceRaw = (road.properties?.surface || '').toLowerCase();
-          const highwayType = (road.properties?.highway || '').toLowerCase();
+          
+          console.log(`[Surface Detection] Point at (${pt.lat}, ${pt.lon}):`, {
+            surface: surfaceRaw,
+            isPaved: PAVED_SURFACES.includes(surfaceRaw),
+            isUnpaved: UNPAVED_SURFACES.includes(surfaceRaw)
+          });
           
           if (PAVED_SURFACES.includes(surfaceRaw)) {
             bestSurface = 'paved';
-          } else if (UNPAVED_SURFACES.includes(surfaceRaw) || UNPAVED_HIGHWAYS.includes(highwayType)) {
+          } else if (UNPAVED_SURFACES.includes(surfaceRaw)) {
             bestSurface = 'unpaved';
           } else {
-            bestSurface = 'unpaved'; // fallback
+            bestSurface = 'unpaved'; // fallback for unknown surfaces
           }
         }
       }

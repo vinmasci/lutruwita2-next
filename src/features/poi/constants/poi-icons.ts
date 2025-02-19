@@ -17,36 +17,38 @@ export const POI_ICONS: POIIconDefinition[] = [
   { name: 'AlertOctagon', category: 'road-information', label: 'Private Road', description: 'Private road or restricted access' },
   { name: 'Lock', category: 'road-information', label: 'Locked Gate', description: 'Gate is locked, no access' },
   { name: 'Unlock', category: 'road-information', label: 'Gate', description: 'Gate present, may need to open/close' },
-  { name: 'ChevronsRightLeft', category: 'road-information', label: 'Rough Surface', description: 'Rough or uneven road surface' },
-  { name: 'ArrowUpRight', category: 'road-information', label: 'Steep Gradient', description: 'Steep uphill or downhill section' },
-  { name: 'AudioWaveform', category: 'road-information', label: 'Single Track', description: 'Narrow single track section' },
-  { name: 'Route', category: 'road-information', label: 'Trailhead', description: 'Start of a trail or track' },
-  { name: 'RailTrail', category: 'road-information', label: 'Rail Trail', description: 'Former railway line converted to trail' },
   { name: 'Construction', category: 'road-information', label: 'Road Construction', description: 'Road works or construction area' },
-  { name: 'HikeABike', category: 'road-information', label: 'Hike-a-bike', description: 'Section where bike must be carried', style: { color: '#e74c3c' } },
+  { name: 'ArrowUpRight', category: 'road-information', label: 'Steep Gradient', description: 'Steep uphill or downhill section' },
+  { name: 'HeavyTraffic', category: 'road-information', label: 'Heavy Traffic', description: 'High traffic area' },
+  { name: 'ChevronsRightLeft', category: 'road-information', label: 'Rough Surface', description: 'Rough or uneven road surface', style: { color: '#ff6348' } },
+  { name: 'AudioWaveform', category: 'road-information', label: 'Single Track', description: 'Narrow single track section', style: { color: '#ff6348' } },
+  { name: 'Route', category: 'road-information', label: 'Trailhead', description: 'Start of a trail or track', style: { color: '#ff6348' } },
+  { name: 'RailTrail', category: 'road-information', label: 'Rail Trail', description: 'Former railway line converted to trail', style: { color: '#ff6348' } },
+  { name: 'HikeABike', category: 'road-information', label: 'Hike-a-bike', description: 'Section where bike must be carried', style: { color: '#ff6348' } },
+  { name: 'WaterCrossing', category: 'road-information', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#ff6348' } },
+  { name: 'RemoteArea', category: 'road-information', label: 'Remote Area', description: 'Remote or isolated area', style: { color: '#ff6348' } },
   
   // Accommodation
-  { name: 'Tent', category: 'accommodation', label: 'Camping', description: 'Camping area or campsite' },
+  { name: 'Tent', category: 'accommodation', label: 'Campsite', description: 'Camping area or campsite' },
+  { name: 'Huts', category: 'accommodation', label: 'Huts', description: 'Mountain huts or shelters' },
   { name: 'Car', category: 'accommodation', label: 'Caravan Park', description: 'Caravan and camping park' },
-  { name: 'Bell', category: 'accommodation', label: 'Motel/Hotel', description: 'Motel or hotel accommodation' },
   { name: 'BedDouble', category: 'accommodation', label: 'Accommodation', description: 'General accommodation' },
-  { name: 'BedSingle', category: 'accommodation', label: 'Hostel', description: 'Hostel or backpacker accommodation' },
 
   // Food/Drink
-  { name: 'Utensils', category: 'food-drink', label: 'Restaurant', description: 'Restaurant or dining' },
-  { name: 'Coffee', category: 'food-drink', label: 'Cafe', description: 'Cafe or coffee shop' },
-  { name: 'Pizza', category: 'food-drink', label: 'Roadhouse', description: 'Roadhouse or truck stop' },
-  { name: 'ShoppingCart', category: 'food-drink', label: 'Supermarket', description: 'Supermarket or grocery store' },
-  { name: 'Store', category: 'food-drink', label: 'General Store', description: 'General store or convenience store' },
-  { name: 'Beer', category: 'food-drink', label: 'Bar/Pub', description: 'Bar or pub' },
-  { name: 'Wine', category: 'food-drink', label: 'Winery', description: 'Winery or cellar door' },
+  { name: 'Utensils', category: 'food-drink', label: 'Restaurant', description: 'Restaurant or dining', style: { color: '#ffa801' } },
+  { name: 'Coffee', category: 'food-drink', label: 'Cafe', description: 'Cafe or coffee shop', style: { color: '#ffa801' } },
+  { name: 'Pizza', category: 'food-drink', label: 'Roadhouse', description: 'Roadhouse or truck stop', style: { color: '#ffa801' } },
+  { name: 'ShoppingCart', category: 'food-drink', label: 'Supermarket', description: 'Supermarket or grocery store', style: { color: '#ffa801' } },
+  { name: 'Store', category: 'food-drink', label: 'General Store', description: 'General store or convenience store', style: { color: '#ffa801' } },
+  { name: 'Beer', category: 'food-drink', label: 'Bar/Pub', description: 'Bar or pub', style: { color: '#ffa801' } },
+  { name: 'Wine', category: 'food-drink', label: 'Winery', description: 'Winery or cellar door', style: { color: '#ffa801' } },
 
   // Natural Features
   { name: 'Mountain', category: 'natural-features', label: 'Summit', description: 'Mountain summit or peak' },
   { name: 'TreePine', category: 'natural-features', label: 'National Park', description: 'National park or reserve' },
   { name: 'Binoculars', category: 'natural-features', label: 'Viewpoint', description: 'Scenic viewpoint or lookout' },
+  { name: 'MountainBikePark', category: 'natural-features', label: 'Mountain Bike Park', description: 'Mountain bike trails or park' },
   { name: 'Droplet', category: 'natural-features', label: 'Drinking Water', description: 'Drinking water available', style: { color: '#3498db' } },
-  { name: 'WaterCrossing', category: 'natural-features', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#3498db' } },
   { name: 'Swimming', category: 'natural-features', label: 'Swimming', description: 'Swimming spot or water access', style: { color: '#3498db' } },
 
   // Town Services
@@ -65,13 +67,12 @@ export const POI_ICONS: POIIconDefinition[] = [
   { name: 'Ship', category: 'transportation', label: 'Ferry', description: 'Ferry terminal or water transport' },
 
   // Event Information
-  { name: 'PlayCircle', category: 'event-information', label: 'Start', description: 'Event start point' },
-  { name: 'StopCircle', category: 'event-information', label: 'Finish', description: 'Event finish point' },
-  { name: 'Stethoscope', category: 'event-information', label: 'Aid Station', description: 'Medical or aid station' },
-  { name: 'BatteryCharging', category: 'event-information', label: 'Rest Stop', description: 'Rest or recovery point' },
-  { name: 'CircleDot', category: 'event-information', label: 'Control Point', description: 'Event control point' },
-  { name: 'Wrench', category: 'event-information', label: 'Bike Hub', description: 'Bike maintenance or repair' },
-  { name: 'Flag', category: 'event-information', label: 'Checkpoint', description: 'Event checkpoint' }
+  { name: 'PlayCircle', category: 'event-information', label: 'Start', description: 'Event start point', style: { color: '#ef5777' } },
+  { name: 'StopCircle', category: 'event-information', label: 'Finish', description: 'Event finish point', style: { color: '#ef5777' } },
+  { name: 'Stethoscope', category: 'event-information', label: 'Aid Station', description: 'Medical or aid station', style: { color: '#ef5777' } },
+  { name: 'BatteryCharging', category: 'event-information', label: 'Rest Stop', description: 'Rest or recovery point', style: { color: '#ef5777' } },
+  { name: 'Wrench', category: 'event-information', label: 'Bike Hub', description: 'Bike maintenance or repair', style: { color: '#ef5777' } },
+  { name: 'Flag', category: 'event-information', label: 'Checkpoint', description: 'Event checkpoint', style: { color: '#ef5777' } }
 ];
 
 export const getIconsByCategory = (category: POICategory): POIIconDefinition[] => {

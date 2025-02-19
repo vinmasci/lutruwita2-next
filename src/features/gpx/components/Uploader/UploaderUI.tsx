@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UploaderUIProps } from './Uploader.types';
 import { Alert, Box, CircularProgress, Typography, IconButton, TextField, List, ListItem, ListItemText, ListItemSecondaryAction, Paper, Divider } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
-import { getRouteDistance } from '../../utils/routeUtils';
+import { getRouteDistance, getUnpavedPercentage, getElevationGain } from '../../utils/routeUtils';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useDropzone, FileWithPath } from 'react-dropzone';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -95,7 +95,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '24px 32px 24px 1px',
+      padding: '24px 16px',
       width: '100%'
     }}>
       <Paper
@@ -153,7 +153,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
               role="button"
               aria-selected={currentRoute?.routeId === route.routeId}
               sx={{
-                backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
+                backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
                 borderRadius: '4px',
                 mb: 1,
                 padding: '8px 12px',
@@ -161,8 +161,10 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 cursor: 'pointer',
                 position: 'relative',
                 outline: 'none',
+                border: currentRoute?.routeId === route.routeId ? '1px solid rgba(74, 158, 255, 0.5)' : '1px solid transparent',
                 '&:hover': {
-                  backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(65, 65, 65, 0.9)' : 'rgba(45, 45, 45, 0.9)',
+                  backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(74, 158, 255, 0.2)' : 'rgba(45, 45, 45, 0.9)',
+                  transform: 'scale(1.02)',
                 },
                 '&:focus-visible': {
                   outline: '2px solid rgba(255, 255, 255, 0.5)',
@@ -205,10 +207,21 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                 <>
                   <ListItemText 
                     primary={route.name}
-                    secondary={`${(getRouteDistance(route) / 1000).toFixed(1)}km`}
+                    secondary={
+                      <Box component="span" sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <i className="fa-solid fa-route" /> {(getRouteDistance(route) / 1000).toFixed(1)}km
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <i className="fa-solid fa-mountains" /> {Math.round(getElevationGain(route)).toLocaleString()}m
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <i className="fa-solid fa-person-biking-mountain" /> {getUnpavedPercentage(route)}% unpaved
+                        </Typography>
+                      </Box>
+                    }
                     sx={{ 
                       '& .MuiTypography-root': { 
-                        fontSize: '0.875rem',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -220,6 +233,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                       edge="end"
                       size="small"
                       onClick={(e) => handleStartEditing(e, route.routeId || route.id, route.name)}
+                      title="Rename route"
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -230,6 +244,7 @@ const UploaderUI: React.FC<UploaderUIProps> = ({
                         e.stopPropagation();
                         onFileDelete(route.routeId || route.id);
                       }}
+                      title="Delete route"
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>

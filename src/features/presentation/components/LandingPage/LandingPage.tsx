@@ -311,7 +311,7 @@ export const LandingPage: React.FC = () => {
               {featuredRoutes.map((route) => (
                 <Grid item xs={12} sm={6} md={4} key={route.id}>
                   <StyledCard 
-                    onClick={() => navigate(`/preview/route/${route.id}`)}
+                    onClick={() => navigate(`/preview/route/${route.persistentId}`)}
                     sx={{ cursor: 'pointer' }}
                   >
                     <MapPreviewWrapper>

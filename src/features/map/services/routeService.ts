@@ -80,9 +80,9 @@ export const useRouteService = () => {
       console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
       console.log('[routeService] Full route data:', JSON.stringify(routeData, null, 2));
       
-// If routeData has an id, it's an update to an existing route
-const endpoint = routeData.id ? `${API_BASE}/${routeData.id}` : `${API_BASE}/save`;
-const method = routeData.id ? 'PUT' : 'POST';
+// If routeData has a persistentId, it's an update to an existing route
+const endpoint = routeData.persistentId ? `${API_BASE}/${routeData.persistentId}` : `${API_BASE}/save`;
+const method = routeData.persistentId ? 'PUT' : 'POST';
 
 const response = await fetch(endpoint, {
   method,
@@ -103,11 +103,11 @@ const response = await fetch(endpoint, {
     }
   };
 
-  const loadRoute = async (id: string): Promise<LoadRouteResponse> => {
+  const loadRoute = async (persistentId: string): Promise<LoadRouteResponse> => {
     try {
       const headers = await getAuthHeaders();
-      console.log('[routeService] Loading route:', id);
-      const response = await fetch(`${API_BASE}/${id}`, {
+      console.log('[routeService] Loading route:', persistentId);
+      const response = await fetch(`${API_BASE}/${persistentId}`, {
         method: 'GET',
         headers,
         credentials: 'include'
@@ -165,10 +165,10 @@ const response = await fetch(endpoint, {
     }
   };
 
-  const deleteRoute = async (id: string): Promise<void> => {
+  const deleteRoute = async (persistentId: string): Promise<void> => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE}/${id}`, {
+      const response = await fetch(`${API_BASE}/${persistentId}`, {
         method: 'DELETE',
         headers,
         credentials: 'include'

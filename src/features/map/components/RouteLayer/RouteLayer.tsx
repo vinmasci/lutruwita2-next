@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, FC } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Feature, LineString } from 'geojson';
 import { RouteLayerProps } from './types';
@@ -6,7 +6,7 @@ import { LoadedRoute, UnpavedSection } from '../../types/route.types';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
 
-export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
+export const RouteLayer: FC<RouteLayerProps> = ({ map, route }) => {
   const isStyleLoaded = useMapStyle(map);
   const { routeVisibility, toggleRouteVisibility } = useRouteState();
 
@@ -74,118 +74,133 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({ map, route }) => {
         terrain: !!map.getTerrain()
       });
       
-      // Only add layers if they don't exist
-      if (!sourceExists) {
-        console.log('[RouteLayer] Adding source:', mainSourceId);
-        try {
-          // Add main route source
-          map.addSource(mainSourceId, {
-            type: 'geojson',
-            data: route.geojson,
-            tolerance: 0.5
-          });
-          console.log('[RouteLayer] Source added successfully');
-        } catch (error) {
-          console.error('[RouteLayer] Error adding source:', error);
-          return;
-        }
+      // Clean up existing layers and source if they exist
+      if (sourceExists) {
+        const layersToRemove = [borderLayerId, mainLayerId, hoverLayerId, `unpaved-sections-layer-${routeId}`];
+        layersToRemove.forEach(layerId => {
+          if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+          }
+        });
 
-        // Add border layer
+        const sourcesToRemove = [mainSourceId, `unpaved-sections-${routeId}`];
+        sourcesToRemove.forEach(sourceId => {
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
+          }
+        });
+      }
+
+      // Add new source and layers
+      console.log('[RouteLayer] Adding source:', mainSourceId);
+      try {
+        // Add main route source
+        map.addSource(mainSourceId, {
+          type: 'geojson',
+          data: route.geojson,
+          tolerance: 0.5
+        });
+        console.log('[RouteLayer] Source added successfully');
+      } catch (error) {
+        console.error('[RouteLayer] Error adding source:', error);
+        return;
+      }
+
+      // Add border layer
+      map.addLayer({
+        id: borderLayerId,
+        type: 'line',
+        source: mainSourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          visibility: 'visible'
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 5,
+          'line-opacity': 1
+        }
+      });
+
+      // Add main route layer
+      map.addLayer({
+        id: mainLayerId,
+        type: 'line',
+        source: mainSourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          visibility: visibility.mainRoute ? 'visible' : 'none'
+        },
+        paint: {
+          'line-color': '#ee5253',
+          'line-width': 3,
+          'line-opacity': 1
+        }
+      });
+
+      // Add hover layer (initially hidden) only for focused routes
+      if (route.isFocused) {
         map.addLayer({
-          id: borderLayerId,
+          id: hoverLayerId,
           type: 'line',
           source: mainSourceId,
           layout: {
             'line-join': 'round',
             'line-cap': 'round',
-            visibility: 'visible'
+            visibility: 'none'
           },
           paint: {
-            'line-color': '#ffffff',
+            'line-color': '#ff8f8f',
             'line-width': 5,
             'line-opacity': 1
           }
         });
+      }
 
-        // Add main route layer
+      // Add combined surface layer for all routes
+      if (route.unpavedSections && route.unpavedSections.length > 0) {
+        const surfaceSourceId = `unpaved-sections-${routeId}`;
+        const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
+
+        // Combine all unpaved sections into a single feature collection
+        const features = route.unpavedSections.map(section => ({
+          type: 'Feature' as const,
+          properties: {
+            surface: section.surfaceType
+          },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: section.coordinates
+          }
+        }));
+
+        map.addSource(surfaceSourceId, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features
+          },
+          tolerance: 1, // Increase simplification tolerance
+          maxzoom: 14 // Limit detail at high zoom levels
+        });
+
         map.addLayer({
-          id: mainLayerId,
+          id: surfaceLayerId,
           type: 'line',
-          source: mainSourceId,
+          source: surfaceSourceId,
           layout: {
             'line-join': 'round',
             'line-cap': 'round',
-            visibility: visibility.mainRoute ? 'visible' : 'none'
+            visibility: visibility.unpavedSections ? 'visible' : 'none'
           },
           paint: {
-            'line-color': '#ee5253',
-            'line-width': 3,
-            'line-opacity': 1
+            'line-color': '#ffffff',
+            'line-width': 2,
+            'line-dasharray': [1, 3]
           }
         });
-
-        // Add hover layer (initially hidden) only for focused routes
-        if (route.isFocused) {
-          map.addLayer({
-            id: hoverLayerId,
-            type: 'line',
-            source: mainSourceId,
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round',
-              visibility: 'none'
-            },
-            paint: {
-              'line-color': '#ff8f8f',
-              'line-width': 5,
-              'line-opacity': 1
-            }
-          });
-        }
-
-        // Add combined surface layer for all routes
-        if (route.unpavedSections && route.unpavedSections.length > 0) {
-          const surfaceSourceId = `unpaved-sections-${routeId}`;
-          const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
-
-          // Combine all unpaved sections into a single feature collection
-          const features = route.unpavedSections.map(section => ({
-            type: 'Feature' as const,
-            properties: {
-              surface: section.surfaceType
-            },
-            geometry: {
-              type: 'LineString' as const,
-              coordinates: section.coordinates
-            }
-          }));
-
-          map.addSource(surfaceSourceId, {
-            type: 'geojson',
-            data: {
-              type: 'FeatureCollection',
-              features
-            },
-            tolerance: 1, // Increase simplification tolerance
-            maxzoom: 14 // Limit detail at high zoom levels
-          });
-
-          map.addLayer({
-            id: surfaceLayerId,
-            type: 'line',
-            source: surfaceSourceId,
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round',
-              visibility: visibility.unpavedSections ? 'visible' : 'none'
-            },
-            paint: {
-              'line-color': '#ffffff',
-              'line-width': 2,
-              'line-dasharray': [1, 3]
-            }
-          });
-        }
       }
 
       // Add hover handlers only for focused routes

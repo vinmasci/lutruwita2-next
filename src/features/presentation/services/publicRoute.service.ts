@@ -14,9 +14,9 @@ class PublicRouteService {
     }
   }
 
-  async loadRoute(id: string): Promise<LoadPublicRouteResponse> {
+  async loadRoute(persistentId: string): Promise<LoadPublicRouteResponse> {
     try {
-      const response = await fetch(`/api/routes/public/${id}`);
+      const response = await fetch(`/api/routes/public/${persistentId}`);
       if (!response.ok) throw new Error('Failed to load public route');
       const data: LoadPublicRouteResponse = await response.json();
       return data;

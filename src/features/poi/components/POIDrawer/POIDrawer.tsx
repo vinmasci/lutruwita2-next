@@ -4,15 +4,15 @@ import { usePOIContext } from '../../context/POIContext';
 import { POIType, POIMode } from '../../types/poi.types';
 import { useMapContext } from '../../../map/context/MapContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
-import { POIDrawerProps, POIDrawerState, POIFormData } from './types';
+import { POIDrawerProps, POIDrawerState } from './types';
 import { StyledDrawer } from './POIDrawer.styles';
-import { createPOIPhotos } from '../../utils/photo';
 import { POI_ICONS, getIconDefinition } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
 import PlacePOIIconSelection from '../PlacePOIIconSelection';
 import PlacePOIInstructions from './PlacePOIInstructions';
 import { PlaceLabel, getPlaceLabelAtPoint } from '../../utils/placeDetection';
+import POIDetailsDrawer from '../POIDetailsDrawer/POIDetailsDrawer';
 
 const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
   const { addPOI, poiMode, setPoiMode, pois } = usePOIContext();
@@ -31,6 +31,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
 
   // State to store draggable POI data that will be displayed and saved to MongoDB
   const [draggablePoiData, setDraggablePoiData] = React.useState<any[]>([]);
+  const [selectedPoi, setSelectedPoi] = React.useState<any>(null);
 
   // Reset state when drawer closes
   React.useEffect(() => {
@@ -185,7 +186,11 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
           coordinates: [lng, lat] as [number, number]
         };
         setDraggablePoiData(prev => [...prev.slice(0, -1), updatedPoi]);
-        addPOI(updatedPoi);
+        setSelectedPoi(updatedPoi);
+        setState(prev => ({
+          ...prev,
+          step: 'details'
+        }));
       }
     };
 
@@ -220,7 +225,7 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
             <PlacePOIInstructions />
           );
         }
-        return poiMode !== 'none' && (
+        return (
           <POIIconSelection
             mode={poiMode}
             selectedIcon={state.selectedIcon}
@@ -229,8 +234,40 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
             startDrag={handleStartDrag}
           />
         );
-      default:
+      case 'details':
+        if (selectedPoi) {
+          return (
+            <POIDetailsDrawer
+              isOpen={true}
+              onClose={() => {
+                setState(prev => ({
+                  ...prev,
+                  step: 'mode-select'
+                }));
+                setSelectedPoi(null);
+              }}
+              iconName={selectedPoi.icon}
+              category={selectedPoi.category}
+              onSave={(details) => {
+                addPOI({
+                  ...selectedPoi,
+                  ...details
+                });
+                setState(prev => ({
+                  ...prev,
+                  step: 'mode-select',
+                  selectedCategory: null,
+                  selectedIcon: null
+                }));
+                setPoiMode('none');
+                setSelectedPoi(null);
+              }}
+            />
+          );
+        }
         return null;
+      default:
+        return <POIModeSelection onModeSelect={handleModeSelect} />;
     }
   };
 
@@ -242,9 +279,10 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       variant="persistent"
       sx={{
         '& .MuiDrawer-paper': {
-          width: 'auto',
+          width: '264px',
           border: 'none',
-          backgroundColor: 'transparent'
+          backgroundColor: 'transparent',
+          overflow: 'hidden'
         }
       }}
     >
@@ -255,21 +293,12 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
         <div 
           id="poi-data-for-mongo"
           style={{
-            marginTop: '20px',
-            padding: '15px',
-            backgroundColor: '#1e1e1e',
-            color: '#fff',
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all',
-            borderRadius: '4px',
-            maxHeight: '300px',
-            overflowY: 'auto'
+            display: 'none' // Hide the metadata display
           }}
         >
           {JSON.stringify(draggablePoiData, null, 2)}
         </div>
+
       </StyledDrawer>
     </Drawer>
   );

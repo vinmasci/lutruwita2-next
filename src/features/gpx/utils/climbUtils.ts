@@ -19,20 +19,22 @@ export interface Climb {
 
 // Configuration for climb detection
 const CLIMB_CONFIG = {
-  MIN_GRADIENT: 3,           // Minimum gradient to consider as climbing (percent)
-  MIN_LENGTH: 1000,         // Minimum length for a climb segment (meters)
-  SMOOTHING_WINDOW: 10,      // Number of points to use for smoothing elevation data
-  PEAK_THRESHOLD: 50,       // Minimum elevation difference to consider as a peak (meters)
+  MIN_GRADIENT: 2,           // Minimum gradient to consider as climbing (percent)
+  MIN_LENGTH: 1200,         // Minimum length for a climb segment (meters)
+  SMOOTHING_WINDOW: 20,      // Number of points to use for smoothing elevation data
+  PEAK_THRESHOLD: 10,       // Minimum elevation difference to consider as a peak (meters)
   VALLEY_MERGE_DIST: 20000,  // Maximum distance between valleys to merge climbs (meters)
+  MIN_DOWNHILL_GRADIENT: -1, // Minimum gradient to consider as significant downhill (percent)
+  MIN_DOWNHILL_LENGTH: 1200, // Minimum length for a downhill section to reset climb (meters)
 };
 
 // Category configuration
 const CATEGORY_CONFIG = {
-  HC: { minFiets: 8.0, color: '#8B0000' },   // Dark Red
-  CAT1: { minFiets: 6.0, color: '#FF0000' }, // Red
-  CAT2: { minFiets: 4.5, color: '#fa8231' }, // Orange
-  CAT3: { minFiets: 3.0, color: '#f7b731' }, // Yellow
-  CAT4: { minFiets: 2.0, color: '#228B22' }, // Forest Green
+  HC: { minFiets: 8.0, color: '#8B000099' },   // Dark Red with 60% opacity
+  CAT1: { minFiets: 6.0, color: '#FF000099' }, // Red with 60% opacity
+  CAT2: { minFiets: 4.5, color: '#fa823199' }, // Orange with 60% opacity
+  CAT3: { minFiets: 3.0, color: '#f7b73199' }, // Yellow with 60% opacity
+  CAT4: { minFiets: 2.0, color: '#228B2299' }, // Forest Green with 60% opacity
 };
 
 /**
@@ -139,13 +141,42 @@ export const detectClimbs = (data: { distance: number; elevation: number }[]): C
       }
     }
     
+    // Check for significant downhill sections that would reset the climb
+    let hasSignificantDownhill = false;
+    let currentDownhillLength = 0;
+    let lastGradient = 0;
+
+    for (let j = 1; j < segment.length; j++) {
+      const gradient = calculateGradient(segment[j-1], segment[j]);
+      
+      if (gradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
+        if (lastGradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
+          // Accumulate downhill length if consecutive points are downhill
+          currentDownhillLength += segment[j].distance - segment[j-1].distance;
+        } else {
+          // Start new downhill section
+          currentDownhillLength = segment[j].distance - segment[j-1].distance;
+        }
+        
+        if (currentDownhillLength >= CLIMB_CONFIG.MIN_DOWNHILL_LENGTH) {
+          hasSignificantDownhill = true;
+          break;
+        }
+      } else {
+        currentDownhillLength = 0;
+      }
+      
+      lastGradient = gradient;
+    }
+
     // Calculate climb characteristics
     const elevationGain = maxElevation - smoothedData[startIdx].elevation;
     const totalDistance = smoothedData[maxElevationIdx].distance - smoothedData[startIdx].distance;
     const averageGradient = (elevationGain / totalDistance) * 100;
     
-    // Check if this segment qualifies as a climb
-    if (elevationGain >= CLIMB_CONFIG.PEAK_THRESHOLD && 
+    // Check if this segment qualifies as a climb and doesn't have significant downhill sections
+    if (!hasSignificantDownhill && 
+        elevationGain >= CLIMB_CONFIG.PEAK_THRESHOLD && 
         totalDistance >= CLIMB_CONFIG.MIN_LENGTH && 
         averageGradient >= CLIMB_CONFIG.MIN_GRADIENT) {
       
@@ -180,21 +211,57 @@ export const detectClimbs = (data: { distance: number; elevation: number }[]): C
         const distanceBetweenClimbs = climb.startPoint.distance - prevClimb.endPoint.distance;
         
         if (distanceBetweenClimbs <= CLIMB_CONFIG.VALLEY_MERGE_DIST) {
-          // Merge climbs by updating end point of previous climb
-          prevClimb.endPoint = climb.endPoint;
-          prevClimb.totalDistance = prevClimb.endPoint.distance - prevClimb.startPoint.distance;
-          prevClimb.elevationGain = prevClimb.endPoint.elevation - prevClimb.startPoint.elevation;
-          prevClimb.averageGradient = (prevClimb.elevationGain / prevClimb.totalDistance) * 100;
+          // Check for significant downhill sections between climbs
+          let hasSignificantDownhillBetweenClimbs = false;
+          let currentDownhillLength = 0;
+          let lastGradient = 0;
           
-          // Recalculate FIETS score and category for merged climb
-          const mergedDistanceKm = prevClimb.totalDistance / 1000;
-          prevClimb.fietsScore = calculateFietsScore(prevClimb.elevationGain, mergedDistanceKm);
-          const { category, color } = determineCategory(prevClimb.fietsScore);
-          prevClimb.category = category;
-          prevClimb.color = color;
+          // Get the data points between the two climbs
+          const betweenClimbsStartIdx = smoothedData.findIndex(p => p.distance >= prevClimb.endPoint.distance);
+          const betweenClimbsEndIdx = smoothedData.findIndex(p => p.distance >= climb.startPoint.distance);
+          const betweenClimbsSegment = smoothedData.slice(betweenClimbsStartIdx, betweenClimbsEndIdx + 1);
           
-          console.log(`[ClimbUtils] Merged climb with previous: ${mergedDistanceKm.toFixed(1)}km at ${prevClimb.averageGradient.toFixed(1)}% (${prevClimb.category})`);
-          continue;
+          for (let j = 1; j < betweenClimbsSegment.length; j++) {
+            const gradient = calculateGradient(betweenClimbsSegment[j-1], betweenClimbsSegment[j]);
+            
+            if (gradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
+              if (lastGradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
+                currentDownhillLength += betweenClimbsSegment[j].distance - betweenClimbsSegment[j-1].distance;
+              } else {
+                currentDownhillLength = betweenClimbsSegment[j].distance - betweenClimbsSegment[j-1].distance;
+              }
+              
+              if (currentDownhillLength >= CLIMB_CONFIG.MIN_DOWNHILL_LENGTH) {
+                hasSignificantDownhillBetweenClimbs = true;
+                break;
+              }
+            } else {
+              currentDownhillLength = 0;
+            }
+            
+            lastGradient = gradient;
+          }
+          
+          // Only merge if there's no significant downhill between climbs
+          if (!hasSignificantDownhillBetweenClimbs) {
+            // Merge climbs by updating end point of previous climb
+            prevClimb.endPoint = climb.endPoint;
+            prevClimb.totalDistance = prevClimb.endPoint.distance - prevClimb.startPoint.distance;
+            prevClimb.elevationGain = prevClimb.endPoint.elevation - prevClimb.startPoint.elevation;
+            prevClimb.averageGradient = (prevClimb.elevationGain / prevClimb.totalDistance) * 100;
+            
+            // Recalculate FIETS score and category for merged climb
+            const mergedDistanceKm = prevClimb.totalDistance / 1000;
+            prevClimb.fietsScore = calculateFietsScore(prevClimb.elevationGain, mergedDistanceKm);
+            const { category, color } = determineCategory(prevClimb.fietsScore);
+            prevClimb.category = category;
+            prevClimb.color = color;
+            
+            console.log(`[ClimbUtils] Merged climb with previous: ${mergedDistanceKm.toFixed(1)}km at ${prevClimb.averageGradient.toFixed(1)}% (${prevClimb.category})`);
+            continue;
+          } else {
+            console.log(`[ClimbUtils] Skipped merge due to significant downhill between climbs`);
+          }
         }
       }
       

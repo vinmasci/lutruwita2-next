@@ -4,9 +4,12 @@ import { Paper, Box, IconButton, Typography, List, ListItem } from '@mui/materia
 export const StyledDrawer = styled(Box)(({ theme }) => ({
   width: '264px',
   height: '100%',
-  backgroundColor: 'rgba(35, 35, 35, 0.9)',
+  backgroundColor: 'rgb(35, 35, 35)',
   display: 'flex',
   flexDirection: 'column',
+  overflow: 'hidden',
+  padding: '16px',
+  boxSizing: 'border-box',
 }));
 
 export const DrawerHeader = styled(Box)(({ theme }) => ({
@@ -14,18 +17,26 @@ export const DrawerHeader = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  borderBottom: '1px solid rgb(255, 255, 255)',
+  width: '100%',
+  boxSizing: 'border-box',
 }));
 
 export const DrawerContent = styled(Box)(({ theme }) => ({
   flex: 1,
   overflowY: 'auto',
-  padding: '12px',
+  padding: '16px',
+  width: '100%',
+  boxSizing: 'border-box',
+  '& > *': {
+    maxWidth: '232px', // 264px - 32px (padding)
+    wordWrap: 'break-word'
+  }
 }));
 
 export const DrawerFooter = styled(Box)(({ theme }) => ({
   padding: '16px',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+  borderTop: '1px solid rgb(255, 255, 255)',
   display: 'flex',
   justifyContent: 'space-between',
   gap: '4px',
@@ -37,8 +48,14 @@ export const ModeSelectionCard = styled(Paper)(({ theme }) => ({
   backgroundColor: 'transparent',
   cursor: 'pointer',
   transition: 'all 0.2s ease-in-out',
+  width: '100%',
+  boxSizing: 'border-box',
+  '& > div': {
+    maxWidth: '100%',
+    wordWrap: 'break-word'
+  },
   '&:hover': {
-    backgroundColor: 'rgba(45, 45, 45, 0.9)',
+    backgroundColor: 'rgb(45, 45, 45)',
     transform: 'translateY(-2px)',
   },
 }));
@@ -51,12 +68,12 @@ export const CategoryList = styled(List)(({ theme }) => ({
 export const CategoryItem = styled(ListItem)<{ selected?: boolean }>(({ theme, selected }) => ({
   padding: '4px 12px',
   marginBottom: '8px',
-  backgroundColor: selected ? 'rgba(55, 55, 55, 0.9)' : 'rgba(35, 35, 35, 0.9)',
+  backgroundColor: selected ? 'rgb(55, 55, 55)' : 'rgb(35, 35, 35)',
   borderRadius: '4px',
   cursor: 'pointer',
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
-    backgroundColor: 'rgba(45, 45, 45, 0.9)',
+    backgroundColor: 'rgb(45, 45, 45)',
   },
 }));
 
@@ -124,22 +141,22 @@ export const DeletePhotoButton = styled(IconButton)(({ theme }) => ({
   top: '4px',
   right: '4px',
   padding: '4px',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  backgroundColor: 'rgb(0, 0, 0)',
   '&:hover': {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgb(0, 0, 0)',
   },
 }));
 
 export const InstructionsBox = styled(Box)(({ theme }) => ({
   padding: '16px',
-  backgroundColor: 'rgba(45, 45, 45, 0.9)',
+  backgroundColor: 'rgb(45, 45, 45)',
   borderRadius: '4px',
   marginBottom: '16px',
 }));
 
 export const InstructionsText = styled(Typography)(({ theme }) => ({
   marginBottom: '8px',
-  color: 'rgba(255, 255, 255, 0.87)',
+  color: 'rgb(255, 255, 255)',
 }));
 
 export const StyledTooltip = styled(Box)(({ theme }) => ({

@@ -78,8 +78,21 @@ placeNamePOISchema.add({
   placeId: { type: String, required: true }
 });
 
+// Description schema for route descriptions
+const descriptionSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  photos: { type: [photoSchema], required: false }
+});
+
 // Main route schema
 const routeSchema = new mongoose.Schema({
+  persistentId: { 
+    type: String, 
+    required: true,
+    unique: true,
+    index: true 
+  },
   name: { type: String, required: true },
   type: {
     type: String,
@@ -110,6 +123,7 @@ const routeSchema = new mongoose.Schema({
     color: { type: String, required: true },
     isVisible: { type: Boolean, required: true },
     geojson: { type: mongoose.Schema.Types.Mixed, required: true },
+    description: { type: descriptionSchema, required: false },
 
     // Surface information - core part of route analysis
     surface: {
@@ -215,5 +229,6 @@ routeSchema.index({ userId: 1 });
 routeSchema.index({ type: 1 });
 routeSchema.index({ isPublic: 1 });
 routeSchema.index({ createdAt: -1 });
+routeSchema.index({ persistentId: 1 });
 
 export const RouteModel = mongoose.model<SavedRouteState>('Route', routeSchema);

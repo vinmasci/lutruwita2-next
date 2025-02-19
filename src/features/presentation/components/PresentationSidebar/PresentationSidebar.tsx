@@ -16,7 +16,7 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { ProcessedRoute } from '../../../map/types/route.types';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
-import { deserializePhoto } from '../../../map/types/route.types';
+import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
@@ -83,11 +83,13 @@ export const PresentationSidebar: React.FC<PresentationSidebarProps> = ({ isOpen
         anchor="left"
       >
         <List>
-          <ListItemButton onClick={() => setIsNestedOpen(!isNestedOpen)}>
-            <ListItemIcon>
-              <MapIcon />
-            </ListItemIcon>
-          </ListItemButton>
+          <Tooltip title="Routes" placement="right">
+            <ListItemButton onClick={() => setIsNestedOpen(!isNestedOpen)}>
+              <ListItemIcon>
+                <MapIcon />
+              </ListItemIcon>
+            </ListItemButton>
+          </Tooltip>
         </List>
       </StyledDrawer>
 
@@ -99,12 +101,52 @@ export const PresentationSidebar: React.FC<PresentationSidebarProps> = ({ isOpen
         <Suspense fallback={<CircularProgress />}>
           <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ p: 3, pb: 0 }}>
-              <Typography variant="h5" component="h2" sx={{ fontWeight: 600, color: 'white' }}>
-                Routes
-              </Typography>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                mb: 2
+              }}>
+                <Typography variant="h5" component="h2" sx={{ fontWeight: 600, color: 'white' }}>
+                  Routes
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Tooltip title="Previous route">
+                    <span>
+                      <IconButton
+                        onClick={() => handleNavigate('prev')}
+                        disabled={currentIndex <= 0}
+                        sx={{ 
+                          color: 'white',
+                          '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.3)' }
+                        }}
+                      >
+                        <NavigateBeforeIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    {`${currentIndex + 1} of ${routes.length}`}
+                  </Typography>
+                  <Tooltip title="Next route">
+                    <span>
+                      <IconButton
+                        onClick={() => handleNavigate('next')}
+                        disabled={currentIndex >= routes.length - 1}
+                        sx={{ 
+                          color: 'white',
+                          '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.3)' }
+                        }}
+                      >
+                        <NavigateNextIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
+              </Box>
             </Box>
 
-            <List sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2 }}>
+            <List sx={{ flex: 1, overflowY: 'auto', px: 3, py: 2, pb: 40 }}>
               {routes.map((route) => (
                 <ListItem
                   key={route.id}
@@ -172,45 +214,6 @@ export const PresentationSidebar: React.FC<PresentationSidebarProps> = ({ isOpen
               ))}
             </List>
 
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              p: 2,
-              borderTop: '1px solid #333'
-            }}>
-              <Tooltip title="Previous route">
-                <span>
-                  <IconButton
-                    onClick={() => handleNavigate('prev')}
-                    disabled={currentIndex <= 0}
-                    sx={{ 
-                      color: 'white',
-                      '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.3)' }
-                    }}
-                  >
-                    <NavigateBeforeIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                {`${currentIndex + 1} of ${routes.length}`}
-              </Typography>
-              <Tooltip title="Next route">
-                <span>
-                  <IconButton
-                    onClick={() => handleNavigate('next')}
-                    disabled={currentIndex >= routes.length - 1}
-                    sx={{ 
-                      color: 'white',
-                      '&.Mui-disabled': { color: 'rgba(255, 255, 255, 0.3)' }
-                    }}
-                  >
-                    <NavigateNextIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Box>
           </Box>
         </Suspense>
       </NestedDrawer>

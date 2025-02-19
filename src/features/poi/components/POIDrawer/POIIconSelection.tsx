@@ -21,11 +21,11 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
 
   return (
     <>
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="h6" gutterBottom sx={{ width: '100%', wordWrap: 'break-word' }}>
         {mode === 'regular' ? 'Choose POI Type' : 'Select POI Types'}
       </Typography>
 
-      <Typography variant="body2" color="text.secondary" gutterBottom>
+      <Typography variant="body2" color="text.secondary" gutterBottom sx={{ width: '100%', wordWrap: 'break-word' }}>
         {mode === 'regular'
           ? 'Choose an icon for your point of interest.'
           : 'Select one or more icons to attach to the selected place.'}
@@ -36,11 +36,11 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
           category: 'road-information', 
           label: 'Road Information', 
           iconGroups: [
-            ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ChevronsRightLeft', 'ArrowUpRight', 'Construction', 'HikeABike'],
-            ['AudioWaveform', 'Route', 'RailTrail']
+            ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ArrowUpRight', 'Construction', 'HeavyTraffic'],
+            ['AudioWaveform', 'Route', 'RailTrail', 'ChevronsRightLeft', 'HikeABike', 'WaterCrossing', 'RemoteArea']
           ]
         },
-        { category: 'accommodation', label: 'Accommodation', iconGroups: [['Bell', 'BedDouble', 'Car', 'Tent']] },
+        { category: 'accommodation', label: 'Accommodation', iconGroups: [['Tent', 'Huts', 'Car', 'BedDouble']] },
         { 
           category: 'food-drink', 
           label: 'Food & Drink', 
@@ -49,10 +49,10 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
             ['Droplet']
           ]
         },
-        { category: 'natural-features', label: 'Natural Features', iconGroups: [['Mountain', 'TreePine', 'Binoculars', 'WaterCrossing', 'Swimming']] },
+        { category: 'natural-features', label: 'Natural Features', iconGroups: [['Mountain', 'TreePine', 'Binoculars', 'MountainBikePark', 'Swimming']] },
         { category: 'town-services', label: 'Town Services', iconGroups: [['Hospital', 'Toilet', 'ShowerHead', 'ParkingSquare', 'Fuel', 'Mail', 'Bike']] },
         { category: 'transportation', label: 'Transportation', iconGroups: [['Bus', 'TrainStation', 'Plane', 'Ship']] },
-        { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'CircleDot', 'Wrench', 'Flag']] }
+        { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'Wrench', 'Flag']] }
       ].map(({ category: categoryKey, label, iconGroups }) => {
         return (
           <Box key={`${categoryKey}-${iconGroups[0][0]}`} sx={{ mb: 2 }}>
@@ -64,7 +64,9 @@ const POIIconSelection: React.FC<POIIconSelectionProps> = ({
                 display: 'block',
                 fontSize: '0.7rem',
                 opacity: 0.7,
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                width: '100%',
+                wordWrap: 'break-word'
               }}
             >
               {label}

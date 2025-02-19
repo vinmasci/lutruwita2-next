@@ -79,7 +79,7 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
               display: 'flex', 
               alignItems: 'center', 
               gap: 1, 
-              backgroundColor: 'rgba(45, 45, 45, 0.9)',
+              backgroundColor: 'rgb(45, 45, 45)',
               padding: '12px',
               borderRadius: '4px'
             }}>
@@ -104,23 +104,23 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
               variant="outlined"
               size="small"
               sx={{ 
-                backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                backgroundColor: 'rgb(35, 35, 35)',
                 '& .MuiOutlinedInput-root': {
                   '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderColor: 'rgb(255, 255, 255)',
                   },
                   '&:hover fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderColor: 'rgb(255, 255, 255)',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderColor: 'rgb(255, 255, 255)',
                   }
                 },
                 '& .MuiInputLabel-root': {
-                  color: 'rgba(255, 255, 255, 0.7)'
+                  color: 'rgb(255, 255, 255)'
                 },
                 '& .MuiOutlinedInput-input': {
-                  color: 'rgba(255, 255, 255, 0.9)'
+                  color: 'rgb(255, 255, 255)'
                 }
               }}
             />
@@ -136,23 +136,23 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
               variant="outlined"
               size="small"
               sx={{ 
-                backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                backgroundColor: 'rgb(35, 35, 35)',
                 '& .MuiOutlinedInput-root': {
                   '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderColor: 'rgb(255, 255, 255)',
                   },
                   '&:hover fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderColor: 'rgb(255, 255, 255)',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderColor: 'rgb(255, 255, 255)',
                   }
                 },
                 '& .MuiInputLabel-root': {
-                  color: 'rgba(255, 255, 255, 0.7)'
+                  color: 'rgb(255, 255, 255)'
                 },
                 '& .MuiOutlinedInput-input': {
-                  color: 'rgba(255, 255, 255, 0.9)'
+                  color: 'rgb(255, 255, 255)'
                 }
               }}
             />
@@ -163,12 +163,12 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
               variant="outlined"
               fullWidth
               sx={{ 
-                backgroundColor: 'rgba(35, 35, 35, 0.9)',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                color: 'rgba(255, 255, 255, 0.9)',
+                backgroundColor: 'rgb(35, 35, 35)',
+                borderColor: 'rgb(255, 255, 255)',
+                color: 'rgb(255, 255, 255)',
                 '&:hover': {
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  backgroundColor: 'rgba(45, 45, 45, 0.9)'
+                  borderColor: 'rgb(255, 255, 255)',
+                  backgroundColor: 'rgb(45, 45, 45)'
                 }
               }}
             >
@@ -208,7 +208,7 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
                       display: 'block',
                       width: '100%',
                       aspectRatio: '1',
-                      backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                      backgroundColor: 'rgb(35, 35, 35)',
                       borderRadius: 1,
                       overflow: 'hidden',
                       position: 'relative'
@@ -245,8 +245,7 @@ const POIDetailsDrawer: React.FC<POIDetailsDrawerProps> = ({
                   sx={{ 
                     backgroundColor: POI_CATEGORIES[category].color,
                     '&:hover': {
-                      backgroundColor: POI_CATEGORIES[category].color,
-                      opacity: 0.9
+                      backgroundColor: POI_CATEGORIES[category].color
                     }
                   }}
                 >

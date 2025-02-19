@@ -39,7 +39,7 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
   });
 
   return (
-    <Box sx={{ pr: 2, width: '100%' }}>
+    <Box sx={{ padding: '24px 16px', width: '100%' }}>
       {/* Upload Area */}
       <Paper
         {...getRootProps()}
@@ -70,6 +70,18 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
           Supports: JPG, PNG, GIF
         </Typography>
       </Paper>
+
+      <Alert 
+        severity="info" 
+        sx={{ 
+          mt: 2, 
+          borderRadius: 3,
+          backgroundColor: 'rgba(35, 35, 35, 0.9)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}
+      >
+        Images must have GPS data to load onto map
+      </Alert>
 
       {/* Error Display */}
       {error && (

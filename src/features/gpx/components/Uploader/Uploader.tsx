@@ -13,7 +13,13 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   console.log('[Uploader] Component initializing');
   const { processGpx, isLoading: processingLoading, error } = useClientGpxProcessing();
   const { isMapReady } = useMapContext();
-  const { addRoute, deleteRoute, setCurrentRoute, routes } = useRouteContext();
+  const { 
+    addRoute, 
+    deleteRoute, 
+    setCurrentRoute, 
+    routes,
+    updateRoute 
+  } = useRouteContext();
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
@@ -46,7 +52,10 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
         // Use normalizeRoute to ensure proper type and structure
         const processedRoute = normalizeRoute(result);
         addRoute(processedRoute);
-        setCurrentRoute(processedRoute);
+        // Only set as current route if it's the first one
+        if (!routes.length) {
+          setCurrentRoute(processedRoute);
+        }
         onUploadComplete(processedRoute);
       }
     } catch (error) {
@@ -63,46 +72,31 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
       type: r._type
     })));
     
-    // Find the route using the fileId (which could be either id or routeId)
-    const route = routes.find(r => r.id === fileId || r.routeId === fileId);
+    // Find the route using the routeId
+    const route = routes.find(r => r.routeId === fileId);
     if (!route) {
       console.error('[Uploader][DELETE] Could not find route with id:', fileId);
       return;
     }
 
-    // Get the routeId - if it's not set, use the id
-    const routeId = route.routeId || `route-${route.id}`;
-    console.debug('[Uploader][DELETE] Found route to delete:', { 
-      id: route.id, 
-      routeId, 
-      name: route.name,
-      type: route._type,
-      totalRoutes: routes.length,
-      otherRouteIds: routes.filter(r => r.id !== fileId).map(r => ({
-        id: r.id,
-        routeId: r.routeId
-      }))
-    });
-
     try {
       // First clean up map layers
       if (onDeleteRoute) {
-        console.debug('[Uploader][DELETE] Calling onDeleteRoute with routeId:', routeId);
-        onDeleteRoute(routeId);
+        console.debug('[Uploader][DELETE] Calling onDeleteRoute with routeId:', fileId);
+        onDeleteRoute(fileId);
       }
 
       // Brief delay to ensure map cleanup is complete
       setTimeout(() => {
         // Then update route context state
-        console.debug('[Uploader][DELETE] Calling deleteRoute with routeId:', routeId);
-        deleteRoute(routeId);
-        console.debug('[Uploader][DELETE] Route deletion complete for:', routeId);
+        console.debug('[Uploader][DELETE] Calling deleteRoute with routeId:', fileId);
+        deleteRoute(fileId);
+        console.debug('[Uploader][DELETE] Route deletion complete for:', fileId);
       }, 100);
     } catch (error) {
       console.error('[Uploader][DELETE] Error deleting route:', error);
       console.error('[Uploader][DELETE] Error details:', {
         fileId,
-        routeId,
         error: error instanceof Error ? error.message : error
       });
     }
@@ -110,31 +104,10 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
 
   const handleFileRename = async (fileId: string, newName: string) => {
     try {
-      // Find the existing route in context
-      const existingRoute = routes.find((r: MapProcessedRoute) => r.id === fileId);
-      if (!existingRoute) {
-        console.error('[Uploader] Route not found for rename:', fileId);
-        return;
-      }
-
-      // Create a new file with the same content but new name
-      const file = new File([existingRoute.rawGpx], newName, { type: 'application/gpx+xml' });
-      const result = await processGpx(file);
-      
-      if (result) {
-        // Use normalizeRoute and override specific fields
-        const updatedRoute = {
-          ...normalizeRoute(result),
-          id: existingRoute.id,
-          routeId: existingRoute.routeId || existingRoute.id,
-          name: newName
-        };
-        addRoute(updatedRoute);
-        setCurrentRoute(updatedRoute);
-        onUploadComplete(updatedRoute);
-      }
+      // Simply update the name for this route
+      updateRoute(fileId, { name: newName });
     } catch (error) {
-      console.error('[Uploader] Error processing file:', error);
+      console.error('[Uploader] Error renaming route:', error);
     }
   };
 

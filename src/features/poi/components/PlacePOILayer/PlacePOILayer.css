@@ -2,6 +2,7 @@
   pointer-events: auto !important;
   cursor: pointer !important;
   position: absolute !important;
+  background-color: transparent !important;
 }
 
 .poi-marker {
@@ -10,13 +11,11 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background-color: rgba(47, 54, 64, 1) !important;
   position: relative !important;
-  border-radius: 30% !important;
 }
 
 .poi-marker .poi-icon {
-  color: #FFFFFF !important;
+  color: #000000 !important;
   font-size: 10px !important;
   line-height: 1px !important;
   position: absolute !important;
