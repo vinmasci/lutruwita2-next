@@ -14,7 +14,9 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── ARCHITECTURE.md            # Overall system architecture and design decisions
 │   ├── DATA_OPTIMIZATION.md       # Data optimization strategies and implementation
 │   ├── DIR.md                     # This directory structure document
+│   ├── DRAWER_SYSTEM.md          # Drawer system implementation details
 │   ├── INIT_MODE_COMPARISON.md    # Initialization mode comparison documentation
+│   ├── PERSISTENT_ID.md          # Persistent ID system documentation
 │   ├── PHOTO_CLUSTERING_DEBUG.md  # Photo clustering debugging information
 │   ├── PHOTO_CLUSTERING_FACTS.md  # Photo clustering implementation details
 │   ├── PHOTO_MODE_COMPARISON.md   # Photo mode comparison documentation
@@ -24,7 +26,10 @@ This document outlines the project structure and describes the purpose of key fi
 │   ├── POIPLACES.md              # POI places integration documentation
 │   ├── PRESENTATION_PERFORMANCE.md # Presentation mode performance documentation
 │   ├── PRESENTATION.md           # Route presentation feature documentation
+│   ├── ROUTE_DESCRIPTION_EDITOR.md # Route description editor implementation
+│   ├── ROUTE_DESCRIPTION_TAB.md  # Route description tab documentation
 │   ├── ROUTE_FOCUS_MODE_IMPLEMENTATION.md # Route focus mode implementation details
+│   ├── ROUTE_NAME_EDITING.md     # Route name editing feature documentation
 │   └── SAVE_LOAD_SYSTEM.md       # Save/load system documentation
 ├── logs/                          # Application logging directory
 │   ├── error.log                  # General application error logs
@@ -49,6 +54,7 @@ This document outlines the project structure and describes the purpose of key fi
 │   │   │   └── route/           # Route management feature backend
 │   │   ├── routes/              # [REDUNDANT] Main routes (should be moved to features)
 │   │   ├── scripts/             # Utility scripts
+│   │   │   ├── add-persistent-ids.ts # Persistent ID generation utility
 │   │   │   ├── clear-model-cache.ts # Cache clearing utility
 │   │   │   ├── clear-routes.ts     # Route cleanup utility
 │   │   │   ├── optimize-routes.ts  # Route optimization script
@@ -59,31 +65,31 @@ This document outlines the project structure and describes the purpose of key fi
 │   │       ├── middlewares/    # Express middlewares (auth, cache, error handling, rate limiting)
 │   │       └── types/         # Shared type definitions
 ├── src/                          # Frontend source code
-│   ├── App.tsx                   # Main React application component and routing
+│   ├── App.js                    # Main React application component and routing
 │   ├── env.d.ts                 # Environment variable type definitions
 │   ├── index.css               # Global CSS styles
-│   ├── main.tsx                 # Frontend entry point and provider setup
-│   ├── theme.ts                 # Global theme configuration
+│   ├── main.js                  # Frontend entry point and provider setup
+│   ├── theme.js                 # Global theme configuration
 │   ├── components/              # Shared UI components
 │   │   ├── ui/                 # Base UI components
-│   │   │   ├── alert.tsx      # Alert component
-│   │   │   ├── drawer.tsx     # Drawer component
-│   │   │   └── skeleton.tsx   # Loading skeleton component
-│   │   └── ErrorBoundary.tsx   # Error boundary for component error handling
+│   │   │   ├── alert.js       # Alert component
+│   │   │   ├── drawer.js      # Drawer component
+│   │   │   └── skeleton.js    # Loading skeleton component
+│   │   └── ErrorBoundary.js    # Error boundary for component error handling
 │   ├── features/               # Feature modules
 │   │   ├── auth/               # Authentication feature
-│   │   ├── gpx/               # GPX processing feature
+│   │   ├── gpx/               # GPX processing feature with surface detection
 │   │   ├── map/               # Map visualization feature
 │   │   ├── photo/             # Photo management feature
 │   │   ├── place/             # Place management feature
 │   │   ├── poi/               # Points of Interest feature
 │   │   └── presentation/      # Route presentation feature
 │   ├── lib/                   # Core utilities
-│   │   ├── errors.ts         # Error handling
-│   │   └── utils.ts          # Common utilities
+│   │   ├── errors.js         # Error handling
+│   │   └── utils.js          # Common utilities
 │   ├── types/                # Global types
-│   │   ├── api.types.ts      # API interfaces
-│   │   └── index.ts          # Type exports
+│   │   ├── api.types.js      # API interfaces
+│   │   └── index.js          # Type exports
 │   └── utils/                # Shared utilities
 │       └── gpx/              # GPX parsing
 └── uploads/                  # Temporary file storage
@@ -98,8 +104,10 @@ The application's features are tightly integrated while maintaining clear bounda
 - GPX processing provides route data to the map
 - Map context maintains the visual state of routes
 - Elevation profile syncs with map interactions
-- Surface detection results overlay on the map
+- Surface detection analyzes and displays route terrain
 - Multiple routes can be loaded and managed simultaneously
+- Route descriptions with rich text editing support
+- Persistent IDs for stable route identification
 
 ### POI ↔ Map Integration
 - POI markers render on the map layer
@@ -137,13 +145,12 @@ The application's features are tightly integrated while maintaining clear bounda
 
 ## Configuration
 
-### TypeScript Configuration
-Multiple TypeScript configuration files target different parts of the application:
-- `tsconfig.app.json`: React application settings
-- `tsconfig.base.json`: Shared base configuration
-- `tsconfig.client.json`: Frontend-specific settings
-- `tsconfig.server.json`: Backend-specific settings
-- `tsconfig.node.json`: Node.js runtime settings
+### JavaScript Migration
+The project has been migrated from TypeScript to JavaScript while maintaining type safety through JSDoc comments and type definitions. Key benefits include:
+- Simplified build process
+- Improved development experience
+- Maintained type safety through JSDoc annotations
+- Better compatibility with external libraries
 
 ### Environment Configuration
 - `.env.local`: Local environment variables
