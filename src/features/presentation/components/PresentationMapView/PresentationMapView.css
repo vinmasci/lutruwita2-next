@@ -12,3 +12,16 @@
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
   z-index: 1000;
 }
+
+.elevation-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.elevation-container > * {
+  pointer-events: auto;
+}

@@ -1,1 +1,1 @@
-export { PresentationElevationProfile } from './PresentationElevationProfile';
+export { PresentationElevationProfile } from './PresentationElevationProfile.tsx';

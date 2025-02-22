@@ -60,5 +60,13 @@ export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
     minWidth: 0,
     color: '#ffffff',
     justifyContent: 'center',
+    '& svg': {
+      transition: 'color 0.2s ease',
+    },
+    '.MuiListItemButton-root:hover &, .MuiListItemButton-root.Mui-selected &, .MuiListItemButton-root[data-active="true"] &': {
+      '& svg': {
+        color: '#ff4d4f',
+      }
+    }
   },
 }));

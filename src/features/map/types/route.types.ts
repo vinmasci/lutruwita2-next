@@ -2,12 +2,13 @@ import { ProcessedRoute as GpxProcessedRoute, UnpavedSection } from '../../gpx/t
 import { ProcessedPhoto } from '../../photo/components/Uploader/PhotoUploader.types';
 
 export interface RouteDescription {
-  title: string;
-  description: string;
-  photos: ProcessedPhoto[];
+  title?: string;
+  description?: string;
+  photos?: ProcessedPhoto[];
 }
 
 export interface ProcessedRoute extends GpxProcessedRoute {
+  order?: number;  // Optional in type but will be set in normalizeRoute
   description?: RouteDescription;
   isFocused?: boolean;
   _type?: 'loaded' | 'fresh';
@@ -78,6 +79,7 @@ export type { UnpavedSection };
 export const normalizeRoute = (route: ProcessedRoute): ProcessedRoute => {
   return {
     ...route,
-    routeId: route.routeId || `route-${route.id}`
+    routeId: route.routeId || `route-${route.id}`,
+    order: route.order ?? 0 // Ensure order is set with a default value
   };
 };

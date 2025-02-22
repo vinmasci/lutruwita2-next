@@ -77,9 +77,9 @@ app.use((req, res, next) => {
     next();
 });
 // Feature Routes
+app.use('/api/routes/public', public_route_routes_1.default); // Register public routes first
 app.use('/api/gpx', gpx_routes_1.gpxRoutes);
 app.use('/api/routes', route_routes_1.default);
-app.use('/api/routes/public', public_route_routes_1.default);
 app.use('/api/photos', photo_routes_1.photoRoutes);
 // Error handling
 app.use(error_handling_1.errorHandler);

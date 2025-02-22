@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Box, TextField, Button, IconButton, Snackbar, Alert } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { ProcessedRoute } from '../../../../features/map/types/route.types';
-import { RichTextEditor } from './RichTextEditor';
+import { RichTextEditor } from './RichTextEditor.js';
 import { ProcessedPhoto } from '../../../../features/photo/components/Uploader/PhotoUploader.types';
 import { fileToProcessedPhoto, deserializePhoto, serializePhoto } from '../../../../features/photo/utils';
 import { useRouteContext } from '../../../../features/map/context/RouteContext';
+import { usePhotoService } from '../../../../features/photo/services/photoService';
+
+interface PhotoWithFile extends ProcessedPhoto {
+  file?: File;
+}
 
 interface RouteDescriptionPanelProps {
   route?: ProcessedRoute;
@@ -14,23 +19,70 @@ interface RouteDescriptionPanelProps {
 export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
   route
 }) => {
-  const { updateRoute } = useRouteContext();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<ProcessedPhoto[]>([]);
+  const { updateRoute, routes } = useRouteContext();
+  const photoService = usePhotoService();
+  const [title, setTitle] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+  const [photos, setPhotos] = useState<PhotoWithFile[]>([]);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Keep local state in sync with route changes
   useEffect(() => {
+    console.debug('[RouteDescriptionPanel] Route description changed:', {
+      hasRoute: !!route,
+      hasDescription: !!route?.description,
+      title: route?.description?.title,
+      descriptionLength: route?.description?.description?.length || 0
+    });
+
     if (route?.description) {
-      setTitle(route.description.title || '');
-      setDescription(route.description.description || '');
+      setTitle(route.description.title ?? '');
+      setDescription(route.description.description ?? '');
       setPhotos((route.description.photos || []).map(deserializePhoto));
     }
-  }, [route]);
+  }, [route?.description]);
+
+  // Debounced update to route
+  useEffect(() => {
+    if (!route?.routeId) return;
+
+    const currentRoute = routes.find(r => r.routeId === route.routeId);
+    if (!currentRoute) return;
+
+    const hasChanges = 
+      currentRoute.description?.title !== title || 
+      currentRoute.description?.description !== description ||
+      currentRoute.description?.photos?.length !== photos.length;
+
+    if (hasChanges) {
+      console.debug('[RouteDescriptionPanel] Updating route with new description:', {
+        routeId: route.routeId,
+        title,
+        descriptionLength: description?.length || 0,
+        photoCount: photos.length
+      });
+
+      const timeoutId = setTimeout(() => {
+        updateRoute(route.routeId, {
+          description: {
+            title: title ?? '',
+            description: description ?? '',
+            photos: photos.map(serializePhoto)
+          }
+        });
+      }, 500); // Debounce updates
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [title, description, photos, route?.routeId, routes, updateRoute]);
 
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const newPhotos = Array.from(event.target.files).map(fileToProcessedPhoto);
+      const newPhotos = Array.from(event.target.files).map(file => ({
+        ...fileToProcessedPhoto(file),
+        file
+      }));
       setPhotos([...photos, ...newPhotos]);
     }
   };
@@ -43,16 +95,50 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
     setPhotos(photos.filter(photo => photo.id !== photoId));
   };
 
-  const handleSave = () => {
-    if (route?.routeId) {
-      updateRoute(route.routeId, {
+  const handleSave = async () => {
+    if (!route?.routeId) return;
+    
+    try {
+      setIsSaving(true);
+
+      // Upload any new photos that have File objects
+      const uploadPromises = photos
+        .filter(photo => photo.file)
+        .map(async photo => {
+          if (!photo.file) return photo;
+          
+          const result = await photoService.uploadPhoto(photo.file);
+          return {
+            ...photo,
+            url: result.url,
+            thumbnailUrl: result.thumbnailUrl,
+            file: undefined // Clear the file after upload
+          };
+        });
+
+      const uploadedPhotos = await Promise.all(uploadPromises);
+
+      // Update photos array with uploaded photos
+      const updatedPhotos = photos.map(photo => {
+        const uploaded = uploadedPhotos.find(up => up.id === photo.id);
+        return uploaded || photo;
+      });
+
+      // Update route with new description including uploaded photos
+      await updateRoute(route.routeId, {
         description: {
-          title,
-          description,
-          photos: photos.map(serializePhoto)
+          title: title ?? '',
+          description: description ?? '',
+          photos: updatedPhotos.map(serializePhoto)
         }
       });
+
+      setPhotos(updatedPhotos);
       setShowSaveSuccess(true);
+    } catch (error) {
+      console.error('[RouteDescriptionPanel] Failed to save:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -197,6 +283,7 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
             variant="outlined"
             onClick={handleSave}
             color="info"
+            disabled={isSaving}
             sx={{
               marginTop: 'auto',
               borderColor: 'rgb(41, 182, 246)',
@@ -209,7 +296,7 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
               }
             }}
           >
-            Save Description
+            {isSaving ? 'Saving...' : 'Save Description'}
           </Button>
         </Box>
       </Box>

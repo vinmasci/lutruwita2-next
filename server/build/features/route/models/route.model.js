@@ -77,8 +77,19 @@ placeNamePOISchema.add({
     type: { type: String, enum: ['place'], required: true },
     placeId: { type: String, required: true }
 });
+// Description schema for route descriptions
+const descriptionSchema = new mongoose_1.default.Schema({
+    description: { type: String, required: false },
+    photos: { type: [photoSchema], required: false }
+});
 // Main route schema
 const routeSchema = new mongoose_1.default.Schema({
+    persistentId: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true
+    },
     name: { type: String, required: true },
     type: {
         type: String,
@@ -107,6 +118,7 @@ const routeSchema = new mongoose_1.default.Schema({
             color: { type: String, required: true },
             isVisible: { type: Boolean, required: true },
             geojson: { type: mongoose_1.default.Schema.Types.Mixed, required: true },
+            description: { type: descriptionSchema, required: false },
             // Surface information - core part of route analysis
             surface: {
                 surfaceTypes: [{
@@ -204,4 +216,5 @@ routeSchema.index({ userId: 1 });
 routeSchema.index({ type: 1 });
 routeSchema.index({ isPublic: 1 });
 routeSchema.index({ createdAt: -1 });
+routeSchema.index({ persistentId: 1 });
 exports.RouteModel = mongoose_1.default.model('Route', routeSchema);

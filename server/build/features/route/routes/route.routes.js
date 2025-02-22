@@ -18,11 +18,11 @@ const asyncHandler = (fn) => (req, res, next) => {
 // Save a new route
 router.post('/save', validateRoute_1.validateRouteData, asyncHandler(controller.saveRoute.bind(controller)));
 // Update an existing route
-router.put('/:id', validateRoute_1.validateRouteData, asyncHandler(controller.updateRoute.bind(controller)));
+router.put('/:persistentId', validateRoute_1.validateRouteData, asyncHandler(controller.updateRoute.bind(controller)));
 // Get a specific route
-router.get('/:id', asyncHandler(controller.loadRoute.bind(controller)));
+router.get('/:persistentId', asyncHandler(controller.loadRoute.bind(controller)));
 // List routes with optional filters
 router.get('/', asyncHandler(controller.listRoutes.bind(controller)));
 // Delete a route
-router.delete('/:id', asyncHandler(controller.deleteRoute.bind(controller)));
+router.delete('/:persistentId', asyncHandler(controller.deleteRoute.bind(controller)));
 exports.default = router;

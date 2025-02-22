@@ -16,7 +16,10 @@ export const StyledDrawer = styled(Drawer)({
       minWidth: '40px',
       transition: 'color 0.2s ease-in-out',
       '&:hover': {
-        color: '#ffffff'
+        color: '#ee5253'
+      },
+      '&.Mui-selected': {
+        color: '#ee5253'
       }
     }
   }

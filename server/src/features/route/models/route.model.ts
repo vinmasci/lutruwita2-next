@@ -80,8 +80,7 @@ placeNamePOISchema.add({
 
 // Description schema for route descriptions
 const descriptionSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
+  description: { type: String, required: false },
   photos: { type: [photoSchema], required: false }
 });
 
@@ -118,6 +117,7 @@ const routeSchema = new mongoose.Schema({
 
   // Route data array - can contain multiple routes
   routes: [{
+    order: { type: Number, required: true },
     routeId: String,
     name: { type: String, required: true },
     color: { type: String, required: true },

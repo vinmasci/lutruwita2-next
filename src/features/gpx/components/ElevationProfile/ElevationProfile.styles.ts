@@ -17,7 +17,7 @@ export const ElevationPanel = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   '&.collapsed': {
-    transform: 'translateY(100%)'
+    transform: 'translateY(300px)'
   },
   '& > *': {
     flex: 1,
@@ -25,31 +25,37 @@ export const ElevationPanel = styled(Box)(({ theme }) => ({
   }
 }));
 
-export const ElevationHeader = styled(Box)(({ theme }) => ({
-  padding: theme.spacing(0.5),
+export const TabContainer = styled(Box)({
+  position: 'absolute',
+  top: '-24px',
+  left: '16px',
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  '& .MuiTypography-root': {
-    fontSize: '0.875rem',
-    fontWeight: 500
-  },
-  '& .MuiIconButton-root': {
-    padding: theme.spacing(0.5)
-  }
-}));
+  alignItems: 'flex-end',
+  gap: '4px',
+  zIndex: 103
+});
 
-export const ElevationContent = styled(Box)(({ theme }) => ({
+export const CollapseButton = styled(Box)({
+  backgroundColor: 'rgba(26, 26, 26, 0.9)',
+  borderRadius: '4px 4px 0 0',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderBottom: 'none',
+  height: '24px',
+  display: 'flex',
+  alignItems: 'center'
+});
+
+export const ElevationContent = styled('div')({
+  width: '100%',
   height: '100%',
   padding: 0,
   backgroundColor: '#1a1a1a',
-  overflow: 'hidden',
   '& .recharts-cartesian-grid-horizontal line, & .recharts-cartesian-grid-vertical line': {
     stroke: 'rgba(255, 255, 255, 0.05)'
   },
   '& .recharts-text': {
-    fill: 'rgba(255, 255, 255, 0.7)'
+    fill: 'rgba(255, 255, 255, 0.7)',
+    fontFamily: 'Futura'
   },
   '& .recharts-tooltip-wrapper': {
     backgroundColor: 'transparent',
@@ -64,13 +70,13 @@ export const ElevationContent = styled(Box)(({ theme }) => ({
       '& .recharts-tooltip-label': {
         color: 'rgba(255, 255, 255, 0.85)',
         fontSize: '0.75rem',
-        fontFamily: 'Futura, sans-serif',
+        fontFamily: 'Futura',
         marginBottom: '2px'
       },
       '& .recharts-tooltip-item': {
         color: 'rgba(255, 255, 255, 0.95)',
         fontSize: '0.75rem',
-        fontFamily: 'Futura, sans-serif',
+        fontFamily: 'Futura',
         padding: '1px 0'
       },
       '& .recharts-tooltip-item-name': {
@@ -85,4 +91,4 @@ export const ElevationContent = styled(Box)(({ theme }) => ({
     stroke: '#4b6584',
     strokeWidth: 2
   }
-}));
+});

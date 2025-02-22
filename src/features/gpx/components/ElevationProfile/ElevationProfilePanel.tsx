@@ -23,7 +23,12 @@ export const ElevationProfilePanel = ({
 
   const TabButton = ({ tab, label }: { tab: TabType; label: string }) => (
     <ButtonBase
-      onClick={() => setActiveTab(tab)}
+      onClick={() => {
+        setActiveTab(tab);
+        if (isCollapsed) {
+          setIsCollapsed(false);
+        }
+      }}
       sx={{
         backgroundColor: 'rgba(26, 26, 26, 0.9)',
         color: 'white',

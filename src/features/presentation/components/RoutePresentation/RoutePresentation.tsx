@@ -46,7 +46,7 @@ export const RoutePresentation: React.FC = () => {
         console.error('Route data missing routeId:', routeData);
         return null;
       }
-      return {
+      const processedRoute = {
         ...routeData,
         _type: 'loaded' as const,
         _loadedState: route,
@@ -56,8 +56,9 @@ export const RoutePresentation: React.FC = () => {
           processingState: 'completed' as const,
           progress: 100
         }
-      };
-    }).filter((route): route is LoadedRoute => route !== null);
+      } as const; // Use const assertion to narrow the type
+      return processedRoute;
+    }).filter((route): route is LoadedRoute => route !== null && route._type === 'loaded');
   }, [route]);
 
   // Create a memoized component for route content

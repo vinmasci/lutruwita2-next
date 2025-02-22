@@ -2,9 +2,9 @@ import { ProcessedRoute } from '../../../shared/types/gpx.types.js';
 import { DraggablePOI, PlaceNamePOI } from '../../../shared/types/poi.types.js';
 
 export interface RouteDescription {
-  title: string;
-  description: string;
-  photos: {
+  title?: string;
+  description?: string;
+  photos?: {
     id: string;
     name: string;
     url: string;

@@ -74,3 +74,23 @@ export const getElevationGain = (route) => {
         return 0;
     }
 };
+
+export const getElevationLoss = (route) => {
+    try {
+        if (!route)
+            return 0;
+        // Check direct statistics
+        if (route.statistics?.elevationLoss) {
+            return route.statistics.elevationLoss;
+        }
+        // Check nested route statistics
+        if (route.routes?.[0]?.statistics?.elevationLoss) {
+            return route.routes[0].statistics.elevationLoss;
+        }
+        return 0;
+    }
+    catch (error) {
+        console.error('Error calculating elevation loss:', error);
+        return 0;
+    }
+};

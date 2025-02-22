@@ -22,6 +22,8 @@ import {
   FormControlLabel,
   Switch,
   ClickAwayListener,
+  Box,
+  useTheme,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
@@ -143,7 +145,7 @@ export const RouteList = () => {
         {routes.map((route) => (
           <StyledListItem
             key={route.id}
-            className={`${currentRoute?.routeId === route.routeId ? 'selected' : ''} ${route.isFocused ? 'focused' : ''}`}
+            className={`${currentRoute?.id === route.id ? 'selected' : ''} ${route.isFocused ? 'focused' : ''}`}
             sx={{ 
               cursor: 'pointer',
               '&.focused': {
@@ -152,14 +154,14 @@ export const RouteList = () => {
               }
             }}
           >
-            {editingRouteId === route.routeId ? (
+            {editingRouteId === route.id ? (
               <ClickAwayListener onClickAway={() => setEditingRouteId(null)}>
                 <TextField
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateRoute(route.routeId, { name: editingName });
+                    if (e.key === 'Enter' && route.id) {
+                      updateRoute(route.id, { name: editingName });
                       setEditingRouteId(null);
                     } else if (e.key === 'Escape') {
                       setEditingRouteId(null);
@@ -184,18 +186,39 @@ export const RouteList = () => {
             ) : (
               <ListItemText 
                 primary={route.name}
-                secondary={`${(route.statistics.totalDistance / 1000).toFixed(1)}km`}
+                secondary={
+                  <Box sx={{ 
+                    fontSize: '0.875rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    mt: 0.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2
+                  }}>
+                    <span>{(route.statistics.totalDistance / 1000).toFixed(1)}km</span>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="fa-solid fa-up-right" style={{ color: '#2196f3' }}></i>
+                      <span>{route.statistics.elevationGain}m</span>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="fa-solid fa-down-right" style={{ color: '#2196f3' }}></i>
+                      <span>{route.statistics.elevationLoss}m</span>
+                    </Box>
+                  </Box>
+                }
                 sx={{ color: 'white' }}
                 onClick={() => {
-                  if (route.isFocused) {
+                  if (route.isFocused && route.routeId) {
                     unfocusRoute(route.routeId);
-                  } else {
+                  } else if (route.routeId) {
                     focusRoute(route.routeId);
                   }
                 }}
                 onDoubleClick={() => {
-                  setEditingRouteId(route.routeId);
-                  setEditingName(route.name);
+                  if (route.routeId) {
+                    setEditingRouteId(route.routeId);
+                    setEditingName(route.name);
+                  }
                 }}
               />
             )}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { createPortal } from 'react-dom';
+import { Box, Typography } from '@mui/material';
+import { ResponsiveLine } from '@nivo/line';
 import { ProcessedRoute } from '../../types/gpx.types';
 import { ElevationContent } from './ElevationProfile.styles';
-import { Box, Typography } from '@mui/material';
 import { Alert } from '@/components/ui/alert';
 import { useMapContext } from '../../../map/context/MapContext';
 import { detectClimbs } from '../../utils/climbUtils';
@@ -14,25 +15,166 @@ interface ElevationProfileProps {
   error?: string;
 }
 
-export const ElevationProfile = ({ route, isLoading, error }: ElevationProfileProps) => {
-  const { setHoverCoordinates } = useMapContext();
-  const [data, setData] = useState<{distance: number; elevation: number}[]>([]);
-  const [climbs, setClimbs] = useState<Climb[]>([]);
-  const [stats, setStats] = useState<{
-    elevationGained: number;
-    elevationLost: number;
-    totalDistance: number;
-  }>({ elevationGained: 0, elevationLost: 0, totalDistance: 0 });
-  useEffect(() => {
-    console.log('[ElevationProfile] Route data:', {
-      hasGeojson: !!route?.geojson,
-      hasFeatures: !!route?.geojson?.features?.length,
-      hasElevation: !!route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation,
-      elevationCount: route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation?.length || 0
-    });
+interface Stats {
+  elevationGained: number;
+  elevationLost: number;
+  totalDistance: number;
+  unpavedPercentage: number;
+}
 
+interface Segment {
+  points: Array<{ x: number; y: number; isPaved: boolean }>;
+  type: 'normal' | 'climb';
+  climbCategory?: string;
+  color?: string;
+  isPaved: boolean;
+}
+
+interface Point {
+  x: number;
+  y: number;
+  isPaved: boolean;
+}
+
+function createLinePath(points: Point[], xScale: any, yScale: any): string {
+  let linePath = `M ${xScale(points[0].x)},${yScale(points[0].y)}`;
+  const tension = 0.3;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const x0 = i > 0 ? xScale(points[i - 1].x) : xScale(points[i].x);
+    const y0 = i > 0 ? yScale(points[i - 1].y) : yScale(points[i].y);
+    const x1 = xScale(points[i].x);
+    const y1 = yScale(points[i].y);
+    const x2 = xScale(points[i + 1].x);
+    const y2 = yScale(points[i + 1].y);
+    const x3 = i < points.length - 2 ? xScale(points[i + 2].x) : x2;
+    const y3 = i < points.length - 2 ? yScale(points[i + 2].y) : y2;
+
+    const cp1x = x1 + (x2 - x0) * tension;
+    const cp1y = y1 + (y2 - y0) * tension;
+    const cp2x = x2 - (x3 - x1) * tension;
+    const cp2y = y2 - (y3 - y1) * tension;
+
+    linePath += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`;
+  }
+
+  return linePath;
+}
+
+function createAreaPath(points: Point[], xScale: any, yScale: any, height: number): string {
+  let areaPath = `M ${xScale(points[0].x)},${height}`;
+  areaPath += ` L ${xScale(points[0].x)},${yScale(points[0].y)}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const x1 = xScale(points[i].x);
+    const y1 = yScale(points[i].y);
+    const x2 = xScale(points[i + 1].x);
+    const y2 = yScale(points[i + 1].y);
+
+    const cp1x = x1 + (x2 - x1) / 2;
+    const cp1y = y1;
+    const cp2x = x2 - (x2 - x1) / 2;
+    const cp2y = y2;
+
+    areaPath += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`;
+  }
+
+  areaPath += ` L ${xScale(points[points.length-1].x)},${height} Z`;
+  return areaPath;
+}
+
+function createSegments(points: Point[], climbs: Climb[]): Segment[] {
+  const segments: Segment[] = [];
+  let currentPoints: Point[] = [];
+  let currentIndex = 0;
+
+  const createSegment = (points: Point[], climb: Climb | null, isPaved: boolean): Segment => ({
+    points,
+    type: climb ? 'climb' : 'normal' as const,
+    climbCategory: climb?.category,
+    color: climb?.color,
+    isPaved
+  });
+
+  const findClimbAtPoint = (point: Point): Climb | null => {
+    const pointDistance = point.x * 1000;
+    const climb = climbs.find(climb => 
+      pointDistance >= climb.startPoint.distance && 
+      pointDistance <= climb.endPoint.distance
+    );
+    return climb || null;
+  };
+
+  while (currentIndex < points.length) {
+    const point = points[currentIndex];
+    const activeClimb = findClimbAtPoint(point);
+
+    if (currentPoints.length === 0) {
+      currentPoints.push(point);
+      currentIndex++;
+      continue;
+    }
+
+    const prevPoint = currentPoints[currentPoints.length - 1];
+    const prevClimb = findClimbAtPoint(prevPoint);
+
+    const climbChanged = !!activeClimb !== !!prevClimb || 
+      (activeClimb && prevClimb && activeClimb.category !== prevClimb.category);
+    const surfaceChanged = point.isPaved !== prevPoint.isPaved;
+
+    if (climbChanged || surfaceChanged) {
+      currentPoints.push(point);
+      segments.push(createSegment([...currentPoints], prevClimb, prevPoint.isPaved));
+      currentPoints = [point];
+    } else {
+      currentPoints.push(point);
+    }
+
+    currentIndex++;
+  }
+
+  if (currentPoints.length > 0) {
+    const finalClimb = findClimbAtPoint(currentPoints[0]);
+    segments.push(createSegment(currentPoints, finalClimb, currentPoints[0].isPaved));
+  }
+
+  return segments;
+}
+
+interface TooltipProps {
+  content: React.ReactNode;
+  x: number;
+  y: number;
+}
+
+const Tooltip: React.FC<TooltipProps> = ({ content, x, y }) => {
+  return createPortal(
+    <div style={{
+      position: 'fixed',
+      left: x + 10,
+      top: y + 10,
+      zIndex: 1000
+    }}>
+      {content}
+    </div>,
+    document.body
+  );
+};
+
+export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoading, error }) => {
+  const { setHoverCoordinates } = useMapContext();
+  const [tooltip, setTooltip] = useState<{ content: React.ReactNode; x: number; y: number } | null>(null);
+  const [data, setData] = useState<Array<{ id: string; data: Point[] }>>([]);
+  const [climbs, setClimbs] = useState<Climb[]>([]);
+  const [stats, setStats] = useState<Stats>({ 
+    elevationGained: 0, 
+    elevationLost: 0, 
+    totalDistance: 0,
+    unpavedPercentage: 0
+  });
+
+  useEffect(() => {
     if (!route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation) {
-      console.log('[ElevationProfile] No elevation data found');
       setData([]);
       return;
     }
@@ -40,43 +182,53 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
     try {
       const feature = route.geojson.features[0];
       if (feature.geometry.type !== 'LineString') {
-        console.error('Expected LineString geometry');
         setData([]);
         return;
       }
 
       const elevations = feature.properties?.coordinateProperties?.elevation;
-      const coordinates = feature.geometry.coordinates;
       const totalDistance = route.statistics.totalDistance;
-
-      console.log('[ElevationProfile] Processing elevation data:', {
-        count: elevations?.length,
-        totalDistance,
-        sample: elevations?.slice(0, 5)
-      });
-
       if (!Array.isArray(elevations)) {
-        console.error('Invalid elevation or coordinate data');
         setData([]);
         return;
       }
 
-      // Calculate the distance between each point as a fraction of total distance
       const elevationData = elevations.map((elev: number, index: number) => {
-        // Calculate the fraction of total distance based on point index
         const distance = (index / (elevations.length - 1)) * totalDistance;
+        let isPaved = true;
+
+        if (route.unpavedSections) {
+          for (const section of route.unpavedSections) {
+            const sectionStartDist = (section.startIndex / (elevations.length - 1)) * totalDistance;
+            const sectionEndDist = (section.endIndex / (elevations.length - 1)) * totalDistance;
+            if (distance >= sectionStartDist && distance <= sectionEndDist) {
+              isPaved = false;
+              break;
+            }
+          }
+        }
+
         return {
-          distance,
-          elevation: elev
+          x: distance / 1000, // Convert to km
+          y: elev,
+          isPaved
         };
       });
 
-      // Calculate elevation stats
+      let unpavedDistance = 0;
+      if (route.unpavedSections) {
+        for (const section of route.unpavedSections) {
+          const sectionStartDist = (section.startIndex / (elevations.length - 1)) * totalDistance;
+          const sectionEndDist = (section.endIndex / (elevations.length - 1)) * totalDistance;
+          unpavedDistance += sectionEndDist - sectionStartDist;
+        }
+      }
+      const unpavedPercentage = (unpavedDistance / totalDistance) * 100;
+
       let elevationGained = 0;
       let elevationLost = 0;
-      
       for (let i = 1; i < elevationData.length; i++) {
-        const elevDiff = elevationData[i].elevation - elevationData[i-1].elevation;
+        const elevDiff = elevationData[i].y - elevationData[i - 1].y;
         if (elevDiff > 0) {
           elevationGained += elevDiff;
         } else {
@@ -87,21 +239,21 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
       setStats({
         elevationGained,
         elevationLost,
-        totalDistance: totalDistance
+        totalDistance,
+        unpavedPercentage
       });
 
-      setData(elevationData);
-      
-      // Detect climbs and store them
-      const detectedClimbs = detectClimbs(elevationData);
+      setData([{
+        id: 'elevation',
+        data: elevationData
+      }]);
+
+      const detectedClimbs = detectClimbs(elevationData.map(point => ({
+        distance: point.x * 1000,
+        elevation: point.y
+      })));
       setClimbs(detectedClimbs);
-      console.log('[ElevationProfile] Detected climbs:', detectedClimbs);
-      
-      console.log('[ElevationProfile] Processed data:', {
-        count: elevationData.length,
-        sample: elevationData.slice(0, 5),
-        stats: { elevationGained, elevationLost, totalDistance }
-      });
+
     } catch (err) {
       console.error('Error processing elevation data:', err);
       setData([]);
@@ -132,212 +284,495 @@ export const ElevationProfile = ({ route, isLoading, error }: ElevationProfilePr
     );
   }
 
+  const defs = [
+    {
+      id: 'unpavedPattern',
+      type: 'patternLines',
+      background: 'rgba(2, 136, 209, 0.2)',
+      color: 'rgba(2, 136, 209, 0.3)',
+      rotation: -65,
+      lineWidth: 1,
+      spacing: 2
+    }
+  ];
+
+  const sortedClimbs = [...climbs].sort((a, b) => a.startPoint.distance - b.startPoint.distance);
+  const categoryCount: { [key: string]: number } = {};
+  sortedClimbs.forEach(climb => {
+    categoryCount[climb.category] = (categoryCount[climb.category] || 0) + 1;
+    climb.number = categoryCount[climb.category];
+    
+    defs.push({
+      id: `unpavedPattern-${climb.category}-${climb.number}`,
+      type: 'patternLines',
+      background: climb.color.replace('99', '33'),
+      color: climb.color.replace('99', '66'),
+      rotation: -60,
+      lineWidth: 1,
+      spacing: 2
+    });
+  });
+
+  const climbsByCategory: { [key: string]: Climb[] } = {};
+  sortedClimbs.forEach(climb => {
+    if (!climbsByCategory[climb.category]) {
+      climbsByCategory[climb.category] = [];
+    }
+    climbsByCategory[climb.category].push(climb);
+  });
+
+  const customLayer = (props: any) => {
+    const { data, xScale, yScale } = props;
+    const points = data[0].data as Point[];
+    const height = props.innerHeight;
+    const segments = createSegments(points, climbs);
+
+    return (
+      <g>
+        {segments.map((segment, i) => {
+          const linePath = createLinePath(segment.points, xScale, yScale);
+          const areaPath = createAreaPath(segment.points, xScale, yScale, height);
+
+          const baseColor = segment.type === 'climb' && segment.color 
+            ? segment.color.replace('99', '66')
+            : "rgba(2, 136, 209, 0.4)";
+
+          const patternId = segment.type === 'climb' && segment.climbCategory
+            ? `unpavedPattern-${segment.climbCategory}-${
+                climbsByCategory[segment.climbCategory].find(c => 
+                  c.startPoint.distance <= segment.points[0].x * 1000 && 
+                  c.endPoint.distance >= segment.points[0].x * 1000
+                )?.number || 1
+              }`
+            : 'unpavedPattern';
+
+          const lineColor = segment.type === 'climb' && segment.color 
+            ? segment.color.replace('99', 'ff')
+            : 'rgba(2, 136, 209, 0.9)';
+
+          return (
+            <g key={i}>
+              <path
+                d={areaPath}
+                fill={baseColor}
+              />
+              {!segment.isPaved && (
+                <path
+                  d={areaPath}
+                  fill={`url(#${patternId})`}
+                  fillOpacity={0.6}
+                />
+              )}
+              <path
+                d={linePath}
+                fill="none"
+                stroke={lineColor}
+                strokeWidth={0.2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                strokeOpacity={1}
+              />
+            </g>
+          );
+        })}
+        {sortedClimbs.map((climb, i) => {
+          const startX = xScale(climb.startPoint.distance / 1000);
+          const startY = yScale(climb.startPoint.elevation);
+          const endX = xScale(climb.endPoint.distance / 1000);
+          const endY = yScale(climb.endPoint.elevation);
+          const color = climb.color.replace('99', 'ff');
+          
+          const distance = (climb.endPoint.distance - climb.startPoint.distance) / 1000;
+          const elevation = climb.endPoint.elevation - climb.startPoint.elevation;
+          const gradient = ((elevation / (distance * 1000)) * 100).toFixed(1);
+
+          const tooltipContent = (
+            <div style={{ 
+              background: 'rgba(30, 30, 30, 0.95)',
+              padding: '8px 12px',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '4px',
+              fontFamily: 'Futura',
+              fontSize: '12px',
+              color: 'white'
+            }}>
+              <div style={{ marginBottom: '4px', color: color, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {climb.category} {climb.category === 'HC' && <i className="fa-regular fa-skull-crossbones" />}
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '4px', 
+                color: 'rgba(255,255,255,0.7)', 
+                marginTop: '8px' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-solid fa-route" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }} />
+                  <span>{distance.toFixed(1)} km</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-solid fa-mountains" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }} />
+                  <span>{elevation.toFixed(0)} m</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <i className="fa-solid fa-angle" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }} />
+                  <span>{gradient}%</span>
+                </div>
+              </div>
+            </div>
+          );
+
+          return (
+            <g key={`flag-${i}`}>
+              <g transform={`translate(${startX},${startY - 20})`}>
+                <g>
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="20"
+                    stroke={color}
+                    strokeWidth="0.5"
+                    strokeOpacity={0.7}
+                  />
+                  <path
+                    d="M0,0 L8,4 L0,8 Z"
+                    fill={color}
+                    stroke="#1a1a1a"
+                    strokeWidth="0.5"
+                    strokeOpacity={0.7}
+                  />
+                  <rect
+                    x="-4"
+                    y="0"
+                    width="12"
+                    height="20"
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => setTooltip({ content: tooltipContent, x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => setTooltip(null)}
+                  />
+                </g>
+              </g>
+              <g transform={`translate(${endX},${endY - 20})`}>
+                <g>
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="20"
+                    stroke={color}
+                    strokeWidth="0.5"
+                    strokeOpacity={0.7}
+                  />
+                  <path
+                    d="M0,0 L-8,4 L0,8 Z"
+                    fill={color}
+                    stroke="#1a1a1a"
+                    strokeWidth="0.5"
+                    strokeOpacity={0.7}
+                  />
+                  <rect
+                    x="-4"
+                    y="0"
+                    width="12"
+                    height="20"
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => setTooltip({ content: tooltipContent, x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => setTooltip(null)}
+                  />
+                </g>
+              </g>
+              {segments
+                .filter(segment => segment.type === 'climb' && segment.climbCategory === climb.category)
+                .map((segment, j) => (
+                  <path
+                    key={`climb-hover-${i}-${j}`}
+                    d={createLinePath(segment.points, xScale, yScale)}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={10}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e: React.MouseEvent) => setTooltip({ content: tooltipContent, x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => setTooltip(null)}
+                  />
+                ))}
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+
   return (
-    <ElevationContent>
-      <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-        <Typography variant="subtitle2" color="white" sx={{ fontSize: '0.8rem', fontWeight: 500, mr: 3, fontFamily: 'Futura' }}>
-          Elevation Profile: {route.name}
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 3, ml: 'auto' }}>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', fontFamily: 'Futura' }}>
-            {(stats.totalDistance / 1000).toFixed(1)} km
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', fontFamily: 'Futura' }}>
-            ↑ {stats.elevationGained.toFixed(0)} m
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', fontFamily: 'Futura' }}>
-            ↓ {stats.elevationLost.toFixed(0)} m
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, borderLeft: '1px solid rgba(255, 255, 255, 0.1)', pl: 2, ml: 2 }}>
-            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#8B0000' }}>HC</Typography>
-            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#FF0000' }}>CAT1</Typography>
-            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#fa8231' }}>CAT2</Typography>
-            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#f7b731' }}>CAT3</Typography>
-            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'Futura', color: '#228B22' }}>CAT4</Typography>
-          </Box>
-        </Box>
-      </Box>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart 
-          data={data}
-          margin={{ top: 30, right: 15, left: 5, bottom: 55 }}
-          onMouseMove={(e) => {
-            if (e?.activePayload?.[0]?.payload) {
-              const point = e.activePayload[0].payload;
-              const feature = route.geojson.features[0];
-              if (feature.geometry.type === 'LineString') {
-                // Find the closest point in the route
-                const coordinates = feature.geometry.coordinates;
-                const index = Math.floor((point.distance / stats.totalDistance) * (coordinates.length - 1));
-                if (coordinates[index]) {
-                  setHoverCoordinates([coordinates[index][0], coordinates[index][1]]);
-                }
-              }
-            }
-          }}
-          onMouseLeave={() => {
-            setHoverCoordinates(null);
+    <div className="elevation-profile">
+      <ElevationContent>
+        <Box 
+          sx={{ 
+            px: 2, 
+            py: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)' 
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="distance"
-            label={{ 
-              value: 'Distance (km)', 
-              position: 'bottom', 
-              dy: -10,
-              style: { fontSize: '0.7rem', fontFamily: 'Futura' }
+          <Typography 
+            variant="subtitle2" 
+            color="white" 
+            sx={{ 
+              fontSize: '0.8rem', 
+              fontWeight: 500, 
+              mr: 3, 
+              fontFamily: 'Futura' 
             }}
-            tickFormatter={(value) => `${(value / 1000).toFixed(0)}`}
-            domain={[0, 'dataMax']}
-            type="number"
-            scale="linear"
-            allowDataOverflow={false}
-            tick={{ fontSize: '0.45rem', fontFamily: 'Futura' }}
-            tickSize={3}
-          />
-          <YAxis
-            label={{ 
-              value: 'Elevation (m)', 
-              angle: -90, 
-              position: 'left', 
-              dx: 20,
-              style: { fontSize: '0.7rem', fontFamily: 'Futura' }
+          >
+            Elevation Profile: {route.name}
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              gap: 3, 
+              ml: 'auto' 
             }}
-            tick={{ fontSize: '0.55rem', fontFamily: 'Futura' }}
-            tickSize={3}
-          />
-          <Tooltip 
-            formatter={(value: number, name: string, props: any) => {
-              const currentIndex = data.findIndex(d => d.distance === props.payload.distance);
+          >
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                fontSize: '0.75rem', 
+                fontFamily: 'Futura',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <i className="fa-solid fa-route" style={{ color: '#0288d1' }} />
+              {(stats.totalDistance / 1000).toFixed(1)} km
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                fontSize: '0.75rem', 
+                fontFamily: 'Futura',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <i className="fa-solid fa-up-right" style={{ color: '#0288d1' }} />
+              {stats.elevationGained.toFixed(0)} m
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                fontSize: '0.75rem', 
+                fontFamily: 'Futura',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <i className="fa-solid fa-down-right" style={{ color: '#0288d1' }} />
+              {stats.elevationLost.toFixed(0)} m
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                fontSize: '0.75rem', 
+                fontFamily: 'Futura',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <i className="fa-solid fa-person-biking-mountain" style={{ color: '#0288d1' }} />
+              {stats.unpavedPercentage.toFixed(0)}%
+            </Typography>
+          </Box>
+        </Box>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end',
+            gap: 3,
+            px: 2,
+            py: 1,
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          }}
+        >
+          <Typography 
+            variant="body2" 
+            color="text.secondary" 
+            sx={{ 
+              fontSize: '0.75rem', 
+              fontFamily: 'Futura',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}
+          >
+            <Box sx={{ 
+              width: 8, 
+              height: 8, 
+              backgroundColor: 'rgba(2, 136, 209, 0.4)'
+            }} />
+            Paved
+          </Typography>
+          <Typography 
+            variant="body2" 
+            color="text.secondary" 
+            sx={{ 
+              fontSize: '0.75rem', 
+              fontFamily: 'Futura',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}
+          >
+            <Box sx={{ 
+              width: 8, 
+              height: 8, 
+              background: 'repeating-linear-gradient(-60deg, rgba(2, 136, 209, 0.4), rgba(2, 136, 209, 0.4) 2px, transparent 2px, transparent 4px)'
+            }} />
+            Unpaved
+          </Typography>
+        </Box>
+        <div style={{ height: 'calc(100% - 82px)' }}>
+          <ResponsiveLine
+            data={data}
+            margin={{ top: 30, right: 15, left: 50, bottom: 55 }}
+            xScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+            yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
+            curve="natural"
+            enableArea={true}
+            areaOpacity={0.2}
+            enablePoints={false}
+            enableSlices="x"
+            enableGridX={true}
+            enableGridY={true}
+            defs={defs}
+            layers={[
+              'grid',
+              'axes',
+              customLayer,
+              'markers',
+              'legends'
+            ]}
+            axisBottom={{
+              tickSize: 5,
+              tickPadding: 5,
+              tickRotation: 0,
+              legend: 'Distance (km)',
+              legendOffset: 36,
+              legendPosition: 'middle'
+            }}
+            axisLeft={{
+              tickSize: 5,
+              tickPadding: 5,
+              tickRotation: 0,
+              legend: 'Elevation (m)',
+              legendOffset: -40,
+              legendPosition: 'middle'
+            }}
+            theme={{
+              axis: {
+                ticks: {
+                  text: {
+                    fill: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: 11,
+                    fontFamily: 'Futura'
+                  }
+                },
+                legend: {
+                  text: {
+                    fill: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: 12,
+                    fontFamily: 'Futura'
+                  }
+                }
+              },
+              grid: {
+                line: {
+                  stroke: 'rgba(255, 255, 255, 0.05)',
+                  strokeWidth: 1
+                }
+              },
+              tooltip: {
+                container: {
+                  background: 'rgba(30, 30, 30, 0.95)',
+                  color: 'white',
+                  fontSize: 12,
+                  borderRadius: 4,
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+                }
+              }
+            }}
+            onMouseMove={(point: any) => {
+              if (point?.data) {
+                const pointData = point.data as { x: number; y: number };
+                const feature = route.geojson.features[0];
+                if (feature.geometry.type === 'LineString') {
+                  const coordinates = feature.geometry.coordinates;
+                  const index = Math.floor((pointData.x * 1000 / stats.totalDistance) * (coordinates.length - 1));
+                  if (coordinates[index]) {
+                    setHoverCoordinates([coordinates[index][0], coordinates[index][1]]);
+                  }
+                }
+              }
+            }}
+            onMouseLeave={() => {
+              setHoverCoordinates(null);
+            }}
+            tooltip={({ point }) => {
+              const pointData = point.data as { x: number; y: number };
+              const currentIndex = data[0].data.findIndex((d: Point) => d.x === pointData.x);
               if (currentIndex > 0) {
-                const currentPoint = data[currentIndex];
-                const prevPoint = data[currentIndex - 1];
-                const elevationChange = currentPoint.elevation - prevPoint.elevation;
-                const distanceChange = (currentPoint.distance - prevPoint.distance) / 1000; // Convert to km
-              const gradient = ((elevationChange / (distanceChange * 1000)) * 100);
-              const gradientDisplay = gradient.toFixed(1);
-              
-              // Calculate gradient from previous point
-              let prevGradient = '';
-              if (currentIndex > 1) {
-                const prevPrevPoint = data[currentIndex - 2];
-                const elevChange = prevPoint.elevation - prevPrevPoint.elevation;
-                const distChange = (prevPoint.distance - prevPrevPoint.distance) / 1000;
-                const prevGradientValue = ((elevChange / (distChange * 1000)) * 100);
-                prevGradient = prevGradientValue.toFixed(1);
-              }
+                const currentPoint = data[0].data[currentIndex] as Point;
+                const prevPoint = data[0].data[currentIndex - 1] as Point;
+                const elevationChange = currentPoint.y - prevPoint.y;
+                const distanceChange = currentPoint.x - prevPoint.x;
+                const gradient = ((elevationChange / (distanceChange * 1000)) * 100);
 
-              // Calculate average gradient over last 500m if we have enough points
-              let avgGradient = '';
-              const lookbackDist = 500; // meters
-              let lookbackIdx = currentIndex - 1;
-              while (lookbackIdx > 0 && prevPoint.distance - data[lookbackIdx].distance < lookbackDist) {
-                lookbackIdx--;
-              }
-              if (prevPoint.distance - data[lookbackIdx].distance >= lookbackDist) {
-                const avgElevChange = prevPoint.elevation - data[lookbackIdx].elevation;
-                const avgDistChange = (prevPoint.distance - data[lookbackIdx].distance) / 1000;
-                const avgGradientValue = ((avgElevChange / (avgDistChange * 1000)) * 100);
-                avgGradient = avgGradientValue.toFixed(1);
-              }
-
-              return [
-                <div key="tooltip">
+                return (
                   <div style={{ 
-                    fontFamily: 'Futura',
-                    color: 'white',
-                    display: 'flex',
-                    gap: '4px'
+                    background: 'rgba(30, 30, 30, 0.95)',
+                    padding: '8px 12px',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '4px'
                   }}>
-                    <span>el:</span>
-                    <span>{value.toFixed(1)} m</span>
-                  </div>
-                  <div style={{ 
-                    color: 'white', 
-                    fontSize: '0.75rem', 
-                    marginTop: '4px',
-                    fontFamily: 'Futura',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'rgba(255,255,255,0.7)' }}>
+                    <div style={{ 
+                      fontFamily: 'Futura',
+                      color: 'white',
+                      display: 'flex',
+                      gap: '4px'
+                    }}>
+                      <span>el:</span>
+                      <span>{pointData.y.toFixed(1)} m</span>
+                    </div>
+                    <div style={{
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: '0.75rem',
+                      marginTop: '4px',
+                      fontFamily: 'Futura',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
                       {gradient > 0 ? '↗' : '↘'} {Math.abs(gradient).toFixed(1)}%
                     </div>
                   </div>
-                </div>
-              ];
+                );
               }
-              return [`${value.toFixed(1)} m`, ''];
+              return null;
             }}
-            labelFormatter={(label) => `${(label / 1000).toFixed(2)} km`}
-            contentStyle={{ background: 'none', border: 'none' }}
-            wrapperStyle={{ outline: 'none' }}
           />
-          {/* Climb markers */}
-          {climbs.map((climb, index) => (
-            <React.Fragment key={index}>
-              {/* Start marker */}
-              <ReferenceLine
-                x={climb.startPoint.distance}
-                stroke={climb.color}
-                strokeWidth={2}
-                label={({ viewBox }) => {
-                  const text = `${(climb.totalDistance/1000).toFixed(1)}km @ ${(climb.averageGradient).toFixed(1)}%`;
-                  const textWidth = text.length * 5.5; // Approximate width based on font size
-                  
-                  // Check if climb is in the last quarter of the route
-                  const isNearEnd = climb.startPoint.distance > (data[data.length - 1].distance * 0.75);
-                  const xOffset = isNearEnd ? -(textWidth + 15) : 5; // Align left if near end
-                  return (
-                    <g>
-                      <filter id={`shadow-${index}`} x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.3"/>
-                      </filter>
-                      <rect
-                        x={viewBox.x + xOffset}
-                        y={viewBox.y - 25}
-                        width={textWidth}
-                        height="16"
-                        rx="2"
-                        fill={climb.color}
-                        fillOpacity={0.9}
-                        filter={`url(#shadow-${index})`}
-                      />
-                      <text
-                        x={viewBox.x + xOffset + 5}
-                        y={viewBox.y - 13}
-                        fill="#fff"
-                        fontSize={8}
-                        fontFamily="Futura"
-                      >
-                        {text}
-                      </text>
-                    </g>
-                  );
-                }}
-                isFront={true}
-              />
-              {/* End marker */}
-              <ReferenceLine
-                x={climb.endPoint.distance}
-                stroke={climb.color}
-                strokeWidth={2}
-                strokeDasharray="4 2"
-                isFront={true}
-              />
-            </React.Fragment>
-          ))}
-          <Area
-            type="monotone"
-            dataKey="elevation"
-            stroke="#ee5253"
-            fill="rgba(238, 82, 83, 0.2)"
-            strokeWidth={2}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </ElevationContent>
+        </div>
+      </ElevationContent>
+      {tooltip && <Tooltip {...tooltip} />}
+    </div>
   );
 };

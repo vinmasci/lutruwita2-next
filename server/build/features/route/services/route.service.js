@@ -1,7 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RouteService = void 0;
 const route_model_1 = require("../models/route.model");
+const mongoose_1 = __importDefault(require("mongoose"));
+const uuid_1 = require("uuid");
 class RouteService {
     async saveRoute(userId, data, routeId) {
         try {
@@ -24,9 +29,21 @@ class RouteService {
                     geojsonSize: route.geojson ? JSON.stringify(route.geojson).length / 1024 + 'KB' : '0KB'
                 });
             });
+            let persistentId;
+            if (routeId) {
+                const existingRoute = await route_model_1.RouteModel.findOne({ persistentId: routeId, userId });
+                if (!existingRoute) {
+                    throw new Error('Route not found or access denied');
+                }
+                persistentId = existingRoute.persistentId;
+            }
+            else {
+                persistentId = (0, uuid_1.v4)();
+            }
             console.log('[RouteService] Preparing route data...');
             const routeData = {
                 userId,
+                persistentId,
                 name: data.name,
                 type: data.type,
                 isPublic: data.isPublic,
@@ -36,32 +53,62 @@ class RouteService {
                 pois: data.pois || { draggable: [], places: [] }
             };
             console.log('[RouteService] Prepared data size:', JSON.stringify(routeData).length / 1024 / 1024, 'MB');
-            let route;
+            let savedRoute;
             try {
                 if (routeId) {
-                    console.log('[RouteService] Updating existing route:', routeId);
-                    // Update existing route
-                    route = await route_model_1.RouteModel.findOneAndUpdate({ _id: routeId, userId }, // Only update if user owns the route
-                    routeData, { new: true, runValidators: true } // Return updated document and run validators
-                    ).catch(err => {
-                        console.error('[RouteService] MongoDB update error:', {
-                            name: err.name,
-                            message: err.message,
-                            code: err.code,
-                            validationErrors: err.errors,
-                            stack: err.stack
-                        });
-                        throw err;
+                    console.log('[RouteService] Creating new version of route:', routeId, {
+                        oldId: routeId,
+                        userId,
+                        routeCount: data.routes?.length
                     });
-                    if (!route) {
-                        throw new Error('Route not found or access denied');
+                    // Use a MongoDB session for atomic operations
+                    const session = await mongoose_1.default.startSession();
+                    try {
+                        // Create and save new route within transaction
+                        savedRoute = await session.withTransaction(async () => {
+                            const newRoute = new route_model_1.RouteModel(routeData);
+                            await newRoute.validate().catch(err => {
+                                console.error('[RouteService] Validation error:', {
+                                    name: err.name,
+                                    message: err.message,
+                                    validationErrors: err.errors,
+                                    stack: err.stack
+                                });
+                                throw err;
+                            });
+                            const saved = await newRoute.save({ session }).catch(err => {
+                                console.error('[RouteService] MongoDB save error:', {
+                                    name: err.name,
+                                    message: err.message,
+                                    code: err.code,
+                                    validationErrors: err.errors,
+                                    stack: err.stack
+                                });
+                                throw err;
+                            });
+                            // Delete the old route
+                            await route_model_1.RouteModel.deleteOne({ persistentId: routeId, userId }, { session });
+                            return saved;
+                        });
                     }
+                    finally {
+                        await session.endSession();
+                    }
+                    if (!savedRoute) {
+                        throw new Error('Failed to save new route version');
+                    }
+                    console.log('[RouteService] Route replacement completed:', {
+                        oldId: routeId,
+                        newId: savedRoute._id.toString(),
+                        persistentId,
+                        userId
+                    });
                 }
                 else {
                     console.log('[RouteService] Creating new route...');
                     // Create new route
-                    route = new route_model_1.RouteModel(routeData);
-                    await route.validate().catch(err => {
+                    const newRoute = new route_model_1.RouteModel(routeData);
+                    await newRoute.validate().catch(err => {
                         console.error('[RouteService] Validation error:', {
                             name: err.name,
                             message: err.message,
@@ -70,7 +117,7 @@ class RouteService {
                         });
                         throw err;
                     });
-                    await route.save().catch(err => {
+                    savedRoute = await newRoute.save().catch(err => {
                         console.error('[RouteService] MongoDB save error:', {
                             name: err.name,
                             message: err.message,
@@ -94,7 +141,8 @@ class RouteService {
             }
             return {
                 message: 'Route saved successfully',
-                id: route._id.toString()
+                id: savedRoute._id.toString(),
+                persistentId: savedRoute.persistentId
             };
         }
         catch (error) {
@@ -109,7 +157,7 @@ class RouteService {
     }
     async loadRoute(userId, routeId) {
         try {
-            const route = await route_model_1.RouteModel.findOne({ _id: routeId });
+            const route = await route_model_1.RouteModel.findOne({ persistentId: routeId });
             if (!route) {
                 throw new Error('Route not found');
             }
@@ -136,18 +184,23 @@ class RouteService {
                 query.type = filter.type;
             }
             const routes = await route_model_1.RouteModel.find(query)
-                .select('_id name type viewCount lastViewed createdAt updatedAt')
+                .select('_id persistentId name type viewCount lastViewed createdAt updatedAt mapState routes pois photos')
                 .sort({ viewCount: -1, createdAt: -1 });
             return {
                 routes: routes.map(route => ({
                     id: route._id.toString(),
+                    persistentId: route.persistentId,
                     name: route.name,
                     type: route.type,
                     isPublic: true,
                     viewCount: route.viewCount,
                     lastViewed: route.lastViewed ? new Date(route.lastViewed).toISOString() : undefined,
                     createdAt: route.createdAt,
-                    updatedAt: route.updatedAt
+                    updatedAt: route.updatedAt,
+                    mapState: route.mapState || { center: [-42.8821, 147.3272], zoom: 8 }, // Default to Tasmania
+                    routes: route.routes || [],
+                    pois: route.pois || { draggable: [], places: [] },
+                    photos: route.photos || []
                 }))
             };
         }
@@ -157,15 +210,29 @@ class RouteService {
     }
     async loadPublicRoute(routeId) {
         try {
-            const route = await route_model_1.RouteModel.findOneAndUpdate({ _id: routeId, isPublic: true }, {
+            console.log('[RouteService] Loading public route:', routeId);
+            const route = await route_model_1.RouteModel.findOneAndUpdate({ persistentId: routeId, isPublic: true }, {
                 $inc: { viewCount: 1 },
                 $set: { lastViewed: new Date() }
             }, { new: true });
             if (!route) {
+                console.error('[RouteService] Public route not found:', routeId);
                 throw new Error('Public route not found');
             }
             const routeData = route.toJSON();
-            console.log('[RouteService] Public route loaded successfully');
+            console.log('[RouteService] Public route data:', {
+                id: routeData.id,
+                persistentId: routeData.persistentId,
+                name: routeData.name,
+                routeCount: routeData.routes?.length,
+                hasMapState: !!routeData.mapState,
+                routeDetails: routeData.routes?.map(r => ({
+                    id: r.routeId,
+                    name: r.name,
+                    hasGeojson: !!r.geojson,
+                    geojsonFeatures: r.geojson?.features?.length
+                }))
+            });
             return {
                 route: routeData,
                 message: 'Route loaded successfully'
@@ -192,11 +259,12 @@ class RouteService {
                 { isPublic: true }
             ];
             const routes = await route_model_1.RouteModel.find(query)
-                .select('_id name type isPublic viewCount lastViewed createdAt updatedAt')
+                .select('_id persistentId name type isPublic viewCount lastViewed createdAt updatedAt')
                 .sort({ createdAt: -1 });
             return {
                 routes: routes.map(route => ({
                     id: route._id.toString(),
+                    persistentId: route.persistentId,
                     name: route.name,
                     type: route.type,
                     isPublic: route.isPublic,
@@ -213,7 +281,7 @@ class RouteService {
     }
     async deleteRoute(userId, routeId) {
         try {
-            const route = await route_model_1.RouteModel.findOne({ _id: routeId });
+            const route = await route_model_1.RouteModel.findOne({ persistentId: routeId });
             if (!route) {
                 throw new Error('Route not found');
             }
@@ -222,7 +290,7 @@ class RouteService {
                 throw new Error('Access denied');
             }
             // Delete the route only
-            await route_model_1.RouteModel.deleteOne({ _id: routeId });
+            await route_model_1.RouteModel.deleteOne({ persistentId: routeId });
             console.log('[RouteService] Route and associated POIs deleted successfully');
         }
         catch (error) {

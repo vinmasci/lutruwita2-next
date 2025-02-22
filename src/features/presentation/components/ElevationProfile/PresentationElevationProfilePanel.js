@@ -2,10 +2,13 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
 import { PresentationElevationProfile } from './PresentationElevationProfile';
 import { styled } from '@mui/material/styles';
-import { Box } from '@mui/material';
+import { Box, ButtonBase } from '@mui/material';
 import { IconButton } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { PresentationRouteDescriptionPanel } from '../RouteDescription';
+import { PresentationWeatherProfilePanel } from '../WeatherProfile';
+
 const ElevationPanel = styled(Box)(({ theme }) => ({
     position: 'fixed',
     bottom: 0,
@@ -18,14 +21,79 @@ const ElevationPanel = styled(Box)(({ theme }) => ({
         easing: theme.transitions.easing.easeInOut,
     }),
     zIndex: 102,
-    height: 220,
+    height: 300,
     '&.collapsed': {
-        transform: 'translateY(220px)'
+        transform: 'translateY(300px)'
     }
 }));
+
+const TabButton = ({ tab, label, activeTab, onClick, isCollapsed, setIsCollapsed }) => _jsx(ButtonBase, {
+    onClick: () => {
+        if (isCollapsed) {
+            setIsCollapsed(false);
+        }
+        onClick();
+    },
+    sx: {
+        backgroundColor: 'rgba(26, 26, 26, 0.9)',
+        color: 'white',
+        padding: '4px 12px',
+        borderRadius: '4px 4px 0 0',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderBottom: activeTab === tab ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+        marginRight: '4px',
+        '&:hover': {
+            backgroundColor: 'rgba(45, 45, 45, 0.9)'
+        }
+    },
+    children: label
+});
+
 export const PresentationElevationProfilePanel = ({ route, header }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
-    return (_jsxs(ElevationPanel, { className: isCollapsed ? 'collapsed' : '', children: [_jsx("div", { style: {
+    const [activeTab, setActiveTab] = useState('elevation'); // 'elevation' | 'description' | 'weather'
+
+    return _jsxs(ElevationPanel, { 
+        className: isCollapsed ? 'collapsed' : '', 
+        children: [
+            _jsxs("div", { 
+                style: {
+                    position: 'absolute',
+                    top: '-24px',
+                    left: '16px',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    zIndex: 103
+                }, 
+                children: [
+                    _jsx(TabButton, {
+                        tab: 'elevation',
+                        label: 'Elevation',
+                        activeTab: activeTab,
+                        onClick: () => setActiveTab('elevation'),
+                        isCollapsed: isCollapsed,
+                        setIsCollapsed: setIsCollapsed
+                    }),
+                    _jsx(TabButton, {
+                        tab: 'description',
+                        label: 'Description',
+                        activeTab: activeTab,
+                        onClick: () => setActiveTab('description'),
+                        isCollapsed: isCollapsed,
+                        setIsCollapsed: setIsCollapsed
+                    }),
+                    _jsx(TabButton, {
+                        tab: 'weather',
+                        label: 'Weather',
+                        activeTab: activeTab,
+                        onClick: () => setActiveTab('weather'),
+                        isCollapsed: isCollapsed,
+                        setIsCollapsed: setIsCollapsed
+                    })
+                ]
+            }),
+            _jsx("div", { 
+                style: {
                     position: 'absolute',
                     top: '-24px',
                     right: '16px',
@@ -33,12 +101,39 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                     borderRadius: '4px 4px 0 0',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderBottom: 'none',
-                    zIndex: 102
-                }, children: _jsx(IconButton, { onClick: () => setIsCollapsed(!isCollapsed), size: "small", sx: {
+                    zIndex: 103
+                }, 
+                children: _jsx(IconButton, { 
+                    onClick: () => setIsCollapsed(!isCollapsed), 
+                    size: "small", 
+                    sx: {
                         color: 'white',
                         padding: '2px',
                         '&:hover': {
                             backgroundColor: 'rgba(255, 255, 255, 0.1)'
                         }
-                    }, children: isCollapsed ? _jsx(KeyboardArrowUpIcon, {}) : _jsx(KeyboardArrowDownIcon, {}) }) }), header, route && _jsx(PresentationElevationProfile, { route: route })] }));
+                    }, 
+                    children: isCollapsed ? _jsx(KeyboardArrowUpIcon, {}) : _jsx(KeyboardArrowDownIcon, {}) 
+                }) 
+            }),
+            header,
+            _jsx(Box, {
+                sx: {
+                    height: '100%',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    '& > *': {
+                        flex: 1,
+                        minHeight: 0
+                    }
+                },
+                children: activeTab === 'elevation' 
+                    ? route && _jsx(PresentationElevationProfile, { route: route })
+                    : activeTab === 'description'
+                    ? route && _jsx(PresentationRouteDescriptionPanel, { route: route })
+                    : route && _jsx(PresentationWeatherProfilePanel, { route: route })
+            })
+        ] 
+    });
 };

@@ -29,11 +29,12 @@ export const deserializePhoto = (photo: any): ProcessedPhoto => {
 };
 
 export const createProcessedPhoto = (file: File): ProcessedPhoto => {
+  const blobUrl = URL.createObjectURL(file);
   return {
     id: Math.random().toString(),
     name: file.name,
-    url: URL.createObjectURL(file),
-    thumbnailUrl: URL.createObjectURL(file),
+    url: blobUrl,
+    thumbnailUrl: blobUrl,
     dateAdded: new Date(),
     hasGps: false
   };
@@ -43,6 +44,8 @@ export const fileToProcessedPhoto = (file: File): ProcessedPhoto => {
   return createProcessedPhoto(file);
 };
 
+// Note: This function is deprecated as we now store the original File object
+// directly in the component state for upload
 export const processedPhotoToFile = (photo: ProcessedPhoto): File => {
-  return new File([], photo.name, { type: 'image/jpeg' });
+  throw new Error('processedPhotoToFile is deprecated. Store the original File object instead.');
 };

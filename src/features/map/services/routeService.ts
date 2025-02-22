@@ -66,6 +66,16 @@ export const useRouteService = () => {
   ): Promise<SaveRouteResponse> => {
     try {
       console.log('[routeService] Starting save route...');
+      
+      // Log route descriptions
+      console.log('[routeService] Route descriptions:', routeData.routes.map(route => ({
+        routeId: route.routeId,
+        hasDescription: !!route.description,
+        title: route.description?.title,
+        descriptionLength: route.description?.description?.length,
+        photoCount: route.description?.photos?.length
+      })));
+
       console.log('[routeService] POIs to save:', {
         draggable: routeData.pois.draggable.length + ' POIs',
         places: routeData.pois.places.length + ' POIs'
@@ -78,6 +88,7 @@ export const useRouteService = () => {
       console.log('[routeService] Request body:', JSON.stringify(routeData, null, 2));
 
       console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
+      console.log('[routeService] Route descriptions raw data:', JSON.stringify(routeData.routes.map(r => r.description), null, 2));
       console.log('[routeService] Full route data:', JSON.stringify(routeData, null, 2));
       
 // If routeData has a persistentId, it's an update to an existing route

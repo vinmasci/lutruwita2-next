@@ -15,14 +15,14 @@ class RouteController {
                     details: 'User ID not found'
                 });
             }
-            const { id } = req.params;
-            if (!id) {
+            const { persistentId } = req.params;
+            if (!persistentId) {
                 return res.status(400).json({
                     error: 'Invalid request',
-                    details: 'Route ID is required'
+                    details: 'Route persistent ID is required'
                 });
             }
-            console.log('[RouteController] Starting route update...');
+            console.log('[RouteController] Starting route update...', { persistentId });
             const { name, type, isPublic, mapState, routes, photos, pois } = req.body;
             // Validate mapState if provided
             if (mapState) {
@@ -47,7 +47,7 @@ class RouteController {
                 pois,
             };
             console.log('[RouteController] Updating route in database...');
-            const result = await this.routeService.saveRoute(userId, routeToUpdate, id);
+            const result = await this.routeService.saveRoute(userId, routeToUpdate, persistentId);
             console.log('[RouteController] Route updated successfully');
             res.json(result);
         }
@@ -131,14 +131,14 @@ class RouteController {
             if (!userId) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
-            const { id } = req.params;
-            if (!id) {
+            const { persistentId } = req.params;
+            if (!persistentId) {
                 return res.status(400).json({
                     error: 'Invalid request',
-                    details: 'Route ID is required'
+                    details: 'Route persistent ID is required'
                 });
             }
-            const result = await this.routeService.loadRoute(userId, id);
+            const result = await this.routeService.loadRoute(userId, persistentId);
             res.json(result);
         }
         catch (error) {
@@ -181,14 +181,14 @@ class RouteController {
             if (!userId) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
-            const { id } = req.params;
-            if (!id) {
+            const { persistentId } = req.params;
+            if (!persistentId) {
                 return res.status(400).json({
                     error: 'Invalid request',
-                    details: 'Route ID is required'
+                    details: 'Route persistent ID is required'
                 });
             }
-            await this.routeService.deleteRoute(userId, id);
+            await this.routeService.deleteRoute(userId, persistentId);
             res.status(204).send();
         }
         catch (error) {

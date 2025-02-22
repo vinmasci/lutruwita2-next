@@ -59,6 +59,22 @@ export const RouteProvider = ({ children, }) => {
     const [currentLoadedState, setCurrentLoadedState] = useState(null);
     const [currentLoadedPersistentId, setCurrentLoadedPersistentId] = useState(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    const reorderRoutes = useCallback((oldIndex, newIndex) => {
+        setRoutes(prev => {
+            const newRoutes = [...prev];
+            const [movedRoute] = newRoutes.splice(oldIndex, 1);
+            newRoutes.splice(newIndex, 0, movedRoute);
+            
+            // Update order field for all routes
+            return newRoutes.map((route, i) => ({
+                ...route,
+                order: i
+            }));
+        });
+        setHasUnsavedChanges(true);
+    }, []);
+
     // Update route properties
     const updateRoute = useCallback((routeId, updates) => {
         setRoutes(prev => prev.map(route => {
@@ -383,6 +399,7 @@ export const RouteProvider = ({ children, }) => {
                     focusRoute,
                     unfocusRoute,
                     updateRoute,
+                    reorderRoutes,
                     // Saved routes state
                     savedRoutes,
                     isSaving,

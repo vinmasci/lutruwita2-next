@@ -1,29 +1,14 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { ProcessedRoute } from '../../../gpx/types/gpx.types';
 import { PresentationElevationProfile } from './PresentationElevationProfile';
-import { styled } from '@mui/material/styles';
-import { Box } from '@mui/material';
-import { IconButton } from '@mui/material';
+import { ButtonBase, IconButton, Box } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { PresentationRouteDescriptionPanel } from '../RouteDescription';
+import { PresentationWeatherProfile } from '../WeatherProfile/PresentationWeatherProfile';
+import { ElevationPanel, TabContainer, CollapseButton } from './PresentationElevationProfile.styles';
 
-const ElevationPanel = styled(Box)(({ theme }) => ({
-  position: 'fixed',
-  bottom: 0,
-  left: '56px', // Width of the sidebar
-  right: 0,
-  backgroundColor: 'rgba(26, 26, 26, 0.9)',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-  transition: theme.transitions.create('transform', {
-    duration: theme.transitions.duration.standard,
-    easing: theme.transitions.easing.easeInOut,
-  }),
-  zIndex: 102,
-  height: 220,
-  '&.collapsed': {
-    transform: 'translateY(220px)'
-  }
-}));
+type TabType = 'elevation' | 'description' | 'weather';
 
 interface PresentationElevationProfilePanelProps {
   route: ProcessedRoute;
@@ -35,35 +20,71 @@ export const PresentationElevationProfilePanel = ({
   header
 }: PresentationElevationProfilePanelProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('elevation');
+
+  useEffect(() => {
+    console.log('PresentationElevationProfilePanel MOUNTED!');
+  }, []);
+
+  const TabButton = ({ tab, label }: { tab: TabType; label: string }) => (
+    <ButtonBase
+      onClick={() => setActiveTab(tab)}
+      sx={{
+        backgroundColor: 'rgba(26, 26, 26, 0.9)',
+        color: 'white',
+        padding: '4px 12px',
+        borderRadius: '4px 4px 0 0',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderBottom: activeTab === tab ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+        marginRight: '4px',
+        '&:hover': {
+          backgroundColor: 'rgba(35, 35, 35, 0.9)'
+        }
+      }}
+    >
+      {label}
+    </ButtonBase>
+  );
 
   return (
     <ElevationPanel className={isCollapsed ? 'collapsed' : ''}>
-      <div style={{ 
-        position: 'absolute', 
-        top: '-24px', 
-        right: '16px',
-        backgroundColor: 'rgba(26, 26, 26, 0.9)',
-        borderRadius: '4px 4px 0 0',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderBottom: 'none',
-        zIndex: 102
-      }}>
-        <IconButton
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          size="small"
-          sx={{ 
-            color: 'white',
-            padding: '2px',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
-            }
-          }}
-        >
-          {isCollapsed ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-        </IconButton>
-      </div>
+      <TabContainer>
+        <TabButton tab="elevation" label="Elevation" />
+        <TabButton tab="description" label="Description" />
+        <TabButton tab="weather" label="Weather" />
+        <CollapseButton>
+          <IconButton
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            size="small"
+            sx={{ 
+              color: 'white',
+              padding: '2px',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
+          >
+            {isCollapsed ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </CollapseButton>
+      </TabContainer>
+
       {header}
-      {route && <PresentationElevationProfile route={route} />}
+      <Box sx={{ 
+        height: '100%', 
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'rgba(26, 26, 26, 0.9)',
+        '& > *': {
+          flex: 1,
+          minHeight: 0
+        }
+      }}>
+        {route && activeTab === 'elevation' && <PresentationElevationProfile route={route} isLoading={false} />}
+        {route && activeTab === 'description' && <PresentationRouteDescriptionPanel route={route} />}
+        {route && activeTab === 'weather' && <PresentationWeatherProfile route={route} />}
+      </Box>
     </ElevationPanel>
   );
 };

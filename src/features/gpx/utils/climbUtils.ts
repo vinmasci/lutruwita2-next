@@ -15,6 +15,7 @@ export interface Climb {
   fietsScore: number;       // FIETS score for climb difficulty
   category: ClimbCategory;  // Climb category based on FIETS score
   color: string;           // Color code for the category
+  number?: number;         // Sequential number within category (added for display purposes)
 }
 
 // Configuration for climb detection
