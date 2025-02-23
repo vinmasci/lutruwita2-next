@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Alert, Box, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider, Popover } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { getRouteDistance, getUnpavedPercentage, getElevationGain, getElevationLoss } from '../../utils/routeUtils';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -10,13 +10,38 @@ import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DraggableRouteItem } from './DraggableRouteItem';
+import { PRESET_COLORS, validateHexColor } from './constants';
+
+const ColorButton = ({ color, onClick, sx }) => (
+    <Box
+        onClick={onClick}
+        sx={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            transition: 'all 0.2s ease-in-out',
+            backgroundColor: color,
+            '&:hover': {
+                transform: 'scale(1.1)',
+                border: '1px solid rgba(255, 255, 255, 0.4)',
+            },
+            ...sx
+        }}
+    />
+);
 
 const UploaderUI = ({ isLoading, error, onFileAdd, onFileDelete, onFileRename }) => {
     const [editing, setEditing] = useState(null);
-    const { routes, currentRoute, setCurrentRoute, reorderRoutes } = useRouteContext();
+    const { routes, currentRoute, setCurrentRoute, reorderRoutes, updateRoute } = useRouteContext();
     const [localRoutes, setLocalRoutes] = useState(routes);
+    const [colorPickerAnchor, setColorPickerAnchor] = useState(null);
+    const [selectedRouteId, setSelectedRouteId] = useState(null);
+    const [customColor, setCustomColor] = useState('');
+    const [customColorError, setCustomColorError] = useState('');
 
     useEffect(() => {
         setLocalRoutes(routes);
@@ -71,6 +96,24 @@ const UploaderUI = ({ isLoading, error, onFileAdd, onFileDelete, onFileRename })
         e.stopPropagation();
         if (editing) {
             setEditing({ ...editing, newName: e.target.value });
+        }
+    };
+
+    const handleColorClick = (e, routeId) => {
+        e.stopPropagation();
+        setColorPickerAnchor(e.currentTarget);
+        setSelectedRouteId(routeId);
+    };
+
+    const handleColorClose = () => {
+        setColorPickerAnchor(null);
+        setSelectedRouteId(null);
+    };
+
+    const handleColorSelect = (color) => {
+        if (selectedRouteId) {
+            updateRoute(selectedRouteId, { color });
+            handleColorClose();
         }
     };
 
@@ -154,6 +197,13 @@ const UploaderUI = ({ isLoading, error, onFileAdd, onFileDelete, onFileRename })
                             >
                                 <DeleteIcon fontSize="small" />
                             </IconButton>
+                        </Box>
+                        <Box sx={{ position: 'absolute', right: '12px', top: '60px' }}>
+                            <ColorButton
+                                color={route.color || '#ee5253'}
+                                onClick={(e) => handleColorClick(e, route.routeId || route.id)}
+                                sx={{ width: '18px', height: '18px' }}
+                            />
                         </Box>
                     </Box>
 
@@ -276,6 +326,87 @@ const UploaderUI = ({ isLoading, error, onFileAdd, onFileDelete, onFileRename })
                     </SortableContext>
                 </DndContext>
             )}
+
+            <Popover
+                open={Boolean(colorPickerAnchor)}
+                anchorEl={colorPickerAnchor}
+                onClose={handleColorClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'left',
+                }}
+            >
+                <Box sx={{ 
+                    p: 1.5,
+                    backgroundColor: 'rgba(35, 35, 35, 0.95)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2
+                }}>
+                    <Box sx={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(8, 1fr)', 
+                        gap: 0.5
+                    }}>
+                        {PRESET_COLORS.map((color) => (
+                            <ColorButton
+                                key={color}
+                                color={color}
+                                onClick={() => handleColorSelect(color)}
+                            />
+                        ))}
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+                        <TextField
+                            label="Custom Color"
+                            placeholder="#RRGGBB"
+                            value={customColor}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setCustomColor(value);
+                                if (value && !validateHexColor(value)) {
+                                    setCustomColorError('Invalid hex color');
+                                } else {
+                                    setCustomColorError('');
+                                }
+                            }}
+                            error={!!customColorError}
+                            helperText={customColorError}
+                            size="small"
+                            sx={{
+                                flex: 1,
+                                '& .MuiInputBase-root': {
+                                    color: 'white',
+                                },
+                                '& .MuiInputLabel-root': {
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                },
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                    borderColor: 'rgba(255, 255, 255, 0.23)',
+                                },
+                            }}
+                        />
+                        <Button
+                            variant="contained"
+                            disabled={!customColor || !!customColorError}
+                            onClick={() => {
+                                if (customColor && !customColorError) {
+                                    handleColorSelect(customColor);
+                                    setCustomColor('');
+                                }
+                            }}
+                            sx={{ minWidth: 'auto' }}
+                        >
+                            Apply
+                        </Button>
+                    </Box>
+                </Box>
+            </Popover>
 
             {error && (
                 <Alert severity="error" sx={{ mt: 2 }}>

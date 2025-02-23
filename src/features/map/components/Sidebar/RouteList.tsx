@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouteState } from '../../hooks/useRouteState';
+import { ProcessedRoute, RouteListItem } from '../../types/route.types';
 import {
   List,
   ListItem,
@@ -24,10 +25,44 @@ import {
   ClickAwayListener,
   Box,
   useTheme,
+  Popover,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { styled } from '@mui/material/styles';
+
+const ColorButton = styled(Box)(({ theme }) => ({
+  width: '24px',
+  height: '24px',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  transition: 'all 0.2s ease-in-out',
+  '&:hover': {
+    transform: 'scale(1.1)',
+    border: '1px solid rgba(255, 255, 255, 0.4)',
+  }
+}));
+
+const PRESET_COLORS = [
+  '#f44336', // Red
+  '#e91e63', // Pink
+  '#9c27b0', // Purple
+  '#673ab7', // Deep Purple
+  '#3f51b5', // Indigo
+  '#2196f3', // Blue
+  '#03a9f4', // Light Blue
+  '#00bcd4', // Cyan
+  '#009688', // Teal
+  '#4caf50', // Green
+  '#8bc34a', // Light Green
+  '#cddc39', // Lime
+  '#ffeb3b', // Yellow
+  '#ffc107', // Amber
+  '#ff9800', // Orange
+  '#ff5722'  // Deep Orange
+];
 
 const StyledListItem = styled(ListItem)(({ theme }) => ({
   backgroundColor: 'rgba(35, 35, 35, 0.9)',
@@ -76,6 +111,10 @@ export const RouteList = () => {
 
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [colorAnchorEl, setColorAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [customColor, setCustomColor] = useState('');
+  const [customColorError, setCustomColorError] = useState('');
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveForm, setSaveForm] = useState({
@@ -126,6 +165,24 @@ export const RouteList = () => {
     }
   };
 
+  const handleColorClick = (event: React.MouseEvent<HTMLElement>, routeId: string) => {
+    event.stopPropagation();
+    setColorAnchorEl(event.currentTarget);
+    setSelectedRouteId(routeId);
+  };
+
+  const handleColorClose = () => {
+    setColorAnchorEl(null);
+    setSelectedRouteId(null);
+  };
+
+  const handleColorSelect = (color: string) => {
+    if (selectedRouteId) {
+      updateRoute(selectedRouteId, { color });
+      handleColorClose();
+    }
+  };
+
   return (
     <>
       {/* Current Routes Section */}
@@ -142,7 +199,7 @@ export const RouteList = () => {
         </Button>
 
         {/* Local Routes */}
-        {routes.map((route) => (
+        {routes.map((route: ProcessedRoute) => (
           <StyledListItem
             key={route.id}
             className={`${currentRoute?.id === route.id ? 'selected' : ''} ${route.isFocused ? 'focused' : ''}`}
@@ -184,43 +241,74 @@ export const RouteList = () => {
                 />
               </ClickAwayListener>
             ) : (
-              <ListItemText 
-                primary={route.name}
-                secondary={
-                  <Box sx={{ 
-                    fontSize: '0.875rem',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    mt: 0.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2
-                  }}>
-                    <span>{(route.statistics.totalDistance / 1000).toFixed(1)}km</span>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <i className="fa-solid fa-up-right" style={{ color: '#2196f3' }}></i>
-                      <span>{route.statistics.elevationGain}m</span>
+              <>
+                <ListItemText 
+                  primary={route.name}
+                  secondary={
+                    <Box sx={{ 
+                      fontSize: '0.875rem',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      mt: 0.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2
+                    }}>
+                      <span>{(route.statistics.totalDistance / 1000).toFixed(1)}km</span>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <i className="fa-solid fa-up-right" style={{ color: '#2196f3' }}></i>
+                        <span>{route.statistics.elevationGain}m</span>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <i className="fa-solid fa-down-right" style={{ color: '#2196f3' }}></i>
+                        <span>{route.statistics.elevationLoss}m</span>
+                      </Box>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <i className="fa-solid fa-down-right" style={{ color: '#2196f3' }}></i>
-                      <span>{route.statistics.elevationLoss}m</span>
-                    </Box>
+                  }
+                  sx={{ color: 'white' }}
+                  onClick={() => {
+                    if (route.isFocused && route.routeId) {
+                      unfocusRoute(route.routeId);
+                    } else if (route.routeId) {
+                      focusRoute(route.routeId);
+                    }
+                  }}
+                  onDoubleClick={() => {
+                    if (route.routeId) {
+                      setEditingRouteId(route.routeId);
+                      setEditingName(route.name);
+                    }
+                  }}
+                />
+                <Box sx={{ position: 'absolute', right: '40px', top: '32px', display: 'flex', gap: 1 }}>
+                  <ColorButton
+                    onClick={(e) => handleColorClick(e, route.id)}
+                    sx={{ backgroundColor: route.color }}
+                  />
+                  <Box
+                    sx={{
+                      cursor: 'grab',
+                      display: 'flex',
+                      alignItems: 'center',
+                      opacity: 0.7,
+                      padding: '4px',
+                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      '&:hover': {
+                        opacity: 1,
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      },
+                      '&:active': {
+                        cursor: 'grabbing',
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                      },
+                      touchAction: 'none',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <DragIndicatorIcon fontSize="small" />
                   </Box>
-                }
-                sx={{ color: 'white' }}
-                onClick={() => {
-                  if (route.isFocused && route.routeId) {
-                    unfocusRoute(route.routeId);
-                  } else if (route.routeId) {
-                    focusRoute(route.routeId);
-                  }
-                }}
-                onDoubleClick={() => {
-                  if (route.routeId) {
-                    setEditingRouteId(route.routeId);
-                    setEditingName(route.name);
-                  }
-                }}
-              />
+                </Box>
+              </>
             )}
           </StyledListItem>
         ))}
@@ -266,6 +354,88 @@ export const RouteList = () => {
           ))
         )}
       </List>
+
+      {/* Color Picker Popover */}
+      <Popover
+        open={Boolean(colorAnchorEl)}
+        anchorEl={colorAnchorEl}
+        onClose={handleColorClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ 
+          p: 2,
+          backgroundColor: 'rgba(35, 35, 35, 0.95)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(4, 1fr)', 
+            gap: 0.5
+          }}>
+            {PRESET_COLORS.map((color) => (
+              <ColorButton
+                key={color}
+                onClick={() => handleColorSelect(color)}
+                sx={{ backgroundColor: color }}
+              />
+            ))}
+          </Box>
+          
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+            <TextField
+              label="Custom Color"
+              placeholder="#RRGGBB"
+              value={customColor}
+              onChange={(e) => {
+                const value = e.target.value;
+                setCustomColor(value);
+                if (value && !value.match(/^#[0-9A-Fa-f]{6}$/)) {
+                  setCustomColorError('Invalid hex color');
+                } else {
+                  setCustomColorError('');
+                }
+              }}
+              error={!!customColorError}
+              helperText={customColorError}
+              size="small"
+              sx={{
+                flex: 1,
+                '& .MuiInputBase-root': {
+                  color: 'white',
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'rgba(255, 255, 255, 0.7)',
+                },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.23)',
+                },
+              }}
+            />
+            <Button
+              variant="contained"
+              disabled={!customColor || !!customColorError}
+              onClick={() => {
+                if (customColor && !customColorError) {
+                  handleColorSelect(customColor);
+                  setCustomColor('');
+                }
+              }}
+              sx={{ minWidth: 'auto' }}
+            >
+              Apply
+            </Button>
+          </Box>
+        </Box>
+      </Popover>
 
       {/* Save Dialog */}
       <SaveDialog

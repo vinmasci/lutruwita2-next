@@ -45,13 +45,25 @@ export const PlaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [places]);
 
   const updatePlace = async (id: string, updates: Partial<Place>) => {
-    setPlaces(prevPlaces => ({
-      ...prevPlaces,
-      [id]: {
-        ...(prevPlaces[id] || {}),
-        ...updates,
-      } as Place
-    }));
+    try {
+      return new Promise<void>((resolve) => {
+        setPlaces(prevPlaces => {
+          const updatedPlaces = {
+            ...prevPlaces,
+            [id]: {
+              ...(prevPlaces[id] || {}),
+              ...updates,
+            } as Place
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPlaces));
+          resolve();
+          return updatedPlaces;
+        });
+      });
+    } catch (error) {
+      console.error('Failed to update place:', error);
+      throw error;
+    }
   };
 
   return (

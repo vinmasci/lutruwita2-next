@@ -193,19 +193,20 @@ export const PlacePOILayer: React.FC<Props> = () => {
         poi.coordinates[1] === place.coordinates[1]
       );
 
-      // Get place data if it exists, or create and save new place
-      const placeData = places[place.id] || {
-        id: place.id,
-        name: place.name,
-        coordinates: place.coordinates,
-        description: '',
-        photos: []
-      };
-
       // Only show details drawer if we're not in place mode or if the place has POIs
       if (poiMode !== 'place' || hasPOIs) {
-        // If this is a new place, save it first
-        if (!places[place.id]) {
+        // Get existing place data or create new if it doesn't exist
+        const existingPlace = places[place.id];
+        const placeData: Place = existingPlace || {
+          id: place.id,
+          name: place.name,
+          coordinates: place.coordinates,
+          description: '',
+          photos: []
+        };
+
+        // Only save if it's a new place
+        if (!existingPlace) {
           await updatePlace(place.id, placeData);
         }
         setSelectedPlace(placeData);
@@ -263,11 +264,64 @@ export const PlacePOILayer: React.FC<Props> = () => {
     markersRef.current.forEach(({ marker }) => marker.remove());
     markersRef.current = [];
 
+      // Helper function to get place ID from coordinates
+      const getPlaceId = (coordinates: [number, number]): string => {
+        // First check if there are any POIs at these coordinates
+        const existingPOI = pois.find(
+          poi => poi.type === 'place' && 
+          poi.coordinates[0] === coordinates[0] && 
+          poi.coordinates[1] === coordinates[1]
+        ) as PlaceNamePOI | undefined;
+
+        if (existingPOI) {
+          console.debug('[PlacePOILayer] Found existing POI:', {
+            coordinates,
+            placeId: existingPOI.placeId
+          });
+          return existingPOI.placeId;
+        }
+
+        // If no POI found, try to get the place label from the map
+        const point = map.project(coordinates);
+        const placeLabel = getPlaceLabelAtPoint(map, point);
+        
+        if (placeLabel) {
+          console.debug('[PlacePOILayer] Found place label:', {
+            coordinates,
+            labelId: placeLabel.id,
+            name: placeLabel.name
+          });
+          return placeLabel.id;
+        }
+
+        // If no place label found, look for existing place by coordinates
+        const existingPlace = Object.values(places).find(
+          place => place.coordinates[0] === coordinates[0] && place.coordinates[1] === coordinates[1]
+        );
+        if (existingPlace) {
+          console.debug('[PlacePOILayer] Found existing place:', {
+            coordinates,
+            existingId: existingPlace.id,
+            description: existingPlace.description
+          });
+          return existingPlace.id;
+        }
+
+        // If no existing place found, use coordinate format as fallback
+        const coordinateId = `${coordinates[0]},${coordinates[1]}`;
+        console.debug('[PlacePOILayer] No place found:', {
+          coordinates,
+          usingCoordinateId: coordinateId
+        });
+        return coordinateId;
+      };
+
       // Get all place POIs and create missing places
       const placePois = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
       for (const poi of placePois) {
-        const placeId = `${poi.coordinates[0]},${poi.coordinates[1]}`;
-        if (!places[placeId]) {
+        const placeId = getPlaceId(poi.coordinates);
+        const existingPlace = places[placeId];
+        if (!existingPlace) {
           await updatePlace(placeId, {
             id: placeId,
             name: poi.name,
@@ -359,19 +413,15 @@ export const PlacePOILayer: React.FC<Props> = () => {
         el.appendChild(container);
         
         // Add click handler to open drawer
-        el.addEventListener('click', async () => {
-          const placeData: Place = {
-            id: coordKey,
-            name: poi.name,
-            coordinates: [lng, lat] as [number, number],
-            description: '',
-            photos: []
-          };
-
-          // Save place data
-          await updatePlace(coordKey, placeData);
-
-          setSelectedPlace(placeData);
+        el.addEventListener('click', () => {
+          const point = map.project([lng, lat]);
+          const place = getPlaceLabelAtPoint(map, point);
+          if (!place) return;
+          
+          const existingPlace = places[place.id];
+          if (existingPlace) {
+            setSelectedPlace(existingPlace);
+          }
         });
 
         // Create and add marker
@@ -403,19 +453,15 @@ export const PlacePOILayer: React.FC<Props> = () => {
           el.appendChild(container);
           
           // Add click handler to open drawer
-          el.addEventListener('click', async () => {
-            const placeData: Place = {
-              id: coordKey,
-              name: locationPois[0].name,
-              coordinates: [lng, lat] as [number, number],
-              description: '',
-              photos: []
-            };
-
-            // Save place data
-            await updatePlace(coordKey, placeData);
-
-            setSelectedPlace(placeData);
+          el.addEventListener('click', () => {
+            const point = map.project([lng, lat]);
+            const place = getPlaceLabelAtPoint(map, point);
+            if (!place) return;
+            
+            const existingPlace = places[place.id];
+            if (existingPlace) {
+              setSelectedPlace(existingPlace);
+            }
           });
 
           // Create and add marker
@@ -450,8 +496,8 @@ export const PlacePOILayer: React.FC<Props> = () => {
       onClose={() => setSelectedPlace(null)}
       placeId={selectedPlace?.id || null}
       placeName={selectedPlace?.name || ''}
-      description={selectedPlace?.description}
-      photos={selectedPlace?.photos}
+      description={selectedPlace?.description || ''}
+      photos={selectedPlace?.photos || []}
     />
   );
 };

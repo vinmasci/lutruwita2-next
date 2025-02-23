@@ -89,12 +89,10 @@ export const PresentationPhotoLayer = () => {
             center: [lng, lat],
             zoom: targetZoom
         });
-        // If it's a small cluster, show the photos
-        if (cluster.properties.point_count <= 4) {
-            setSelectedCluster(cluster.properties.photos);
-            if (cluster.properties.point_count === 1) {
-                setSelectedPhoto(cluster.properties.photos[0]);
-            }
+        // Only show one photo at a time
+        if (cluster.properties.point_count === 1) {
+            setSelectedPhoto(cluster.properties.photos[0]);
+            setSelectedCluster(null);
         }
     }, [map, clusteredItems]);
     return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(PhotoPreviewModal, { photo: selectedPhoto, onClose: () => {

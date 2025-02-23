@@ -11,31 +11,35 @@ import { getIconDefinition } from '../../constants/poi-icons';
 import { ICON_PATHS } from '../../constants/icon-paths';
 import { createPOIPhotos } from '../../utils/photo';
 import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoPreviewModal';
+
 const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, description: initialDescription = '', photos: initialPhotos = [] }) => {
     const { pois } = usePOIContext();
     const { updatePlace } = usePlaceContext();
     const [hoveredIcon, setHoveredIcon] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [description, setDescription] = useState(initialDescription);
+    const [description, setDescription] = useState('');
     const [newPhotos, setNewPhotos] = useState([]);
-    const [existingPhotos, setExistingPhotos] = useState(initialPhotos);
+    const [existingPhotos, setExistingPhotos] = useState([]);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
-    // Reset form state when drawer opens/closes or place changes
+    const [isDirty, setIsDirty] = useState(false);
+
+    // Initialize or update state when drawer opens with new place
     useEffect(() => {
         if (isOpen) {
             setDescription(initialDescription);
-            setNewPhotos([]);
             setExistingPhotos(initialPhotos);
+            setNewPhotos([]);
             setIsEditing(false);
             setIsSaving(false);
+            setIsDirty(false);
         }
-    }, [isOpen, placeId, initialDescription, initialPhotos]);
-    // Get POIs associated with this place and memoize to prevent unnecessary recalculations
+    }, [isOpen, initialDescription, initialPhotos]);
+
     const placePOIs = React.useMemo(() => pois.filter((poi) => poi.type === 'place' &&
         placeId !== null &&
         poi.placeId === placeId), [pois, placeId]);
-    // Group POIs by category
+
     const poiGroups = React.useMemo(() => placePOIs.reduce((acc, poi) => {
         if (!acc[poi.category]) {
             acc[poi.category] = [];
@@ -43,11 +47,24 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
         acc[poi.category].push(poi);
         return acc;
     }, {}), [placePOIs]);
+
     const handlePhotoChange = (event) => {
         if (event.target.files) {
             setNewPhotos(Array.from(event.target.files));
+            setIsDirty(true);
         }
     };
+
+    const handleDescriptionChange = (e) => {
+        setDescription(e.target.value);
+        setIsDirty(true);
+    };
+
+    const handleDeletePhoto = (index) => {
+        setExistingPhotos(photos => photos.filter((_, i) => i !== index));
+        setIsDirty(true);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!placeId) {
@@ -56,22 +73,18 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
         }
         setIsSaving(true);
         try {
-            // Process new photos first
             const processedPhotos = await createPOIPhotos(newPhotos);
-            // Convert processed photos to PlacePhoto format
             const newPlacePhotos = processedPhotos.map(photo => ({
                 url: photo.url,
                 caption: photo.caption
             }));
-            // Update place with new data
             await updatePlace(placeId, {
                 description,
                 photos: [...existingPhotos, ...newPlacePhotos]
             });
-            // Clear state and close drawer
             setNewPhotos([]);
             setIsEditing(false);
-            onClose();
+            setIsDirty(false);
         }
         catch (error) {
             console.error('Failed to save place details:', error);
@@ -80,66 +93,169 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
             setIsSaving(false);
         }
     };
-    return (_jsxs(NestedDrawer, { anchor: "left", open: isOpen, onClose: () => {
+
+    const handleCancel = () => {
+        if (!isSaving) {
+            setDescription(initialDescription);
+            setExistingPhotos(initialPhotos);
+            setNewPhotos([]);
+            setIsEditing(false);
+            setIsDirty(false);
+        }
+    };
+
+    return _jsxs(NestedDrawer, {
+        anchor: "left",
+        open: isOpen,
+        onClose: () => {
             if (!isSaving) {
-                setIsEditing(false);
-                onClose();
+                if (isDirty) {
+                    if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+                        handleCancel();
+                        onClose();
+                    }
+                } else {
+                    onClose();
+                }
             }
-        }, variant: "persistent", sx: {
-            zIndex: 1300 // Higher than POIDrawer
-        }, children: [isSaving && (_jsx(Box, { sx: {
+        },
+        variant: "persistent",
+        sx: { zIndex: 1300 },
+        children: [
+            // Loading overlay
+            isSaving && _jsx(Box, {
+                sx: {
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    backgroundColor: 'rgb(0, 0, 0)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 9999
-                }, children: _jsx(CircularProgress, {}) })), _jsxs(DrawerHeader, { children: [_jsx(IconButton, { onClick: () => {
+                },
+                children: _jsx(CircularProgress, {})
+            }),
+
+            // Header
+            _jsxs(DrawerHeader, {
+                children: [
+                    _jsx(IconButton, {
+                        onClick: () => {
                             if (!isSaving) {
-                                onClose();
+                                if (isDirty) {
+                                    if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+                                        handleCancel();
+                                        onClose();
+                                    }
+                                } else {
+                                    onClose();
+                                }
                             }
-                        }, sx: {
+                        },
+                        sx: {
                             color: 'white',
                             '&:hover': {
                                 backgroundColor: 'rgb(45, 45, 45)'
                             }
-                        }, children: _jsx(ChevronLeft, {}) }), _jsx(Typography, { variant: "h6", children: placeName })] }), _jsx(DrawerContent, { children: _jsx("form", { onSubmit: handleSubmit, style: { height: '100%' }, children: _jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }, children: [_jsxs(Box, { sx: { mb: 3 }, children: [_jsx(Typography, { variant: "subtitle2", color: "text.secondary", gutterBottom: true, children: "About this place" }), isEditing ? (_jsx(TextField, { label: "Description", value: description, onChange: (e) => setDescription(e.target.value), multiline: true, rows: 4, fullWidth: true, variant: "outlined", size: "small", disabled: isSaving, sx: {
-                                            backgroundColor: 'rgb(45, 45, 45)',
-                                            '& .MuiOutlinedInput-root': {
-                                                '& fieldset': {
-                                                    borderColor: 'rgb(255, 255, 255)',
+                        },
+                        children: _jsx(ChevronLeft, {})
+                    }),
+                    _jsx(Typography, {
+                        variant: "h6",
+                        children: placeName
+                    })
+                ]
+            }),
+
+            // Content
+            _jsx(DrawerContent, {
+                children: _jsx("form", {
+                    onSubmit: handleSubmit,
+                    style: { height: '100%' },
+                    children: _jsxs(Box, {
+                        sx: { display: 'flex', flexDirection: 'column', gap: 2, height: '100%' },
+                        children: [
+                            // Description section
+                            _jsxs(Box, {
+                                sx: { mb: 3 },
+                                children: [
+                                    _jsx(Typography, {
+                                        variant: "subtitle2",
+                                        color: "text.secondary",
+                                        gutterBottom: true,
+                                        children: "About this place"
+                                    }),
+                                    isEditing ? (
+                                        _jsx(TextField, {
+                                            label: "Description",
+                                            value: description,
+                                            onChange: handleDescriptionChange,
+                                            multiline: true,
+                                            rows: 4,
+                                            fullWidth: true,
+                                            variant: "outlined",
+                                            size: "small",
+                                            disabled: isSaving,
+                                            sx: {
+                                                backgroundColor: 'rgb(45, 45, 45)',
+                                                '& .MuiOutlinedInput-root': {
+                                                    '& fieldset': {
+                                                        borderColor: 'rgb(255, 255, 255)',
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: 'rgb(255, 255, 255)',
+                                                    },
+                                                    '&.Mui-focused fieldset': {
+                                                        borderColor: 'rgb(255, 255, 255)',
+                                                    }
                                                 },
-                                                '&:hover fieldset': {
-                                                    borderColor: 'rgb(255, 255, 255)',
+                                                '& .MuiInputLabel-root': {
+                                                    color: 'rgb(255, 255, 255)'
                                                 },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: 'rgb(255, 255, 255)',
+                                                '& .MuiOutlinedInput-input': {
+                                                    color: 'rgb(255, 255, 255)'
                                                 }
-                                            },
-                                            '& .MuiInputLabel-root': {
-                                                color: 'rgb(255, 255, 255)'
-                                            },
-                                            '& .MuiOutlinedInput-input': {
-                                                color: 'rgb(255, 255, 255)'
                                             }
-                                        } })) : (_jsx(Typography, { variant: "body1", sx: { whiteSpace: 'pre-wrap' }, children: description || 'No description available' }))] }), Object.entries(poiGroups).map(([category, pois]) => {
+                                        })
+                                    ) : (
+                                        _jsx(Typography, {
+                                            variant: "body1",
+                                            sx: { whiteSpace: 'pre-wrap' },
+                                            children: description || 'No description available'
+                                        })
+                                    )
+                                ]
+                            }),
+
+                            // POIs section
+                            Object.entries(poiGroups).map(([category, pois]) => {
                                 const categoryInfo = POI_CATEGORIES[category];
-                                return (_jsxs(Box, { sx: { mb: 2 }, children: [_jsx(Typography, { variant: "caption", sx: {
+                                return _jsxs(Box, {
+                                    sx: { mb: 2 },
+                                    children: [
+                                        _jsx(Typography, {
+                                            variant: "caption",
+                                            sx: {
                                                 color: 'white',
                                                 mb: 0.5,
                                                 display: 'block',
                                                 fontSize: '0.7rem',
                                                 opacity: 0.7,
                                                 letterSpacing: '0.5px'
-                                            }, children: categoryInfo.label }), _jsx(IconGrid, { children: pois.map((poi) => {
+                                            },
+                                            children: categoryInfo.label
+                                        }),
+                                        _jsx(IconGrid, {
+                                            children: pois.map((poi) => {
                                                 const iconDef = getIconDefinition(poi.icon);
-                                                if (!iconDef)
-                                                    return null;
-                                                return (_jsxs(IconGridItem, { onMouseEnter: () => setHoveredIcon(poi.id), onMouseLeave: () => setHoveredIcon(null), sx: {
+                                                if (!iconDef) return null;
+                                                return _jsxs(IconGridItem, {
+                                                    onMouseEnter: () => setHoveredIcon(poi.id),
+                                                    onMouseLeave: () => setHoveredIcon(null),
+                                                    sx: {
                                                         position: 'relative',
                                                         width: '20px',
                                                         height: '20px',
@@ -148,9 +264,39 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center'
-                                                    }, children: [_jsx("i", { className: ICON_PATHS[iconDef.name], style: { fontSize: '12px', color: 'white' } }), hoveredIcon === poi.id && (_jsx(StyledTooltip, { children: poi.name }))] }, poi.id));
-                                            }) })] }, category));
-                            }), _jsxs(Box, { sx: { mt: 2 }, children: [_jsx(Typography, { variant: "subtitle2", color: "text.secondary", gutterBottom: true, children: "Photos" }), isEditing && (_jsxs(Button, { component: "label", variant: "outlined", fullWidth: true, disabled: isSaving, sx: {
+                                                    },
+                                                    children: [
+                                                        _jsx("i", {
+                                                            className: ICON_PATHS[iconDef.name],
+                                                            style: { fontSize: '12px', color: 'white' }
+                                                        }),
+                                                        hoveredIcon === poi.id && _jsx(StyledTooltip, {
+                                                            children: poi.name
+                                                        })
+                                                    ]
+                                                }, poi.id);
+                                            })
+                                        })
+                                    ]
+                                }, category);
+                            }),
+
+                            // Photos section
+                            _jsxs(Box, {
+                                sx: { mt: 2 },
+                                children: [
+                                    _jsx(Typography, {
+                                        variant: "subtitle2",
+                                        color: "text.secondary",
+                                        gutterBottom: true,
+                                        children: "Photos"
+                                    }),
+                                    isEditing && _jsxs(Button, {
+                                        component: "label",
+                                        variant: "outlined",
+                                        fullWidth: true,
+                                        disabled: isSaving,
+                                        sx: {
                                             backgroundColor: 'rgb(45, 45, 45)',
                                             borderColor: 'rgb(255, 255, 255)',
                                             color: 'rgb(255, 255, 255)',
@@ -158,14 +304,29 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
                                                 borderColor: 'rgb(255, 255, 255)',
                                                 backgroundColor: 'rgb(45, 45, 45)'
                                             }
-                                        }, children: ["Add Photos", _jsx("input", { type: "file", hidden: true, multiple: true, accept: "image/*", onChange: handlePhotoChange, disabled: isSaving })] })), existingPhotos && existingPhotos.length > 0 && (_jsx(Box, { sx: {
+                                        },
+                                        children: [
+                                            "Add Photos",
+                                            _jsx("input", {
+                                                type: "file",
+                                                hidden: true,
+                                                multiple: true,
+                                                accept: "image/*",
+                                                onChange: handlePhotoChange,
+                                                disabled: isSaving
+                                            })
+                                        ]
+                                    }),
+                                    existingPhotos && existingPhotos.length > 0 && _jsx(Box, {
+                                        sx: {
                                             display: 'grid',
                                             gridTemplateColumns: 'repeat(2, 1fr)',
                                             gap: 1,
                                             mt: 2
-                                        }, children: existingPhotos.map((photo, index) => (_jsxs(ButtonBase, { onClick: () => {
+                                        },
+                                        children: existingPhotos.map((photo, index) => _jsxs(ButtonBase, {
+                                            onClick: () => {
                                                 if (!isSaving) {
-                                                    // Convert PlacePhoto to ProcessedPhoto format
                                                     const processedPhoto = {
                                                         id: String(index),
                                                         name: photo.caption || `Photo ${index + 1}`,
@@ -176,7 +337,8 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
                                                     };
                                                     setSelectedPhoto(processedPhoto);
                                                 }
-                                            }, sx: {
+                                            },
+                                            sx: {
                                                 display: 'block',
                                                 width: '100%',
                                                 aspectRatio: '1',
@@ -184,14 +346,24 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
                                                 borderRadius: 1,
                                                 overflow: 'hidden',
                                                 position: 'relative'
-                                            }, children: [_jsx("img", { src: photo.url, alt: photo.caption || `Photo ${index + 1}`, style: {
+                                            },
+                                            children: [
+                                                _jsx("img", {
+                                                    src: photo.url,
+                                                    alt: photo.caption || `Photo ${index + 1}`,
+                                                    style: {
                                                         width: '100%',
                                                         height: '100%',
                                                         objectFit: 'cover'
-                                                    } }), isEditing && !isSaving && (_jsx(IconButton, { size: "small", onClick: (e) => {
-                                                        e.stopPropagation(); // Prevent opening preview when deleting
-                                                        setExistingPhotos(photos => photos.filter((_, i) => i !== index));
-                                                    }, sx: {
+                                                    }
+                                                }),
+                                                isEditing && !isSaving && _jsx(IconButton, {
+                                                    size: "small",
+                                                    onClick: (e) => {
+                                                        e.stopPropagation();
+                                                        handleDeletePhoto(index);
+                                                    },
+                                                    sx: {
                                                         position: 'absolute',
                                                         top: 4,
                                                         right: 4,
@@ -199,22 +371,51 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
                                                         '&:hover': {
                                                             backgroundColor: 'rgb(0, 0, 0)'
                                                         }
-                                                    }, children: _jsx(Delete, { sx: { fontSize: 16, color: 'white' } }) }))] }, index))) })), isEditing && newPhotos.length > 0 && (_jsx(Box, { sx: {
+                                                    },
+                                                    children: _jsx(Delete, {
+                                                        sx: { fontSize: 16, color: 'white' }
+                                                    })
+                                                })
+                                            ]
+                                        }, index))
+                                    }),
+                                    isEditing && newPhotos.length > 0 && _jsx(Box, {
+                                        sx: {
                                             display: 'grid',
                                             gridTemplateColumns: 'repeat(2, 1fr)',
                                             gap: 1,
                                             mt: 2
-                                        }, children: newPhotos.map((photo, index) => (_jsxs(Box, { sx: {
+                                        },
+                                        children: newPhotos.map((photo, index) => _jsxs(Box, {
+                                            sx: {
                                                 aspectRatio: '1',
                                                 backgroundColor: 'rgb(35, 35, 35)',
                                                 borderRadius: 1,
                                                 overflow: 'hidden',
                                                 position: 'relative'
-                                            }, children: [_jsx("img", { src: URL.createObjectURL(photo), alt: `Upload ${index + 1}`, style: {
+                                            },
+                                            children: [
+                                                _jsx("img", {
+                                                    src: URL.createObjectURL(photo),
+                                                    alt: `Upload ${index + 1}`,
+                                                    style: {
                                                         width: '100%',
                                                         height: '100%',
                                                         objectFit: 'cover'
-                                                    } }), !isSaving && (_jsx(IconButton, { size: "small", onClick: () => setNewPhotos(photos => photos.filter((_, i) => i !== index)), sx: {
+                                                    }
+                                                }),
+                                                !isSaving && _jsx(IconButton, {
+                                                    size: "small",
+                                                    onClick: () => {
+                                                        setNewPhotos(photos => {
+                                                            const newPhotos = photos.filter((_, i) => i !== index);
+                                                            if (newPhotos.length === 0 && description === initialDescription) {
+                                                                setIsDirty(false);
+                                                            }
+                                                            return newPhotos;
+                                                        });
+                                                    },
+                                                    sx: {
                                                         position: 'absolute',
                                                         top: 4,
                                                         right: 4,
@@ -222,22 +423,73 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
                                                         '&:hover': {
                                                             backgroundColor: 'rgb(0, 0, 0)'
                                                         }
-                                                    }, children: _jsx(Delete, { sx: { fontSize: 16, color: 'white' } }) }))] }, index))) }))] }), _jsx(DrawerFooter, { children: isEditing ? (_jsxs(_Fragment, { children: [_jsx(Button, { variant: "text", onClick: () => {
-                                                if (!isSaving) {
-                                                    setDescription(initialDescription);
-                                                    setNewPhotos([]);
-                                                    setIsEditing(false);
-                                                }
-                                            }, fullWidth: true, disabled: isSaving, sx: { color: 'white' }, children: "Cancel" }), _jsx(Button, { type: "submit", variant: "contained", fullWidth: true, disabled: isSaving, sx: {
+                                                    },
+                                                    children: _jsx(Delete, {
+                                                        sx: { fontSize: 16, color: 'white' }
+                                                    })
+                                                })
+                                            ]
+                                        }, index))
+                                    })
+                                ]
+                            }),
+
+                            // Footer buttons
+                            _jsx(DrawerFooter, {
+                                children: isEditing ? _jsxs(_Fragment, {
+                                    children: [
+                                        _jsx(Button, {
+                                            variant: "text",
+                                            onClick: handleCancel,
+                                            fullWidth: true,
+                                            disabled: isSaving,
+                                            sx: { color: 'white' },
+                                            children: "Cancel"
+                                        }),
+                                        _jsx(Button, {
+                                            type: "submit",
+                                            variant: "contained",
+                                            fullWidth: true,
+                                            disabled: isSaving || !isDirty,
+                                            sx: {
                                                 backgroundColor: 'rgb(255, 255, 255)',
                                                 '&:hover': {
                                                     backgroundColor: 'rgb(255, 255, 255)',
                                                 }
-                                            }, children: isSaving ? 'Saving...' : 'Save' })] })) : (_jsx(Box, { sx: { display: 'flex', justifyContent: 'flex-end', width: '100%' }, children: _jsx(Button, { onClick: () => setIsEditing(true), variant: "contained", size: "medium", startIcon: _jsx(Edit, {}), disabled: isSaving, sx: {
+                                            },
+                                            children: isSaving ? 'Saving...' : 'Save'
+                                        })
+                                    ]
+                                }) : _jsx(Box, {
+                                    sx: { display: 'flex', justifyContent: 'flex-end', width: '100%' },
+                                    children: _jsx(Button, {
+                                        onClick: () => setIsEditing(true),
+                                        variant: "contained",
+                                        size: "medium",
+                                        startIcon: _jsx(Edit, {}),
+                                        disabled: isSaving,
+                                        sx: {
                                             backgroundColor: 'rgb(255, 255, 255)',
                                             '&:hover': {
                                                 backgroundColor: 'rgb(255, 255, 255)'
                                             }
-                                        }, children: "EDIT" }) })) })] }) }) }), selectedPhoto && (_jsx(PhotoPreviewModal, { photo: selectedPhoto, onClose: () => setSelectedPhoto(null) }))] }, `${placeId}-${isOpen}`));
+                                        },
+                                        children: "EDIT"
+                                    })
+                                })
+                            })
+                        ]
+                    })
+                })
+            }),
+
+            // Photo preview modal
+            selectedPhoto && _jsx(PhotoPreviewModal, {
+                photo: selectedPhoto,
+                onClose: () => setSelectedPhoto(null)
+            })
+        ]
+    });
 };
+
 export default PlacePOIDetailsDrawer;

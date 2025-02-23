@@ -2,10 +2,9 @@ import Supercluster from 'supercluster';
 const createIndex = () => {
     return new Supercluster({
         radius: 40, // Clustering radius in pixels (reduced for finer control)
-        maxZoom: 20, // Maximum zoom level to cluster points (increased to allow more detail)
+        maxZoom: 12, // Maximum zoom level to cluster points (increased to allow more detail)
         minZoom: 0, // Minimum zoom level to cluster points
         map: props => ({
-            cluster: true,
             cluster_id: 0,
             point_count: 1,
             point_count_abbreviated: 1,

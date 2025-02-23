@@ -71,6 +71,7 @@ DraggableRouteItem.propTypes = {
     routeId: PropTypes.string,
     id: PropTypes.string,
     name: PropTypes.string,
+    color: PropTypes.string,
   }).isRequired,
   children: PropTypes.node.isRequired,
 };

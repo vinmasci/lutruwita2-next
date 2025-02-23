@@ -7,13 +7,14 @@ export interface RouteDescription {
   photos?: ProcessedPhoto[];
 }
 
-export interface ProcessedRoute extends GpxProcessedRoute {
+export interface ProcessedRoute extends Omit<GpxProcessedRoute, 'color'> {
   order?: number;  // Optional in type but will be set in normalizeRoute
   description?: RouteDescription;
   isFocused?: boolean;
   _type?: 'loaded' | 'fresh';
   _loadedState?: any;
   routeId?: string;
+  color: string;  // Required color property
 }
 
 export interface SavedRouteState {
@@ -80,6 +81,7 @@ export const normalizeRoute = (route: ProcessedRoute): ProcessedRoute => {
   return {
     ...route,
     routeId: route.routeId || `route-${route.id}`,
-    order: route.order ?? 0 // Ensure order is set with a default value
+    order: route.order ?? 0, // Ensure order is set with a default value
+    color: route.color || '#ee5253' // Default to the original red color
   };
 };

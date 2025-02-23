@@ -1,9 +1,17 @@
 import { useEffect } from 'react';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
+
+// Material UI colors
+const DEFAULT_COLORS = {
+    main: '#f44336', // Red
+    hover: '#ff5252'  // Lighter red
+};
+
 export const RouteLayer = ({ map, route }) => {
     const isStyleLoaded = useMapStyle(map);
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
+
     useEffect(() => {
         try {
             console.log('[RouteLayer] Initializing with:', {
@@ -21,12 +29,14 @@ export const RouteLayer = ({ map, route }) => {
                 });
                 return;
             }
+
             const routeId = route.routeId;
             const mainLayerId = `${routeId}-main-line`;
             const borderLayerId = `${routeId}-main-border`;
             const hoverLayerId = `${routeId}-hover`;
             const mainSourceId = `${routeId}-main`;
             const visibility = routeVisibility[routeId] || { mainRoute: true, unpavedSections: true };
+
             // Initial validation of GeoJSON data
             if (!route.geojson.features || !route.geojson.features.length) {
                 console.error('[RouteLayer] Invalid GeoJSON data:', {
@@ -36,6 +46,7 @@ export const RouteLayer = ({ map, route }) => {
                 });
                 return;
             }
+
             // Extract and validate geometry
             const geometry = route.geojson.features[0].geometry;
             if (!geometry || geometry.type !== 'LineString') {
@@ -45,6 +56,7 @@ export const RouteLayer = ({ map, route }) => {
                 });
                 return;
             }
+
             // Ensure map style is loaded and source doesn't exist
             const sourceExists = map.getSource(mainSourceId);
             const style = map.getStyle();
@@ -52,6 +64,7 @@ export const RouteLayer = ({ map, route }) => {
                 console.error('[RouteLayer] Map style not fully loaded');
                 return;
             }
+
             console.log('[RouteLayer] Source check:', {
                 sourceId: mainSourceId,
                 exists: sourceExists,
@@ -59,6 +72,7 @@ export const RouteLayer = ({ map, route }) => {
                 layerCount: style.layers.length,
                 terrain: !!map.getTerrain()
             });
+
             // Clean up existing layers and source if they exist
             if (sourceExists) {
                 const layersToRemove = [borderLayerId, mainLayerId, hoverLayerId, `unpaved-sections-layer-${routeId}`];
@@ -67,6 +81,7 @@ export const RouteLayer = ({ map, route }) => {
                         map.removeLayer(layerId);
                     }
                 });
+
                 const sourcesToRemove = [mainSourceId, `unpaved-sections-${routeId}`];
                 sourcesToRemove.forEach(sourceId => {
                     if (map.getSource(sourceId)) {
@@ -74,6 +89,7 @@ export const RouteLayer = ({ map, route }) => {
                     }
                 });
             }
+
             // Add new source and layers
             console.log('[RouteLayer] Adding source:', mainSourceId);
             try {
@@ -89,6 +105,7 @@ export const RouteLayer = ({ map, route }) => {
                 console.error('[RouteLayer] Error adding source:', error);
                 return;
             }
+
             // Add border layer
             map.addLayer({
                 id: borderLayerId,
@@ -105,6 +122,7 @@ export const RouteLayer = ({ map, route }) => {
                     'line-opacity': 1
                 }
             });
+
             // Add main route layer
             map.addLayer({
                 id: mainLayerId,
@@ -116,11 +134,12 @@ export const RouteLayer = ({ map, route }) => {
                     visibility: visibility.mainRoute ? 'visible' : 'none'
                 },
                 paint: {
-                    'line-color': '#ee5253',
+                    'line-color': route.color || DEFAULT_COLORS.main,
                     'line-width': 3,
                     'line-opacity': 1
                 }
             });
+
             // Add hover layer (initially hidden) only for focused routes
             if (route.isFocused) {
                 map.addLayer({
@@ -133,16 +152,18 @@ export const RouteLayer = ({ map, route }) => {
                         visibility: 'none'
                     },
                     paint: {
-                        'line-color': '#ff8f8f',
+                        'line-color': route.color ? `${route.color}99` : DEFAULT_COLORS.hover,
                         'line-width': 5,
                         'line-opacity': 1
                     }
                 });
             }
+
             // Add combined surface layer for all routes
             if (route.unpavedSections && route.unpavedSections.length > 0) {
                 const surfaceSourceId = `unpaved-sections-${routeId}`;
                 const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
+
                 // Combine all unpaved sections into a single feature collection
                 const features = route.unpavedSections.map(section => ({
                     type: 'Feature',
@@ -154,6 +175,7 @@ export const RouteLayer = ({ map, route }) => {
                         coordinates: section.coordinates
                     }
                 }));
+
                 map.addSource(surfaceSourceId, {
                     type: 'geojson',
                     data: {
@@ -163,6 +185,7 @@ export const RouteLayer = ({ map, route }) => {
                     tolerance: 1, // Increase simplification tolerance
                     maxzoom: 14 // Limit detail at high zoom levels
                 });
+
                 map.addLayer({
                     id: surfaceLayerId,
                     type: 'line',
@@ -179,6 +202,7 @@ export const RouteLayer = ({ map, route }) => {
                     }
                 });
             }
+
             // Add hover handlers only for focused routes
             if (route.isFocused) {
                 const mouseHandler = () => {
@@ -187,10 +211,12 @@ export const RouteLayer = ({ map, route }) => {
                         map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
                     }
                 };
+
                 const mouseleaveHandler = () => {
                     map.getCanvas().style.cursor = '';
                     map.setLayoutProperty(hoverLayerId, 'visibility', 'none');
                 };
+
                 // Add click handler for toggling visibility
                 const clickHandler = () => {
                     // Just toggle hover layer visibility, no re-rendering
@@ -198,10 +224,12 @@ export const RouteLayer = ({ map, route }) => {
                         map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
                     }
                 };
+
                 map.on('click', mainLayerId, clickHandler);
                 map.on('mouseenter', mainLayerId, mouseHandler);
                 map.on('mousemove', mainLayerId, mouseHandler);
                 map.on('mouseleave', mainLayerId, mouseleaveHandler);
+
                 return () => {
                     // Just remove event listeners, don't cleanup layers
                     map.off('click', mainLayerId, clickHandler);
@@ -215,6 +243,8 @@ export const RouteLayer = ({ map, route }) => {
             console.error('[RouteLayer] Error rendering route:', error);
         }
     }, [map, route, isStyleLoaded, routeVisibility, toggleRouteVisibility]);
+
     return null;
 };
+
 export default RouteLayer;
