@@ -1,6 +1,8 @@
 name: Deploy to Production
 
-# Test deployment with new SSH key
+# Deployment workflow using SSH key authentication
+# - Private key stored in GitHub secrets as DEPLOY_SSH_KEY
+# - Public key added to server's authorized_keys
 on:
   push:
     branches: [ main, surface-detection ]
