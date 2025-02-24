@@ -1,1 +1,0 @@
-export { PresentationPOIViewer } from './PresentationPOIViewer';
