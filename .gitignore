@@ -38,6 +38,8 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+src/**/*.js
+!src/**/*.config.js
 
 # Sensitive documentation
 docs/ENV_VARIABLES.md
