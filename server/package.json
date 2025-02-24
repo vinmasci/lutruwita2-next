@@ -1,10 +1,10 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "dist/server.js",
+  "main": "dist/src/server.js",
   "scripts": {
-    "build": "tsc --noEmit false --skipLibCheck true",
-    "start": "node dist/server.js",
+    "build": "tsc --skipLibCheck true --noEmit false",
+    "start": "node dist/src/server.js",
     "dev": "ts-node src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
