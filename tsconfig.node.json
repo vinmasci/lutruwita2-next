@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "composite": true,
+    "noEmit": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "skipLibCheck": true,
     "strict": true,
     "outDir": "./dist",
     "rootDir": ".",
-    "emitDeclarationOnly": true,
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
