@@ -26,27 +26,19 @@ jobs:
           cd server && SKIP_TYPESCRIPT=true npm run build 2>&1 || { echo "Server build failed with:"; cat npm-debug.log; exit 1; } && cd ..
 
       - name: Deploy to Server
-        uses: webfactory/ssh-agent@v0.8.0
+        uses: appleboy/ssh-action@master
         with:
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-
-      - name: Deploy
-        run: |
-          ssh -o StrictHostKeyChecking=no root@170.64.223.56 '
-            cd /var/www/lutruwita2 &&
-            git pull &&
-            npm install &&
-            SKIP_TYPESCRIPT=true npm run build &&
-            cd server && npm install && SKIP_TYPESCRIPT=true npm run build && cd .. &&
-            cp .env.production server/.env &&
-            pm2 restart all
-          '
+          host: 170.64.223.56
+          username: root
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            ${{ secrets.DEPLOY_SSH_KEY }}
+            -----END OPENSSH PRIVATE KEY-----
           script: |
             cd /var/www/lutruwita2
             git pull
             npm install
             SKIP_TYPESCRIPT=true npm run build
             cd server && npm install && SKIP_TYPESCRIPT=true npm run build && cd ..
-            # Copy environment variables for backend
             cp .env.production server/.env
             pm2 restart all
