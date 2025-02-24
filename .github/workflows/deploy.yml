@@ -36,6 +36,12 @@ jobs:
           eval $(ssh-agent -s)
           DISPLAY=":0.0" SSH_ASKPASS=/bin/false ssh-add ~/.ssh/id_rsa
 
+      - name: Add Deploy Key to Server
+        run: |
+          # Add public key to authorized_keys on server
+          ssh-keyscan -H 170.64.223.56 >> ~/.ssh/known_hosts
+          echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIS1WK8TJQAkjYKbECwGqGnyROyY/R3wQP+QBa8dM1Tw routecanvas" | ssh -o StrictHostKeyChecking=no root@170.64.223.56 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys'
+
       - name: Deploy to Server
         run: |
           # Test connection first
