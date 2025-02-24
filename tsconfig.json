@@ -3,8 +3,10 @@
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "node",
+    "module": "ES2020",
     "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
 
     /* Bundler mode */
     "moduleResolution": "node",
