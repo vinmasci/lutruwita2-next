@@ -15,6 +15,7 @@ node_modules/
 /build
 /.next
 /out
+/src/App.js
 
 # Debug logs
 npm-debug.log*
@@ -38,8 +39,6 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
-src/**/*.js
-!src/**/*.config.js
 
 # Sensitive documentation
 docs/ENV_VARIABLES.md
