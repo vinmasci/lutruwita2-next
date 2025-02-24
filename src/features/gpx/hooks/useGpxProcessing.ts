@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ProcessedRoute } from '../../map/types/route.types';
+import { ProcessedRoute } from '@/types';
 import { useGpxProcessingApi } from '../services/gpxService';
 
 export const useGpxProcessing = () => {

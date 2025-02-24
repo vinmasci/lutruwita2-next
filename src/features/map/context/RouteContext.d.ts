@@ -19,8 +19,6 @@ interface RouteContextType {
   routes: ProcessedRoute[];
   currentRoute: ProcessedRoute | null;
   savedRoutes: SavedRoute[];
-  isSaving: boolean;
-  isLoading: boolean;
   saveCurrentState: (name: string, type: string, isPublic: boolean) => Promise<void>;
   listRoutes: () => Promise<void>;
   loadRoute: (id: string) => Promise<void>;
