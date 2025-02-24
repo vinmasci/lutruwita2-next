@@ -5,22 +5,15 @@
       "moduleResolution": "NodeNext",
       "outDir": "./build",
       "rootDir": "./src",
+      "strict": true,
       "esModuleInterop": true,
       "skipLibCheck": true,
       "forceConsistentCasingInFileNames": true,
       "baseUrl": "./src",
-
-      /* Disable all type checking */
-      "strict": false,
       "noImplicitAny": false,
       "allowJs": true,
       "noUnusedLocals": false,
-      "noUnusedParameters": false,
-      "noFallthroughCasesInSwitch": false,
-      "checkJs": false,
-      "noImplicitThis": false,
-      "noImplicitReturns": false,
-      "noErrorTruncation": false
+      "noUnusedParameters": false
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules"]
