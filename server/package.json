@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/src/server.js",
   "scripts": {
-    "build": "tsc --skipLibCheck true --noEmit false",
+    "build": "cross-env SKIP_TYPESCRIPT=true tsc --skipLibCheck true --noEmit false",
     "start": "node dist/src/server.js",
     "dev": "ts-node src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -49,6 +49,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/express-fileupload": "^1.5.1",
+    "cross-env": "^7.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }
