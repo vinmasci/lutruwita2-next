@@ -26,12 +26,21 @@ jobs:
           cd server && SKIP_TYPESCRIPT=true npm run build 2>&1 || { echo "Server build failed with:"; cat npm-debug.log; exit 1; } && cd ..
 
       - name: Deploy to Server
-        uses: appleboy/ssh-action@master
+        uses: webfactory/ssh-agent@v0.8.0
         with:
-          host: 170.64.223.56
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          key_format: openssh
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Deploy
+        run: |
+          ssh -o StrictHostKeyChecking=no root@170.64.223.56 '
+            cd /var/www/lutruwita2 &&
+            git pull &&
+            npm install &&
+            SKIP_TYPESCRIPT=true npm run build &&
+            cd server && npm install && SKIP_TYPESCRIPT=true npm run build && cd .. &&
+            cp .env.production server/.env &&
+            pm2 restart all
+          '
           script: |
             cd /var/www/lutruwita2
             git pull
