@@ -28,20 +28,14 @@ jobs:
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
-          # Debug: Check if secret is available
-          if [ -n "${{ secrets.DEPLOY_SSH_KEY }}" ]; then echo "SSH key secret is set"; else echo "SSH key secret is empty"; fi
-          # Write key with proper line endings
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          # Write key in OpenSSH format
+          echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ~/.ssh/id_rsa
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | tr -d '\r' >> ~/.ssh/id_rsa
+          echo "-----END OPENSSH PRIVATE KEY-----" >> ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          # Debug: Check key format
-          head -n 1 ~/.ssh/id_rsa
-          # Start agent with debug
+          # Start agent
           eval $(ssh-agent -s)
-          export SSH_AUTH_SOCK
-          echo "Agent pid $SSH_AGENT_PID"
-          DISPLAY=":0.0" SSH_ASKPASS=/bin/false ssh-add -v ~/.ssh/id_rsa
-          ssh-add -l -E sha256
-          ls -la ~/.ssh/id_rsa
+          DISPLAY=":0.0" SSH_ASKPASS=/bin/false ssh-add ~/.ssh/id_rsa
 
       - name: Deploy to Server
         run: |
