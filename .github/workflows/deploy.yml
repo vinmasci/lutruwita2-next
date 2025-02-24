@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           # Write key directly (already has BEGIN/END markers)
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           # Start agent
           eval $(ssh-agent -s)
@@ -41,9 +41,9 @@ jobs:
       - name: Deploy to Server
         run: |
           # Test connection first
-          ssh -v -o StrictHostKeyChecking=no root@170.64.223.56 'echo "SSH connection successful"' || exit 1
+          ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@170.64.223.56 'echo "SSH connection successful"' || exit 1
           # Then proceed with deployment
-          ssh -v -o StrictHostKeyChecking=no root@170.64.223.56 '
+          ssh -v -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@170.64.223.56 '
             cd /var/www/lutruwita2
             git pull
             npm install
