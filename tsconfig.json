@@ -31,5 +31,6 @@
     "allowJs": true
   },
   "include": ["src"],
+  "exclude": ["backup_typescript"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
