@@ -1,5 +1,6 @@
 name: Deploy to Production
 
+# Test deployment with new SSH key
 on:
   push:
     branches: [ main, surface-detection ]
