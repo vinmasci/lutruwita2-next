@@ -35,8 +35,8 @@ jobs:
 
       - name: Deploy to Server
         run: |
-          ssh -o StrictHostKeyChecking=no root@170.64.223.56 '
-            cd /var/www/lutruwita2
+          ssh -o StrictHostKeyChecking=no routecanvas@170.64.223.56 '
+            cd /home/routecanvas/lutruwita2-next
             git pull
             npm install
             SKIP_TYPESCRIPT=true npm run build
