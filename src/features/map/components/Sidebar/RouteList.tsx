@@ -228,6 +228,10 @@ export const RouteList = () => {
                   fullWidth
                   size="small"
                   variant="outlined"
+                  type="text"
+                  inputProps={{
+                    'aria-label': 'Edit route name'
+                  }}
                   sx={{
                     '& .MuiInputBase-root': {
                       color: 'white',
@@ -454,6 +458,10 @@ export const RouteList = () => {
             onChange={(e) => setSaveForm(prev => ({ ...prev, name: e.target.value }))}
             sx={{ marginBottom: 2 }}
             variant="outlined"
+            type="text"
+            inputProps={{
+              'aria-label': 'Route name'
+            }}
           />
           <FormControl fullWidth sx={{ marginBottom: 2 }}>
             <InputLabel>Type</InputLabel>
@@ -504,8 +512,14 @@ export const RouteList = () => {
         <Alert 
           onClose={clearError} 
           severity="error" 
-          sx={{ width: '100%' }}
-          component="div"
+          sx={{ 
+            width: '100%',
+            backgroundColor: 'rgb(22, 11, 11)',
+            color: '#fff',
+            '& .MuiAlert-icon': {
+              color: '#f44336'
+            }
+          }}
         >
           {error}
         </Alert>
@@ -520,8 +534,14 @@ export const RouteList = () => {
         <Alert
           onClose={() => setShowSuccess(false)}
           severity="success"
-          sx={{ width: '100%' }}
-          component="div"
+          sx={{ 
+            width: '100%',
+            backgroundColor: 'rgb(11, 22, 11)',
+            color: '#fff',
+            '& .MuiAlert-icon': {
+              color: '#4caf50'
+            }
+          }}
         >
           Operation completed successfully
         </Alert>

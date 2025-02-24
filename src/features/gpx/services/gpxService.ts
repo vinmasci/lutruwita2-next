@@ -1,4 +1,4 @@
-import { ProcessedRoute } from '../../../types';
+import { ProcessedRoute } from '../../map/types/route.types';
 import type { MapboxMatchResult, SurfaceAnalysis } from '../types/gpx.types';
 
 type ProcessingProgressCallback = (progress: number) => void;

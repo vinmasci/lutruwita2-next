@@ -26,7 +26,6 @@ export function AuthAlert({ show, onClose }: AuthAlertProps) {
             color: '#f44336'
           }
         }}
-        component="div"
       >
         Please sign in to create or modify routes
       </Alert>
