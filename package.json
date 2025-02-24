@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "vite preview --port 3000",
     "dev": "vite --port 3000",
     "dev:server": "NODE_OPTIONS='--import ts-node/esm --require tsconfig-paths/register' node -r tsconfig-paths/register src/features/server/server.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",

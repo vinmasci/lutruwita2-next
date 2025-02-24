@@ -38,3 +38,15 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Sensitive documentation
+docs/ENV_VARIABLES.md
+docs/ENV_VARIABLES.template.md
+docs/DEPLOYMENT.md
+docs/DEPLOYMENT.template.md
+
+# Sensitive files
+.env.production
+.env.production.template
+docs/DEPLOYMENT.md
+docs/SENSITIVE_DOCS.md
