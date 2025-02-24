@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useMapContext } from '../../map/context/MapContext';
-import mapboxgl from 'mapbox-gl';
-import { parseGpx, GpxParseResult } from '../utils/gpxParser';
-import { ProcessedRoute as GpxProcessedRoute, GPXProcessingError } from '../types/gpx.types';
+import { parseGpx } from '../utils/gpxParser';
+import { GPXProcessingError } from '../types/gpx.types';
 import { normalizeRoute, ProcessedRoute } from '../../map/types/route.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { FeatureCollection, Feature, LineString } from 'geojson';

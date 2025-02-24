@@ -4,7 +4,7 @@ import { Box, Typography } from '@mui/material';
 import { ResponsiveLine } from '@nivo/line';
 import { ProcessedRoute } from '../../types/gpx.types';
 import { ElevationContent } from './ElevationProfile.styles';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertTitle, AlertDescription } from "../../../../components/ui/alert";
 import { useMapContext } from '../../../map/context/MapContext';
 import { detectClimbs } from '../../utils/climbUtils';
 import type { Climb } from '../../utils/climbUtils';
@@ -170,7 +170,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
     elevationGained: 0, 
     elevationLost: 0, 
     totalDistance: 0,
-    unpavedPercentage: 0
+    unpavedPercentage: route.surface?.surfaceTypes?.find(t => t.type === 'trail')?.percentage || 0
   });
 
   useEffect(() => {
@@ -223,7 +223,8 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
           unpavedDistance += sectionEndDist - sectionStartDist;
         }
       }
-      const unpavedPercentage = (unpavedDistance / totalDistance) * 100;
+      const unpavedPercentage = route.surface?.surfaceTypes?.find(t => t.type === 'trail')?.percentage || 
+                               (unpavedDistance / totalDistance) * 100;
 
       let elevationGained = 0;
       let elevationLost = 0;
