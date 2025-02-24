@@ -28,7 +28,7 @@ jobs:
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub || exit 1
           eval $(ssh-agent)
@@ -37,7 +37,6 @@ jobs:
       - name: Deploy to Server
         run: |
           ssh -o StrictHostKeyChecking=no root@170.64.223.56 '
-          script: |
             cd /var/www/lutruwita2
             git pull
             npm install
@@ -45,3 +44,4 @@ jobs:
             cd server && npm install && SKIP_TYPESCRIPT=true npm run build && cd ..
             cp .env.production server/.env
             pm2 restart all
+          '
