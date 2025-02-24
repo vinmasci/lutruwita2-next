@@ -25,14 +25,17 @@ jobs:
           SKIP_TYPESCRIPT=true npm run build 2>&1 || { echo "Client build failed with:"; cat npm-debug.log; exit 1; }
           cd server && SKIP_TYPESCRIPT=true npm run build 2>&1 || { echo "Server build failed with:"; cat npm-debug.log; exit 1; } && cd ..
 
-      - name: Install sshpass
-        run: sudo apt-get install -y sshpass
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent)
+          ssh-add ~/.ssh/id_rsa
 
       - name: Deploy to Server
-        env:
-          SERVER_PASS: ${{ secrets.SERVER_PASS }}
         run: |
-          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@170.64.223.56 '
+          ssh -o StrictHostKeyChecking=no root@170.64.223.56 '
             cd /var/www/lutruwita2
             git pull
             npm install
