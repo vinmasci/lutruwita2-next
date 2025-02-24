@@ -37,4 +37,6 @@ jobs:
             npm install
             npm run build
             cd server && npm install && npm run build && cd ..
+            # Copy environment variables for backend
+            cp .env.production server/.env
             pm2 restart all

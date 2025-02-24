@@ -20,18 +20,20 @@ export const StyledDrawer = styled(Drawer)({
         }
     }
 });
-export const NestedDrawer = styled(Drawer)({
-    width: '296px',
-    flexShrink: 0,
-    whiteSpace: 'nowrap',
-    '& .MuiDrawer-paper': {
-        width: '296px',
-        backgroundColor: '#1a1a1a',
-        borderRight: '1px solid #333',
-        color: '#ffffff',
-        overflowX: 'hidden',
-        marginLeft: '56px',
-        transition: 'margin-left 0.2s ease-in-out',
-        zIndex: 99 // Lower than default Drawer z-index of 1200
-    }
+export const NestedDrawer = styled(Drawer)(({ theme }) => {
+    return {
+        width: theme.breakpoints.values.sm ? '264px' : '100%',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+        '& .MuiDrawer-paper': {
+            width: theme.breakpoints.values.sm ? '264px' : '100%',
+            backgroundColor: '#1a1a1a',
+            borderRight: '1px solid #333',
+            color: '#ffffff',
+            overflowX: 'hidden',
+            marginLeft: theme.breakpoints.values.sm ? '56px' : 0,
+            transition: 'margin-left 0.2s ease-in-out',
+            zIndex: 99 // Lower than default Drawer z-index of 1200
+        }
+    };
 });

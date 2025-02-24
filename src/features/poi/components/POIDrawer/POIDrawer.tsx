@@ -277,14 +277,30 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
       open={isOpen}
       onClose={onClose}
       variant="persistent"
-      sx={{
+      sx={(theme) => ({
         '& .MuiDrawer-paper': {
-          width: '264px',
+          width: {
+            xs: '100%',
+            sm: '320px',
+            md: '320px'
+          },
+          height: {
+            xs: '100%',
+            sm: '100%'
+          },
           border: 'none',
           backgroundColor: 'transparent',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          padding: {
+            xs: theme.spacing(1),
+            sm: theme.spacing(2)
+          },
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }
-      }}
+      })}
     >
       <StyledDrawer>
         {renderContent()}
