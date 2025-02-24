@@ -22,8 +22,8 @@ jobs:
 
       - name: Build
         run: |
-          SKIP_TYPESCRIPT=true npm run build
-          cd server && SKIP_TYPESCRIPT=true npm run build && cd ..
+          SKIP_TYPESCRIPT=true npm run build 2>&1 || { echo "Client build failed with:"; cat npm-debug.log; exit 1; }
+          cd server && SKIP_TYPESCRIPT=true npm run build 2>&1 || { echo "Server build failed with:"; cat npm-debug.log; exit 1; } && cd ..
 
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
@@ -31,6 +31,7 @@ jobs:
           host: 170.64.223.56
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          key_format: openssh
           script: |
             cd /var/www/lutruwita2
             git pull
