@@ -29,10 +29,9 @@ jobs:
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_rsa
+          # Write key directly (already has BEGIN/END markers)
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          # Debug: Show first line of key
-          head -n 1 ~/.ssh/id_rsa
           # Start agent
           eval $(ssh-agent -s)
           DISPLAY=":0.0" SSH_ASKPASS=/bin/false ssh-add ~/.ssh/id_rsa
