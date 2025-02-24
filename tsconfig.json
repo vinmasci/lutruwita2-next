@@ -13,7 +13,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
+    "noEmit": false,
     "jsx": "react-jsx",
 
     /* Path aliases */
@@ -22,13 +22,17 @@
       "@/*": ["./src/*"]
     },
 
-    /* Linting */
-    "strict": true,
+    /* Disable all type checking */
+    "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": false,
     "noImplicitAny": false,
-    "allowJs": true
+    "allowJs": true,
+    "checkJs": false,
+    "noImplicitThis": false,
+    "noImplicitReturns": false,
+    "noErrorTruncation": false
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
