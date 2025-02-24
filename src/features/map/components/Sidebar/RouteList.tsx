@@ -227,6 +227,7 @@ export const RouteList = () => {
                   autoFocus
                   fullWidth
                   size="small"
+                  variant="outlined"
                   sx={{
                     '& .MuiInputBase-root': {
                       color: 'white',
@@ -452,6 +453,7 @@ export const RouteList = () => {
             value={saveForm.name}
             onChange={(e) => setSaveForm(prev => ({ ...prev, name: e.target.value }))}
             sx={{ marginBottom: 2 }}
+            variant="outlined"
           />
           <FormControl fullWidth sx={{ marginBottom: 2 }}>
             <InputLabel>Type</InputLabel>
@@ -503,6 +505,7 @@ export const RouteList = () => {
           onClose={clearError} 
           severity="error" 
           sx={{ width: '100%' }}
+          component="div"
         >
           {error}
         </Alert>
@@ -518,6 +521,7 @@ export const RouteList = () => {
           onClose={() => setShowSuccess(false)}
           severity="success"
           sx={{ width: '100%' }}
+          component="div"
         >
           Operation completed successfully
         </Alert>

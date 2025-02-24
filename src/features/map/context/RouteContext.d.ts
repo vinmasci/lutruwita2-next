@@ -26,9 +26,17 @@ interface RouteContextType {
   currentLoadedState: LoadedState | null;
   currentLoadedPersistentId: string | null;
   hasUnsavedChanges: boolean;
+  updateRoute: (routeId: string, updates: Partial<ProcessedRoute>) => void;
+  addRoute: (route: ProcessedRoute) => void;
+  deleteRoute: (routeId: string) => void;
+  setCurrentRoute: (route: ProcessedRoute | null) => void;
+  focusRoute: (routeId: string) => void;
+  unfocusRoute: (routeId: string) => void;
+  reorderRoutes: (oldIndex: number, newIndex: number) => void;
+  clearCurrentWork: () => void;
 }
 
-declare module '../../context/RouteContext.js' {
+declare module './RouteContext.js' {
   const useRouteContext: () => RouteContextType;
   export { useRouteContext };
 }

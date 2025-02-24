@@ -5,7 +5,7 @@ import { ProcessedRoute } from '../../../../features/map/types/route.types';
 import { RichTextEditor } from './RichTextEditor.js';
 import { ProcessedPhoto } from '../../../../features/photo/components/Uploader/PhotoUploader.types';
 import { fileToProcessedPhoto, deserializePhoto, serializePhoto } from '../../../../features/photo/utils';
-import { useRouteContext } from '../../../../features/map/context/RouteContext';
+import { useRouteContext } from '../../../../features/map/context/RouteContext.js';
 import { usePhotoService } from '../../../../features/photo/services/photoService';
 
 interface PhotoWithFile extends ProcessedPhoto {
@@ -14,6 +14,12 @@ interface PhotoWithFile extends ProcessedPhoto {
 
 interface RouteDescriptionPanelProps {
   route?: ProcessedRoute;
+}
+
+interface RouteDescription {
+  title: string;
+  description: string;
+  photos: ProcessedPhoto[];
 }
 
 export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
@@ -64,13 +70,15 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
       });
 
       const timeoutId = setTimeout(() => {
-        updateRoute(route.routeId, {
+        const routeId = route.routeId as string;
+        const updates: Partial<ProcessedRoute> = {
           description: {
             title: title ?? '',
             description: description ?? '',
             photos: photos.map(serializePhoto)
           }
-        });
+        };
+        updateRoute(routeId, updates);
       }, 500); // Debounce updates
 
       return () => clearTimeout(timeoutId);
@@ -125,13 +133,15 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
       });
 
       // Update route with new description including uploaded photos
-      await updateRoute(route.routeId, {
+      const routeId = route.routeId as string;
+      const updates: Partial<ProcessedRoute> = {
         description: {
           title: title ?? '',
           description: description ?? '',
           photos: updatedPhotos.map(serializePhoto)
         }
-      });
+      };
+      await updateRoute(routeId, updates);
 
       setPhotos(updatedPhotos);
       setShowSaveSuccess(true);
@@ -306,7 +316,7 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity="info" sx={{ width: '100%' }}>
+        <Alert onClose={handleCloseSnackbar} severity="info" sx={{ width: '100%' }} component="div">
           Description saved successfully
         </Alert>
       </Snackbar>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import './DistanceMarkers.css';
-import { useRouteContext } from '../../context/RouteContext';
+import { useRouteContext } from '../../context/RouteContext.js';
 import { Feature, LineString } from 'geojson';
 import { ProcessedRoute } from '../../../gpx/types/gpx.types';
 
