@@ -2,7 +2,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 export const usePhotoService = () => {
   const { getAccessTokenSilently } = useAuth0();
-  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/photos` : 'http://localhost:8080/api/photos';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/photos` : '/api/photos';
 
   const uploadPhoto = async (file: File) => {
     try {

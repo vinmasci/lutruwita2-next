@@ -10,8 +10,8 @@ import {
 export const useRouteService = () => {
   const { getAccessTokenSilently } = useAuth0();
   
-  // Use environment variable for API base
-  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/routes` : 'http://localhost:8080/api/routes';
+  // Use environment variable for API base or default to relative URL for Vercel deployment
+  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/routes` : '/api/routes';
 
   const getAuthHeaders = async () => {
     try {
@@ -76,9 +76,9 @@ export const useRouteService = () => {
         photoCount: route.description?.photos?.length
       })));
 
+      // Handle POI logging safely
       console.log('[routeService] POIs to save:', {
-        draggable: routeData.pois.draggable.length + ' POIs',
-        places: routeData.pois.places.length + ' POIs'
+        count: routeData.pois.length + ' POIs'
       });
       console.log('[routeService] POI details:', routeData.pois);
       
