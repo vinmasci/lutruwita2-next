@@ -64,7 +64,19 @@ app.use(express.json({ limit: '300mb' }));
 app.use(express.urlencoded({ limit: '300mb', extended: true }));
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
-// Health check endpoint
+// Serve static files from the React app in production
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '../../../dist');
+  logger.info(`Serving static files from: ${distPath}`);
+  app.use(express.static(distPath));
+}
+
+// Health check endpoint for DigitalOcean App Platform
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+// API health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
@@ -87,10 +99,18 @@ app.use('/api/gpx', gpxRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/photos', photoRoutes);
 
+// In production, serve the React app for any routes not matched by API routes
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../../dist/index.html'));
+  });
+}
+
 // Error handling
 app.use(errorHandler);
 
-// Start server
-app.listen(SERVER_CONFIG.port, () => {
-  logger.info(`Server running on port ${SERVER_CONFIG.port}`);
+// Start server - listen on all interfaces for DigitalOcean App Platform
+const port = typeof SERVER_CONFIG.port === 'string' ? parseInt(SERVER_CONFIG.port, 10) : SERVER_CONFIG.port;
+app.listen(port, '0.0.0.0', () => {
+  logger.info(`Server running on port ${port} (0.0.0.0)`);
 });
