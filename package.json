@@ -9,7 +9,7 @@
     "dev": "vite --port 3000",
     "dev:server": "cd server && ts-node -r tsconfig-paths/register ../server/src/server.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
-    "build": "npm install --legacy-peer-deps && cross-env SKIP_TYPESCRIPT=true vite build",
+    "build": "npm install --legacy-peer-deps && SKIP_TYPESCRIPT=true vite build",
     "build:server": "tsc -p tsconfig.server.json --outDir dist/server --skipLibCheck --noEmit",
     "build:vercel": "npm run build",
     "clean": "rm -rf dist/server",
