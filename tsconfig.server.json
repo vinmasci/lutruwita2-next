@@ -3,7 +3,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "module": "ESNext",
+    "module": "NodeNext",
     "target": "ESNext",
     "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
@@ -20,7 +20,7 @@
     "noUnusedParameters": false,
     "rootDir": "./src",
     "outDir": "./dist/server",
-    "types": ["node", "express", "express-openid-connect", "geojson", "ol"],
+    "types": ["node", "express", "geojson", "ol"],
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "baseUrl": ".",
     "paths": {
