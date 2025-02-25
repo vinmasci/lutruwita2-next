@@ -1,8 +1,8 @@
 import { useAuth0 } from '@auth0/auth0-react';
 export const useRouteService = () => {
     const { getAccessTokenSilently } = useAuth0();
-    // Use environment variable for API base
-    const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/routes` : 'http://localhost:8080/api/routes';
+    // Always use relative URL for serverless deployment
+    const API_BASE = '/api/routes';
     const getAuthHeaders = async () => {
         try {
             const token = await getAccessTokenSilently();

@@ -10,8 +10,8 @@ import {
 export const useRouteService = () => {
   const { getAccessTokenSilently } = useAuth0();
   
-  // Use environment variable for API base or default to relative URL for Vercel deployment
-  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/routes` : '/api/routes';
+  // Always use relative URL for serverless deployment
+  const API_BASE = '/api/routes';
 
   const getAuthHeaders = async () => {
     try {

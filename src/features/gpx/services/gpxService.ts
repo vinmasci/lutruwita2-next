@@ -5,6 +5,9 @@ type ProcessingProgressCallback = (progress: number) => void;
 
 export const useGpxProcessingApi = () => {
   const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/gpx` : '/api/gpx';
+  
+  // Polling interval in milliseconds
+  const POLLING_INTERVAL = 1000;
 
   const processGpxFile = async (
     file: File,
@@ -17,53 +20,65 @@ export const useGpxProcessingApi = () => {
       console.log('Starting GPX file upload...');
       
       return new Promise<ProcessedRoute>((resolve, reject) => {
-        // Send the file data first to get uploadId
-        fetch(`${API_BASE}/upload`, {
+        // Send the file data first to get jobId
+        fetch(`${API_BASE}`, {
           method: 'POST',
           body: formData
         })
         .then(response => response.json())
         .then(data => {
-          if (!data.uploadId) {
-            throw new Error('No upload ID received from server');
+          if (!data.jobId) {
+            throw new Error('No job ID received from server');
           }
-
-          // Now create EventSource with the uploadId
-          const eventSource = new EventSource(`${API_BASE}/progress/${data.uploadId}`);
           
-          eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            if (data.progress) {
-              onProgress?.(data.progress);
-              return;
-            }
-
-            if (data.error) {
-              eventSource.close();
-              reject(new Error(data.error));
-              return;
-            }
-
-            if (data.geojson) {
-              eventSource.close();
-              resolve({
-                ...data,
-                id: crypto.randomUUID(),
-                name: file.name.replace('.gpx', ''),
-                color: '#3b82f6',
-                isVisible: true
-              });
-            }
+          console.log(`File uploaded successfully, job ID: ${data.jobId}`);
+          
+          // Start polling for job status
+          const pollJobStatus = () => {
+            fetch(`${API_BASE}?jobId=${data.jobId}`, {
+              method: 'GET'
+            })
+            .then(response => response.json())
+            .then(statusData => {
+              // Check for errors
+              if (statusData.status === 'error') {
+                console.error('Job processing error:', statusData.error);
+                reject(new Error(statusData.error || 'Processing failed'));
+                return;
+              }
+              
+              // Update progress
+              if (statusData.progress !== undefined) {
+                onProgress?.(statusData.progress);
+              }
+              
+              // Check if job is completed
+              if (statusData.status === 'completed' && statusData.result) {
+                console.log('GPX processing completed successfully');
+                resolve({
+                  ...statusData.result,
+                  id: crypto.randomUUID(),
+                  name: file.name.replace('.gpx', ''),
+                  color: '#3b82f6',
+                  isVisible: true
+                });
+                return;
+              }
+              
+              // Continue polling if job is still in progress
+              setTimeout(pollJobStatus, POLLING_INTERVAL);
+            })
+            .catch(error => {
+              console.error('Error polling job status:', error);
+              reject(error);
+            });
           };
-
-          eventSource.onerror = (error) => {
-            eventSource.close();
-            reject(new Error('SSE connection failed'));
-          };
-
+          
+          // Start the polling process
+          pollJobStatus();
         })
         .catch(error => {
+          console.error('Upload error:', error);
           reject(error);
         });
       });

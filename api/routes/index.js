@@ -1,6 +1,6 @@
-import { createApiHandler } from '../lib/middleware';
+import { createApiHandler } from '../lib/middleware.js';
 import mongoose from 'mongoose';
-import { connectToDatabase } from '../lib/db';
+import { connectToDatabase } from '../lib/db.js';
 
 // Define Route schema
 const RouteSchema = new mongoose.Schema({

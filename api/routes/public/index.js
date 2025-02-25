@@ -1,8 +1,8 @@
-import { createApiHandler } from '../../lib/middleware';
+import { createApiHandler } from '../../lib/middleware.js';
 import mongoose from 'mongoose';
-import { connectToDatabase } from '../../lib/db';
-import { getCache, setCache } from '../../lib/redis';
-import { CACHE_DURATIONS } from '../../lib/redis';
+import { connectToDatabase } from '../../lib/db.js';
+import { getCache, setCache } from '../../lib/redis.js';
+import { CACHE_DURATIONS } from '../../lib/redis.js';
 
 // Define Route schema (same as in the main routes API)
 const RouteSchema = new mongoose.Schema({

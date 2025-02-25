@@ -3,13 +3,11 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  // Proxy configuration has been removed to use serverless functions directly
   server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false
-      }
+    fs: {
+      // Allow access to necessary directories
+      allow: ['src', 'public', 'node_modules', 'api']
     }
   },
   base: '/',
@@ -24,7 +22,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {}
-      }
+      },
+      // Exclude API directory from the build process
+      external: [
+        /^api\//,
+        'mongoose',
+        'mongodb'
+      ]
     },
     // Skip type checking during build when SKIP_TYPESCRIPT is true
     minify: true,
@@ -42,6 +46,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['@auth0/auth0-react']
+    include: ['@auth0/auth0-react'],
+    exclude: ['api', 'mongoose', 'mongodb']
   }
 })

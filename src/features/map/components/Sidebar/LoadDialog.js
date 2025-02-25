@@ -38,7 +38,7 @@ export const LoadDialog = ({ open, onClose, routes, onLoad, onDelete, hasUnsaved
                     pb: 1,
                     fontSize: '1.5rem',
                     fontWeight: 500
-                }, children: "Load Route" }), _jsx(DialogContent, { sx: { pt: '8px !important' }, children: routes.length === 0 ? (_jsx(Typography, { sx: { color: 'rgba(255, 255, 255, 0.7)' }, children: "No saved routes found" })) : (_jsx(List, { children: routes.map((route) => (_jsxs(ListItem, { component: "div", onClick: () => handleLoadClick(route.persistentId), sx: {
+                }, children: "Load Route" }), _jsx(DialogContent, { sx: { pt: '8px !important' }, children: !routes || routes.length === 0 ? (_jsx(Typography, { sx: { color: 'rgba(255, 255, 255, 0.7)' }, children: "No saved routes found" })) : (_jsx(List, { children: routes.map((route) => (_jsxs(ListItem, { component: "div", onClick: () => handleLoadClick(route.persistentId), sx: {
                             width: '100%',
                             py: 1.5,
                             px: 2,

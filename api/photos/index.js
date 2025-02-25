@@ -1,7 +1,7 @@
-import { createApiHandler } from '../lib/middleware';
+import { createApiHandler } from '../lib/middleware.js';
 import mongoose from 'mongoose';
-import { connectToDatabase } from '../lib/db';
-import { uploadToS3, getSignedUrl, deleteFromS3 } from '../lib/storage';
+import { connectToDatabase } from '../lib/db.js';
+import { uploadToS3, getSignedUrl, deleteFromS3 } from '../lib/storage.js';
 
 // Define Photo schema
 const PhotoSchema = new mongoose.Schema({

@@ -4,7 +4,7 @@ import { POIType, NewPOIInput } from '../types/poi.types';
 export const usePOIService = () => {
   const { getAccessTokenSilently } = useAuth0();
   
-  const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/pois` : '/api/pois';
+  const API_BASE = '/api/pois';
 
   const getAuthHeaders = async () => {
     try {

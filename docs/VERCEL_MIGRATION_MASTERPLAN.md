@@ -182,18 +182,19 @@ Rather than creating a new project or significantly restructuring the codebase, 
 - Replaced in-memory processing jobs with Redis-based job queue
 - Replaced SSE with client-side polling for long-running operations (GPX processing)
 
-### Phase 4: Frontend Adaptation (1-2 days) ✅ COMPLETED
+### Phase 4: Frontend Adaptation (1-2 days) ⏳ IN PROGRESS
 
 - [x] Update API service calls to use relative URLs
 - [x] Modify environment variable usage
 - [x] Test frontend integration with serverless APIs
 - [x] Update any client-side code that depends on server behavior
+- [ ] Replace Server-Sent Events (SSE) with polling for GPX processing
 
 **Verification Steps:**
 - [x] Frontend successfully connects to serverless APIs
 - [x] Authentication flow works end-to-end
 - [x] File uploads and downloads work from the UI
-- [x] All interactive features function correctly
+- [ ] All interactive features function correctly without the Express server
 
 **AI Assistant Notes:**
 - Updated routeService.ts to use relative URLs (/api/routes)
@@ -204,8 +205,53 @@ Rather than creating a new project or significantly restructuring the codebase, 
 - Modified environment variable usage to be compatible with Vercel
 - Ensured all API services use consistent URL patterns
 - Maintained support for VITE_API_BASE_URL environment variable for flexibility
+- **SSE to Polling Migration**: Discovered that the frontend still uses Server-Sent Events (SSE) for GPX processing progress updates, which is incompatible with serverless architecture. Need to update gpxService.ts to use polling instead of SSE to eliminate dependency on the Express server.
 
-### Phase 5: Testing and Deployment (1-2 days) ⏳ PENDING
+**Local Development Setup:**
+- Successfully connected frontend and backend servers in local development environment
+- To run the application locally:
+  1. Start the frontend: `npm run dev` (runs on port 3000)
+  2. Start the backend: `cd server && npm run dev` or `npm run server` from the project root (runs on port 8080)
+- This setup ensures proper loading of environment variables from the server/.env file
+
+**Current Issues:**
+- Route loading functionality is not working correctly:
+  - The Load Routes modal appears without displaying any routes, even though routes exist in the database
+  - Individual routes are not loading when accessed directly (e.g., http://localhost:3000/preview/route/67b56367-5952-4a2a-9eb9-63ab467b5636)
+- Need to investigate route loading issues in routeService.ts and related components
+
+**SSE to Polling Migration Plan:**
+1. **Issue**: The frontend uses EventSource for real-time progress updates during GPX processing, but serverless functions cannot maintain long-lived connections required for SSE.
+2. **Solution**: Modify src/features/gpx/services/gpxService.ts to use polling instead of SSE:
+   - Upload GPX file to get a job ID
+   - Periodically poll the serverless endpoint to check job status
+   - Continue polling until job completes or fails
+3. **Benefits**: This approach is more compatible with serverless architecture and will allow the application to function without the Express server.
+4. **Implementation**: Replace EventSource with a polling mechanism that checks job status at regular intervals.
+
+### Phase 5: Troubleshooting and Fixes (1-2 days) ⏳ IN PROGRESS
+
+- [x] Fix module import issues in serverless functions
+- [x] Install missing dependencies
+- [x] Configure environment variables for serverless functions
+- [ ] Test all API endpoints with Vercel dev
+- [ ] Fix any remaining issues with serverless functions
+
+**Verification Steps:**
+- [x] All serverless functions load without syntax or import errors
+- [x] Dependencies are properly installed and available
+- [x] Environment variables are correctly configured and accessible
+- [ ] API endpoints return expected responses
+- [ ] Frontend can communicate with serverless functions
+
+**AI Assistant Notes:**
+- Fixed CommonJS vs ESM module issues in middleware.js by changing import style for jsonwebtoken
+- Installed missing dependencies: ioredis, jsonwebtoken, express-fileupload, cors
+- Added Redis URL to environment variables in .env.local
+- Fixed file extension issues in import statements (added .js extensions)
+- Identified environment variable access issues in serverless functions
+
+### Phase 6: Testing and Deployment (1-2 days) ⏳ PENDING
 
 - [ ] Comprehensive local testing with Vercel dev
 - [ ] Deploy to Vercel preview environment
@@ -219,12 +265,69 @@ Rather than creating a new project or significantly restructuring the codebase, 
 - [ ] Authentication works in production environment
 - [ ] File uploads and downloads work in production
 - [ ] No regression in functionality compared to current deployment
+- [ ] GPX processing works without the Express server
 
 **AI Assistant Notes:**
 - Created docs/VERCEL_DEPLOYMENT.md with detailed deployment instructions
 - Added memory and timeout settings in vercel.json for optimal performance
 - Created docs/VERCEL_MIGRATION_README.md with migration overview
 - Need to implement proper error handling and logging in API functions
+
+## Serverless Architecture Challenges
+
+During the migration process, we've encountered several challenges specific to serverless architecture:
+
+### Long-Running Connections
+
+**Challenge**: Serverless functions are not designed to maintain long-lived connections like Server-Sent Events (SSE) that the original Express server used for GPX processing progress updates.
+
+**Solution**: Replace SSE with a polling mechanism where the client periodically checks the status of long-running operations. This approach is more compatible with the stateless nature of serverless functions.
+
+**Implementation**: 
+- Store job state in Redis instead of in-memory
+- Provide endpoints for clients to check job status
+- Update frontend services to poll for updates instead of using EventSource
+
+### API URL Configuration
+
+**Challenge**: The frontend services were configured to use environment variables for API base URLs, which caused them to try connecting to the Express server at http://localhost:8080 instead of using the serverless functions.
+
+**Solution**: Update all frontend services to use relative URLs that will automatically connect to the serverless functions regardless of the deployment environment.
+
+**Implementation**:
+- Remove VITE_API_BASE_URL from .env.local to prevent overriding the default relative URLs
+- Update all service files to use hardcoded relative URLs (e.g., '/api/routes') instead of checking for environment variables
+- Remove the Vite proxy configuration in vite.config.ts that was redirecting all /api requests to http://localhost:8080
+- This ensures consistent behavior across all environments and eliminates the dependency on the Express server
+
+**Debugging Notes**:
+- Even after updating the service files to use relative URLs, requests were still being sent to http://localhost:8080
+- The issue was traced to two configuration sources:
+  1. The VITE_API_BASE_URL in .env.local was commented out with # but might still be loaded by Vite
+  2. The proxy configuration in vite.config.ts was redirecting all /api requests to the Express server
+- Both issues needed to be fixed to properly use the serverless functions
+
+### State Management
+
+**Challenge**: Serverless functions are stateless by nature, which conflicts with the original application's use of in-memory state for tracking processing jobs.
+
+**Solution**: Use Redis for all state that needs to persist between function invocations, including job queues, processing status, and caching.
+
+**Implementation**:
+- Created Redis-based job queue system in api/lib/job-queue.js
+- Implemented connection pooling for database and Redis connections
+- Cached frequently accessed data with appropriate TTL values
+
+### File Handling
+
+**Challenge**: Serverless functions cannot rely on local filesystem for temporary or permanent storage.
+
+**Solution**: Use S3 for all file storage needs, including uploads, downloads, and temporary processing files.
+
+**Implementation**:
+- Implemented S3 integration for file uploads and downloads
+- Created presigned URL system for direct client-to-S3 uploads
+- Updated all file handling code to use S3 instead of local filesystem
 
 ## Code Quality Strategy
 

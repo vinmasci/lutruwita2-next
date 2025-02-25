@@ -1,9 +1,9 @@
-import { createApiHandler } from '../lib/middleware';
-import { connectToDatabase } from '../lib/db';
-import { uploadToS3, getSignedUrl, deleteFromS3 } from '../lib/storage';
-import { createJob, getJob, updateJob, deleteJob } from '../lib/job-queue';
-import { getCachedSurface, setCachedSurface } from '../lib/surface-cache';
-import { parseGPX } from '../lib/gpx-parser';
+import { createApiHandler } from '../lib/middleware.js';
+import { connectToDatabase } from '../lib/db.js';
+import { uploadToS3, getSignedUrl, deleteFromS3 } from '../lib/storage.js';
+import { createJob, getJob, updateJob, deleteJob } from '../lib/job-queue.js';
+import { getCachedSurface, setCachedSurface } from '../lib/surface-cache.js';
+import { parseGPX } from '../lib/gpx-parser.js';
 
 // Handler for uploading a GPX file
 async function handleUploadGPX(req, res) {

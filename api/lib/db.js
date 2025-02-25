@@ -9,11 +9,18 @@ export async function connectToDatabase() {
     return cachedConnection;
   }
 
-  // Check for MongoDB URI
+  // Check for MongoDB URI with detailed logging
+  console.log('Environment variables available:', Object.keys(process.env).filter(key => !key.includes('SECRET')));
   const uri = process.env.MONGODB_URI;
   if (!uri) {
+    console.error('MONGODB_URI is not defined. Available environment variables:', 
+      Object.keys(process.env)
+        .filter(key => !key.includes('SECRET') && !key.includes('KEY'))
+        .join(', ')
+    );
     throw new Error('MONGODB_URI environment variable is not defined');
   }
+  console.log('MongoDB URI found, attempting connection...');
 
   try {
     // Set up connection options for serverless environment
