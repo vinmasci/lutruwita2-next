@@ -66,7 +66,9 @@ The application will be available at:
 
 ### Production Deployment
 
-See [docs/DEPLOYMENT.template.md](docs/DEPLOYMENT.template.md) for detailed deployment instructions.
+For Digital Ocean deployment, see [docs/DEPLOYMENT.template.md](docs/DEPLOYMENT.template.md) for detailed instructions.
+
+For Vercel deployment, see [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md) and [docs/VERCEL_MIGRATION_MASTERPLAN.md](docs/VERCEL_MIGRATION_MASTERPLAN.md) for the serverless migration process.
 
 ## Project Structure
 
