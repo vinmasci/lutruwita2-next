@@ -237,18 +237,14 @@ async function handleGetPublicRoute(req, res) {
     
     // Check cache first
     let cachedRoute = null;
-    try {
-      const cacheKey = `public-route:${publicId}`;
-      cachedRoute = await getCache(cacheKey);
-      
-      if (cachedRoute) {
-        console.log(`[API] Found route in cache`);
-        return res.status(200).json(cachedRoute);
-      }
-    } catch (cacheError) {
-      // Log Redis error but continue without cache
-      console.error(`[API] Redis cache error:`, cacheError.message);
-      console.log(`[API] Continuing without cache...`);
+    const routeCacheKey = `public-route:${publicId}`;
+    cachedRoute = await getCache(routeCacheKey);
+    
+    if (cachedRoute) {
+      console.log(`[API] Found route in cache`);
+      return res.status(200).json(cachedRoute);
+    } else {
+      console.log(`[API] No cached data found, fetching from database...`);
     }
     
     // Log all available collections in the database
@@ -308,13 +304,10 @@ async function handleGetPublicRoute(req, res) {
       hasMapState: !!routeData.mapState
     });
     
-    // Cache the result
-    try {
-      const cacheKey = `public-route:${publicId}`;
-      await setCache(cacheKey, publicRouteData, CACHE_DURATIONS.publicRoutes);
-    } catch (cacheError) {
-      console.error(`[API] Redis cache error when setting cache:`, cacheError.message);
-      // Continue without caching
+    // Cache the result - getCache/setCache functions already handle Redis errors internally
+    const cacheResult = await setCache(routeCacheKey, publicRouteData, CACHE_DURATIONS.publicRoutes);
+    if (cacheResult) {
+      console.log(`[API] Successfully cached route data`);
     }
     
     return res.status(200).json(publicRouteData);
@@ -340,20 +333,15 @@ async function handleGetPublicRoutes(req, res) {
     
     console.log(`[API] Listing public routes with filter:`, filter);
     
-    // Check cache first
-    let cachedRoutes = null;
-    try {
-      const cacheKey = `public-routes:${JSON.stringify(filter)}`;
-      cachedRoutes = await getCache(cacheKey);
-      
-      if (cachedRoutes) {
-        console.log(`[API] Found routes in cache`);
-        return res.status(200).json(cachedRoutes);
-      }
-    } catch (cacheError) {
-      // Log Redis error but continue without cache
-      console.error(`[API] Redis cache error:`, cacheError.message);
-      console.log(`[API] Continuing without cache...`);
+    // Check cache first - getCache function already handles Redis errors internally
+    const routesListCacheKey = `public-routes:${JSON.stringify(filter)}`;
+    const cachedRoutes = await getCache(routesListCacheKey);
+    
+    if (cachedRoutes) {
+      console.log(`[API] Found routes in cache`);
+      return res.status(200).json(cachedRoutes);
+    } else {
+      console.log(`[API] No cached routes found, fetching from database...`);
     }
     
     // Get routes from database
@@ -386,13 +374,10 @@ async function handleGetPublicRoutes(req, res) {
       })
     };
     
-    // Cache the result
-    try {
-      const cacheKey = `public-routes:${JSON.stringify(filter)}`;
-      await setCache(cacheKey, response, CACHE_DURATIONS.publicRoutes);
-    } catch (cacheError) {
-      console.error(`[API] Redis cache error when setting cache:`, cacheError.message);
-      // Continue without caching
+    // Cache the result - setCache function already handles Redis errors internally
+    const cacheResult = await setCache(routesListCacheKey, response, CACHE_DURATIONS.publicRoutes);
+    if (cacheResult) {
+      console.log(`[API] Successfully cached routes list`);
     }
     
     return res.status(200).json(response);
@@ -414,20 +399,15 @@ async function handleGetPublicRoutePOIs(req, res) {
       return res.status(400).json({ error: 'Missing route ID parameter' });
     }
     
-    // Check cache first
-    let cachedPOIs = null;
-    try {
-      const cacheKey = `public-route-pois:${publicId}`;
-      cachedPOIs = await getCache(cacheKey);
-      
-      if (cachedPOIs) {
-        console.log(`[API] Found POIs in cache`);
-        return res.status(200).json(cachedPOIs);
-      }
-    } catch (cacheError) {
-      // Log Redis error but continue without cache
-      console.error(`[API] Redis cache error:`, cacheError.message);
-      console.log(`[API] Continuing without cache...`);
+    // Check cache first - getCache function already handles Redis errors internally
+    const poisCacheKey = `public-route-pois:${publicId}`;
+    const cachedPOIs = await getCache(poisCacheKey);
+    
+    if (cachedPOIs) {
+      console.log(`[API] Found POIs in cache`);
+      return res.status(200).json(cachedPOIs);
+    } else {
+      console.log(`[API] No cached POIs found, fetching from database...`);
     }
     
     // Get route from database - try to find by persistentId first, then by publicId
@@ -448,13 +428,10 @@ async function handleGetPublicRoutePOIs(req, res) {
     const pois = await POI.find({ routeId: route._id })
       .select('name description icon location metadata persistentId createdAt updatedAt');
     
-    // Cache the result
-    try {
-      const cacheKey = `public-route-pois:${publicId}`;
-      await setCache(cacheKey, { pois }, CACHE_DURATIONS.publicRoutes);
-    } catch (cacheError) {
-      console.error(`[API] Redis cache error when setting cache:`, cacheError.message);
-      // Continue without caching
+    // Cache the result - setCache function already handles Redis errors internally
+    const poisCacheResult = await setCache(poisCacheKey, { pois }, CACHE_DURATIONS.publicRoutes);
+    if (poisCacheResult) {
+      console.log(`[API] Successfully cached POIs data`);
     }
     
     return res.status(200).json({ pois });
@@ -476,20 +453,15 @@ async function handleGetPublicRoutePhotos(req, res) {
       return res.status(400).json({ error: 'Missing route ID parameter' });
     }
     
-    // Check cache first
-    let cachedPhotos = null;
-    try {
-      const cacheKey = `public-route-photos:${publicId}`;
-      cachedPhotos = await getCache(cacheKey);
-      
-      if (cachedPhotos) {
-        console.log(`[API] Found photos in cache`);
-        return res.status(200).json(cachedPhotos);
-      }
-    } catch (cacheError) {
-      // Log Redis error but continue without cache
-      console.error(`[API] Redis cache error:`, cacheError.message);
-      console.log(`[API] Continuing without cache...`);
+    // Check cache first - getCache function already handles Redis errors internally
+    const photosCacheKey = `public-route-photos:${publicId}`;
+    const cachedPhotos = await getCache(photosCacheKey);
+    
+    if (cachedPhotos) {
+      console.log(`[API] Found photos in cache`);
+      return res.status(200).json(cachedPhotos);
+    } else {
+      console.log(`[API] No cached photos found, fetching from database...`);
     }
     
     // Get route from database - try to find by persistentId first, then by publicId
@@ -522,13 +494,10 @@ async function handleGetPublicRoutePhotos(req, res) {
     const photos = await Photo.find({ _id: { $in: photoIds } })
       .select('filename url metadata.location createdAt');
     
-    // Cache the result
-    try {
-      const cacheKey = `public-route-photos:${publicId}`;
-      await setCache(cacheKey, { photos }, CACHE_DURATIONS.publicRoutes);
-    } catch (cacheError) {
-      console.error(`[API] Redis cache error when setting cache:`, cacheError.message);
-      // Continue without caching
+    // Cache the result - setCache function already handles Redis errors internally
+    const photosCacheResult = await setCache(photosCacheKey, { photos }, CACHE_DURATIONS.publicRoutes);
+    if (photosCacheResult) {
+      console.log(`[API] Successfully cached photos data`);
     }
     
     return res.status(200).json({ photos });
