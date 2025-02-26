@@ -92,7 +92,7 @@ export const RouteProvider = ({ children, }) => {
     const routeService = useRouteService();
     const { map } = useMapContext();
     const { pois, getPOIsForRoute, loadPOIsFromRoute } = usePOIContext();
-    const { photos, addPhoto } = usePhotoContext();
+    const { photos, addPhoto, uploadLocalPhotos } = usePhotoContext();
     const { places, updatePlace } = usePlaceContext();
     const addRoute = useCallback((route) => {
         console.debug('[RouteContext] Adding route:', {
@@ -227,6 +227,24 @@ export const RouteProvider = ({ children, }) => {
                 throw new Error('No route data to save');
             }
             setIsSaving(true);
+            
+            // Upload any local photos to Cloudinary before saving
+            console.log('[RouteContext] Checking for local photos to upload...');
+            let updatedPhotos = photos;
+            try {
+                // Check if there are any local photos that need to be uploaded
+                const localPhotos = photos.filter(p => p.isLocal === true);
+                if (localPhotos.length > 0) {
+                    console.log(`[RouteContext] Found ${localPhotos.length} local photos to upload`);
+                    // Upload local photos to Cloudinary
+                    updatedPhotos = await uploadLocalPhotos();
+                } else {
+                    console.log('[RouteContext] No local photos to upload');
+                }
+            } catch (photoError) {
+                console.error('[RouteContext] Error uploading photos:', photoError);
+                // Continue with save even if photo upload fails
+            }
             const routeState = {
                 id: "", // Will be set by backend
                 persistentId: currentLoadedPersistentId || "", // Will be set by backend for new routes
@@ -251,7 +269,7 @@ export const RouteProvider = ({ children, }) => {
                     style: 'default'
                 },
                 routes: routes.map(roundRouteCoordinates),
-                photos,
+                photos: updatedPhotos,
                 pois,
             };
             let result;
@@ -314,12 +332,22 @@ export const RouteProvider = ({ children, }) => {
             });
             setIsLoadedMap(true);
             setCurrentLoadedState(route);
-            setCurrentLoadedPersistentId(persistentId);
+            // Ensure we're setting the persistentId from the route object if available, otherwise use the parameter
+            setCurrentLoadedPersistentId(route.persistentId || persistentId);
+            
+            // Log the persistentId for debugging
+            console.log('[RouteContext] Setting currentLoadedPersistentId:', route.persistentId || persistentId);
             const loadedRoutes = route.routes.map(r => ({
                 ...r,
                 _type: 'loaded',
-                _loadedState: route
+                persistentId: route.persistentId, // Ensure persistentId is set on each route
+                _loadedState: {
+                    ...route,
+                    persistentId: route.persistentId || persistentId // Ensure persistentId is set in _loadedState
+                }
             }));
+            
+            console.log('[RouteContext] Created loaded routes with persistentId:', route.persistentId || persistentId);
             setRoutes(loadedRoutes);
             if (route.routes[0]) {
                 const normalizedRoute = normalizeRoute(route);
