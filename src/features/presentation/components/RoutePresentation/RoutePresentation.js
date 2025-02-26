@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { publicRouteService } from '../../services/publicRoute.service';
+import { publicRouteService } from '../../services/publicRoute.service.js';
 import { PresentationMapView } from '../PresentationMapView';
 import { Box, CircularProgress, Alert } from '@mui/material';
 import { RouteProvider, useRouteContext } from '../../../map/context/RouteContext';
@@ -20,13 +20,32 @@ export const RoutePresentation = () => {
             try {
                 setLoading(true);
                 setError(null);
+                console.log('[RoutePresentation] Fetching route with ID:', id);
                 const routeData = await publicRouteService.loadRoute(id);
-                console.log('Fetched route data:', routeData);
-                setRoute(routeData.route);
+                console.log('[RoutePresentation] Fetched route data:', routeData);
+                console.log('[RoutePresentation] Route data type:', typeof routeData);
+                console.log('[RoutePresentation] Is null?', routeData === null);
+                console.log('[RoutePresentation] Is undefined?', routeData === undefined);
+                
+                if (!routeData) {
+                    console.error('[RoutePresentation] Route data is null or undefined');
+                    setError('Route data is empty');
+                    return;
+                }
+                
+                if (!routeData.routes || !Array.isArray(routeData.routes)) {
+                    console.error('[RoutePresentation] Missing routes array:', routeData.routes);
+                    setError('Invalid route data structure');
+                    return;
+                }
+                
+                // The API now returns the route data directly
+                console.log('[RoutePresentation] Using direct route data object');
+                setRoute(routeData);
             }
             catch (error) {
                 setError('Failed to load route');
-                console.error('Error fetching route:', error);
+                console.error('[RoutePresentation] Error fetching route:', error);
             }
             finally {
                 setLoading(false);
@@ -39,15 +58,37 @@ export const RoutePresentation = () => {
         if (!route)
             return [];
         console.log('[RoutePresentation] Using server routes:', route.name);
+        console.log('[RoutePresentation] Route data structure:', {
+            persistentId: route.persistentId,
+            routeCount: route.routes?.length,
+            hasRoutes: !!route.routes,
+            isRoutesArray: Array.isArray(route.routes)
+        });
+        
+        if (!route.routes || !Array.isArray(route.routes) || route.routes.length === 0) {
+            console.error('[RoutePresentation] Invalid routes array:', route.routes);
+            return [];
+        }
+        
         return route.routes.map(routeData => {
             if (!routeData.routeId) {
-                console.error('Route data missing routeId:', routeData);
+                console.error('[RoutePresentation] Route data missing routeId:', routeData);
                 return null;
             }
+            
+            console.log('[RoutePresentation] Processing route:', routeData.routeId);
+            
+            // Ensure the route object has the persistentId property
             return {
                 ...routeData,
                 _type: 'loaded',
-                _loadedState: route,
+                _loadedState: {
+                    ...route,
+                    // Ensure persistentId is explicitly set in _loadedState
+                    persistentId: route.persistentId
+                },
+                // Also set persistentId directly on the route object
+                persistentId: route.persistentId,
                 id: routeData.routeId,
                 isVisible: true,
                 status: {

@@ -23,16 +23,16 @@ export function getRedisClient() {
   try {
     // Create a new Redis client with optimized options for serverless
     const client = new Redis(url, {
-      maxRetriesPerRequest: 3,
-      connectTimeout: 3000,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 1500,
       // These options help with connection stability in serverless
       enableReadyCheck: false,
-      enableOfflineQueue: true, // Enable offline queue to handle temporary connection issues
-      disconnectTimeout: 2000,
-      keepAlive: 1000,
+      enableOfflineQueue: false, // Disable offline queue to fail fast in serverless
+      disconnectTimeout: 1000,
+      keepAlive: 0, // Disable keepalive in serverless
       reconnectOnError: (err) => {
         // Only reconnect on specific errors
-        const targetErrors = ['READONLY', 'ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'];
+        const targetErrors = ['READONLY'];
         return targetErrors.includes(err.code);
       },
       retryStrategy: (times) => {
@@ -50,10 +50,15 @@ export function getRedisClient() {
     // Handle connection errors
     client.on('error', (error) => {
       console.error('[Redis Error]', error);
-      // If we get a connection error, mark Redis as unavailable
-      if (['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET'].includes(error.code)) {
-        redisAvailable = false;
-        console.log(`[Redis] Marking Redis as unavailable due to ${error.code}`);
+      // Always mark Redis as unavailable on any error in serverless
+      redisAvailable = false;
+      console.log(`[Redis] Marking Redis as unavailable due to error: ${error.message}`);
+      
+      // In serverless, we should close the connection on error
+      try {
+        client.disconnect();
+      } catch (e) {
+        // Ignore disconnect errors
       }
     });
     
