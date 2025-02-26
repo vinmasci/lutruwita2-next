@@ -96,21 +96,35 @@ export const useRouteService = () => {
             console.log('[routeService] Load response status:', response.status);
             const data = await handleResponse(response);
             console.log('[routeService] Loaded route data:', data);
+            
+            // Handle both formats: data.route (old format) or data directly (new format)
+            // Check if the data has a 'route' property or if it has 'routes' directly
+            const routeData = data.route || data;
+            
             // Add detailed logging for route data
-            if (data.route && data.route.routes && data.route.routes.length > 0) {
+            if (routeData && routeData.routes && routeData.routes.length > 0) {
                 console.log('[routeService] First route details:', {
-                    id: data.route.routes[0].id,
-                    routeId: data.route.routes[0].routeId,
-                    hasGeojson: Boolean(data.route.routes[0].geojson),
-                    geojsonFeatures: data.route.routes[0].geojson?.features?.length || 0
+                    id: routeData.routes[0].id,
+                    routeId: routeData.routes[0].routeId,
+                    hasGeojson: Boolean(routeData.routes[0].geojson),
+                    geojsonFeatures: routeData.routes[0].geojson?.features?.length || 0,
+                    persistentId: routeData.persistentId
                 });
-                if (!data.route.routes[0].geojson) {
+                
+                if (!routeData.routes[0].geojson) {
                     console.error('[routeService] Missing GeoJSON data in route');
                 }
             }
             else {
                 console.error('[routeService] No routes found in response');
             }
+            
+            // If the data doesn't have a 'route' property but has 'routes' directly,
+            // wrap it in a 'route' property to maintain compatibility with the rest of the code
+            if (!data.route && data.routes) {
+                return { route: data };
+            }
+            
             return data;
         }
         catch (error) {
