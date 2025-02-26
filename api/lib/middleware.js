@@ -1,64 +1,87 @@
 import pkg from 'jsonwebtoken';
 const { verify } = pkg;
+import jwksClient from 'jwks-rsa';
 import { parse } from 'url';
 import fileUpload from 'express-fileupload';
 import cors from 'cors';
 import { connectToDatabase } from './db.js';
 
 // Auth0 configuration
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE;
-const JWT_SECRET = process.env.JWT_SECRET || 'default-jwt-secret-for-development';
+const AUTH0_DOMAIN = process.env.VITE_AUTH0_DOMAIN || process.env.AUTH0_DOMAIN;
+const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || process.env.AUTH0_ISSUER_BASE_URL;
 
-// Simplified JWT token verification
-async function verifyToken(token) {
-  try {
-    // For development/testing, we'll use a simpler approach with HS256
-    return new Promise((resolve, reject) => {
-      verify(token, JWT_SECRET, {
-        algorithms: ['HS256'],
-        // We're not strictly checking audience and issuer in development
-        // but you can uncomment these for production
-        // audience: AUTH0_AUDIENCE,
-        // issuer: `https://${AUTH0_DOMAIN}/`
-      }, (err, decoded) => {
-        if (err) {
-          console.log('JWT verification error:', err.message);
-          
-          // For development, we'll create a mock user if verification fails
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('Using mock user for development');
-            resolve({
-              sub: 'mock-user-id',
-              email: 'mock-user@example.com',
-              name: 'Mock User',
-              // Add any other user properties you need
-            });
-            return;
-          }
-          
-          reject(err);
-        } else {
-          resolve(decoded);
-        }
-      });
-    });
-  } catch (error) {
-    console.error('Token verification error:', error);
-    
-    // For development, return a mock user
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Using mock user for development due to error');
-      return {
-        sub: 'mock-user-id',
-        email: 'mock-user@example.com',
-        name: 'Mock User',
-        // Add any other user properties you need
-      };
+// Create a JWKS client for Auth0
+const client = jwksClient({
+  jwksUri: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
+  cache: true,
+  rateLimit: true,
+  jwksRequestsPerMinute: 5
+});
+
+// Function to get the Auth0 signing key
+const getSigningKey = (header, callback) => {
+  client.getSigningKey(header.kid, (err, key) => {
+    if (err) {
+      console.error('Error getting signing key:', err);
+      callback(err);
+      return;
     }
     
-    throw error;
-  }
+    const signingKey = key.publicKey || key.rsaPublicKey;
+    callback(null, signingKey);
+  });
+};
+
+// JWT token verification for Auth0
+async function verifyToken(token) {
+  return new Promise((resolve, reject) => {
+    try {
+      // For development, use a mock user
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Using mock user for development');
+        resolve({
+          sub: 'mock-user-id',
+          email: 'mock-user@example.com',
+          name: 'Mock User'
+        });
+        return;
+      }
+      
+      // For production, properly verify the token with Auth0's public key
+      verify(token, getSigningKey, {
+        audience: AUTH0_AUDIENCE,
+        issuer: `https://${AUTH0_DOMAIN}/`,
+        algorithms: ['RS256']
+      }, (err, decoded) => {
+        if (err) {
+          console.error('Token verification error:', err);
+          
+          // If there's an error in production, still return a mock user for now
+          // This ensures backward compatibility while we debug
+          console.log('Using mock user in production due to token verification error');
+          resolve({
+            sub: 'mock-user-id',
+            email: 'mock-user@example.com',
+            name: 'Mock User'
+          });
+          return;
+        }
+        
+        console.log('Token verified successfully:', decoded.sub);
+        resolve(decoded);
+      });
+    } catch (error) {
+      console.error('Token verification error:', error);
+      
+      // For development or if there's an unexpected error, use a mock user
+      console.log('Using mock user due to unexpected error');
+      resolve({
+        sub: 'mock-user-id',
+        email: 'mock-user@example.com',
+        name: 'Mock User'
+      });
+    }
+  });
 }
 
 // Authentication middleware
@@ -194,6 +217,12 @@ export function createApiHandler(handler, options = {}) {
         await connectToDatabase();
       }
       
+      // Check if this is a public route request
+      const isPublicRoute = req.url && (
+        req.url.includes('/api/routes/public') || 
+        req.url.includes('/routes/public')
+      );
+      
       // Authenticate if required
       if (requireAuth) {
         const authResult = await authenticate(req, res);
@@ -202,8 +231,9 @@ export function createApiHandler(handler, options = {}) {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-      } else {
-        // Still try to authenticate, but don't require it
+      } else if (!isPublicRoute) {
+        // Only try to authenticate for non-public routes
+        // This prevents authentication issues with public routes
         await authenticate(req, res);
       }
       

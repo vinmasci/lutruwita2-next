@@ -20,6 +20,10 @@
       "dest": "/api/poi"
     },
     {
+      "src": "/api/routes/public/([^/]+)",
+      "dest": "/api/routes/public?publicId=$1"
+    },
+    {
       "src": "/api/routes/public",
       "dest": "/api/routes/public"
     },
