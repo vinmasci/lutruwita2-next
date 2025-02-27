@@ -4,7 +4,7 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
 import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
 import { PhotoCluster } from '../PhotoCluster/PhotoCluster';
-import { PhotoPreviewModal } from '../PhotoPreview/PhotoPreviewModal';
+import { SimpleLightbox } from '../PhotoPreview/SimpleLightbox';
 import { clusterPhotos, isCluster, getClusterExpansionZoom } from '../../utils/clustering';
 import './PhotoLayer.css';
 export const PhotoLayer = () => {
@@ -86,7 +86,7 @@ export const PhotoLayer = () => {
             setSelectedPhoto(cluster.properties.photos[0]);
         }
     }, [map, clusteredItems]);
-    return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(PhotoPreviewModal, { photo: selectedPhoto, onClose: () => {
+    return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(SimpleLightbox, { photo: selectedPhoto, onClose: () => {
                     setSelectedPhoto(null);
                     setSelectedCluster(null);
                 }, additionalPhotos: selectedCluster }, `preview-${selectedPhoto.id}`))] }));
