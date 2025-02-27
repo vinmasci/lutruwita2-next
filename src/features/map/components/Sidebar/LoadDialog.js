@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { Dialog, DialogTitle, DialogContent, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Typography, Button, DialogActions } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Typography, Button, DialogActions, Box, CircularProgress } from '@mui/material';
 import { Delete } from '@mui/icons-material';
 import { useState } from 'react';
 const ConfirmDialog = ({ open, onClose, onConfirm }) => (_jsxs(Dialog, { open: open, onClose: onClose, PaperProps: {
@@ -8,7 +8,7 @@ const ConfirmDialog = ({ open, onClose, onConfirm }) => (_jsxs(Dialog, { open: o
             color: 'white'
         }
     }, children: [_jsx(DialogTitle, { children: "Unsaved Changes" }), _jsx(DialogContent, { children: _jsx(Typography, { children: "You have unsaved changes that will be lost. Do you want to continue?" }) }), _jsxs(DialogActions, { children: [_jsx(Button, { onClick: onClose, sx: { color: 'rgba(255, 255, 255, 0.7)' }, children: "Cancel" }), _jsx(Button, { onClick: onConfirm, sx: { color: '#f44336' }, children: "Discard Changes" })] })] }));
-export const LoadDialog = ({ open, onClose, routes, onLoad, onDelete, hasUnsavedChanges = false }) => {
+export const LoadDialog = ({ open, onClose, routes, onLoad, onDelete, hasUnsavedChanges = false, isLoading = false }) => {
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingLoadId, setPendingLoadId] = useState(null);
     const handleLoadClick = (id) => {
@@ -38,7 +38,14 @@ export const LoadDialog = ({ open, onClose, routes, onLoad, onDelete, hasUnsaved
                     pb: 1,
                     fontSize: '1.5rem',
                     fontWeight: 500
-                }, children: "Load Route" }), _jsx(DialogContent, { sx: { pt: '8px !important' }, children: !routes || routes.length === 0 ? (_jsx(Typography, { sx: { color: 'rgba(255, 255, 255, 0.7)' }, children: "No saved routes found" })) : (_jsx(List, { children: routes.map((route) => (_jsxs(ListItem, { component: "div", onClick: () => handleLoadClick(route.persistentId), sx: {
+                }, children: "Load Route" }), _jsx(DialogContent, { sx: { pt: '8px !important' }, children: isLoading ? (
+                    // Show loading spinner when routes are being fetched
+                    _jsx(Box, { sx: { display: 'flex', justifyContent: 'center', py: 4 }, children: 
+                        _jsx(CircularProgress, { sx: { color: 'rgba(255, 255, 255, 0.7)' } })
+                    })
+                ) : !routes || routes.length === 0 ? (
+                    _jsx(Typography, { sx: { color: 'rgba(255, 255, 255, 0.7)' }, children: "No saved routes found" })
+                ) : (_jsx(List, { children: routes.map((route) => (_jsxs(ListItem, { component: "div", onClick: () => handleLoadClick(route.persistentId), sx: {
                             width: '100%',
                             py: 1.5,
                             px: 2,

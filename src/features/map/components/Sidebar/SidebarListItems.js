@@ -1,6 +1,6 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
-import { List, ListItem, ListItemButton, ListItemIcon, Tooltip, Divider } from '@mui/material';
+import { List, ListItem, ListItemButton, ListItemIcon, Tooltip, Divider, Snackbar, Alert } from '@mui/material';
 import { useRouteContext } from '../../context/RouteContext';
 import { SidebarIcons } from './icons';
 import { SaveDialog } from './SaveDialog';
@@ -10,6 +10,8 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
     const { routes, savedRoutes, saveCurrentState, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges } = useRouteContext();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+    const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [activeItem, setActiveItem] = useState(null);
 
     const handleSaveClick = () => {
@@ -21,15 +23,28 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
         setSaveDialogOpen(true);
     };
 
-    const handleLoadClick = async () => {
+    const handleLoadClick = () => {
         console.log('Load clicked');
-        try {
-            await listRoutes();
-            setLoadDialogOpen(true);
-        }
-        catch (error) {
-            console.error('Failed to list routes:', error);
-        }
+        // Open the modal immediately with loading state
+        setIsLoadingRoutes(true);
+        setLoadDialogOpen(true);
+        // Show the snackbar notification
+        setSnackbarOpen(true);
+        
+        // Fetch routes in the background
+        listRoutes()
+            .then(() => {
+                // Update the loading state when routes are fetched
+                setIsLoadingRoutes(false);
+                // Close the snackbar
+                setSnackbarOpen(false);
+            })
+            .catch(error => {
+                console.error('Failed to list routes:', error);
+                setIsLoadingRoutes(false);
+                // Close the snackbar
+                setSnackbarOpen(false);
+            });
     };
 
     const handleItemClick = (id, onClick) => {
@@ -79,6 +94,16 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
 
     return (_jsxs(_Fragment, { 
         children: [
+            // Snackbar notification for loading routes
+            _jsx(Snackbar, {
+                open: snackbarOpen,
+                anchorOrigin: { vertical: 'bottom', horizontal: 'center' },
+                children: _jsx(Alert, {
+                    severity: "info",
+                    sx: { width: '100%', backgroundColor: 'rgb(35, 35, 35)', color: 'white' },
+                    children: "Loading routes, this may take a moment..."
+                })
+            }),
             _jsx(List, { 
                 sx: { display: 'flex', flexDirection: 'column', height: '100%' },
                 children: [
@@ -159,7 +184,8 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
             _jsx(LoadDialog, { 
                 open: loadDialogOpen, 
                 onClose: () => setLoadDialogOpen(false), 
-                routes: savedRoutes, 
+                routes: savedRoutes,
+                isLoading: isLoadingRoutes,
                 onLoad: async (id) => {
                     try {
                         await loadRoute(id);
