@@ -1,44 +1,81 @@
 .auth0-login {
-  padding: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: auto;
+  z-index: 900;
   display: flex;
   justify-content: center;
-}
-
-.auth0-loading {
-  color: #888;
-  text-align: center;
-  font-size: 14px;
+  width: 100%;
+  position: relative;
+  transform: translateY(-10px) !important; /* Force move up by 20px */
 }
 
 .auth0-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #444;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
   object-fit: cover;
-  transition: opacity 0.2s ease;
-  background-color: #2a2a2a;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  padding: 2px;
+}
+
+.auth-status-indicator {
+  position: absolute;
+  bottom: -2px;
+  right: calc(50% - 25px);
+  font-size: 14px;
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.auth-status-indicator.logged-in {
+  color: #4caf50;
+}
+
+.auth-status-indicator.logged-out {
+  color: #f44336;
 }
 
 .auth0-avatar:hover {
-  opacity: 0.8;
+  transform: scale(1.05);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  border-color: #666;
 }
 
-.auth0-button {
-  background: #2a2a2a;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.auth0-loading {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  color: white;
+  border: 2px solid #444;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.auth0-button:hover {
-  background: #3a3a3a;
-  border-color: rgba(255, 255, 255, 0.2);
+/* User Profile Drawer Container */
+.user-profile-drawer-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 0;
+  z-index: 1000;
+}
+
+.user-profile-drawer-container.open {
+  width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .auth0-login {
+    top: 10px;
+    right: 10px;
+  }
+  
+  .auth0-avatar {
+    width: 36px;
+    height: 36px;
+  }
 }

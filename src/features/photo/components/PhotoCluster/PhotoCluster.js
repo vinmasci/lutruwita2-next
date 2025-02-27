@@ -66,16 +66,40 @@ export const PhotoCluster = ({ cluster, onClick }) => {
         // Add preview container
         const previewsContainer = document.createElement('div');
         previewsContainer.className = 'photo-cluster-previews';
-        // Add preview image
+        
+        // Get the first photo in the cluster
+        const firstPhoto = cluster.properties.photos[0];
+        
+        // Use tinyThumbnailUrl if available, otherwise fall back to thumbnailUrl
+        const thumbnailUrl = firstPhoto.tinyThumbnailUrl || firstPhoto.thumbnailUrl;
+        
+        // Create image element
         const preview = document.createElement('img');
-        preview.src = cluster.properties.photos[0].thumbnailUrl;
-        preview.alt = cluster.properties.photos[0].name || 'Photo preview';
+        
+        // Set up error handler for fallback
         preview.onerror = () => {
+            console.error('Failed to load photo thumbnail:', thumbnailUrl);
             preview.src = '/images/photo-fallback.svg';
             preview.alt = 'Failed to load photo';
         };
+        
+        // Set alt text
+        preview.alt = firstPhoto.name || 'Photo preview';
+        
+        // Check if the thumbnailUrl exists
+        if (thumbnailUrl) {
+            preview.src = thumbnailUrl;
+        } else {
+            // No thumbnail URL, use fallback
+            preview.src = '/images/photo-fallback.svg';
+            preview.alt = 'No thumbnail available';
+        }
+        
+        // Add the image to the container
         previewsContainer.appendChild(preview);
+        
         bubble.appendChild(previewsContainer);
+        
         // Add count
         const count = document.createElement('div');
         count.className = 'photo-cluster-count';

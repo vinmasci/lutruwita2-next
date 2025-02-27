@@ -1,4 +1,4 @@
-import { useClientGpxProcessing } from '../../hooks/useClientGpxProcessing';
+import { useGpxProcessing } from '../../hooks/useGpxProcessing';
 import { useMapContext } from '../../../map/context/MapContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { GpxUploaderProps } from './Uploader.types';
@@ -11,7 +11,8 @@ import { Box, Typography, Button } from '@mui/material';
 
 const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
   console.log('[Uploader] Component initializing');
-  const { processGpx, isLoading: processingLoading, error } = useClientGpxProcessing();
+  const { processGpxFile, isProcessing: processingLoading, debugLog } = useGpxProcessing();
+  const [error, setError] = useState(null);
   const { isMapReady } = useMapContext();
   const { 
     addRoute, 
@@ -46,11 +47,29 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
     }
 
     try {
-      const fileContent = await file.text();
-      const result = await processGpx(file);
+      const result = await processGpxFile(file);
       if (result) {
+        // Add missing properties required by normalizeRoute
+        const enhancedResult = {
+          ...result,
+          rawGpx: '',
+          statistics: {
+            totalDistance: 0,
+            elevationGain: 0,
+            elevationLoss: 0,
+            maxElevation: 0,
+            minElevation: 0,
+            averageSpeed: 0,
+            movingTime: 0,
+            totalTime: 0
+          },
+          status: {
+            processingState: "completed" as "completed",
+            progress: 100
+          }
+        };
         // Use normalizeRoute to ensure proper type and structure
-        const processedRoute = normalizeRoute(result);
+        const processedRoute = normalizeRoute(enhancedResult);
         addRoute(processedRoute);
         // Only set as current route if it's the first one
         if (!routes.length) {
@@ -131,6 +150,7 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }: GpxUploaderProps) => {
       <UploaderUI 
         isLoading={isLoading}
         error={error}
+        debugLog={debugLog}
         onFileAdd={handleFileAdd}
         onFileDelete={handleFileDelete}
         onFileRename={handleFileRename}

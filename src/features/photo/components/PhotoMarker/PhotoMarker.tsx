@@ -49,15 +49,27 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
       bubble.addEventListener('click', handleClick);
     }
 
-    const img = document.createElement('img');
-    img.onerror = () => {
+    // Create a new Image object to preload the image
+    const imgLoader = new Image();
+    imgLoader.onload = () => {
+      // Once loaded, create the actual img element for the marker
+      const img = document.createElement('img');
+      img.src = imgLoader.src;
+      img.alt = photo.name || 'Photo';
+      bubble.appendChild(img);
+    };
+    
+    imgLoader.onerror = () => {
       console.error('Failed to load photo thumbnail:', photo.thumbnailUrl);
+      // Create fallback image
+      const img = document.createElement('img');
       img.src = '/images/photo-fallback.svg';
       img.alt = 'Failed to load photo';
+      bubble.appendChild(img);
     };
-    img.src = photo.thumbnailUrl;
-    img.alt = photo.name || 'Photo';
-    bubble.appendChild(img);
+    
+    // Set the source to start loading
+    imgLoader.src = photo.thumbnailUrl;
 
     const point = document.createElement('div');
     point.className = 'photo-marker-point';
@@ -85,7 +97,8 @@ export const PhotoMarker: React.FC<PhotoMarkerProps> = ({ photo, onClick }) => {
         bubble.removeEventListener('click', handleClick);
       }
       // Clean up image error handler
-      img.onerror = null;
+      imgLoader.onerror = null;
+      imgLoader.onload = null;
       map.off('zoom', updateZoom);
     };
   }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.thumbnailUrl, photo.name, onClick]);

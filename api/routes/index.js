@@ -2,16 +2,100 @@ import { createApiHandler } from '../lib/middleware.js';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '../lib/db.js';
 
-// Define Route schema
+// Define Route schema to match the original structure
 const RouteSchema = new mongoose.Schema({
-  userId: { type: String, required: true, index: true },
+  // Top-level fields
+  persistentId: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true },
-  description: { type: String },
+  type: { type: String, enum: ['tourism', 'event', 'bikepacking', 'single'], required: true },
   isPublic: { type: Boolean, default: false },
+  userId: { type: String, required: true, index: true },
+  viewCount: { type: Number, default: 0 },
+  lastViewed: { type: Date },
   publicId: { type: String, index: true, sparse: true },
+  
+  // Map state
+  mapState: {
+    zoom: { type: Number, default: 0 },
+    center: { type: [Number], default: [0, 0] },
+    bearing: { type: Number, default: 0 },
+    pitch: { type: Number, default: 0 },
+    style: { type: String, default: 'default' }
+  },
+  
+  // Routes array
+  routes: [{
+    order: { type: Number }, // Made optional by removing required: true
+    routeId: { type: String },
+    name: { type: String, required: true },
+    color: { type: String, required: true, default: '#ee5253' },
+    isVisible: { type: Boolean, required: true, default: true },
+    geojson: { type: mongoose.Schema.Types.Mixed },
+    surface: {
+      surfaceTypes: [{ 
+        type: { type: String },
+        percentage: { type: Number },
+        distance: { type: Number }
+      }],
+      elevationProfile: [{ 
+        elevation: { type: Number },
+        distance: { type: Number },
+        grade: { type: Number }
+      }]
+    },
+    unpavedSections: [{
+      startIndex: { type: Number },
+      endIndex: { type: Number },
+      coordinates: { type: [[Number]] },
+      surfaceType: { type: String }
+    }],
+    statistics: { type: mongoose.Schema.Types.Mixed },
+    status: { type: mongoose.Schema.Types.Mixed }
+  }],
+  
+  // Photos array
+  photos: [{
+    name: { type: String },
+    url: { type: String },
+    thumbnailUrl: { type: String },
+    dateAdded: { type: String },
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number }
+    },
+    rotation: { type: Number },
+    altitude: { type: Number }
+  }],
+  
+  // POIs object
+  pois: {
+    draggable: [{
+      id: { type: String, required: true },
+      coordinates: { type: [Number], required: true },
+      name: { type: String, required: true },
+      description: { type: String },
+      category: { type: String, required: true },
+      icon: { type: String, required: true },
+      photos: [{ type: mongoose.Schema.Types.Mixed }],
+      type: { type: String, enum: ['draggable'], required: true }
+    }],
+    places: [{
+      id: { type: String, required: true },
+      coordinates: { type: [Number], required: true },
+      name: { type: String, required: true },
+      category: { type: String, required: true },
+      icon: { type: String, required: true },
+      photos: [{ type: mongoose.Schema.Types.Mixed }],
+      type: { type: String, enum: ['place'], required: true },
+      placeId: { type: String, required: true }
+    }]
+  },
+  
+  // Data object
   data: {
+    points: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    surfaces: { type: [mongoose.Schema.Types.Mixed], default: [] },
     geojson: mongoose.Schema.Types.Mixed,
-    points: [{ type: [Number] }],
     distance: Number,
     elevation: {
       gain: Number,
@@ -24,22 +108,21 @@ const RouteSchema = new mongoose.Schema({
       south: Number,
       east: Number,
       west: Number
-    },
-    surfaces: [{
-      type: String,
-      percentage: Number,
-      distance: Number
-    }]
+    }
   },
+  
+  // Metadata object
   metadata: {
-    tags: [String],
+    tags: { type: [String], default: [] },
     difficulty: String,
     season: String,
     custom: mongoose.Schema.Types.Mixed
   },
-  persistentId: { type: String, index: true },
+  
+  // Timestamps
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  __v: { type: Number, default: 0 }
 });
 
 // Initialize the model
@@ -56,29 +139,73 @@ try {
 async function handleCreateRoute(req, res) {
   try {
     // Check if required fields are provided
-    if (!req.body || !req.body.name || !req.body.data) {
+    if (!req.body || !req.body.name) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const { name, description, isPublic, data, metadata } = req.body;
+    const { name, description, isPublic, data, metadata, type, routes, pois, mapState, photos } = req.body;
     
     // Generate a public ID if the route is public
     const publicId = isPublic ? `route_${Date.now()}_${Math.random().toString(36).substring(2, 9)}` : undefined;
     
-    // Create a new route
+    // Generate a persistent ID if not provided
+    const persistentId = req.body.persistentId || `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    
+    console.log(`[API] Creating new route with persistentId: ${persistentId}`);
+    
+    // Create a new route with the original schema structure
     const route = new Route({
-      userId: req.body.userId || 'anonymous', // In a real app, get from auth
+      // Required top-level fields
+      persistentId,
       name,
-      description,
+      type: type || 'bikepacking', // Default to bikepacking if not provided
       isPublic: !!isPublic,
+      userId: req.body.userId || 'anonymous', // In a real app, get from auth
+      viewCount: 0,
       publicId,
-      data,
-      metadata,
-      persistentId: req.body.persistentId || `route_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      
+      // Optional fields with defaults
+      description,
+      lastViewed: new Date(),
+      
+      // Complex structures
+      mapState: mapState || {
+        zoom: 0,
+        center: [0, 0],
+        bearing: 0,
+        pitch: 0,
+        style: 'default'
+      },
+      
+      routes: routes || [],
+      photos: photos || [],
+      
+      pois: pois || {
+        draggable: [],
+        places: []
+      },
+      
+      data: data || {
+        points: [],
+        surfaces: []
+      },
+      
+      metadata: metadata || {
+        tags: []
+      },
+      
+      // Timestamps
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      __v: 0
     });
+    
+    console.log(`[API] Route object created, saving to database...`);
     
     // Save to database
     await route.save();
+    
+    console.log(`[API] Route saved successfully with ID: ${route._id}`);
     
     return res.status(201).json(route);
   } catch (error) {
@@ -127,11 +254,21 @@ async function handleUpdateRoute(req, res) {
       return res.status(404).json({ error: 'Route not found' });
     }
     
-    // Update fields
-    const { name, description, isPublic, data, metadata } = req.body;
+    console.log(`[API] Updating route: ${route.name} with ID: ${route.persistentId}`);
     
+    // Update all fields that are provided in the request
+    const { 
+      name, description, isPublic, type, data, metadata, 
+      mapState, routes: routeSegments, pois, photos, viewCount, lastViewed 
+    } = req.body;
+    
+    // Update basic fields
     if (name) route.name = name;
     if (description !== undefined) route.description = description;
+    if (type) route.type = type;
+    if (viewCount !== undefined) route.viewCount = viewCount;
+    
+    // Update isPublic and generate publicId if needed
     if (isPublic !== undefined) {
       route.isPublic = isPublic;
       
@@ -140,13 +277,64 @@ async function handleUpdateRoute(req, res) {
         route.publicId = `route_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       }
     }
-    if (data) route.data = { ...route.data, ...data };
-    if (metadata) route.metadata = { ...route.metadata, ...metadata };
     
+    // Update complex structures
+    if (mapState) {
+      route.mapState = {
+        ...route.mapState,
+        ...mapState
+      };
+    }
+    
+    if (routeSegments) {
+      // If routes is an array, replace the entire array
+      if (Array.isArray(routeSegments)) {
+        route.routes = routeSegments;
+      } else {
+        // If it's an object with specific updates, apply them
+        console.log(`[API] Received route segments update: ${JSON.stringify(routeSegments)}`);
+      }
+    }
+    
+    if (pois) {
+      // Handle POIs object with draggable and places arrays
+      if (pois.draggable) route.pois.draggable = pois.draggable;
+      if (pois.places) route.pois.places = pois.places;
+    }
+    
+    if (photos) {
+      route.photos = photos;
+    }
+    
+    // Update data and metadata
+    if (data) {
+      route.data = {
+        ...route.data,
+        ...data
+      };
+    }
+    
+    if (metadata) {
+      route.metadata = {
+        ...route.metadata,
+        ...metadata
+      };
+    }
+    
+    // Update timestamps
     route.updatedAt = new Date();
+    if (lastViewed) {
+      route.lastViewed = lastViewed;
+    } else {
+      route.lastViewed = new Date();
+    }
+    
+    console.log(`[API] Saving updated route to database...`);
     
     // Save to database
     await route.save();
+    
+    console.log(`[API] Route updated successfully`);
     
     return res.status(200).json(route);
   } catch (error) {

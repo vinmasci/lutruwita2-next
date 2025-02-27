@@ -4,15 +4,23 @@ import crypto from 'crypto';
 
 // Initialize S3 client
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || process.env.VITE_AWS_REGION || 'ap-southeast-2',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.VITE_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.VITE_AWS_SECRET_ACCESS_KEY
   }
 });
 
 // Bucket name from environment variable
-const bucketName = process.env.S3_BUCKET_NAME;
+const bucketName = process.env.S3_BUCKET_NAME || process.env.VITE_AWS_S3_BUCKET;
+
+// Debug S3 configuration
+console.log('S3 Configuration:', {
+  region: process.env.AWS_REGION || process.env.VITE_AWS_REGION || 'ap-southeast-2',
+  hasAccessKeyId: Boolean(process.env.AWS_ACCESS_KEY_ID || process.env.VITE_AWS_ACCESS_KEY_ID),
+  hasSecretAccessKey: Boolean(process.env.AWS_SECRET_ACCESS_KEY || process.env.VITE_AWS_SECRET_ACCESS_KEY),
+  bucketName
+});
 
 // Generate a unique filename
 export function generateUniqueFilename(originalFilename) {
@@ -34,7 +42,8 @@ export async function uploadFile(fileBuffer, filename, contentType) {
     Bucket: bucketName,
     Key: key,
     Body: fileBuffer,
-    ContentType: contentType
+    ContentType: contentType,
+    ACL: 'public-read'  // Add ACL parameter to make objects publicly readable
   };
 
   try {
@@ -107,7 +116,8 @@ export async function getPresignedUploadUrl(filename, contentType, expiresIn = 3
   const params = {
     Bucket: bucketName,
     Key: key,
-    ContentType: contentType
+    ContentType: contentType,
+    ACL: 'public-read'  // Add ACL parameter to make objects publicly readable
   };
 
   try {

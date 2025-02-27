@@ -2,6 +2,35 @@
 
 This document lists JavaScript (.js, .jsx, .tsx) files that have duplicate implementations in the codebase.
 
+## Service Files
+
+- `src/features/photo/services/`
+  - photoService.js
+  - photoService.ts
+  - Both files are functionally identical, with the TypeScript version adding type annotations.
+  - The JavaScript version is imported by multiple components including PhotoUploader.js and RouteDescriptionPanel.js.
+
+- `src/features/gpx/services/`
+  - gpxService.js
+  - gpxService.ts
+  - These files have significant differences:
+    - The JavaScript version uses Server-Sent Events (EventSource) for real-time progress updates during GPX processing.
+    - The TypeScript version uses polling with setTimeout to check job status periodically.
+    - This change was part of the Vercel migration to make the application compatible with serverless architecture.
+    - See docs/SSE_TO_POLLING_MIGRATION.md for details on this change.
+
+- `src/features/poi/services/`
+  - poiService.js
+  - poiService.ts
+  - These files have minor differences:
+    - The JavaScript version uses '/api/poi' as the API_BASE path.
+    - The TypeScript version uses '/api/pois' as the API_BASE path.
+
+- `src/features/map/services/`
+  - routeService.js
+  - routeService.ts
+  - The TypeScript version has the same functionality with added type safety.
+
 ## Presentation Components
 
 - `src/features/presentation/components/PresentationSidebar/`

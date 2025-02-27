@@ -12,6 +12,10 @@
       "dest": "/api/gpx"
     },
     {
+      "src": "/api/photos/upload",
+      "dest": "/api/photos"
+    },
+    {
       "src": "/api/photos",
       "dest": "/api/photos"
     },

@@ -89,11 +89,8 @@ export const PresentationPhotoLayer = () => {
             center: [lng, lat],
             zoom: targetZoom
         });
-        // Only show one photo at a time
-        if (cluster.properties.point_count === 1) {
-            setSelectedPhoto(cluster.properties.photos[0]);
-            setSelectedCluster(null);
-        }
+        // No longer opening the modal for clusters
+        // Only individual photo markers will open the modal when clicked
     }, [map, clusteredItems]);
     return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(SimpleLightbox, { photo: selectedPhoto, onClose: () => {
                     setSelectedPhoto(null);

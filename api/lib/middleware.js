@@ -204,12 +204,61 @@ export function createApiHandler(handler, options = {}) {
       
       // Handle file uploads
       if (req.headers['content-type']?.includes('multipart/form-data')) {
-        await new Promise((resolve) => {
-          fileUpload({
-            useTempFiles: false,
-            limits: { fileSize: 50 * 1024 * 1024 } // 50MB
-          })(req, res, resolve);
-        });
+        console.log('Processing multipart form data');
+        try {
+          // Try to read the raw body if it's not already parsed
+          if (!req.body || typeof req.body === 'string' || Object.keys(req.body).length === 0) {
+            console.log('Attempting to parse raw body');
+            const chunks = [];
+            for await (const chunk of req) {
+              chunks.push(chunk);
+            }
+            const buffer = Buffer.concat(chunks);
+            console.log(`Raw body size: ${buffer.length} bytes`);
+            
+            // Store the raw body for later processing
+            req.rawBody = buffer;
+          }
+          
+          // Apply the fileUpload middleware
+          await new Promise((resolve) => {
+            fileUpload({
+              useTempFiles: false,
+              limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+              debug: true,
+              abortOnLimit: false,
+              preserveExtension: true,
+              createParentPath: true,
+              parseNested: true,
+              safeFileNames: true,
+              uploadTimeout: 0 // No timeout
+            })(req, res, resolve);
+          });
+          
+          // If we have files but they're not under the expected field name 'photo',
+          // restructure them to use the correct field name
+          if (req.files && Object.keys(req.files).length > 0 && !req.files.photo) {
+            const fileKeys = Object.keys(req.files);
+            if (fileKeys.length > 0) {
+              const firstKey = fileKeys[0];
+              console.log(`Restructuring file from field '${firstKey}' to 'photo'`);
+              req.files.photo = req.files[firstKey];
+              
+              // If it's an array, take the first file
+              if (Array.isArray(req.files.photo)) {
+                req.files.photo = req.files.photo[0];
+              }
+            }
+          }
+          
+          console.log('After fileUpload middleware:', {
+            hasFiles: !!req.files,
+            fileKeys: req.files ? Object.keys(req.files) : [],
+            bodyKeys: req.body ? Object.keys(req.body) : []
+          });
+        } catch (error) {
+          console.error('Error processing multipart form data:', error);
+        }
       }
       
       // Connect to database if required

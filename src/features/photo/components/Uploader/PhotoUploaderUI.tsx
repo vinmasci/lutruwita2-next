@@ -7,6 +7,7 @@ import {
   CircularProgress,
   Grid,
   IconButton,
+  LinearProgress,
   Paper,
   Typography
 } from '@mui/material';
@@ -24,6 +25,8 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
   error,
   photos,
   selectedPhotos,
+  uploadProgress,
+  uploadStatus,
   onFileAdd,
   onFileDelete,
   onFileRename,
@@ -95,6 +98,13 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
         </Alert>
       )}
 
+      {/* Upload Status */}
+      {uploadStatus && (
+        <Alert severity="info" sx={{ my: 2 }}>
+          {uploadStatus}
+        </Alert>
+      )}
+
       {/* Loading Indicator */}
       {isLoading && (
         <Box sx={{ textAlign: 'center', my: 2 }}>
@@ -137,16 +147,86 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
                   }}
                 >
                   <Box
-                    component="img"
-                    src={photo.thumbnailUrl}
-                    alt={photo.name}
+                    ref={(el: HTMLDivElement | null) => {
+                      if (el) {
+                        // Clear any existing content
+                        while (el.firstChild) {
+                          el.removeChild(el.firstChild);
+                        }
+                        
+                        // Method 1: Fetch with explicit headers
+                        fetch(photo.thumbnailUrl, {
+                          headers: {
+                            'Accept': 'image/jpeg, image/png, image/*',
+                            'Cache-Control': 'no-cache'
+                          }
+                        })
+                          .then(response => {
+                            if (!response.ok) {
+                              throw new Error(`Network response was not ok: ${response.status}`);
+                            }
+                            return response.blob();
+                          })
+                          .then(blob => {
+                            const img = document.createElement('img');
+                            img.src = URL.createObjectURL(blob);
+                            img.alt = photo.name || 'Photo';
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = 'cover';
+                            img.style.display = 'block';
+                            el.appendChild(img);
+                          })
+                          .catch(error => {
+                            console.error('Failed to load photo thumbnail:', photo.thumbnailUrl, error);
+                            // Create fallback image
+                            const img = document.createElement('img');
+                            img.src = '/images/photo-fallback.svg';
+                            img.alt = 'Failed to load photo';
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = 'contain';
+                            img.style.display = 'block';
+                            el.appendChild(img);
+                          });
+                      }
+                    }}
                     sx={{
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover',
                       display: 'block'
                     }}
                   />
+                  
+                  {/* Upload Progress */}
+                  {uploadProgress[photo.id] !== undefined && uploadProgress[photo.id] < 100 && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        padding: '8px'
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: 'white', display: 'block', mb: 0.5 }}>
+                        Uploading: {Math.round(uploadProgress[photo.id])}%
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={uploadProgress[photo.id]} 
+                        sx={{ 
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                          '& .MuiLinearProgress-bar': {
+                            backgroundColor: '#2ecc71'
+                          }
+                        }}
+                      />
+                    </Box>
+                  )}
                   
                   {/* GPS Indicator */}
                   {photo.hasGps && (

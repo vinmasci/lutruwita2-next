@@ -61,11 +61,24 @@ export const normalizeRoute = (route: GpxProcessedRoute | SavedRouteState): Proc
       surfaceType: isValidSurfaceType(section.surfaceType) ? section.surfaceType : 'unpaved'
     })) || [];
 
+    // Log the route data for debugging
+    console.log('[normalizeRoute] Route data:', {
+      routeId: firstRoute.routeId,
+      persistentId: route.persistentId,
+      hasLoadedState: !!route
+    });
+
     return {
       ...defaultRoute,
       ...firstRoute,
       _type: 'loaded' as const,
-      _loadedState: route,
+      // Ensure persistentId is set on the route object
+      persistentId: route.persistentId,
+      // Ensure _loadedState has the persistentId
+      _loadedState: {
+        ...route,
+        persistentId: route.persistentId
+      },
       routeId: firstRoute.routeId || defaultRoute.routeId,
       color: firstRoute.color || defaultRoute.color,
       isVisible: firstRoute.isVisible ?? defaultRoute.isVisible,

@@ -4,6 +4,7 @@ import { useRouteService } from "../services/routeService";
 import { useMapContext } from "./MapContext";
 import { usePOIContext } from "../../poi/context/POIContext";
 import { usePhotoContext } from "../../photo/context/PhotoContext";
+import { usePhotoService } from "../../photo/services/photoService";
 import { usePlaceContext } from "../../place/context/PlaceContext";
 import { normalizeRoute } from "../utils/routeUtils";
 import { AuthAlert } from "@/features/auth/components/AuthAlert/AuthAlert";
@@ -92,8 +93,50 @@ export const RouteProvider = ({ children, }) => {
     const routeService = useRouteService();
     const { map } = useMapContext();
     const { pois, getPOIsForRoute, loadPOIsFromRoute } = usePOIContext();
-    const { photos, addPhoto, uploadLocalPhotos } = usePhotoContext();
+    const photoContext = usePhotoContext();
+    const { photos, addPhoto } = photoContext;
+    const photoService = usePhotoService();
     const { places, updatePlace } = usePlaceContext();
+    
+    // Helper function to upload photos to Cloudinary
+    const uploadPhotosToCloudinary = async () => {
+      const localPhotos = photos.filter(p => p.isLocal === true);
+      if (localPhotos.length === 0) return photos;
+      
+      const updatedPhotos = [...photos];
+      
+      for (const photo of localPhotos) {
+        if (!photo._blobs?.large) continue;
+        
+        try {
+          // Create a File object from the blob
+          const fileObject = new File([photo._blobs.large], photo.name, { type: 'image/jpeg' });
+          
+          // Use the photoService directly to upload
+          const result = await photoService.uploadPhoto(fileObject);
+          
+          // Update this photo in the array
+          const index = updatedPhotos.findIndex(p => p.id === photo.id);
+          if (index !== -1) {
+            updatedPhotos[index] = {
+              ...photo,
+              url: result.url,
+              tinyThumbnailUrl: result.tinyThumbnailUrl,
+              thumbnailUrl: result.thumbnailUrl,
+              mediumUrl: result.mediumUrl,
+              largeUrl: result.largeUrl,
+              publicId: result.publicId,
+              isLocal: false,
+              _blobs: undefined
+            };
+          }
+        } catch (error) {
+          console.error(`Failed to upload photo ${photo.id}:`, error);
+        }
+      }
+      
+      return updatedPhotos;
+    };
     const addRoute = useCallback((route) => {
         console.debug('[RouteContext] Adding route:', {
             routeId: route.routeId,
@@ -237,7 +280,7 @@ export const RouteProvider = ({ children, }) => {
                 if (localPhotos.length > 0) {
                     console.log(`[RouteContext] Found ${localPhotos.length} local photos to upload`);
                     // Upload local photos to Cloudinary
-                    updatedPhotos = await uploadLocalPhotos();
+                    updatedPhotos = await uploadPhotosToCloudinary();
                 } else {
                     console.log('[RouteContext] No local photos to upload');
                 }

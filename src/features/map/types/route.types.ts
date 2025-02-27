@@ -14,6 +14,7 @@ export interface ProcessedRoute extends Omit<GpxProcessedRoute, 'color'> {
   _type?: 'loaded' | 'fresh';
   _loadedState?: any;
   routeId?: string;
+  persistentId?: string;  // Added persistentId property
   color: string;  // Required color property
 }
 

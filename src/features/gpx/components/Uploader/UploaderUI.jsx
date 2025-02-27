@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Alert, Box, Button, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider, Popover } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider, Popover, LinearProgress } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { getRouteDistance, getUnpavedPercentage, getElevationGain, getElevationLoss } from '../../utils/routeUtils';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -34,7 +34,7 @@ const ColorButton = ({ color, onClick, sx }) => (
     />
 );
 
-const UploaderUI = ({ isLoading, error, onFileAdd, onFileDelete, onFileRename }) => {
+const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFileRename }) => {
     const [editing, setEditing] = useState(null);
     const { routes, currentRoute, setCurrentRoute, reorderRoutes, updateRoute } = useRouteContext();
     const [localRoutes, setLocalRoutes] = useState(routes);
@@ -266,7 +266,37 @@ const UploaderUI = ({ isLoading, error, onFileAdd, onFileDelete, onFileRename })
             >
                 <input {...getInputProps()} />
                 {isLoading ? (
-                    <CircularProgress size={32} />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' }}>
+                        <CircularProgress size={32} />
+                        {/* Add progress display */}
+                        {debugLog && debugLog.length > 0 && (
+                            <Box sx={{ mt: 1, width: '100%' }}>
+                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                    {debugLog[debugLog.length - 1]}
+                                </Typography>
+                                {/* Extract progress percentage if available */}
+                                {debugLog.some(log => log.includes('progress')) && (
+                                    <Box sx={{ width: '100%', mt: 1 }}>
+                                        <LinearProgress 
+                                            variant="determinate" 
+                                            value={
+                                                (() => {
+                                                    const progressLog = debugLog
+                                                        .filter(log => log.includes('progress'))
+                                                        .pop();
+                                                    if (progressLog) {
+                                                        const match = progressLog.match(/(\d+)%/);
+                                                        return match ? parseInt(match[1]) : 0;
+                                                    }
+                                                    return 0;
+                                                })()
+                                            } 
+                                        />
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+                    </Box>
                 ) : (
                     <>
                         <UploadFileIcon sx={{ fontSize: 36, opacity: 0.8 }} />
@@ -428,6 +458,7 @@ UploaderUI.propTypes = {
         message: PropTypes.string,
         details: PropTypes.string,
     }),
+    debugLog: PropTypes.arrayOf(PropTypes.string),
     onFileAdd: PropTypes.func.isRequired,
     onFileDelete: PropTypes.func.isRequired,
     onFileRename: PropTypes.func.isRequired,

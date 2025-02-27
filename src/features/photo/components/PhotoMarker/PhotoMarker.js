@@ -33,15 +33,35 @@ export const PhotoMarker = ({ photo, onClick }) => {
         if (onClick) {
             bubble.addEventListener('click', handleClick);
         }
+        
+        // Use tinyThumbnailUrl if available, otherwise fall back to thumbnailUrl
+        const thumbnailUrl = photo.tinyThumbnailUrl || photo.thumbnailUrl;
+        
+        // Create image element
         const img = document.createElement('img');
+        
+        // Set up error handler for fallback
         img.onerror = () => {
-            console.error('Failed to load photo thumbnail:', photo.thumbnailUrl);
+            console.error('Failed to load photo thumbnail:', thumbnailUrl);
             img.src = '/images/photo-fallback.svg';
             img.alt = 'Failed to load photo';
         };
-        img.src = photo.thumbnailUrl;
+        
+        // Set alt text
         img.alt = photo.name || 'Photo';
+        
+        // Check if the thumbnailUrl is a data URL (local preview) or a regular URL
+        if (thumbnailUrl) {
+            img.src = thumbnailUrl;
+        } else {
+            // No thumbnail URL, use fallback
+            img.src = '/images/photo-fallback.svg';
+            img.alt = 'No thumbnail available';
+        }
+        
+        // Add the image to the bubble
         bubble.appendChild(img);
+        
         const point = document.createElement('div');
         point.className = 'photo-marker-point';
         container.appendChild(bubble);
@@ -63,10 +83,8 @@ export const PhotoMarker = ({ photo, onClick }) => {
             if (onClick) {
                 bubble.removeEventListener('click', handleClick);
             }
-            // Clean up image error handler
-            img.onerror = null;
             map.off('zoom', updateZoom);
         };
-    }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.thumbnailUrl, photo.name, onClick]);
+    }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.name, onClick]);
     return null;
 };

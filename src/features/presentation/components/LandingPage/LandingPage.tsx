@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import { PublicRouteMetadata } from '../../types/route.types';
-import { publicRouteService } from '../../services/publicRoute.service';
+import { publicRouteService } from '../../services/publicRoute.service.js';
 import { MapPreview } from '../MapPreview/MapPreview';
 import { 
   Container,

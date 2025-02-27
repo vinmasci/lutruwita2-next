@@ -1,5 +1,5 @@
 export const useGpxProcessingApi = () => {
-    const API_BASE = 'http://localhost:3002/api/gpx';
+    const API_BASE = '/api/gpx';
     const processGpxFile = async (file, onProgress) => {
         const formData = new FormData();
         formData.append('gpxFile', file);

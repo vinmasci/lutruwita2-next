@@ -1,0 +1,204 @@
+.user-profile-drawer {
+  position: fixed;
+  top: 0;
+  right: -350px;
+  width: 350px;
+  height: 100vh;
+  background-color: #1a1a1a;
+  color: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+  transition: right 0.3s ease-in-out;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.user-profile-drawer.open {
+  right: 0;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+}
+
+.drawer-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+.profile-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-image-container {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-initials {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: white;
+  background-color: #444;
+}
+
+.profile-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-details h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.email {
+  margin: 0;
+  color: #aaa;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.detail-item {
+  margin: 5px 0;
+  font-size: 0.9rem;
+}
+
+.detail-item span {
+  font-weight: bold;
+  color: #aaa;
+}
+
+.token-section {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #222;
+  border-radius: 5px;
+}
+
+.token-label {
+  margin: 0 0 5px 0;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #aaa;
+}
+
+.token-display {
+  padding: 10px;
+  background-color: #333;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.token-truncated {
+  color: #ddd;
+}
+
+.token-unavailable {
+  color: #888;
+  font-style: italic;
+}
+
+.drawer-footer {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.logout-button {
+  padding: 10px 20px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #b71c1c;
+}
+
+/* Backdrop for mobile */
+.user-profile-drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: none;
+}
+
+.user-profile-drawer-backdrop.open {
+  display: block;
+}
+
+/* Fix for drawer container */
+.user-profile-drawer-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 0;
+  z-index: 1000;
+  overflow: visible;
+}
+
+.user-profile-drawer-container.open {
+  width: 350px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .user-profile-drawer {
+    width: 85%;
+    right: -85%;
+  }
+}

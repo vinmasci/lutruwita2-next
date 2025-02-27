@@ -2,6 +2,7 @@ import { SavedRouteState } from '../../map/types/route.types';
 
 export interface PublicRouteMetadata {
   id: string;
+  persistentId: string;
   name: string;
   type: string;
   viewCount: number;
@@ -41,7 +42,5 @@ export interface ListPublicRoutesResponse {
   routes: PublicRouteMetadata[];
 }
 
-export interface LoadPublicRouteResponse {
-  route: PublicRouteDetails;
-  message: string;
-}
+// The API now returns the route data directly
+export type LoadPublicRouteResponse = PublicRouteDetails;

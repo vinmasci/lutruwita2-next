@@ -1,7 +1,7 @@
 import { useAuth0 } from '@auth0/auth0-react';
 export const usePOIService = () => {
     const { getAccessTokenSilently } = useAuth0();
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/pois';
+    const API_BASE = '/api/poi';
     const getAuthHeaders = async () => {
         try {
             const token = await getAccessTokenSilently();

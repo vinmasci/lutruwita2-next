@@ -72,15 +72,17 @@ export const Sidebar = (props: SidebarProps) => {
   return (
     <>
       <StyledDrawer variant="permanent">
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <SidebarListItems 
-            {...props}
-            onUploadGpx={() => handleUploadGpx()}
-            onAddPOI={() => handleAddPOI()}
-            onAddPhotos={() => handleAddPhotos()}
-          />
-          <Auth0Login />
-        </Box>
+<Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+  <SidebarListItems 
+    {...props}
+    onUploadGpx={() => handleUploadGpx()}
+    onAddPOI={() => handleAddPOI()}
+    onAddPhotos={() => handleAddPhotos()}
+  />
+  <Box sx={{ mt: 'auto', width: '100%', display: 'flex', justifyContent: 'center' }}>
+    <Auth0Login />
+  </Box>
+</Box>
       </StyledDrawer>
       
       <>

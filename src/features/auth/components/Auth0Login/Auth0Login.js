@@ -1,4 +1,4 @@
-import { jsx as _jsx } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import './Auth0Login.css';
@@ -15,6 +15,11 @@ export const Auth0Login = () => {
     const profilePicture = isAuthenticated && user?.picture && !imageError
         ? user.picture
         : defaultAvatar;
-    return (_jsx("div", { className: "auth0-login", children: _jsx("img", { src: profilePicture, alt: isAuthenticated ? user?.name : "Login", className: "auth0-avatar", onClick: () => isAuthenticated ? logout({ logoutParams: { returnTo: window.location.origin } }) : loginWithRedirect(), title: isAuthenticated ? "Click to logout" : "Click to login", style: { cursor: 'pointer', backgroundColor: '#2a2a2a' }, onError: () => setImageError(true) }) }));
+    return (_jsxs("div", { className: "auth0-login", children: [
+            _jsx("img", { src: profilePicture, alt: isAuthenticated ? user?.name : "Login", className: "auth0-avatar", onClick: () => isAuthenticated ? logout({ logoutParams: { returnTo: window.location.origin } }) : loginWithRedirect(), title: isAuthenticated ? "Click to logout" : "Click to login", style: { cursor: 'pointer', backgroundColor: '#2a2a2a' }, onError: () => setImageError(true) }),
+            isAuthenticated ? 
+                _jsx("i", { className: "fa-solid fa-circle-check auth-status-indicator logged-in", title: "Logged in" }) : 
+                _jsx("i", { className: "fa-solid fa-circle-xmark auth-status-indicator logged-out", title: "Logged out" })
+        ] }));
 };
 export default Auth0Login;

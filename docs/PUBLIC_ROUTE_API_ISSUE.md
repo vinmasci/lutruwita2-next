@@ -222,49 +222,71 @@ This change ensures that the routeService can handle both the old format (where 
 
 ## Current Status
 
-The fixes have been implemented and pushed to the repository. The public routes API now correctly handles Redis connection errors and doesn't require authentication. The route loading functionality now works correctly with the new API response format.
+We've made significant progress with the public routes API:
+
+1. **Working Features**:
+   - The landing page loads correctly and displays the list of public routes
+   - Individual routes can be viewed in presentation mode (preview)
+   - Redis connection errors are handled gracefully
+   - The API doesn't require authentication for public routes
+
+2. **Remaining Issues**:
+   - Routes cannot be loaded in creation mode, with the following error:
+     ```
+     Error: Cast to ObjectId failed for value "67b56367-5952-4a2a-9eb9-63ab467b5636" (type string) at path "_id" for model "Route"
+     ```
+   - This suggests that the API is trying to use the persistentId as an ObjectId when querying the database in creation mode
+
+The error occurs when trying to load a route in the editor/creation mode. The API endpoint is trying to convert the persistentId (which is a UUID string) to a MongoDB ObjectId, which is failing because UUIDs don't conform to the ObjectId format.
 
 ## Redis Connection Issue Analysis
 
-The Redis connection errors indicate that the application is trying to connect to a Redis server at 127.0.0.1:6379, but no Redis server is running at that address. This is expected in a development environment where Redis might not be set up, and our error handling changes ensure the application continues to function without Redis.
+We've successfully addressed the Redis connection issues:
 
-The error sequence shows:
-1. Initial connection attempt fails with "ECONNREFUSED"
-2. Redis client marks the connection as unavailable
-3. After multiple failures, the Redis client is closed
-4. Subsequent operations fail with "Connection is closed"
+1. **Redis Configuration Optimized for Serverless**:
+   - Changed `enableOfflineQueue` to `false` to fail fast in serverless environments
+   - Reduced connection timeouts and retry attempts
+   - Disabled keepalive which isn't effective in serverless
+   - Improved error handling to mark Redis as unavailable immediately on any error
 
-Despite these Redis errors, the API is still able to retrieve data from the database as shown by the log messages:
+2. **Graceful Fallback to Database**:
+   - When Redis is unavailable, the system now gracefully falls back to the database
+   - This ensures the application continues to function even without Redis
 
-```
-[API] Available collections: [
-  'drawnsegments',
-  'maps',
-  'comments',
-  'activities',
-  'gpxFiles',
-  'pois',
-  'routes',
-  'users',
-  'photos'
-]
-[API] Total routes in database: 3
-[API] Total public routes in database: 3
-```
+3. **Improved Error Handling**:
+   - Added better error logging for Redis operations
+   - Implemented proper cleanup of Redis connections on error
+
+The Redis connection errors are now properly handled, and the application continues to function by retrieving data directly from the database when Redis is unavailable.
 
 ## Next Steps
 
-1. **Redis Configuration**:
-   - For development environments, consider making Redis optional by adding a feature flag
-   - For production, ensure Redis is properly configured and running
+1. **Fix Route Loading in Creation Mode**:
+   - Modify the API endpoint to handle persistentId correctly when loading routes in creation mode
+   - Update the route lookup logic to query by persistentId instead of trying to convert it to an ObjectId
+   - Example fix in the API route handler:
+     ```javascript
+     // Before
+     const route = await Route.findById(routeId);
+     
+     // After
+     let route;
+     if (mongoose.Types.ObjectId.isValid(routeId)) {
+       route = await Route.findById(routeId);
+     } else {
+       // If not a valid ObjectId, try to find by persistentId
+       route = await Route.findOne({ persistentId: routeId });
+     }
+     ```
 
-2. **Further Error Handling Improvements**:
-   - Consider adding a Redis health check at startup
-   - Implement a fallback mechanism that disables Redis usage after a certain number of failures
+2. **Redis Improvements**:
+   - Consider using Vercel KV store instead of a separate Redis instance for better serverless compatibility
+   - Implement more aggressive caching strategies for frequently accessed routes
 
-3. **Monitoring**:
-   - Add more detailed logging for Redis operations
-   - Consider adding metrics to track Redis performance and availability
+3. **Error Handling Enhancements**:
+   - Add more detailed error messages in the client to help diagnose issues
+   - Implement better logging for database queries and results
 
 4. **Testing**:
-   - Test the application with Redis both available and unavailable to ensure it works in both scenarios
+   - Create comprehensive tests for all route loading scenarios
+   - Test with various route IDs and persistentIds to ensure all cases work correctly

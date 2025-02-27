@@ -188,7 +188,7 @@ Rather than creating a new project or significantly restructuring the codebase, 
 - [x] Modify environment variable usage
 - [x] Test frontend integration with serverless APIs
 - [x] Update any client-side code that depends on server behavior
-- [ ] Replace Server-Sent Events (SSE) with polling for GPX processing
+- [x] Replace Server-Sent Events (SSE) with polling for GPX processing
 
 **Verification Steps:**
 - [x] Frontend successfully connects to serverless APIs
@@ -219,6 +219,13 @@ Rather than creating a new project or significantly restructuring the codebase, 
   - The Load Routes modal appears without displaying any routes, even though routes exist in the database
   - Individual routes are not loading when accessed directly (e.g., http://localhost:3000/preview/route/67b56367-5952-4a2a-9eb9-63ab467b5636)
 - Need to investigate route loading issues in routeService.ts and related components
+- Authentication UI issues:
+  - The Auth0 login functionality now works correctly (users can log in and stay logged in)
+  - Fixed the avatar positioning in the sidebar by applying a CSS transform to move it up by 20px
+  - Simplified the Sidebar.tsx component by removing unnecessary elements
+  - The user profile drawer may not open correctly when clicking on the avatar
+  - The Google profile picture may not display correctly in the avatar
+  - These remaining UI issues need to be addressed in a future update
 
 **SSE to Polling Migration Plan:**
 1. **Issue**: The frontend uses EventSource for real-time progress updates during GPX processing, but serverless functions cannot maintain long-lived connections required for SSE.
@@ -249,7 +256,10 @@ Rather than creating a new project or significantly restructuring the codebase, 
 - Installed missing dependencies: ioredis, jsonwebtoken, express-fileupload, cors
 - Added Redis URL to environment variables in .env.local
 - Fixed file extension issues in import statements (added .js extensions)
-- Identified environment variable access issues in serverless functions
+- Identified and fixed environment variable access issues in serverless functions:
+  - Added VITE_ prefix to frontend environment variables in Vercel
+  - Fixed static asset routing in vercel.json to properly serve CSS and JavaScript files
+  - Successfully deployed initial map view to Vercel
 
 ### Phase 6: Testing and Deployment (1-2 days) ⏳ PENDING
 
@@ -276,6 +286,26 @@ Rather than creating a new project or significantly restructuring the codebase, 
 ## Serverless Architecture Challenges
 
 During the migration process, we've encountered several challenges specific to serverless architecture:
+
+### Identifying and Avoiding Problematic "Hybrid" Approaches
+
+**Challenge**: Certain "hybrid" approaches that attempt to adapt traditional Express server patterns to serverless functions can cause reliability issues. These approaches often look like they should work in theory but fail in practice due to fundamental differences between traditional servers and serverless environments.
+
+**Warning Signs**: Be cautious when you see:
+- Express middleware being used directly in serverless functions
+- File upload handling using traditional server approaches
+- In-memory state management across requests
+- Long-running connections or processes
+
+**Example Issue**: The photo upload functionality was failing because we were trying to use `express-fileupload` middleware in a serverless function. While our manual parsing detected files, it failed to correctly identify them with the field name "photo" that the handler expected.
+
+**Better Approach**: Instead of trying to adapt Express patterns, use serverless-native patterns:
+- For file uploads: Use direct-to-S3 uploads with presigned URLs
+- For state management: Use Redis or other external state stores
+- For long-running processes: Break into smaller functions with async coordination
+- For middleware: Reimplement only the essential functionality needed for serverless
+
+**Implementation**: See `docs/DIRECT_S3_UPLOAD_IMPLEMENTATION.md` for a detailed example of replacing a problematic hybrid approach with a serverless-native solution.
 
 ### Long-Running Connections
 

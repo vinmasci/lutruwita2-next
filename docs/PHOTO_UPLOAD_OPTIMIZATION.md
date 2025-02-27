@@ -88,3 +88,9 @@ To verify the fix is working:
 2. Save the route
 3. Check the network tab in browser dev tools to confirm the optimized image sizes are being loaded
 4. Verify the map performance is improved when displaying many photos
+
+## Results
+
+The optimization has significantly improved map performance. Loading and displaying photos on the map is now much faster, especially when many photos are present.
+
+However, there is one remaining issue: the modal window sometimes doesn't show the image properly when clicked. This will need to be addressed in a future update.
