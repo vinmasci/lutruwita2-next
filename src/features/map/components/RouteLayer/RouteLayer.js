@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
 
@@ -12,13 +12,17 @@ export const RouteLayer = ({ map, route }) => {
     const isStyleLoaded = useMapStyle(map);
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
 
+    // Keep track of the previous color to detect changes
+    const prevColorRef = useRef(route?.color);
+
     useEffect(() => {
         try {
             console.log('[RouteLayer] Initializing with:', {
                 map: !!map,
                 routeId: route?.routeId,
                 hasGeojson: !!route?.geojson,
-                isStyleLoaded
+                isStyleLoaded,
+                color: route?.color
             });
             if (!map || !route || !isStyleLoaded || !route.geojson) {
                 console.log('[RouteLayer] Missing required props:', {
@@ -243,6 +247,55 @@ export const RouteLayer = ({ map, route }) => {
             console.error('[RouteLayer] Error rendering route:', error);
         }
     }, [map, route, isStyleLoaded, routeVisibility, toggleRouteVisibility]);
+
+    // Effect to update the line color when the route color changes
+    useEffect(() => {
+        if (!map || !route || !isStyleLoaded) return;
+        
+        const currentColor = route.color;
+        const prevColor = prevColorRef.current;
+        
+        console.log('[RouteLayer] Checking color:', {
+            current: currentColor,
+            previous: prevColor,
+            routeId: route.routeId,
+            hasChanged: currentColor !== prevColor
+        });
+        
+        // Only update if the color has changed
+        if (currentColor !== prevColor) {
+            console.log('[RouteLayer] Color changed from', prevColor, 'to', currentColor);
+            
+            const routeId = route.routeId;
+            const mainLayerId = `${routeId}-main-line`;
+            const hoverLayerId = `${routeId}-hover`;
+            
+            // Update main layer color
+            if (map.getLayer(mainLayerId)) {
+                console.log(`[RouteLayer] Updating main layer (${mainLayerId}) color to`, currentColor || DEFAULT_COLORS.main);
+                map.setPaintProperty(
+                    mainLayerId,
+                    'line-color',
+                    currentColor || DEFAULT_COLORS.main
+                );
+            } else {
+                console.warn(`[RouteLayer] Main layer (${mainLayerId}) not found`);
+            }
+            
+            // Update hover layer color if it exists
+            if (map.getLayer(hoverLayerId)) {
+                console.log(`[RouteLayer] Updating hover layer (${hoverLayerId}) color to`, currentColor ? `${currentColor}99` : DEFAULT_COLORS.hover);
+                map.setPaintProperty(
+                    hoverLayerId,
+                    'line-color',
+                    currentColor ? `${currentColor}99` : DEFAULT_COLORS.hover
+                );
+            }
+            
+            // Update the ref for next comparison
+            prevColorRef.current = currentColor;
+        }
+    }, [map, route, isStyleLoaded, route?.color]); // Add route.color as a direct dependency
 
     return null;
 };

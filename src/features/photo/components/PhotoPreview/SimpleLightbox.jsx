@@ -22,8 +22,9 @@ import { usePhotoContext } from '../../context/PhotoContext';
  * @param {Function} props.onClose - Function to call when closing the lightbox
  * @param {Array} props.additionalPhotos - Optional array of additional photos for navigation
  * @param {Function} props.onDelete - Optional function to call when deleting a photo
+ * @param {boolean} props.disableDelete - Optional flag to disable the delete button (used in presentation mode)
  */
-export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete }) => {
+export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, disableDelete = false }) => {
   // Use all photos if provided, otherwise just the single photo
   const photos = additionalPhotos || [photo];
   
@@ -251,15 +252,17 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete }) =
           
           {/* Actions */}
           <Box>
-            <Button
-              startIcon={<DeleteIcon />}
-              onClick={handleDelete}
-              color="error"
-              variant="outlined"
-              size="small"
-            >
-              Delete
-            </Button>
+            {!disableDelete && (
+              <Button
+                startIcon={<DeleteIcon />}
+                onClick={handleDelete}
+                color="error"
+                variant="outlined"
+                size="small"
+              >
+                Delete
+              </Button>
+            )}
           </Box>
         </Stack>
         

@@ -1,17 +1,19 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { List, ListItem, ListItemButton, ListItemIcon, Tooltip, Divider, Snackbar, Alert } from '@mui/material';
 import { useRouteContext } from '../../context/RouteContext';
 import { SidebarIcons } from './icons';
-import { SaveDialog } from './SaveDialog';
+import { SaveDialog } from './SaveDialog.jsx';
 import { LoadDialog } from './LoadDialog';
 
 export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemClick }) => {
-    const { routes, savedRoutes, saveCurrentState, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges } = useRouteContext();
+    const { routes, savedRoutes, saveCurrentState, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving } = useRouteContext();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
     const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [snackbarSeverity, setSnackbarSeverity] = useState('info');
     const [activeItem, setActiveItem] = useState(null);
 
     const handleSaveClick = () => {
@@ -30,6 +32,8 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
         setLoadDialogOpen(true);
         // Show the snackbar notification
         setSnackbarOpen(true);
+        setSnackbarMessage('Loading routes, this may take a moment...');
+        setSnackbarSeverity('info');
         
         // Fetch routes in the background
         listRoutes()
@@ -46,6 +50,17 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
                 setSnackbarOpen(false);
             });
     };
+
+    // Show saving notification when isSaving changes
+    useEffect(() => {
+        if (isSaving) {
+            setSnackbarMessage('Your route is saving, this may take a moment...');
+            setSnackbarSeverity('info');
+            setSnackbarOpen(true);
+        } else if (snackbarMessage === 'Your route is saving, this may take a moment...') {
+            setSnackbarOpen(false);
+        }
+    }, [isSaving, snackbarMessage]);
 
     const handleItemClick = (id, onClick) => {
         setActiveItem(id === activeItem ? null : id);
@@ -94,14 +109,14 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
 
     return (_jsxs(_Fragment, { 
         children: [
-            // Snackbar notification for loading routes
+            // Snackbar notification for loading/saving routes
             _jsx(Snackbar, {
                 open: snackbarOpen,
                 anchorOrigin: { vertical: 'bottom', horizontal: 'center' },
                 children: _jsx(Alert, {
-                    severity: "info",
+                    severity: snackbarSeverity,
                     sx: { width: '100%', backgroundColor: 'rgb(35, 35, 35)', color: 'white' },
-                    children: "Loading routes, this may take a moment..."
+                    children: snackbarMessage
                 })
             }),
             _jsx(List, { 
@@ -165,21 +180,24 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
             _jsx(SaveDialog, { 
                 open: saveDialogOpen, 
                 onClose: () => setSaveDialogOpen(false), 
-                onSave: async (formData) => {
-                    try {
-                        await saveCurrentState(formData.name, formData.type, formData.isPublic);
-                        setSaveDialogOpen(false);
-                    }
-                    catch (error) {
-                        console.error('Failed to save:', error);
-                    }
+                onSave: (formData) => {
+                    // Don't close the dialog immediately, let it stay open while saving
+                    // The isSaving prop will show the spinner
+                    saveCurrentState(formData.name, formData.type, formData.isPublic)
+                        .then(() => {
+                            setSaveDialogOpen(false);
+                        })
+                        .catch(error => {
+                            console.error('Failed to save:', error);
+                        });
                 }, 
                 initialValues: currentLoadedState ? {
                     name: currentLoadedState.name,
                     type: currentLoadedState.type || 'tourism',
                     isPublic: currentLoadedState.isPublic || false
                 } : undefined, 
-                isEditing: !!currentLoadedPersistentId 
+                isEditing: !!currentLoadedPersistentId,
+                isSaving: isSaving
             }), 
             _jsx(LoadDialog, { 
                 open: loadDialogOpen, 

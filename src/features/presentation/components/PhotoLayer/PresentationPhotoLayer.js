@@ -95,5 +95,9 @@ export const PresentationPhotoLayer = () => {
     return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(SimpleLightbox, { photo: selectedPhoto, onClose: () => {
                     setSelectedPhoto(null);
                     setSelectedCluster(null);
-                }, additionalPhotos: selectedCluster }, `preview-${selectedPhoto.id}`))] }));
+                }, 
+                additionalPhotos: selectedCluster,
+                // Don't allow photo deletion in presentation mode
+                disableDelete: true
+              }, `preview-${selectedPhoto.id}`))] }));
 };

@@ -11,7 +11,10 @@ import {
   Select,
   MenuItem,
   FormControlLabel,
-  Switch
+  Switch,
+  CircularProgress,
+  Box,
+  Typography
 } from '@mui/material';
 
 interface SaveDialogProps {
@@ -28,9 +31,10 @@ interface SaveDialogProps {
     isPublic: boolean;
   };
   isEditing?: boolean;
+  isSaving?: boolean;
 }
 
-export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing }: SaveDialogProps) => {
+export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, isSaving = false }: SaveDialogProps) => {
   const [formData, setFormData] = useState({
     name: initialValues?.name || '',
     type: initialValues?.type || 'tourism' as const,
@@ -149,18 +153,32 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing }: 
         <Button 
           onClick={onClose}
           sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+          disabled={isSaving}
         >
           Cancel
         </Button>
-        <Button 
-          onClick={() => onSave(formData)}
-          disabled={!formData.name}
-          sx={{ 
-            color: formData.name ? '#90caf9' : 'rgba(255, 255, 255, 0.3)'
-          }}
-        >
-          {isEditing ? 'Update' : 'Save'}
-        </Button>
+        {isSaving ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, padding: '0 8px' }}>
+            <CircularProgress
+              variant="indeterminate"
+              size={32}
+              sx={{ color: '#90caf9' }}
+            />
+            <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 'medium' }}>
+              Saving...
+            </Typography>
+          </Box>
+        ) : (
+          <Button 
+            onClick={() => onSave(formData)}
+            disabled={!formData.name}
+            sx={{ 
+              color: formData.name ? '#90caf9' : 'rgba(255, 255, 255, 0.3)'
+            }}
+          >
+            {isEditing ? 'Update' : 'Save'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

@@ -112,7 +112,22 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
 
     const handleColorSelect = (color) => {
         if (selectedRouteId) {
+            // Update the route color
             updateRoute(selectedRouteId, { color });
+            
+            // Find the route and set it as current to trigger immediate re-render
+            const route = routes.find(r => (r.routeId || r.id) === selectedRouteId);
+            if (route) {
+                // Create a new route object with the updated color to force a re-render
+                const updatedRoute = {
+                    ...route,
+                    color: color
+                };
+                
+                // Set as current route to trigger the map update
+                setCurrentRoute(updatedRoute);
+            }
+            
             handleColorClose();
         }
     };

@@ -135,17 +135,23 @@ function MapViewContent() {
         }
     }, [hoverCoordinates]);
     // Reusable function to render a route on the map
-    const renderRouteOnMap = useCallback(async (route) => {
+    const renderRouteOnMap = useCallback(async (route, options = {}) => {
         if (!mapInstance.current || !isMapReady) {
             console.error('Map is not ready');
             return;
         }
+        
+        // Default options
+        const { fitBounds = true } = options;
+        
         const map = mapInstance.current;
         const routeId = route.routeId || `route-${route.id}`;
-        console.log('[MapView] Rendering route:', routeId);
+        console.log('[MapView] Rendering route:', routeId, 'with options:', { fitBounds });
+        
         const mainLayerId = `${routeId}-main-line`;
         const borderLayerId = `${routeId}-main-border`;
         const mainSourceId = `${routeId}-main`;
+        
         // Clean up existing layers
         if (map.getLayer(borderLayerId))
             map.removeLayer(borderLayerId);
@@ -153,6 +159,7 @@ function MapViewContent() {
             map.removeLayer(mainLayerId);
         if (map.getSource(mainSourceId))
             map.removeSource(mainSourceId);
+            
         // Add the main route source and layers
         map.addSource(mainSourceId, {
             type: 'geojson',
@@ -160,6 +167,7 @@ function MapViewContent() {
             generateId: true,
             tolerance: 0.5
         });
+        
         // Add main route layers
         map.addLayer({
             id: borderLayerId,
@@ -176,6 +184,7 @@ function MapViewContent() {
                 'line-opacity': 1
             }
         });
+        
         map.addLayer({
             id: mainLayerId,
             type: 'line',
@@ -190,7 +199,7 @@ function MapViewContent() {
                     'case',
                     ['boolean', ['feature-state', 'hover'], false],
                     '#ff8f8f',
-                    '#ee5253'
+                    route.color || '#ee5253'  // Use route color or default
                 ],
                 'line-width': [
                     'case',
@@ -201,16 +210,19 @@ function MapViewContent() {
                 'line-opacity': 1
             }
         });
+        
         // Render unpaved sections if they exist
         if (route.unpavedSections?.length) {
             route.unpavedSections?.forEach((section, index) => {
                 const sourceId = `unpaved-section-${routeId}-${index}`;
                 const layerId = `unpaved-section-layer-${routeId}-${index}`;
+                
                 // Clean up existing
                 if (map.getSource(sourceId)) {
                     map.removeLayer(layerId);
                     map.removeSource(sourceId);
                 }
+                
                 // Add source with surface property
                 map.addSource(sourceId, {
                     type: 'geojson',
@@ -225,6 +237,7 @@ function MapViewContent() {
                         }
                     }
                 });
+                
                 // Add white dashed line for unpaved segments
                 map.addLayer({
                     id: layerId,
@@ -235,31 +248,39 @@ function MapViewContent() {
                         'line-cap': 'round'
                     },
                     paint: {
-                        'line-color': '#ffffff',
+                        'line-color': '#ffffff',  // Keep white for better visibility
                         'line-width': 2,
                         'line-dasharray': [1, 3]
                     }
                 });
             });
         }
+        
         // Add click handler
         addRouteClickHandler(map, routeId);
-        // Get coordinates from the GeoJSON
-        const feature = route.geojson.features[0];
-        // Wait briefly for layers to be ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        // Fit bounds to show the route
-        const bounds = new mapboxgl.LngLatBounds();
-        feature.geometry.coordinates.forEach((coord) => {
-            if (coord.length >= 2) {
-                bounds.extend([coord[0], coord[1]]);
-            }
-        });
-        map.fitBounds(bounds, {
-            padding: 50,
-            maxZoom: 13,
-            minZoom: 13
-        });
+        
+        // Only fit bounds if requested
+        if (fitBounds) {
+            // Get coordinates from the GeoJSON
+            const feature = route.geojson.features[0];
+            
+            // Wait briefly for layers to be ready
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Fit bounds to show the route
+            const bounds = new mapboxgl.LngLatBounds();
+            feature.geometry.coordinates.forEach((coord) => {
+                if (coord.length >= 2) {
+                    bounds.extend([coord[0], coord[1]]);
+                }
+            });
+            
+            map.fitBounds(bounds, {
+                padding: 50,
+                maxZoom: 13,
+                minZoom: 13
+            });
+        }
     }, [isMapReady, addRouteClickHandler]);
     // Effect to render current route when it changes
     useEffect(() => {
@@ -274,6 +295,70 @@ function MapViewContent() {
         }
         // For loaded routes (from MongoDB), RouteLayer component handles rendering
     }, [currentRoute, isMapReady, renderRouteOnMap]);
+    
+    // Effect to re-render the route when its color changes
+    useEffect(() => {
+        if (!currentRoute || !mapInstance.current || !isMapReady || currentRoute._type !== 'fresh')
+            return;
+            
+        console.log('[MapView] Checking for color change:', {
+            routeId: currentRoute.routeId || currentRoute.id,
+            color: currentRoute.color
+        });
+        
+        // For fresh routes, re-render when color changes, but don't zoom to fit bounds
+        renderRouteOnMap(currentRoute, { fitBounds: false }).catch(error => {
+            console.error('[MapView] Error re-rendering route after color change:', error);
+        });
+    }, [currentRoute?.color, isMapReady, renderRouteOnMap]);
+
+    // Function to directly update route color on the map without re-rendering
+    const updateRouteColor = useCallback((routeId, color) => {
+        if (!mapInstance.current || !isMapReady) return;
+        
+        const map = mapInstance.current;
+        const mainLayerId = `${routeId}-main-line`;
+        
+        // Check if the layer exists
+        if (map.getLayer(mainLayerId)) {
+            console.log('[MapView] Directly updating route color for', mainLayerId, 'to', color);
+            
+            // Update the line-color paint property
+            map.setPaintProperty(mainLayerId, 'line-color', [
+                'case',
+                ['boolean', ['feature-state', 'hover'], false],
+                '#ff8f8f',
+                color || '#ee5253'
+            ]);
+        }
+    }, [isMapReady]);
+    
+    // Force re-render of route when route color changes
+    const routeColorRef = useRef(currentRoute?.color);
+    useEffect(() => {
+        // Check if the color has changed
+        if (currentRoute?.color !== routeColorRef.current) {
+            console.log('[MapView] Route color changed from', routeColorRef.current, 'to', currentRoute?.color);
+            
+            // Update the color reference
+            const oldColor = routeColorRef.current;
+            routeColorRef.current = currentRoute?.color;
+            
+            if (currentRoute && mapInstance.current && isMapReady) {
+                const routeId = currentRoute.routeId || `route-${currentRoute.id}`;
+                
+                // First try to update the color directly
+                updateRouteColor(routeId, currentRoute.color);
+                
+                // If that doesn't work, fall back to re-rendering the route
+                if (currentRoute._type === 'fresh') {
+                    renderRouteOnMap(currentRoute, { fitBounds: false }).catch(error => {
+                        console.error('[MapView] Error force re-rendering route after color change:', error);
+                    });
+                }
+            }
+        }
+    }, [currentRoute, isMapReady, renderRouteOnMap, updateRouteColor]);
     const handleUploadGpx = async (file, processedRoute) => {
         if (!file && !processedRoute) {
             setIsGpxDrawerOpen(true);
