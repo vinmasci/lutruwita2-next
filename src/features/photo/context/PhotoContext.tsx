@@ -9,6 +9,7 @@ interface PhotoContextType {
   deletePhoto: (photoId: string) => void;
   updatePhoto: (photoId: string, updates: Partial<ProcessedPhoto>) => void;
   loadPhotos: (newPhotos: ProcessedPhoto[]) => void;
+  clearPhotos: () => void;
   uploadLocalPhotos: () => Promise<ProcessedPhoto[]>;
   isUploading: boolean;
   uploadProgress: Record<string, number>;
@@ -77,6 +78,29 @@ export const PhotoProvider: React.FC<PhotoProviderProps> = ({ children }) => {
 
     // Replace existing photos entirely
     setPhotos(processedPhotos);
+  };
+  
+  const clearPhotos = () => {
+    // Clean up blob URLs if they exist
+    photos.forEach(photo => {
+      if (photo.isLocal && photo._blobs) {
+        if (photo.tinyThumbnailUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(photo.tinyThumbnailUrl);
+        }
+        if (photo.thumbnailUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(photo.thumbnailUrl);
+        }
+        if (photo.mediumUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(photo.mediumUrl);
+        }
+        if (photo.url?.startsWith('blob:')) {
+          URL.revokeObjectURL(photo.url);
+        }
+      }
+    });
+    
+    // Clear all photos
+    setPhotos([]);
   };
 
   // Upload all local photos to Cloudinary
@@ -206,6 +230,7 @@ export const PhotoProvider: React.FC<PhotoProviderProps> = ({ children }) => {
       deletePhoto, 
       updatePhoto, 
       loadPhotos,
+      clearPhotos,
       uploadLocalPhotos,
       isUploading,
       uploadProgress

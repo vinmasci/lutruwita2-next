@@ -41,7 +41,15 @@ export const PlaceProvider = ({ children }) => {
             }
         }));
     };
-    return (_jsx(PlaceContext.Provider, { value: { places, updatePlace }, children: children }));
+    
+    const clearPlaces = () => {
+        // Clear all places by setting to an empty object
+        setPlaces({});
+        // Also clear from localStorage
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+        console.log('[PlaceContext] All places cleared');
+    };
+    return (_jsx(PlaceContext.Provider, { value: { places, updatePlace, clearPlaces }, children: children }));
 };
 export const usePlaceContext = () => {
     const context = useContext(PlaceContext);

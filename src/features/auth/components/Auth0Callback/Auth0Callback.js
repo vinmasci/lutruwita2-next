@@ -13,7 +13,7 @@ export const Auth0Callback = () => {
             currentPath: window.location.pathname
         });
         if (isAuthenticated) {
-            navigate('/', { replace: true });
+            navigate('/editor', { replace: true }); // Redirect to editor page
         }
     }, [isAuthenticated, navigate, error, user]);
     if (error) {

@@ -154,7 +154,10 @@ export default function App() {
                   <Routes>
                     {/* Use the original Auth0Callback component */}
                     <Route path="/callback" element={<Auth0Callback />} />
-                    <Route path="/" element={
+                    {/* Make landing page the home page */}
+                    <Route path="/" element={<LandingPage />} />
+                    {/* Move the map view to /editor route */}
+                    <Route path="/editor" element={
                       <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
                         <MapView />
                       </Box>
@@ -169,7 +172,6 @@ export default function App() {
                     }}>
                       <Outlet />
                     </Box>}>
-                      <Route path="landing" element={<LandingPage />} />
                       <Route path="route/:id" element={<RoutePresentation />} />
                     </Route>
                   </Routes>

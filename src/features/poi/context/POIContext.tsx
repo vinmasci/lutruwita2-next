@@ -17,7 +17,8 @@ type POIAction =
   | { type: 'REMOVE_POI'; payload: string }
   | { type: 'UPDATE_POI'; payload: { id: string; updates: Partial<Omit<POIType, 'id'>> } }
   | { type: 'UPDATE_POSITION'; payload: { id: string; coordinates: POICoordinates } }
-  | { type: 'LOAD_POIS'; payload: POIType[] };
+  | { type: 'LOAD_POIS'; payload: POIType[] }
+  | { type: 'CLEAR_POIS' };
 
 // Reducer
 const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
@@ -80,6 +81,8 @@ const poiReducer = (state: POIType[], action: POIAction): POIType[] => {
       );
     case 'LOAD_POIS':
       return action.payload;
+    case 'CLEAR_POIS':
+      return [];
     default:
       return state;
   }
@@ -182,6 +185,16 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Clear all POIs
+  const clearPOIs = () => {
+    try {
+      dispatch({ type: 'CLEAR_POIS' });
+    } catch (error) {
+      console.error('[POIContext] Error clearing POIs:', error);
+      setError(error instanceof Error ? error : new Error('Failed to clear POIs'));
+    }
+  };
+
   return (
     <POIContext.Provider
       value={{
@@ -196,6 +209,7 @@ export const POIProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatePOIPosition,
         getPOIsForRoute,
         loadPOIsFromRoute,
+        clearPOIs,
       }}
     >
       {children}

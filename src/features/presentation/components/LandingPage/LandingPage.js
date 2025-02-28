@@ -73,9 +73,11 @@ export const LandingPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const featuredRoutesRef = React.useRef(null);
+    
     const scrollToFeaturedRoutes = () => {
         featuredRoutesRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
+    
     useEffect(() => {
         const fetchFeaturedRoutes = async () => {
             try {
@@ -94,6 +96,11 @@ export const LandingPage = () => {
         };
         fetchFeaturedRoutes();
     }, []);
+    
+    const goToEditor = () => {
+        navigate('/editor');
+    };
+    
     return (_jsxs(Box, { sx: {
             minHeight: '100vh',
             width: '100vw',
@@ -106,31 +113,42 @@ export const LandingPage = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                }, children: [_jsx(Box, { sx: {
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundImage: 'url(/images/hero.png)',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            filter: 'brightness(0.35)',
-                            zIndex: 0
-                        } }), _jsx(Container, { maxWidth: "lg", sx: { position: 'relative', zIndex: 1 }, children: _jsxs(Box, { textAlign: "center", children: [_jsx(Typography, { variant: "h2", component: "h1", gutterBottom: true, sx: {
+                    overflow: 'hidden',
+                    '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundImage: 'url(/images/hero.png)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundAttachment: 'fixed', // This creates the parallax effect
+                        filter: 'brightness(0.55)',
+                        zIndex: 0
+                    }
+                }, children: [_jsx(Container, { maxWidth: "lg", sx: { position: 'relative', zIndex: 1 }, children: _jsxs(Box, { textAlign: "center", children: [_jsx(Typography, { variant: "h2", component: "h1", gutterBottom: true, sx: {
                                         fontFamily: 'Montserrat',
                                         fontWeight: 'bold',
                                         mb: 3,
                                         fontSize: { xs: '2.5rem', md: '3.75rem' },
                                         color: 'white',
-                                        textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8)'
+                                        textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8)',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                        borderRadius: '16px',
+                                        padding: '16px',
+                                        display: 'inline-block'
                                     }, children: "Create Beautiful Maps" }), _jsx(Typography, { variant: "h5", sx: {
                                         fontFamily: 'Montserrat',
                                         maxWidth: 'md',
                                         mx: 'auto',
                                         mb: 4,
                                         color: 'white',
-                                        textShadow: '1px 1px 4px rgba(0, 0, 0, 0.8)'
+                                        textShadow: '1px 1px 4px rgba(0, 0, 0, 0.8)',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                        borderRadius: '12px',
+                                        padding: '12px'
                                     }, children: "Create & share beautiful cycling, hiking or tourism maps with 3d terrain, points of interest, photos and much more.." }), _jsxs(Stack, { spacing: 3, alignItems: "center", children: [_jsx(Button, { variant: "outlined", size: "large", sx: {
                                                 px: 6,
                                                 py: 2.5,
@@ -141,13 +159,13 @@ export const LandingPage = () => {
                                                 color: 'white',
                                                 borderColor: 'white',
                                                 borderWidth: 2,
-                                                bgcolor: 'transparent',
+                                                bgcolor: 'rgba(0, 0, 0, 0.3)',
                                                 '&:hover': {
                                                     bgcolor: 'rgba(255, 255, 255, 0.05)',
                                                     borderColor: 'white',
                                                     borderWidth: 2
                                                 }
-                                            }, onClick: () => loginWithRedirect(), children: "Start Creating" }), _jsxs(Button, { variant: "outlined", size: "large", onClick: scrollToFeaturedRoutes, sx: {
+                                            }, onClick: goToEditor, children: "Create A Map" }), _jsxs(Button, { variant: "outlined", size: "large", onClick: scrollToFeaturedRoutes, sx: {
                                                 px: 6,
                                                 py: 2.5,
                                                 fontSize: '1.2rem',
@@ -157,7 +175,7 @@ export const LandingPage = () => {
                                                 color: 'white',
                                                 borderColor: 'white',
                                                 borderWidth: 2,
-                                                bgcolor: 'transparent',
+                                                bgcolor: 'rgba(0, 0, 0, 0.3)',
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 alignItems: 'center',

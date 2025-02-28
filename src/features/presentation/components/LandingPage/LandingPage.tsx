@@ -162,7 +162,7 @@ export const LandingPage: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: 'url(/images/hero.png)',
+            backgroundImage: 'url(../../../../docs/hero.png)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             filter: 'brightness(0.35)',
@@ -220,9 +220,9 @@ export const LandingPage: React.FC = () => {
                     borderWidth: 2
                   }
                 }}
-                onClick={() => loginWithRedirect()}
+                onClick={() => navigate('/editor')}
               >
-                Start Creating
+                CREATE A MAP
               </Button>
               <Button 
                 variant="outlined"

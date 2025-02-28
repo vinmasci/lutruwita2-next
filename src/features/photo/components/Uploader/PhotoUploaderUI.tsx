@@ -78,6 +78,7 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
         severity="info" 
         sx={{ 
           mt: 2, 
+          mb: 3, // Added more spacing under the info box
           borderRadius: 3,
           backgroundColor: 'rgba(35, 35, 35, 0.9)',
           border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -116,12 +117,11 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
       {photos.length > 0 && (
         <>
           <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            display: 'flex',
+            flexDirection: 'column',
             mb: 2 
           }}>
-            <Typography variant="h6">
+            <Typography variant="body1" sx={{ fontSize: '0.9rem', mb: 1 }}>
               {photos.filter(p => p.hasGps).length} photo(s) with GPS data
             </Typography>
             <Button
@@ -129,6 +129,7 @@ const PhotoUploaderUI: React.FC<PhotoUploaderUIProps> = ({
               startIcon={<MapIcon />}
               disabled={!photos.some(p => p.hasGps)}
               onClick={onAddToMap}
+              sx={{ alignSelf: 'flex-start' }}
             >
               Add to Map
             </Button>

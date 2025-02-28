@@ -57,6 +57,7 @@ const PhotoUploaderUI = ({ isLoading, error, photos, selectedPhotos, onFileAdd, 
             severity: "info", 
             sx: {
                 mt: 2,
+                mb: 3, // Added more spacing under the info box
                 borderRadius: 3,
                 backgroundColor: 'rgba(35, 35, 35, 0.9)',
                 border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -97,13 +98,13 @@ const PhotoUploaderUI = ({ isLoading, error, photos, selectedPhotos, onFileAdd, 
                 _jsxs(Box, { 
                     sx: {
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
+                        flexDirection: 'column',
                         mb: 2
                     }, 
                     children: [
                         _jsxs(Typography, { 
-                            variant: "h6", 
+                            variant: "body1", 
+                            sx: { fontSize: '0.9rem', mb: 1 },
                             children: [
                                 photos.filter(p => p.hasGps).length, 
                                 " photo(s) with GPS data"
@@ -114,6 +115,7 @@ const PhotoUploaderUI = ({ isLoading, error, photos, selectedPhotos, onFileAdd, 
                             startIcon: _jsx(MapIcon, {}), 
                             disabled: !photos.some(p => p.hasGps), 
                             onClick: onAddToMap, 
+                            sx: { alignSelf: 'flex-start' },
                             children: "Add to Map" 
                         })
                     ] 

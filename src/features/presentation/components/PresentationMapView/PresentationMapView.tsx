@@ -81,7 +81,7 @@ export default function PresentationMapView() {
         }
 
         // Update previous route reference
-        previousRouteRef.current = currentRoute.routeId;
+        previousRouteRef.current = currentRoute.routeId || null;
       }
     }
   }, [isMapReady, currentRoute]);
@@ -97,7 +97,7 @@ export default function PresentationMapView() {
         bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
         fitBoundsOptions: {
           padding: 0,
-          pitch: 45,
+          pitch: 0,
           bearing: 0
         },
         projection: 'globe',

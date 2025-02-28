@@ -96,9 +96,9 @@ export const Auth0Callback: React.FC = () => {
             
             setProcessingStep('Authentication complete, redirecting...');
             
-            // Redirect to home
+            // Redirect to landing page
             redirectTimeoutRef.current = setTimeout(() => {
-              console.log('Auth0Callback: Redirecting to home page');
+              console.log('Auth0Callback: Redirecting to landing page');
               window.location.href = '/'; // Use window.location for a full page reload
             }, 1000);
           } catch (tokenError: any) {

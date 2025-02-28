@@ -28,5 +28,11 @@ export const PhotoProvider = ({ children }) => {
         // Replace existing photos entirely
         setPhotos(processedPhotos);
     };
-    return (_jsx(PhotoContext.Provider, { value: { photos, setPhotos, addPhoto, deletePhoto, updatePhoto, loadPhotos }, children: children }));
+    
+    const clearPhotos = () => {
+        // Clear all photos by setting to an empty array
+        setPhotos([]);
+        console.log('[PhotoContext] All photos cleared');
+    };
+    return (_jsx(PhotoContext.Provider, { value: { photos, setPhotos, addPhoto, deletePhoto, updatePhoto, loadPhotos, clearPhotos }, children: children }));
 };

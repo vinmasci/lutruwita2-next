@@ -21,8 +21,8 @@ const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({ isOpen, onClose, 
     // Clear stored authentication data
     clearStoredAuthentication();
     
-    // Use Auth0 logout
-    logout({ logoutParams: { returnTo: window.location.origin } });
+    // Use Auth0 logout with redirect to landing page
+    logout({ logoutParams: { returnTo: window.location.origin + '/' } });
     
     // Close the drawer
     onClose();

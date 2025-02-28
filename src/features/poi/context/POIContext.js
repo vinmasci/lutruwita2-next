@@ -155,6 +155,18 @@ export const POIProvider = ({ children }) => {
             setError(error instanceof Error ? error : new Error('Failed to load POIs'));
         }
     };
+    
+    const clearPOIs = () => {
+        try {
+            // Clear all POIs by loading an empty array
+            dispatch({ type: 'LOAD_POIS', payload: [] });
+            console.log('[POIContext] All POIs cleared');
+        }
+        catch (error) {
+            console.error('[POIContext] Error clearing POIs:', error);
+            setError(error instanceof Error ? error : new Error('Failed to clear POIs'));
+        }
+    };
     return (_jsx(POIContext.Provider, { value: {
             pois,
             isLoading,
@@ -167,6 +179,7 @@ export const POIProvider = ({ children }) => {
             updatePOIPosition,
             getPOIsForRoute,
             loadPOIsFromRoute,
+            clearPOIs,
         }, children: children }));
 };
 // Custom hook for using POI context

@@ -564,12 +564,12 @@ function MapViewContent() {
         const map = new mapboxgl.Map({
             container: mapRef.current,
             style: MAP_STYLES.satellite.url,
-            bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
-            fitBoundsOptions: {
-                padding: 0,
-                pitch: 45,
-                bearing: 0
-            },
+        bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
+        fitBoundsOptions: {
+            padding: 0,
+            pitch: 0,
+            bearing: 0
+        },
             projection: 'globe',
             maxPitch: 85
         });

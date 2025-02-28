@@ -5,6 +5,7 @@ import { migratePlaceMetadata } from '../utils/migration';
 interface PlaceContextType {
   places: Record<string, Place>;
   updatePlace: (id: string, updates: Partial<Place>) => Promise<void>;
+  clearPlaces: () => void;
 }
 
 const STORAGE_KEY = 'lutruwita2_places';
@@ -65,9 +66,14 @@ export const PlaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw error;
     }
   };
+  
+  const clearPlaces = () => {
+    setPlaces({});
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+  };
 
   return (
-    <PlaceContext.Provider value={{ places, updatePlace }}>
+    <PlaceContext.Provider value={{ places, updatePlace, clearPlaces }}>
       {children}
     </PlaceContext.Provider>
   );
