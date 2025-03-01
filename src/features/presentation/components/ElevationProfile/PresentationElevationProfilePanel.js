@@ -8,53 +8,24 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { PresentationRouteDescriptionPanel } from '../RouteDescription';
 import { PresentationWeatherProfilePanel } from '../WeatherProfile';
-import { responsivePanelHeight } from '../../../../utils/responsive';
 
-const ElevationPanel = styled(Box)(({ theme }) => {
-    const panelHeight = responsivePanelHeight(theme);
-    
-    return {
-        position: 'fixed',
-        bottom: 0,
-        left: {
-            xs: 0,
-            sm: '7vw', // Match sidebar width
-        },
-        minLeft: {
-            xs: 0,
-            sm: '28px', // Match sidebar min-width
-        },
-        maxLeft: {
-            xs: 0,
-            sm: '56px', // Match sidebar max-width
-        },
-        right: 0,
-        backgroundColor: 'rgba(26, 26, 26, 0.9)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        transition: theme.transitions.create('transform', {
-            duration: theme.transitions.duration.standard,
-            easing: theme.transitions.easing.easeInOut,
-        }),
-        zIndex: 102,
-        height: panelHeight.height,
-        minHeight: panelHeight.minHeight,
-        maxHeight: panelHeight.maxHeight,
-        '&.collapsed': {
-            transform: `translateY(${typeof panelHeight.height === 'object' 
-                ? '30vh' // Default for responsive height
-                : panelHeight.height})`
-        },
-        [theme.breakpoints.down('sm')]: {
-            left: '10vw', // Match sidebar width on mobile
-        },
-        [theme.breakpoints.down(375)]: {
-            left: '12vw', // Match sidebar width on small mobile
-        },
-        [theme.breakpoints.down('xs')]: {
-            left: 0, // Full width on extra small devices
-        }
-    };
-});
+const ElevationPanel = styled(Box)(({ theme }) => ({
+    position: 'fixed',
+    bottom: 0,
+    left: '56px', // Width of the sidebar
+    right: 0,
+    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+    transition: theme.transitions.create('transform', {
+        duration: theme.transitions.duration.standard,
+        easing: theme.transitions.easing.easeInOut,
+    }),
+    zIndex: 102,
+    height: 300,
+    '&.collapsed': {
+        transform: 'translateY(300px)'
+    }
+}));
 
 const TabButton = ({ tab, label, activeTab, onClick, isCollapsed, setIsCollapsed }) => _jsx(ButtonBase, {
     onClick: () => {

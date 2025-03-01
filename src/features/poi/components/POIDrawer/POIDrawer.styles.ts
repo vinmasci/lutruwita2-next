@@ -1,11 +1,8 @@
 import { styled } from '@mui/material/styles';
 import { Paper, Box, IconButton, Typography, List, ListItem } from '@mui/material';
-import { responsiveNestedDrawerWidth } from '../../../../utils/responsive';
 
 export const StyledDrawer = styled(Box)(({ theme }) => ({
-  width: '30vw',
-  minWidth: '200px',
-  maxWidth: '264px',
+  width: '264px',
   height: '100%',
   backgroundColor: 'rgb(35, 35, 35)',
   display: 'flex',
@@ -13,15 +10,6 @@ export const StyledDrawer = styled(Box)(({ theme }) => ({
   overflow: 'hidden',
   padding: '16px',
   boxSizing: 'border-box',
-  [theme.breakpoints.down('sm')]: {
-    width: '70vw',
-    maxWidth: 'none',
-    padding: '12px',
-  },
-  [theme.breakpoints.down(375)]: {
-    width: '80vw',
-    padding: '8px',
-  }
 }));
 
 export const DrawerHeader = styled(Box)(({ theme }) => ({
