@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, Suspense } from 'react';
-import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Box, Typography, IconButton, CircularProgress, Tooltip } from '@mui/material';
+import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Box, Typography, IconButton, CircularProgress, Tooltip, Divider } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
@@ -9,14 +9,14 @@ import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { Route as MapIcon } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
 
 export const PresentationSidebar = ({ isOpen }) => {
     const { routes, currentRoute, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
     const { loadPOIsFromRoute } = usePOIContext();
-    const { addPhoto } = usePhotoContext();
+    const { addPhoto, isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
     const [isNestedOpen, setIsNestedOpen] = useState(true);
     const currentIndex = routes.findIndex(route => route.id === currentRoute?.id);
 
@@ -50,28 +50,57 @@ export const PresentationSidebar = ({ isOpen }) => {
         _jsx(StyledDrawer, { 
             variant: "permanent", 
             anchor: "left", 
-            children: _jsx(List, { 
-                children: _jsx(Tooltip, { 
-                    title: "Routes", 
-                    placement: "right", 
-                    children: _jsx(ListItemButton, { 
-                        onClick: () => {
-                            setIsNestedOpen(!isNestedOpen);
-                        },
-                        'data-active': isNestedOpen,
-                        sx: {
-                            '&:hover': {
-                                backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            children: _jsxs(List, { 
+                children: [
+                    _jsx(Tooltip, { 
+                        title: "Routes", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => {
+                                setIsNestedOpen(!isNestedOpen);
                             },
-                            '&:hover .MuiListItemIcon-root svg, &[data-active="true"] .MuiListItemIcon-root svg': {
-                                color: '#ff4d4f'
-                            }
-                        }, 
-                        children: _jsx(ListItemIcon, { 
-                            children: _jsx(MapIcon, {}) 
+                            'data-active': isNestedOpen,
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                '&:hover .MuiListItemIcon-root svg, &[data-active="true"] .MuiListItemIcon-root svg': {
+                                    color: '#ff4d4f'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(ListOrdered, {}) 
+                            }) 
                         }) 
-                    }) 
-                }) 
+                    }),
+                    _jsx(Divider, { 
+                        sx: { 
+                            my: 1, 
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)' 
+                        } 
+                    }),
+                    _jsx(Tooltip, { 
+                        title: isPhotosVisible ? "Hide Photos" : "Show Photos", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: togglePhotosVisibility,
+                            sx: {
+                                marginTop: '8px',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                '&:hover .MuiListItemIcon-root svg': {
+                                    color: '#ff4d4f'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: isPhotosVisible ? 
+                                    _jsx(Camera, { color: '#4caf50' }) : 
+                                    _jsx(CameraOff, { color: '#ff4d4f' }) 
+                            }) 
+                        }) 
+                    })
+                ] 
             }) 
         }), 
         _jsx(NestedDrawer, { 
@@ -166,6 +195,15 @@ export const PresentationSidebar = ({ isOpen }) => {
                                     }, 
                                     children: _jsx(ListItemText, { 
                                         primary: route.name, 
+                                        sx: { 
+                                            color: 'white',
+                                            '& .MuiTypography-root': {
+                                                wordWrap: 'break-word',
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                whiteSpace: 'normal'
+                                            }
+                                        },
                                         secondary: _jsxs("div", {
                                             style: { 
                                                 display: 'flex',
@@ -233,8 +271,7 @@ export const PresentationSidebar = ({ isOpen }) => {
                                                     ]
                                                 })
                                             ]
-                                        }),
-                                        sx: { color: 'white' } 
+                                        })
                                     }) 
                                 }, route.id)
                             )) 

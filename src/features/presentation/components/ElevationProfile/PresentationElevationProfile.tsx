@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useMapContext } from '../../../map/context/MapContext';
 import { createPortal } from 'react-dom';
 import { Box, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
@@ -39,14 +40,27 @@ interface Stats {
 }
 
 interface Segment {
-    points: any[];
+    points: Array<{x: number, y: number, isPaved: boolean}>;
     type: 'normal' | 'climb';
     climbCategory?: string;
     color?: string;
     isPaved: boolean;
 }
 
-function createLinePath(points: any[], xScale: any, yScale: any): string {
+interface ClimbPoint {
+    distance: number;
+    elevation: number;
+}
+
+interface Climb {
+    startPoint: ClimbPoint;
+    endPoint: ClimbPoint;
+    category: string;
+    color: string;
+    number?: number;
+}
+
+function createLinePath(points: Array<{x: number, y: number}>, xScale: any, yScale: any): string {
     let linePath = `M ${xScale(points[0].x)},${yScale(points[0].y)}`;
     const tension = 0.3; // Increased tension for smoother curves
 
@@ -71,7 +85,7 @@ function createLinePath(points: any[], xScale: any, yScale: any): string {
     return linePath;
 }
 
-function createAreaPath(points: any[], xScale: any, yScale: any, height: number): string {
+function createAreaPath(points: Array<{x: number, y: number}>, xScale: any, yScale: any, height: number): string {
     let areaPath = `M ${xScale(points[0].x)},${height}`;
     areaPath += ` L ${xScale(points[0].x)},${yScale(points[0].y)}`;
 
@@ -93,12 +107,12 @@ function createAreaPath(points: any[], xScale: any, yScale: any, height: number)
     return areaPath;
 }
 
-function createSegments(points: any[], climbs: any[]): Segment[] {
+function createSegments(points: Array<{x: number, y: number, isPaved: boolean}>, climbs: Climb[]): Segment[] {
     const segments: Segment[] = [];
-    let currentPoints = [];
+    let currentPoints: Array<{x: number, y: number, isPaved: boolean}> = [];
     let currentIndex = 0;
 
-    const createSegment = (points: any[], climb: any | null, isPaved: boolean): Segment => ({
+    const createSegment = (points: Array<{x: number, y: number, isPaved: boolean}>, climb: Climb | null, isPaved: boolean): Segment => ({
         points,
         type: climb ? 'climb' : 'normal' as const,
         climbCategory: climb?.category,
@@ -107,7 +121,7 @@ function createSegments(points: any[], climbs: any[]): Segment[] {
     });
 
     // Helper to find climb at a point
-    const findClimbAtPoint = (point: any) => {
+    const findClimbAtPoint = (point: {x: number, y: number, isPaved: boolean}) => {
         const pointDistance = point.x * 1000;
         return climbs.find(climb => 
             pointDistance >= climb.startPoint.distance && 
@@ -138,7 +152,7 @@ function createSegments(points: any[], climbs: any[]): Segment[] {
         if (climbChanged || surfaceChanged) {
             // Add transition point to current segment
             currentPoints.push(point);
-            segments.push(createSegment([...currentPoints], prevClimb, prevPoint.isPaved));
+            segments.push(createSegment([...currentPoints], prevClimb || null, prevPoint.isPaved));
             
             // Start new segment with the transition point
             currentPoints = [point];
@@ -156,7 +170,7 @@ function createSegments(points: any[], climbs: any[]): Segment[] {
             return pointDistance >= climb.startPoint.distance && 
                    pointDistance <= climb.endPoint.distance;
         });
-        segments.push(createSegment(currentPoints, finalClimb, currentPoints[0].isPaved));
+        segments.push(createSegment(currentPoints, finalClimb || null, currentPoints[0].isPaved));
     }
 
     return segments;
@@ -185,13 +199,67 @@ const Tooltip: React.FC<TooltipProps> = ({ content, x, y }) => {
 export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading, error }) => {
     const [tooltip, setTooltip] = useState<{ content: React.ReactNode; x: number; y: number } | null>(null);
     const [data, setData] = useState<ElevationPoint[]>([]);
-    const [climbs, setClimbs] = useState<any[]>([]);
+    const [climbs, setClimbs] = useState<Climb[]>([]);
     const [stats, setStats] = useState<Stats>({ 
         elevationGained: 0, 
         elevationLost: 0, 
         totalDistance: 0,
         unpavedPercentage: 0
     });
+    const [currentProfilePoint, setCurrentProfilePoint] = useState<{ x: number, y: number } | null>(null);
+    const { hoverCoordinates } = useMapContext();
+
+    // Effect to update the current profile point based on hover coordinates
+    useEffect(() => {
+        console.log('[PresentationElevationProfile] hoverCoordinates changed:', hoverCoordinates);
+        
+        if (!hoverCoordinates || !data.length || !route?.geojson?.features?.[0]) {
+            console.log('[PresentationElevationProfile] No hover coordinates, data, or route features');
+            setCurrentProfilePoint(null);
+            return;
+        }
+
+        // Find the closest point in the elevation data to the hover coordinates
+        const feature = route.geojson.features[0];
+        if (feature.geometry.type !== 'LineString') {
+            console.log('[PresentationElevationProfile] Feature is not a LineString');
+            return;
+        }
+
+        const coordinates = feature.geometry.coordinates;
+        const totalDistance = route.statistics.totalDistance;
+
+        console.log('[PresentationElevationProfile] Processing route with', coordinates.length, 'coordinates');
+
+        // Find the index of the closest coordinate
+        let closestIndex = -1;
+        let minDistance = Infinity;
+
+        coordinates.forEach((coord, index) => {
+            const dx = coord[0] - hoverCoordinates[0];
+            const dy = coord[1] - hoverCoordinates[1];
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestIndex = index;
+            }
+        });
+
+        console.log('[PresentationElevationProfile] Closest index:', closestIndex, 'with distance:', minDistance);
+
+        if (closestIndex >= 0) {
+            // Convert to distance along the route (in km)
+            const distance = (closestIndex / (coordinates.length - 1)) * totalDistance / 1000;
+            const elevation = data[closestIndex]?.elevation || 0;
+            
+            console.log('[PresentationElevationProfile] Setting current profile point:', { distance, elevation });
+            setCurrentProfilePoint({ x: distance, y: elevation });
+        } else {
+            console.log('[PresentationElevationProfile] No closest point found');
+            setCurrentProfilePoint(null);
+        }
+    }, [hoverCoordinates, data, route]);
 
     useEffect(() => {
         if (!route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation) {
@@ -366,7 +434,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
     });
 
     // Group climbs by category for easier lookup
-    const climbsByCategory: { [key: string]: any[] } = {};
+    const climbsByCategory: { [key: string]: Climb[] } = {};
     sortedClimbs.forEach(climb => {
         if (!climbsByCategory[climb.category]) {
             climbsByCategory[climb.category] = [];
@@ -398,7 +466,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
 
                     const patternId = segment.type === 'climb' && segment.climbCategory
                         ? `unpavedPattern-${segment.climbCategory}-${
-                            climbsByCategory[segment.climbCategory].find(c => 
+                            climbsByCategory[segment.climbCategory]?.find(c => 
                                 c.startPoint.distance <= segment.points[0].x * 1000 && 
                                 c.endPoint.distance >= segment.points[0].x * 1000
                             )?.number || 1
@@ -571,6 +639,53 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         </g>
                     );
                 })}
+                
+                {/* Render the hover marker - LUTRUWITA MAP TRACER */}
+                {currentProfilePoint && (
+                    <g>
+                        {/* Vertical line from bottom to point */}
+                        <line
+                            x1={xScale(currentProfilePoint.x)}
+                            y1={height}
+                            x2={xScale(currentProfilePoint.x)}
+                            y2={yScale(currentProfilePoint.y)}
+                            stroke="rgba(255, 255, 255, 0.5)"
+                            strokeWidth={1}
+                            strokeDasharray="3,3"
+                        />
+                        
+                        {/* Circle at the current position */}
+                        <circle
+                            cx={xScale(currentProfilePoint.x)}
+                            cy={yScale(currentProfilePoint.y)}
+                            r={4}
+                            fill="#ff0000"
+                            stroke="white"
+                            strokeWidth={1.5}
+                        />
+                        <text
+                            x={xScale(currentProfilePoint.x)}
+                            y={yScale(currentProfilePoint.y) - 12}
+                            textAnchor="middle"
+                            fill="white"
+                            strokeWidth={1.5}
+                            fontSize="10px"
+                            fontWeight="bold"
+                            paintOrder="stroke"
+                        >
+                            {currentProfilePoint.y.toFixed(0)}m
+                        </text>
+                    </g>
+                )}
+                {/* Debug info */}
+                <text
+                    x={10}
+                    y={10}
+                    fill="#ffffff"
+                    fontSize={10}
+                >
+                    Hover: {hoverCoordinates ? `${hoverCoordinates[0].toFixed(4)}, ${hoverCoordinates[1].toFixed(4)}` : 'None'}
+                </text>
             </g>
         );
     };

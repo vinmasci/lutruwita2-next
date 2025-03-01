@@ -13,23 +13,16 @@ export const useClientGpxProcessing = () => {
   const [error, setError] = useState<GPXProcessingError | null>(null);
 
   const processGpx = async (file: File): Promise<ProcessedRoute | null> => {
-    console.log('[useClientGpxProcessing] Starting GPX processing', { fileName: file.name });
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log('[useClientGpxProcessing] Parsing GPX file');
       const parsed = await parseGpx(file);
       const rawGpx = await file.text();
       
       if (!parsed.geometry.coordinates.length) {
         throw new Error('No valid track points found in GPX file');
       }
-
-      console.log('[useClientGpxProcessing] Creating GeoJSON', {
-        parsedElevations: parsed.properties.coordinateProperties?.elevation?.length || 0,
-        elevationSample: parsed.properties.coordinateProperties?.elevation?.slice(0, 5)
-      });
       const geojson: FeatureCollection<LineString> = {
         type: 'FeatureCollection',
         features: [{
@@ -49,12 +42,6 @@ export const useClientGpxProcessing = () => {
 
       // Calculate basic statistics
       const elevations = parsed.properties.coordinateProperties?.elevation || [];
-      console.log('[useClientGpxProcessing] Processing elevation statistics:', {
-        elevationCount: elevations.length,
-        hasElevations: elevations.length > 0,
-        minElevation: elevations.length ? Math.min(...elevations) : 'N/A',
-        maxElevation: elevations.length ? Math.max(...elevations) : 'N/A'
-      });
       // Calculate total distance from original coordinates since map matching might fail
       const totalDistance = parsed.geometry.coordinates.reduce((acc, coord, i) => {
         if (i === 0) return 0;
@@ -132,11 +119,10 @@ export const useClientGpxProcessing = () => {
                         section.surfaceType === 'gravel' ? 'gravel' : 'trail'
           }));
         } catch (error) {
-          console.error('[useClientGpxProcessing] Surface detection error:', error);
+          console.error('Surface detection error:', error);
         }
       }
 
-      console.log('[useClientGpxProcessing] Processing complete', { routeId: route.id });
       return route;
     } catch (err) {
       const gpxError: GPXProcessingError = {
@@ -145,7 +131,7 @@ export const useClientGpxProcessing = () => {
         details: err instanceof Error ? err.stack : undefined
       };
       setError(gpxError);
-      console.error('[useClientGpxProcessing] Processing error:', gpxError);
+      console.error('GPX processing error:', gpxError);
       return null;
     } finally {
       setIsLoading(false);

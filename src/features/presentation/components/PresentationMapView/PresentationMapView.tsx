@@ -136,6 +136,113 @@ export default function PresentationMapView() {
       map.on('error', (e) => {
         console.error('[PresentationMapView] Map error:', e);
       });
+      
+    // Add mousemove event to set hover coordinates
+    map.on('mousemove', (e) => {
+      // Get mouse coordinates
+      const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
+      console.log('[PresentationMapView] Mouse move:', mouseCoords);
+      
+      // Get all route sources directly from the map
+      const style = map.getStyle();
+      if (!style || !style.sources) {
+        console.log('[PresentationMapView] No style or sources available');
+        return;
+      }
+      
+      // Find all sources that might contain route data
+      let routeSources = Object.entries(style.sources)
+        .filter(([id, source]) => {
+          if (id.includes('-main') && source.type === 'geojson') {
+            const geoJsonSource = source as mapboxgl.GeoJSONSourceSpecification;
+            if (typeof geoJsonSource.data === 'object' && 
+                geoJsonSource.data !== null && 
+                'features' in geoJsonSource.data && 
+                Array.isArray(geoJsonSource.data.features) && 
+                geoJsonSource.data.features.length > 0 &&
+                geoJsonSource.data.features[0].geometry?.type === 'LineString') {
+              return true;
+            }
+          }
+          return false;
+        });
+      
+      console.log('[PresentationMapView] Found route sources:', routeSources.map(([id]) => id));
+      
+      // Try to find the active route
+      let activeRouteSource: mapboxgl.GeoJSONSourceSpecification | null = null;
+      
+      // Use the current route from context
+      if (currentRoute) {
+        const routeId = currentRoute.routeId || `route-${currentRoute.id}`;
+        const sourceId = `${routeId}-main`;
+        
+        console.log('[PresentationMapView] Looking for source ID:', sourceId);
+        
+        // Find this source in our routeSources
+        const foundSource = routeSources.find(([id]) => id === sourceId);
+        if (foundSource) {
+          console.log('[PresentationMapView] Found active route source:', sourceId);
+          activeRouteSource = foundSource[1] as mapboxgl.GeoJSONSourceSpecification;
+        } else {
+          console.log('[PresentationMapView] Active route source not found');
+        }
+      } else if (routeSources.length > 0) {
+        // Fallback to first route if no current route
+        console.log('[PresentationMapView] No current route, using first route source');
+        activeRouteSource = routeSources[0][1] as mapboxgl.GeoJSONSourceSpecification;
+      }
+      
+      // If we don't have an active route, clear any marker and return
+      if (!activeRouteSource) {
+        console.log('[PresentationMapView] No active route source found');
+        if (hoverCoordinates) {
+          setHoverCoordinates(null);
+        }
+        return;
+      }
+      
+      // Get coordinates from the active route
+      const geoJsonData = activeRouteSource.data as GeoJSON.FeatureCollection<GeoJSON.LineString>;
+      const coordinates = geoJsonData.features[0].geometry.coordinates;
+      
+      console.log('[PresentationMapView] Route has', coordinates.length, 'coordinates');
+      
+      // Find the closest point on the active route
+      let closestPoint: [number, number] | null = null;
+      let minDistance = Infinity;
+      
+      // Check all coordinates in the active route
+      coordinates.forEach((coord) => {
+        if (coord.length >= 2) {
+          const dx = coord[0] - mouseCoords[0];
+          const dy = coord[1] - mouseCoords[1];
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestPoint = [coord[0], coord[1]];
+          }
+        }
+      });
+      
+      console.log('[PresentationMapView] Closest point:', closestPoint, 'with distance:', minDistance);
+      
+      // Define a threshold distance - only show marker when close to the route
+      const distanceThreshold = 0.005; // Approximately 500m at the equator
+      
+      // If we found a closest point on the active route and it's within the threshold
+      if (closestPoint && minDistance < distanceThreshold) {
+        console.log('[PresentationMapView] Setting hover coordinates:', closestPoint);
+        setHoverCoordinates(closestPoint);
+      } else {
+        // If no point found or too far from route, clear the marker
+        if (hoverCoordinates) {
+          console.log('[PresentationMapView] Clearing hover coordinates');
+          setHoverCoordinates(null);
+        }
+      }
+    });
 
     // Add Mapbox controls first
     map.addControl(new mapboxgl.NavigationControl({
@@ -192,19 +299,22 @@ export default function PresentationMapView() {
     };
   }, []);
 
-  const mapContextValue = useMemo(() => ({
-    map: mapInstance.current,
-    dragPreview: null,
-    setDragPreview: () => {},
-    isMapReady,
-    isInitializing: false,
-    hoverCoordinates,
-    setHoverCoordinates,
-    onPoiPlacementClick: undefined,
-    setPoiPlacementClick: () => {},
-    poiPlacementMode: false,
-    setPoiPlacementMode: () => {}
-  }), [isMapReady, hoverCoordinates]);
+  const mapContextValue = useMemo(() => {
+    console.log('[PresentationMapView] Creating map context with hoverCoordinates:', hoverCoordinates);
+    return {
+      map: mapInstance.current,
+      dragPreview: null,
+      setDragPreview: () => {},
+      isMapReady,
+      isInitializing: false,
+      hoverCoordinates,
+      setHoverCoordinates,
+      onPoiPlacementClick: undefined,
+      setPoiPlacementClick: () => {},
+      poiPlacementMode: false,
+      setPoiPlacementMode: () => {}
+    };
+  }, [isMapReady, hoverCoordinates]);
 
   return (
     <MapProvider value={mapContextValue}>

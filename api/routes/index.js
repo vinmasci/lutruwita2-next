@@ -1,6 +1,7 @@
 import { createApiHandler } from '../lib/middleware.js';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '../lib/db.js';
+import { deleteFile } from '../lib/cloudinary.js';
 
 // Define Route schema to match the original structure
 const RouteSchema = new mongoose.Schema({
@@ -346,6 +347,31 @@ async function handleUpdateRoute(req, res) {
   }
 }
 
+/**
+ * Extract Cloudinary public ID from a URL
+ * @param {string} url The Cloudinary URL
+ * @returns {string|undefined} The extracted public ID or undefined if not found
+ */
+function extractPublicIdFromUrl(url) {
+  try {
+    // Cloudinary URLs are typically in the format:
+    // https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/filename.jpg
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    
+    // The public ID is everything after /upload/vXXXXXXXXXX/
+    const uploadIndex = pathParts.findIndex(part => part === 'upload');
+    if (uploadIndex !== -1 && uploadIndex + 2 < pathParts.length) {
+      // Skip the version part (vXXXXXXXXXX)
+      return pathParts.slice(uploadIndex + 2).join('/');
+    }
+    return undefined;
+  } catch (error) {
+    console.error('[API] Error extracting public ID from URL:', error);
+    return undefined;
+  }
+}
+
 // Handler for deleting a route
 async function handleDeleteRoute(req, res) {
   try {
@@ -355,7 +381,6 @@ async function handleDeleteRoute(req, res) {
       return res.status(400).json({ error: 'Missing route ID' });
     }
     
-    let result = null;
     let route = null;
     
     // Try to find by persistentId first (prioritize this method)
@@ -366,23 +391,54 @@ async function handleDeleteRoute(req, res) {
       
       if (route) {
         console.log(`[API] Found route by persistentId for deletion: ${route.name}`);
-        // Delete the route
-        result = await Route.findByIdAndDelete(route._id);
       }
     }
     
     // If not found by persistentId and the ID is a valid ObjectId,
-    // try to find and delete by MongoDB _id (only if findBy isn't explicitly set to 'persistentId')
-    if (!result && findBy !== 'persistentId' && mongoose.Types.ObjectId.isValid(id)) {
-      console.log(`[API] Trying to find and delete route by MongoDB _id: ${id}`);
-      result = await Route.findByIdAndDelete(id);
+    // try to find by MongoDB _id (only if findBy isn't explicitly set to 'persistentId')
+    if (!route && findBy !== 'persistentId' && mongoose.Types.ObjectId.isValid(id)) {
+      console.log(`[API] Trying to find route by MongoDB _id: ${id}`);
+      route = await Route.findById(id);
     }
     
-    if (!result) {
+    if (!route) {
       return res.status(404).json({ error: 'Route not found' });
     }
     
-    return res.status(200).json({ message: 'Route deleted successfully' });
+    // Delete associated photos from Cloudinary
+    if (route.photos && route.photos.length > 0) {
+      console.log(`[API] Deleting ${route.photos.length} photos from Cloudinary`);
+      
+      for (const photo of route.photos) {
+        try {
+          // Extract publicId from URL or use stored publicId
+          let publicId = photo.publicId;
+          
+          if (!publicId && photo.url) {
+            publicId = extractPublicIdFromUrl(photo.url);
+          }
+          
+          if (publicId) {
+            await deleteFile(publicId);
+            console.log(`[API] Deleted photo: ${publicId}`);
+          } else {
+            console.warn(`[API] Could not extract public ID from photo URL: ${photo.url}`);
+          }
+        } catch (photoError) {
+          console.error(`[API] Error deleting photo: ${photoError.message}`);
+          // Continue with other photos even if one fails
+        }
+      }
+    }
+    
+    // Delete the route
+    const result = await Route.findByIdAndDelete(route._id);
+    
+    if (!result) {
+      return res.status(404).json({ error: 'Failed to delete route' });
+    }
+    
+    return res.status(200).json({ message: 'Route and associated photos deleted successfully' });
   } catch (error) {
     console.error('Delete route error:', error);
     return res.status(500).json({ 

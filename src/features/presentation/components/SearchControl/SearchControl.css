@@ -20,13 +20,59 @@
   justify-content: center;
 }
 
+/* Responsive button sizing */
+@media (max-width: 900px) {
+  .search-control-button {
+    width: 30px !important;
+    height: 30px !important;
+    padding: 6px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .search-control-button {
+    width: 26px !important;
+    height: 26px !important;
+    padding: 5px !important;
+  }
+}
+
+@media (max-width: 375px) {
+  .search-control-button {
+    width: 22px !important;
+    height: 22px !important;
+    padding: 4px !important;
+  }
+}
+
 .search-control-button svg {
   filter: invert(1);
+  width: 100%;
+  height: 100%;
 }
 
 .search-control.expanded {
   width: 300px;
   background-color: rgba(35, 35, 35, 0.9) !important;
+}
+
+/* Responsive expanded width */
+@media (max-width: 900px) {
+  .search-control.expanded {
+    width: 250px;
+  }
+}
+
+@media (max-width: 600px) {
+  .search-control.expanded {
+    width: 200px;
+  }
+}
+
+@media (max-width: 375px) {
+  .search-control.expanded {
+    width: 180px;
+  }
 }
 
 .search-control-input {
@@ -40,6 +86,36 @@
   background: transparent;
   color: white;
   font-size: 14px;
+}
+
+/* Responsive input sizing */
+@media (max-width: 900px) {
+  .search-control-input {
+    left: 30px;
+    width: calc(100% - 30px);
+    height: 30px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 600px) {
+  .search-control-input {
+    left: 26px;
+    width: calc(100% - 26px);
+    height: 26px;
+    font-size: 12px;
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 375px) {
+  .search-control-input {
+    left: 22px;
+    width: calc(100% - 22px);
+    height: 22px;
+    font-size: 11px;
+    padding: 0 6px;
+  }
 }
 
 .search-control-input::placeholder {
@@ -63,11 +139,46 @@
   z-index: 1;
 }
 
+/* Responsive results */
+@media (max-width: 600px) {
+  .search-control-results {
+    max-height: 180px;
+  }
+}
+
+@media (max-width: 375px) {
+  .search-control-results {
+    max-height: 150px;
+  }
+}
+
 .search-result-item {
   padding: 8px 12px;
   color: white;
   cursor: pointer;
   font-size: 14px;
+}
+
+/* Responsive result items */
+@media (max-width: 900px) {
+  .search-result-item {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 600px) {
+  .search-result-item {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 375px) {
+  .search-result-item {
+    padding: 5px 6px;
+    font-size: 11px;
+  }
 }
 
 .search-result-item:hover {

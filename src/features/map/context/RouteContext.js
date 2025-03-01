@@ -1,7 +1,9 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { useRouteService } from "../services/routeService";
 import { useMapContext } from "./MapContext";
+import { queueMapOperation } from "../utils/mapOperationsQueue";
+import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from "../../poi/context/POIContext";
 import { usePhotoContext } from "../../photo/context/PhotoContext";
 import { usePhotoService } from "../../photo/services/photoService";
@@ -60,6 +62,7 @@ export const RouteProvider = ({ children, }) => {
     const [currentLoadedState, setCurrentLoadedState] = useState(null);
     const [currentLoadedPersistentId, setCurrentLoadedPersistentId] = useState(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [pendingRouteBounds, setPendingRouteBounds] = useState(null);
 
     const reorderRoutes = useCallback((oldIndex, newIndex) => {
         setRoutes(prev => {
@@ -458,14 +461,76 @@ export const RouteProvider = ({ children, }) => {
             else {
                 setCurrentRouteWithDebug(null);
             }
-            if (map && route.mapState) {
-                map.setZoom(route.mapState.zoom);
-                map.setCenter(route.mapState.center);
-                map.setBearing(route.mapState.bearing);
-                map.setPitch(route.mapState.pitch);
-                if (route.mapState.style) {
-                    map.setStyle(route.mapState.style);
+                        // Instead of immediately trying to position the map, store the route bounds for later use
+            console.log('[RouteContext] Preparing route bounds for deferred positioning');
+            
+            try {
+                // Find the middle route to position the map
+                if (route.routes && route.routes.length > 0) {
+                    console.log('[RouteContext] Finding middle route for positioning');
+                    
+                    // Get the number of routes and find the middle one
+                    const routeCount = route.routes.length;
+                    console.log(`[RouteContext] Found ${routeCount} routes`);
+                    
+                    // Log all routes for debugging
+                    route.routes.forEach((r, idx) => {
+                        console.log(`[RouteContext] Route ${idx}: id=${r.routeId || r.id}, name=${r.name || 'unnamed'}, hasGeojson=${!!r.geojson}`);
+                    });
+                    
+                    const middleRouteIndex = Math.floor(routeCount / 2);
+                    const middleRoute = route.routes[middleRouteIndex];
+                    
+                    console.log(`[RouteContext] Using middle route (index ${middleRouteIndex}): ${middleRoute.name || 'unnamed'}`);
+                    
+                    // Store bounds information for later use
+                    if (middleRoute.geojson?.features?.[0]?.geometry?.coordinates?.length > 0) {
+                        const coordinates = middleRoute.geojson.features[0].geometry.coordinates;
+                        console.log(`[RouteContext] Found ${coordinates.length} coordinates in route`);
+                        
+                        // Store the coordinates and other necessary information
+                        setPendingRouteBounds({
+                            type: 'bounds',
+                            coordinates: coordinates,
+                            mapStyle: route.mapState?.style,
+                            persistentId: route.persistentId || persistentId
+                        });
+                        
+                        console.log('[RouteContext] Stored route bounds for deferred positioning:', {
+                            coordinateCount: coordinates.length,
+                            persistentId: route.persistentId || persistentId
+                        });
+                    } 
+                    // Fallback to first point if we can't fit bounds
+                    else if (middleRoute.geojson?.features?.[0]?.geometry?.coordinates?.[0]) {
+                        const firstPoint = middleRoute.geojson.features[0].geometry.coordinates[0];
+                        
+                        if (Array.isArray(firstPoint) && firstPoint.length >= 2) {
+                            console.log('[RouteContext] Using first point of middle route for positioning:', firstPoint);
+                            
+                            // Store the first point for later use
+                            setPendingRouteBounds({
+                                type: 'point',
+                                point: firstPoint,
+                                mapStyle: route.mapState?.style,
+                                persistentId: route.persistentId || persistentId
+                            });
+                            
+                            console.log('[RouteContext] Stored route point for deferred positioning:', {
+                                point: firstPoint,
+                                persistentId: route.persistentId || persistentId
+                            });
+                        } else {
+                            console.error('[RouteContext] First point is not a valid coordinate:', firstPoint);
+                        }
+                    } else {
+                        console.error('[RouteContext] No coordinates found in middle route');
+                    }
+                } else {
+                    console.warn('[RouteContext] No route data available for positioning');
                 }
+            } catch (error) {
+                console.error('[RouteContext] Error preparing route bounds:', error);
             }
             if (route.photos) {
                 photos.forEach(photo => URL.revokeObjectURL(photo.url));
@@ -519,6 +584,68 @@ export const RouteProvider = ({ children, }) => {
             throw error;
         }
     }, [routeService, handleAuthError]);
+    // Effect to handle map positioning when route bounds are available
+    useEffect(() => {
+        if (!pendingRouteBounds) {
+            return;
+        }
+        
+        console.log('[RouteContext] Route bounds available, queueing positioning operation');
+        
+        // Queue the positioning operation using the map operations queue
+        queueMapOperation((map) => {
+            try {
+                // Apply map style if available first
+                if (pendingRouteBounds.mapStyle && pendingRouteBounds.mapStyle !== 'default') {
+                    console.log('[RouteContext] Applying map style:', pendingRouteBounds.mapStyle);
+                    try {
+                        map.setStyle(pendingRouteBounds.mapStyle);
+                    } catch (styleError) {
+                        console.error('[RouteContext] Error setting map style:', styleError);
+                        // Continue with positioning even if style setting fails
+                    }
+                }
+                
+                if (pendingRouteBounds.type === 'bounds') {
+                    console.log('[RouteContext] Positioning using bounds with', pendingRouteBounds.coordinates.length, 'coordinates');
+                    
+                    // Create bounds from all coordinates
+                    const bounds = new mapboxgl.LngLatBounds();
+                    pendingRouteBounds.coordinates.forEach(coord => {
+                        if (Array.isArray(coord) && coord.length >= 2) {
+                            bounds.extend([coord[0], coord[1]]);
+                        }
+                    });
+                    
+                    // Fit bounds to show the entire route
+                    map.fitBounds(bounds, {
+                        padding: 50,
+                        duration: 1500
+                    });
+                    console.log('[RouteContext] Successfully fit map to route bounds');
+                } else if (pendingRouteBounds.type === 'point') {
+                    console.log('[RouteContext] Positioning using point:', pendingRouteBounds.point);
+                    
+                    // Zoom to the point
+                    map.easeTo({
+                        center: [pendingRouteBounds.point[0], pendingRouteBounds.point[1]],
+                        zoom: 10, // Zoomed out a bit for context
+                        duration: 1500,
+                        essential: true
+                    });
+                    console.log('[RouteContext] Successfully positioned map to point');
+                }
+                
+                // Clear the pending bounds after positioning
+                setPendingRouteBounds(null);
+                console.log('[RouteContext] Cleared pending route bounds after positioning');
+            } catch (error) {
+                console.error('[RouteContext] Error during map positioning:', error);
+            }
+        }, 'routePositioning');
+        
+    }, [pendingRouteBounds]);
+
     return (_jsxs(_Fragment, { children: [_jsx(AuthAlert, { show: showAuthAlert, onClose: () => setShowAuthAlert(false) }), _jsx(RouteContext.Provider, { value: {
                     // Local route state
                     routes,
@@ -544,6 +671,7 @@ export const RouteProvider = ({ children, }) => {
                     listRoutes,
                     deleteSavedRoute,
                     clearCurrentWork,
+                    pendingRouteBounds,
                 }, children: children })] }));
 };
 export const useRouteContext = () => {

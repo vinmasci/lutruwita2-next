@@ -22,7 +22,8 @@ const photoSchema = new mongoose.Schema({
     lng: { type: Number }
   },
   rotation: Number,
-  altitude: Number
+  altitude: Number,
+  publicId: String // Cloudinary public ID for image deletion
 });
 
 // POI base schema - for points of interest along routes

@@ -16,6 +16,7 @@ export interface RouteDescription {
     };
     rotation?: number;
     altitude?: number;
+    publicId?: string;
   }[];
 }
 
@@ -60,6 +61,7 @@ export interface SavedRouteState {
     };
     rotation?: number;
     altitude?: number;
+    publicId?: string;
   }[];
 
   // POIs and Places

@@ -17,8 +17,6 @@ export const useGpxProcessingApi = () => {
     formData.append('gpxFile', file);
 
     try {
-      console.log('Starting GPX file upload...');
-      
       return new Promise<ProcessedRoute>((resolve, reject) => {
         // Send the file data first to get jobId
         fetch(`${API_BASE}`, {
@@ -31,8 +29,6 @@ export const useGpxProcessingApi = () => {
             throw new Error('No job ID received from server');
           }
           
-          console.log(`File uploaded successfully, job ID: ${data.jobId}`);
-          
           // Start polling for job status
           const pollJobStatus = () => {
             fetch(`${API_BASE}?jobId=${data.jobId}`, {
@@ -42,8 +38,7 @@ export const useGpxProcessingApi = () => {
             .then(statusData => {
               // Check for errors
               if (statusData.status === 'error') {
-                console.error('Job processing error:', statusData.error);
-                reject(new Error(statusData.error || 'Processing failed'));
+                  reject(new Error(statusData.error || 'Processing failed'));
                 return;
               }
               
@@ -54,8 +49,7 @@ export const useGpxProcessingApi = () => {
               
               // Check if job is completed
               if (statusData.status === 'completed' && statusData.result) {
-                console.log('GPX processing completed successfully');
-                resolve({
+                  resolve({
                   ...statusData.result,
                   id: crypto.randomUUID(),
                   name: file.name.replace('.gpx', ''),
@@ -69,7 +63,7 @@ export const useGpxProcessingApi = () => {
               setTimeout(pollJobStatus, POLLING_INTERVAL);
             })
             .catch(error => {
-              console.error('Error polling job status:', error);
+              console.error('Error polling job status');
               reject(error);
             });
           };
@@ -78,12 +72,12 @@ export const useGpxProcessingApi = () => {
           pollJobStatus();
         })
         .catch(error => {
-          console.error('Upload error:', error);
+          console.error('Upload error');
           reject(error);
         });
       });
     } catch (error) {
-      console.error('GPX processing error:', error);
+      console.error('GPX processing error');
       throw error;
     }
   };

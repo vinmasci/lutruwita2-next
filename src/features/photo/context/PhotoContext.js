@@ -1,5 +1,5 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 const PhotoContext = createContext(undefined);
 export const usePhotoContext = () => {
     const context = useContext(PhotoContext);
@@ -10,6 +10,7 @@ export const usePhotoContext = () => {
 };
 export const PhotoProvider = ({ children }) => {
     const [photos, setPhotos] = useState([]);
+    const [isPhotosVisible, setIsPhotosVisible] = useState(true);
     const addPhoto = (newPhotos) => {
         setPhotos(prev => [...prev, ...newPhotos]);
     };
@@ -34,5 +35,23 @@ export const PhotoProvider = ({ children }) => {
         setPhotos([]);
         console.log('[PhotoContext] All photos cleared');
     };
-    return (_jsx(PhotoContext.Provider, { value: { photos, setPhotos, addPhoto, deletePhoto, updatePhoto, loadPhotos, clearPhotos }, children: children }));
+    const togglePhotosVisibility = useCallback(() => {
+        setIsPhotosVisible(prev => !prev);
+        console.log('[PhotoContext] Photos visibility toggled:', !isPhotosVisible);
+    }, [isPhotosVisible]);
+    
+    return (_jsx(PhotoContext.Provider, { 
+        value: { 
+            photos, 
+            setPhotos, 
+            addPhoto, 
+            deletePhoto, 
+            updatePhoto, 
+            loadPhotos, 
+            clearPhotos,
+            isPhotosVisible,
+            togglePhotosVisibility
+        }, 
+        children: children 
+    }));
 };

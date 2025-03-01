@@ -83,15 +83,12 @@ const waitForMapResources = (map: mapboxgl.Map): Promise<void> => {
     const checkResources = () => {
       const source = map.getSource('australia-roads') as mapboxgl.VectorTileSource;
       if (!source) {
-        console.log('[surfaceService] Waiting for source to be added...');
         return false;
       }
 
       if (source.loaded()) {
-        console.log('[surfaceService] Vector tiles loaded');
         return true;
       }
-      console.log('[surfaceService] Waiting for tiles to load...');
       return false;
     };
 
@@ -118,7 +115,6 @@ const waitForMapResources = (map: mapboxgl.Map): Promise<void> => {
 const findNearestRoad = (map: mapboxgl.Map, point: [number, number]): RoadFeature | null => {
   const lngLat = toLngLat(point);
   if (!lngLat) {
-    console.warn('[findNearestRoad] Invalid coordinates:', point);
     return null;
   }
   
@@ -278,10 +274,7 @@ export const assignSurfacesViaNearest = async (
   coords: Point[],
   onProgress?: (progress: number, total: number) => void
 ): Promise<Point[]> => {
-  console.log('[assignSurfacesViaNearest] Starting surface detection...');
-
   if (!map) {
-    console.log('[assignSurfacesViaNearest] No map provided, returning coords unmodified');
     return coords;
   }
 
@@ -343,7 +336,6 @@ export const assignSurfacesViaNearest = async (
 
           attempts++;
           if (attempts >= MAX_RETRIES) {
-            console.warn(`[assignSurfacesViaNearest] No roads found for batch ${batchStart}-${batchEnd-1} after ${MAX_RETRIES} attempts`);
             resolve();
             return;
           }
@@ -363,11 +355,6 @@ export const assignSurfacesViaNearest = async (
     let bestSurface: 'paved' | 'unpaved' = 'unpaved';
     let minDist = Infinity;
 
-    if (i % 100 === 0) {
-      console.log(
-        `[assignSurfacesViaNearest] Processing point #${i}, coords=(${pt.lat}, ${pt.lon})`
-      );
-    }
 
     // If no roads found, use previous point's surface type if available
     if (!cachedRoads || cachedRoads.length === 0) {
@@ -399,7 +386,6 @@ export const assignSurfacesViaNearest = async (
             continue;
           }
         } catch (error) {
-          console.warn('[assignSurfacesViaNearest] Invalid coordinates:', error);
           continue;
         }
 
@@ -409,12 +395,6 @@ export const assignSurfacesViaNearest = async (
         if (dist < minDist) {
           minDist = dist;
           const surfaceRaw = (road.properties?.surface || '').toLowerCase();
-          
-          console.log(`[Surface Detection] Point at (${pt.lat}, ${pt.lon}):`, {
-            surface: surfaceRaw,
-            isPaved: PAVED_SURFACES.includes(surfaceRaw),
-            isUnpaved: UNPAVED_SURFACES.includes(surfaceRaw)
-          });
           
           if (PAVED_SURFACES.includes(surfaceRaw)) {
             bestSurface = 'paved';
@@ -432,7 +412,6 @@ export const assignSurfacesViaNearest = async (
     cachedRoads = null;
   }
 
-  console.log('[assignSurfacesViaNearest] => Finished processing. Returning coords...');
   return results;
 };
 
@@ -441,8 +420,6 @@ export const addSurfaceOverlay = async (
   map: mapboxgl.Map,
   routeFeature: Feature<LineString>
 ): Promise<UnpavedSection[]> => {
-  console.log('[surfaceService] Starting surface detection...');
-
   try {
     // Wait for resources and ensure proper zoom
     await waitForMapResources(map);
@@ -529,7 +506,6 @@ export const addSurfaceOverlay = async (
       });
     });
 
-    console.log('[surfaceService] Surface detection complete');
     return sections;  // Return the sections array
   } catch (error) {
     console.error('[surfaceService] Error in surface detection:', error);

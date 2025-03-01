@@ -6,6 +6,7 @@ import { DraggablePOI, PlaceNamePOI } from '../../../shared/types/poi.types';
 import { ProcessedRoute } from '../../../shared/types/gpx.types';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
 
 export class RouteService {
   async saveRoute(userId: string, data: SaveRouteRequest & {
@@ -29,6 +30,7 @@ export class RouteService {
       };
       rotation?: number;
       altitude?: number;
+      publicId?: string;
     }[];
     pois?: {
       draggable: DraggablePOI[];
@@ -330,6 +332,70 @@ export class RouteService {
     }
   }
 
+  /**
+   * Extract Cloudinary public ID from a URL
+   * @param url The Cloudinary URL
+   * @returns The extracted public ID or undefined if not found
+   */
+  private extractPublicIdFromUrl(url: string): string | undefined {
+    try {
+      // Cloudinary URLs are typically in the format:
+      // https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/filename.jpg
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/');
+      
+      // The public ID is everything after /upload/vXXXXXXXXXX/
+      const uploadIndex = pathParts.findIndex(part => part === 'upload');
+      if (uploadIndex !== -1 && uploadIndex + 2 < pathParts.length) {
+        // Skip the version part (vXXXXXXXXXX)
+        return pathParts.slice(uploadIndex + 2).join('/');
+      }
+      return undefined;
+    } catch (error) {
+      console.error('[RouteService] Error extracting public ID from URL:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Delete a photo from Cloudinary
+   * @param publicId The Cloudinary public ID
+   * @returns Promise that resolves when deletion is complete
+   */
+  private async deleteCloudinaryPhoto(publicId: string): Promise<void> {
+    try {
+      // Use Cloudinary API to delete the photo
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+      const apiKey = process.env.CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET;
+      
+      if (!cloudName || !apiKey || !apiSecret) {
+        console.error('[RouteService] Cloudinary credentials not found in environment variables');
+        return;
+      }
+      
+      const timestamp = Math.floor(Date.now() / 1000);
+      const signature = require('crypto')
+        .createHash('sha1')
+        .update(`public_id=${publicId}&timestamp=${timestamp}${apiSecret}`)
+        .digest('hex');
+      
+      const response = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
+        {
+          public_id: publicId,
+          timestamp,
+          signature,
+          api_key: apiKey
+        }
+      );
+      
+      console.log(`[RouteService] Deleted photo from Cloudinary: ${publicId}`, response.data);
+    } catch (error) {
+      console.error(`[RouteService] Error deleting photo from Cloudinary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async deleteRoute(userId: string, routeId: string): Promise<void> {
     try {
       const route = await RouteModel.findOne({ persistentId: routeId });
@@ -343,9 +409,35 @@ export class RouteService {
         throw new Error('Access denied');
       }
 
-      // Delete the route only
+      // Delete associated photos from Cloudinary
+      if (route.photos && route.photos.length > 0) {
+        console.log(`[RouteService] Deleting ${route.photos.length} photos from Cloudinary`);
+        
+        for (const photo of route.photos) {
+          try {
+            // Extract publicId from URL or use stored publicId
+            let publicId = photo.publicId;
+            
+            if (!publicId && photo.url) {
+              publicId = this.extractPublicIdFromUrl(photo.url);
+            }
+            
+            if (publicId) {
+              await this.deleteCloudinaryPhoto(publicId);
+              console.log(`[RouteService] Deleted photo: ${publicId}`);
+            } else {
+              console.warn(`[RouteService] Could not extract public ID from photo URL: ${photo.url}`);
+            }
+          } catch (photoError) {
+            console.error(`[RouteService] Error deleting photo: ${photoError instanceof Error ? photoError.message : 'Unknown error'}`);
+            // Continue with other photos even if one fails
+          }
+        }
+      }
+
+      // Delete the route
       await RouteModel.deleteOne({ persistentId: routeId });
-      console.log('[RouteService] Route and associated POIs deleted successfully');
+      console.log('[RouteService] Route and associated photos deleted successfully');
     } catch (error) {
       throw new Error(`Failed to delete route: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

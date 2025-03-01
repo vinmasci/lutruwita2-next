@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
@@ -92,6 +92,14 @@ export const PresentationPhotoLayer = () => {
         // No longer opening the modal for clusters
         // Only individual photo markers will open the modal when clicked
     }, [map, clusteredItems]);
+    // Get the photo visibility state from context
+    const { isPhotosVisible } = usePhotoContext();
+
+    // If photos are not visible, return an empty fragment
+    if (!isPhotosVisible) {
+        return _jsx(_Fragment, {});
+    }
+
     return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(SimpleLightbox, { photo: selectedPhoto, onClose: () => {
                     setSelectedPhoto(null);
                     setSelectedCluster(null);

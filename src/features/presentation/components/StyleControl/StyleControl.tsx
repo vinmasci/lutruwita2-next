@@ -179,6 +179,35 @@ class StyleControl {
         transition: all 0.2s ease;
         color: white;
       }
+      
+      /* Responsive sizing for controls */
+      @media (max-width: 900px) {
+        .style-button {
+          width: 28px;
+          height: 28px;
+          padding: 4px;
+          font-size: 12px;
+        }
+      }
+      
+      @media (max-width: 600px) {
+        .style-button {
+          width: 24px;
+          height: 24px;
+          padding: 3px;
+          font-size: 10px;
+        }
+      }
+      
+      @media (max-width: 375px) {
+        .style-button {
+          width: 20px;
+          height: 20px;
+          padding: 2px;
+          font-size: 9px;
+        }
+      }
+      
       .style-button:hover {
         opacity: 1;
       }
@@ -205,6 +234,15 @@ class StyleControl {
         top: 50%;
         transform: translateY(-50%);
       }
+      
+      @media (max-width: 600px) {
+        .style-tooltip {
+          font-size: 10px;
+          padding: 3px 6px;
+          margin-left: 8px;
+        }
+      }
+      
       .style-button:hover .style-tooltip {
         opacity: 1;
       }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Box, Typography } from '@mui/material';
 import { ResponsiveLine } from '@nivo/line';
@@ -162,16 +162,80 @@ const Tooltip: React.FC<TooltipProps> = ({ content, x, y }) => {
 };
 
 export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoading, error }) => {
-  const { setHoverCoordinates } = useMapContext();
+  const { setHoverCoordinates, hoverCoordinates, map } = useMapContext();
   const [tooltip, setTooltip] = useState<{ content: React.ReactNode; x: number; y: number } | null>(null);
   const [data, setData] = useState<Array<{ id: string; data: Point[] }>>([]);
   const [climbs, setClimbs] = useState<Climb[]>([]);
+  const [currentProfilePoint, setCurrentProfilePoint] = useState<{ x: number, y: number } | null>(null);
   const [stats, setStats] = useState<Stats>({ 
     elevationGained: 0, 
     elevationLost: 0, 
     totalDistance: 0,
     unpavedPercentage: route.surface?.surfaceTypes?.find(t => t.type === 'trail')?.percentage || 0
   });
+
+  // Find the closest point on the route to the hover coordinates
+  useEffect(() => {
+    if (!hoverCoordinates || !route?.geojson?.features?.[0]?.geometry) {
+      setCurrentProfilePoint(null);
+      return;
+    }
+
+    try {
+      const feature = route.geojson.features[0];
+      if (feature.geometry.type !== 'LineString') {
+        setCurrentProfilePoint(null);
+        return;
+      }
+      
+      const coordinates = feature.geometry.coordinates;
+      
+      // Find the closest point on the route to the hover coordinates
+      let closestPoint = null;
+      let minDistance = Infinity;
+      let closestIndex = -1;
+      
+      coordinates.forEach((coord, index) => {
+        const dx = coord[0] - hoverCoordinates[0];
+        const dy = coord[1] - hoverCoordinates[1];
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestPoint = coord;
+          closestIndex = index;
+        }
+      });
+      
+      if (closestIndex >= 0 && data.length > 0 && data[0].data.length > 0) {
+        // Convert the index to a distance along the route
+        const totalPoints = coordinates.length;
+        const distanceRatio = closestIndex / (totalPoints - 1);
+        const totalDistance = stats.totalDistance;
+        const distanceAlongRoute = distanceRatio * totalDistance / 1000; // in km
+        
+        // Find the closest point in the elevation profile data
+        const profileData = data[0].data;
+        let closestProfilePoint = profileData[0];
+        let minProfileDistance = Math.abs(profileData[0].x - distanceAlongRoute);
+        
+        for (let i = 1; i < profileData.length; i++) {
+          const distance = Math.abs(profileData[i].x - distanceAlongRoute);
+          if (distance < minProfileDistance) {
+            minProfileDistance = distance;
+            closestProfilePoint = profileData[i];
+          }
+        }
+        
+        setCurrentProfilePoint(closestProfilePoint);
+      } else {
+        setCurrentProfilePoint(null);
+      }
+    } catch (error) {
+      console.error('Error finding closest point:', error);
+      setCurrentProfilePoint(null);
+    }
+  }, [hoverCoordinates, route?.geojson, data, stats.totalDistance]);
 
   useEffect(() => {
     if (!route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation) {
@@ -660,6 +724,51 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               'grid',
               'axes',
               customLayer,
+              ({ xScale, yScale, innerHeight }) => {
+                // Render the current position marker
+                if (currentProfilePoint && xScale && yScale) {
+                  const x = xScale(currentProfilePoint.x);
+                  const y = yScale(currentProfilePoint.y);
+                  
+                  return (
+                    <g>
+                      {/* Vertical line from bottom to point */}
+                      <line
+                        x1={x}
+                        y1={innerHeight}
+                        x2={x}
+                        y2={y}
+                        stroke="rgba(255, 255, 255, 0.5)"
+                        strokeWidth={1}
+                        strokeDasharray="3,3"
+                      />
+                      
+                      {/* Circle at the current position - LUTRUWITA MAP TRACER */}
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={4}
+                        fill="#ff0000"
+                        stroke="white"
+                        strokeWidth={1.5}
+                      />
+                      <text
+                        x={x}
+                        y={y - 12}
+                        textAnchor="middle"
+                        fill="white"
+                        strokeWidth={1.5}
+                        fontSize="10px"
+                        fontWeight="bold"
+                        paintOrder="stroke"
+                      >
+                        {currentProfilePoint.y.toFixed(0)}m
+                      </text>
+                    </g>
+                  );
+                }
+                return null;
+              },
               'markers',
               'legends'
             ]}
@@ -712,7 +821,9 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                 }
               }
             }}
-            onMouseMove={(point: any) => {
+            onClick={() => {}}
+            onMouseEnter={() => {}}
+            onMouseMove={(point, event) => {
               if (point?.data) {
                 const pointData = point.data as { x: number; y: number };
                 const feature = route.geojson.features[0];
@@ -720,6 +831,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                   const coordinates = feature.geometry.coordinates;
                   const index = Math.floor((pointData.x * 1000 / stats.totalDistance) * (coordinates.length - 1));
                   if (coordinates[index]) {
+                    // Set hover coordinates for the map marker
                     setHoverCoordinates([coordinates[index][0], coordinates[index][1]]);
                   }
                 }
