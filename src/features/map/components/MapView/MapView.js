@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { setMapInstance } from '../../utils/mapOperationsQueue';
+import { setupMapScaleListener } from '../../utils/mapScaleUtils';
 import { DistanceMarkers } from '../DistanceMarkers/DistanceMarkers';
 import StyleControl, { MAP_STYLES } from '../StyleControl/StyleControl';
 import SearchControl from '../SearchControl/SearchControl';
@@ -18,6 +19,7 @@ import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPrevie
 import PlacePOILayer from '../../../poi/components/PlacePOILayer/PlacePOILayer';
 import '../../../poi/components/PlacePOILayer/PlacePOILayer.css';
 import './MapView.css';
+import './photo-fix.css'; // Nuclear option to force photos behind UI components
 import { Sidebar } from '../Sidebar';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
@@ -26,24 +28,17 @@ import { normalizeRoute } from '../../utils/routeUtils';
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 // Debug function for road layer
 const debugRoadLayer = (map) => {
-    console.log('[DEBUG] Checking road layer...');
     // Log all available layers
     const style = map.getStyle();
     const allLayers = style?.layers || [];
-    console.log('[DEBUG] All layers:', allLayers.map(l => ({
-        id: l.id,
-        type: l.type,
-        source: l['source'],
-        'source-layer': l['source-layer']
-    })));
+    
     // Check our specific layer
     const roadLayer = map.getLayer('custom-roads');
-    console.log('[DEBUG] Road layer:', roadLayer);
+    
     // Try to get some features
     if (map.isStyleLoaded()) {
         const bounds = map.getBounds();
         if (!bounds) {
-            console.log('[DEBUG] No bounds available');
             return;
         }
         const sw = bounds.getSouthWest();
@@ -54,18 +49,12 @@ const debugRoadLayer = (map) => {
         ], {
             layers: ['custom-roads']
         });
-        console.log('[DEBUG] Found features:', features.length);
-        if (features.length > 0) {
-            console.log('[DEBUG] Sample feature:', {
-                properties: features[0].properties,
-                geometry: features[0].geometry
-            });
-        }
     }
 };
 function MapViewContent() {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
+    const containerRef = useRef(null); // Add a ref for the container
     const [isMapReady, setIsMapReady] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
     const [streetsLayersLoaded, setStreetsLayersLoaded] = useState(false);
@@ -77,19 +66,26 @@ function MapViewContent() {
     const hoverMarkerRef = useRef(null);
     const { processGpx } = useClientGpxProcessing();
     const { addRoute, deleteRoute, setCurrentRoute, currentRoute, routes } = useRouteContext();
+    
+    // Set up scaling using the same approach as in PresentationMapView
+    useEffect(() => {
+        if (containerRef.current) {
+            const cleanupScaleListener = setupMapScaleListener(containerRef.current);
+            return () => {
+                if (cleanupScaleListener) {
+                    cleanupScaleListener();
+                }
+            };
+        }
+    }, []);
     // Function to add route click handler
     const addRouteClickHandler = useCallback((map, routeId) => {
         const mainLayerId = `${routeId}-main-line`;
         // Create click handler
         const clickHandler = (e) => {
-            console.log('[MapView] Route layer clicked:', mainLayerId);
             const route = routes.find((r) => r.routeId === routeId);
             if (route) {
-                console.log('[MapView] Found matching route:', route.routeId);
                 setCurrentRoute(route);
-            }
-            else {
-                console.log('[MapView] No matching route found for ID:', routeId);
             }
         };
         // Remove existing handler if any
@@ -102,12 +98,10 @@ function MapViewContent() {
         if (!mapInstance.current || !isMapReady)
             return;
         const map = mapInstance.current;
-        console.log('[MapView] Adding click handlers for routes:', routes);
+        
         routes.forEach(route => {
             const routeId = route.routeId || `route-${route.id}`;
-            console.log('[MapView] Checking for route layer:', `${routeId}-main-line`);
             if (map.getLayer(`${routeId}-main-line`)) {
-                console.log('[MapView] Adding click handler for route:', routeId);
                 addRouteClickHandler(map, routeId);
             }
         });
@@ -415,10 +409,8 @@ function MapViewContent() {
         // Handle clicks only in regular POI mode
         if (poiMode === 'regular') {
             const clickHandler = (e) => {
-                console.log('[MapView] Map clicked in regular mode:', e.lngLat);
                 if (onPoiPlacementClick) {
                     const coords = [e.lngLat.lng, e.lngLat.lat];
-                    console.log('[MapView] Calling onPoiPlacementClick with coords:', coords);
                     onPoiPlacementClick(coords);
                 }
             };
@@ -588,7 +580,9 @@ function MapViewContent() {
       bearing: 0
     },
     projection: 'globe',
-    maxPitch: 85
+    maxPitch: 85,
+    width: '100%',
+    height: '100%'  // Explicitly setting width and height to match presentation mode
   });
   
   // Set the map instance in the queue
@@ -704,6 +698,15 @@ function MapViewContent() {
             setStreetsLayersLoaded(true);
             setIsMapReady(true);
             setMapReady(true);
+            
+            // Manually trigger the scaling function after the map is loaded
+            const mapContainer = document.querySelector('.w-full.h-full.relative');
+            if (mapContainer) {
+                // Import the adjustMapScale function
+                const { adjustMapScale } = require('../../utils/mapScaleUtils');
+                // Call it directly to ensure proper scaling on initial load
+                adjustMapScale(mapContainer);
+            }
         });
         // Add controls
         map.addControl(new SearchControl(), 'top-right');
@@ -738,17 +741,12 @@ function MapViewContent() {
                     source.data?.features?.[0]?.geometry?.type === 'LineString'
                 );
             
-            // Log all found route sources for debugging
-            console.log('[Tracer] Found route sources:', routeSources.map(([id]) => id));
-            
             // Try to find the active route
             let activeRouteSource = null;
             let activeRouteId = null;
             
             // First check if we have a current route ID from the ref
             if (currentRouteId.current) {
-                console.log('[Tracer] Current route ID from ref:', currentRouteId.current);
-                
                 const currentSourceId = `${currentRouteId.current}-main`;
                 
                 // Find this source in our routeSources
@@ -756,43 +754,25 @@ function MapViewContent() {
                 if (foundSource) {
                     activeRouteSource = foundSource[1];
                     activeRouteId = currentRouteId.current;
-                    console.log('[Tracer] Found active route from ref:', currentRouteId.current);
-                } else {
-                    console.log('[Tracer] Could not find source for current route ID from ref:', currentSourceId);
                 }
             } 
             
             // If we couldn't find the route from the ref, try from the context
             if (!activeRouteSource && currentRoute) {
-                console.log('[Tracer] Current route from context:', {
-                    id: currentRoute.id,
-                    routeId: currentRoute.routeId,
-                    _type: currentRoute._type,
-                    name: currentRoute.name || 'Unnamed'
-                });
-                
                 const routeId = currentRoute.routeId || `route-${currentRoute.id}`;
                 const sourceId = `${routeId}-main`;
-                
-                console.log('[Tracer] Looking for source ID from context:', sourceId);
                 
                 // Find this source in our routeSources
                 const foundSource = routeSources.find(([id]) => id === sourceId);
                 if (foundSource) {
                     activeRouteSource = foundSource[1];
                     activeRouteId = routeId;
-                    console.log('[Tracer] Found active route from context:', routeId);
                     
                     // Update the ref if it's different
                     if (currentRouteId.current !== routeId) {
-                        console.log('[Tracer] Updating currentRouteId.current from', currentRouteId.current, 'to', routeId);
                         currentRouteId.current = routeId;
                     }
-                } else {
-                    console.log('[Tracer] Could not find source for current route from context:', sourceId);
                 }
-            } else if (!activeRouteSource) {
-                console.log('[Tracer] No current route in context or ref');
             }
             
             // If we couldn't find the active route from context, try to find it another way
@@ -802,13 +782,11 @@ function MapViewContent() {
                 if (routeSources.length > 0) {
                     activeRouteSource = routeSources[0][1];
                     activeRouteId = routeSources[0][0].replace('-main', '');
-                    console.log('[Tracer] Using first route as active (fallback):', activeRouteId);
                 }
             }
             
             // If we still don't have an active route, clear any marker and return
             if (!activeRouteSource) {
-                console.log('[Tracer] No active route found');
                 if (hoverCoordinates) {
                     setHoverCoordinates(null);
                 }
@@ -839,108 +817,122 @@ function MapViewContent() {
             
             // If we found a closest point on the active route and it's within the threshold
             if (closestPoint && minDistance < distanceThreshold) {
-                console.log('[Tracer] Found closest point on active route:', closestPoint, 'distance:', minDistance);
                 setHoverCoordinates(closestPoint);
             } else {
                 // If no point found or too far from route, clear the marker
                 if (hoverCoordinates) {
-                    if (!closestPoint) {
-                        console.log('[Tracer] No closest point found on active route');
-                    } else {
-                        console.log('[Tracer] Too far from route, clearing hover coordinates');
-                    }
                     setHoverCoordinates(null);
                 }
             }
         });
         
-        // Style controls
-        const style = document.createElement('style');
-        style.textContent = `
-      .mapboxgl-ctrl-group {
-        background-color: rgba(35, 35, 35, 0.9) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-      }
-      .mapboxgl-ctrl-group button {
-        width: 36px !important;
-        height: 36px !important;
-      }
-      .mapboxgl-ctrl-icon {
-        filter: invert(1);
-      }
-      .mapboxgl-ctrl-geolocate {
-        display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      .coordinate-popup .mapboxgl-popup-content {
-        background-color: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 8px;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      }
-      .coordinate-popup .mapboxgl-popup-tip {
-        border-top-color: rgba(0, 0, 0, 0.7);
-      }
-    `;
-        document.head.appendChild(style);
-        mapInstance.current = map;
+ // Style controls
+const style = document.createElement('style');
+style.textContent = `
+  .mapboxgl-ctrl-group {
+    background-color: rgba(35, 35, 35, 0.9) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  }
+  .mapboxgl-ctrl-group button {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .mapboxgl-ctrl-icon {
+    filter: invert(1);
+  }
+  .mapboxgl-ctrl-geolocate {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .coordinate-popup .mapboxgl-popup-content {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  .coordinate-popup .mapboxgl-popup-tip {
+    border-top-color: rgba(0, 0, 0, 0.7);
+  }
+`;
+document.head.appendChild(style);
+mapInstance.current = map;
+
+// Set up scaling for the map container
+const mapContainer = document.querySelector('.w-full.h-full.relative');
+if (mapContainer) {
+  const cleanupScaleListener = setupMapScaleListener(mapContainer);
+  
   return () => {
     map.remove();
     document.head.removeChild(style);
+    // Clean up the scale listener
+    cleanupScaleListener();
     // Clear the map instance when component unmounts
     setMapInstance(null);
   };
-    }, []);
-    // Handle POI drag end
-    const handlePOIDragEnd = useCallback((poi, newCoordinates) => {
-        updatePOIPosition(poi.id, newCoordinates);
-    }, [updatePOIPosition]);
-    return (_jsx(MapProvider, { value: {
-            map: mapInstance.current,
-            isMapReady,
-            isInitializing,
-            hoverCoordinates,
-            setHoverCoordinates,
-            onPoiPlacementClick,
-            setPoiPlacementClick,
-            dragPreview,
-            setDragPreview,
-            poiPlacementMode: poiMode === 'regular',
-            setPoiPlacementMode: (mode) => setPoiMode(mode ? 'regular' : 'none')
-        }, children: _jsxs("div", { className: "w-full h-full relative", children: [_jsx("div", { ref: mapRef, style: { width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 } }), !isMapReady && (_jsxs(Box, { sx: {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000
-                    }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })), _jsx(Sidebar, { onUploadGpx: handleUploadGpx, onAddPhotos: () => { }, onAddPOI: handleAddPOI, mapReady: mapReady, onItemClick: () => { }, onToggleRoute: () => { }, onToggleGradient: () => { }, onToggleSurface: () => { }, onPlacePOI: () => { }, onDeleteRoute: handleDeleteRoute }), isMapReady && (_jsxs("div", { className: "map-layers", children: [_jsx(PhotoLayer, {}, "photo-layer"), _jsx(PlacePOILayer, {}, "place-poi-layer"), _jsx("div", { children: pois
-                                .filter(poi => poi.type === 'draggable')
-                                .map(poi => (_jsx(MapboxPOIMarker, { poi: poi, onDragEnd: handlePOIDragEnd, onClick: () => handlePOIClick(poi) }, poi.id))) }, "draggable-pois")] })), dragPreview && (_jsx(POIDragPreview, { icon: dragPreview.icon, category: dragPreview.category, onPlace: (coordinates) => {
-                        handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
-                        setDragPreview(null);
-                    } })), selectedPOIDetails && (_jsx(MapboxPOIMarker, { poi: {
-                        id: 'temp-poi',
-                        type: 'draggable',
-                        coordinates: selectedPOIDetails.coordinates,
-                        name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
-                        category: selectedPOIDetails.category,
-                        icon: selectedPOIDetails.iconName
-                    } })), isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [routes.filter(route => route._type === 'loaded').map(route => (_jsx(RouteLayer, { map: mapInstance.current, route: route }, route.routeId))), currentRoute && (_jsxs(_Fragment, { children: [_jsx("div", { className: "route-filename", children: currentRoute._type === 'loaded' && currentRoute._loadedState ? currentRoute._loadedState.name : currentRoute.name || 'Untitled Route' }), _jsx(ElevationProfilePanel, { route: currentRoute }), _jsx(DistanceMarkers, { map: mapInstance.current })] }))] })), selectedPOIDetails && (_jsx(POIDetailsDrawer, { isOpen: detailsDrawerOpen, onClose: () => {
-                        setDetailsDrawerOpen(false);
-                        setSelectedPOIDetails(null);
-                        setPoiMode('none');
-                        setIsPOIDrawerOpen(false);
-                    }, iconName: selectedPOIDetails.iconName, category: selectedPOIDetails.category, onSave: handlePOIDetailsSave })), selectedPOI && (_jsx(POIViewer, { poi: selectedPOI, onClose: () => setSelectedPOI(null), onUpdate: updatePOI }))] }) }));
+}
+
+return () => {
+  map.remove();
+  document.head.removeChild(style);
+  // Clear the map instance when component unmounts
+  setMapInstance(null);
+};
+}, []);
+// Handle POI drag end
+const handlePOIDragEnd = useCallback((poi, newCoordinates) => {
+    updatePOIPosition(poi.id, newCoordinates);
+}, [updatePOIPosition]);
+return (_jsx(MapProvider, { value: {
+        map: mapInstance.current,
+        isMapReady,
+        isInitializing,
+        hoverCoordinates,
+        setHoverCoordinates,
+        onPoiPlacementClick,
+        setPoiPlacementClick,
+        dragPreview,
+        setDragPreview,
+        poiPlacementMode: poiMode === 'regular',
+        setPoiPlacementMode: (mode) => setPoiMode(mode ? 'regular' : 'none')
+    }, children: _jsxs("div", { ref: containerRef, className: "w-full h-full relative", children: [_jsx("div", { className: "map-container", ref: mapRef }), !isMapReady && (_jsxs(Box, { sx: {
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })), _jsx(Sidebar, { onUploadGpx: handleUploadGpx, onAddPhotos: () => { }, onAddPOI: handleAddPOI, mapReady: mapReady, onItemClick: () => { }, onToggleRoute: () => { }, onToggleGradient: () => { }, onToggleSurface: () => { }, onPlacePOI: () => { }, onDeleteRoute: handleDeleteRoute }), 
+                isMapReady && (_jsxs("div", { className: "map-layers", children: [
+                    _jsx(PlacePOILayer, {}, "place-poi-layer"), 
+                    _jsx("div", { children: pois
+                            .filter(poi => poi.type === 'draggable')
+                            .map(poi => (_jsx(MapboxPOIMarker, { poi: poi, onDragEnd: handlePOIDragEnd, onClick: () => handlePOIClick(poi) }, poi.id))) }, "draggable-pois"),
+                    _jsx(PhotoLayer, {}, "photo-layer")] })), dragPreview && (_jsx(POIDragPreview, { icon: dragPreview.icon, category: dragPreview.category, onPlace: (coordinates) => {
+                    handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
+                    setDragPreview(null);
+                } })), selectedPOIDetails && (_jsx(MapboxPOIMarker, { poi: {
+                    id: 'temp-poi',
+                    type: 'draggable',
+                    coordinates: selectedPOIDetails.coordinates,
+                    name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
+                    category: selectedPOIDetails.category,
+                    icon: selectedPOIDetails.iconName
+                } })), isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [routes.filter(route => route._type === 'loaded').map(route => (_jsx(RouteLayer, { map: mapInstance.current, route: route }, route.routeId))), currentRoute && (_jsxs(_Fragment, { children: [_jsx("div", { className: "route-filename", children: currentRoute._type === 'loaded' && currentRoute._loadedState ? currentRoute._loadedState.name : currentRoute.name || 'Untitled Route' }), _jsx(ElevationProfilePanel, { route: currentRoute }), _jsx(DistanceMarkers, { map: mapInstance.current })] }))] })), selectedPOIDetails && (_jsx(POIDetailsDrawer, { isOpen: detailsDrawerOpen, onClose: () => {
+                    setDetailsDrawerOpen(false);
+                    setSelectedPOIDetails(null);
+                    setPoiMode('none');
+                    setIsPOIDrawerOpen(false);
+                }, iconName: selectedPOIDetails.iconName, category: selectedPOIDetails.category, onSave: handlePOIDetailsSave })), selectedPOI && (_jsx(POIViewer, { poi: selectedPOI, onClose: () => setSelectedPOI(null), onUpdate: updatePOI }))] }) }));
 }
 export default function MapView() {
-    return (_jsx(RouteProvider, { children: _jsx(MapViewContent, {}) }));
+return (_jsx(RouteProvider, { children: _jsx(MapViewContent, {}) }));
 }

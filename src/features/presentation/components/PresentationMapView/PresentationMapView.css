@@ -1,5 +1,35 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@700&display=swap');
 
+/* Root container with scaling */
+.presentation-flex-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  transform-origin: top left;
+  /* Initial scale - will be adjusted by JavaScript */
+  transform: scale(1); /* Default to no scaling, JS will handle it */
+  /* Ensure the container fills the viewport after scaling */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Ensure the container has enough space for the scaled content */
+.presentation-map-area {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+}
+
 .route-filename {
   position: absolute;
   top: 20px;

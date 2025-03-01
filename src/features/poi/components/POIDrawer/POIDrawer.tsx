@@ -299,6 +299,8 @@ const POIDrawer: React.FC<POIDrawerProps> = ({ isOpen, onClose }) => {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
+          // Lower z-index to be behind elevation profile (which is 102)
+          zIndex: 90
         }
       })}
     >

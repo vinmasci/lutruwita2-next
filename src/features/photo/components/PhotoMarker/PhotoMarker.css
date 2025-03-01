@@ -2,8 +2,13 @@
   position: absolute;
   transform-origin: center center;
   user-select: none;
-  transform: translateZ(-10px);
   pointer-events: auto;
+  /* Removed translateZ(-10px) as it causes issues with z-index stacking context */
+}
+
+/* In creation mode, ensure photo markers are behind all UI elements */
+.map-layers .photo-marker {
+  z-index: -1000000 !important; /* Extremely low z-index to ensure it's behind everything */
 }
 
 .photo-marker-container {

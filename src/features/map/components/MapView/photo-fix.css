@@ -1,0 +1,33 @@
+/* Modified approach to keep photos behind UI components without extreme z-index values */
+
+/* Target all photo-related elements and place them behind UI */
+.photo-layer,
+.photo-marker,
+.photo-cluster,
+.photo-marker-container,
+.photo-cluster-container,
+.photo-marker-bubble,
+.photo-cluster-bubble,
+.photo-marker img,
+.photo-cluster img {
+  z-index: 5 !important; /* Higher than map layers (1) but lower than UI (100+) */
+}
+
+/* Ensure UI components maintain their proper z-index hierarchy */
+.sidebar-container {
+  z-index: 100 !important; /* Keep consistent with MapView.css */
+}
+
+.elevation-profile-container {
+  z-index: 102 !important; /* Keep consistent with MapView.css */
+}
+
+/* Create a new stacking context for the map container */
+.map-container {
+  isolation: isolate;
+}
+
+/* Ensure the map layers are properly positioned */
+.map-layers {
+  z-index: 1 !important; /* Keep consistent with MapView.css */
+}

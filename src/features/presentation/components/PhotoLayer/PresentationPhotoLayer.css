@@ -1,3 +1,9 @@
 /* Import marker styles */
 @import url('../../../photo/components/PhotoMarker/PhotoMarker.css');
 @import url('../../../photo/components/PhotoCluster/PhotoCluster.css');
+
+/* Ensure proper z-index in presentation mode */
+.presentation-photo-layer {
+  position: relative;
+  z-index: 50; /* Lower than sidebar (100) and elevation profile (102) */
+}

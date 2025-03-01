@@ -14,15 +14,25 @@ import { PresentationPOILayer } from '../POILayer/PresentationPOILayer';
 import { PresentationPhotoLayer } from '../PhotoLayer/PresentationPhotoLayer';
 import { PresentationDistanceMarkers } from '../DistanceMarkers/PresentationDistanceMarkers';
 import { MapProvider } from '../../../map/context/MapContext';
+import { setupScaleListener } from '../../utils/scaleUtils';
 import './PresentationMapView.css';
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 export default function PresentationMapView() {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
+    const containerRef = useRef(null);
     const [isMapReady, setIsMapReady] = useState(false);
     const { currentRoute, routes, currentLoadedState } = useRouteContext();
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
+    
+    // Set up scaling
+    useEffect(() => {
+        if (containerRef.current) {
+            const cleanup = setupScaleListener(containerRef.current);
+            return cleanup;
+        }
+    }, []);
     // Initialize routes using our presentation-specific hook
     const { initialized: routesInitialized } = usePresentationRouteInit({
         routes,
@@ -132,7 +142,9 @@ export default function PresentationMapView() {
                 bearing: 0
             },
             projection: 'globe',
-            maxPitch: 85
+            maxPitch: 85,
+            width: '100%',
+            height: '100%'
         });
         // Log map initialization events
         map.on('load', () => {
@@ -366,7 +378,11 @@ export default function PresentationMapView() {
         poiPlacementMode: false,
         setPoiPlacementMode: () => { }
     }), [isMapReady, hoverCoordinates]);
-    return (_jsx(MapProvider, { value: mapContextValue, children: _jsxs("div", { className: "w-full h-full relative", children: [_jsx("div", { ref: mapRef, style: { width: 'calc(100vw - 56px)', height: '100vh', position: 'fixed', top: 0, left: '56px' } }), !isMapReady && (_jsxs(Box, { sx: {
+    return (_jsx(MapProvider, { value: mapContextValue, children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
+        _jsx(PresentationSidebar, { isOpen: true }),
+        _jsxs("div", { className: "presentation-map-area", children: [
+            _jsx("div", { ref: mapRef, className: "map-container" }),
+            !isMapReady && (_jsxs(Box, { sx: {
                         position: 'absolute',
                         top: 0,
                         left: 0,
@@ -378,5 +394,17 @@ export default function PresentationMapView() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         zIndex: 1000
-                    }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })), _jsx(PresentationSidebar, { isOpen: true }), isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [routes.map(route => (_jsx(RouteLayer, { map: mapInstance.current, route: route }, route.routeId))), _jsx(PresentationPOILayer, { map: mapInstance.current }), _jsx(PresentationPhotoLayer, {}), currentRoute && (_jsxs(_Fragment, { children: [_jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }), _jsx("div", { className: "route-filename", children: currentRoute.name || "Unnamed Route" })] })), currentRoute && (_jsx("div", { className: "elevation-container", children: _jsx(PresentationElevationProfilePanel, { route: currentRoute }) }))] }))] }) }));
+                    }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })),
+            isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [
+                routes.map(route => (_jsx(RouteLayer, { map: mapInstance.current, route: route }, route.routeId))),
+                _jsx(PresentationPOILayer, { map: mapInstance.current }),
+                _jsx(PresentationPhotoLayer, {}),
+                currentRoute && (_jsxs(_Fragment, { children: [
+                    _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),
+                    _jsx("div", { className: "route-filename", children: currentRoute.name || "Unnamed Route" })
+                ] })),
+                currentRoute && (_jsx("div", { className: "elevation-container", children: _jsx(PresentationElevationProfilePanel, { route: currentRoute }) }))
+            ] }))
+        ] })
+    ] }) }));
 }

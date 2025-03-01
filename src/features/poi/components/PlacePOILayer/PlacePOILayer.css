@@ -3,6 +3,7 @@
   cursor: pointer !important;
   position: absolute !important;
   background-color: transparent !important;
+  z-index: 50 !important; /* Lower than sidebar (100) and elevation profile (102) */
 }
 
 .poi-marker {
