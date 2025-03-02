@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useMemo } from 'react';
-import { Box, ImageList, ImageListItem, Modal, IconButton, Typography, useTheme, Chip } from '@mui/material';
+import { Box, ImageList, ImageListItem, Modal, IconButton, Typography, useTheme, Chip, Tooltip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { deserializePhoto } from '../../../../features/photo/utils/photoUtils';
 import { getRouteDistance, getElevationGain, getUnpavedPercentage } from '../../../gpx/utils/routeUtils';
@@ -9,8 +9,27 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoIcon from '@mui/icons-material/Photo';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { useMapContext } from '../../../map/context/MapContext';
 
 const EDITOR_BACKGROUND = 'rgb(35, 35, 35)';
+
+// Function to calculate bearing between two points
+const calculateBearing = (start, end) => {
+    const startLat = start[1] * Math.PI / 180;
+    const startLng = start[0] * Math.PI / 180;
+    const endLat = end[1] * Math.PI / 180;
+    const endLng = end[0] * Math.PI / 180;
+    
+    const y = Math.sin(endLng - startLng) * Math.cos(endLat);
+    const x = Math.cos(startLat) * Math.sin(endLat) -
+              Math.sin(startLat) * Math.cos(endLat) * Math.cos(endLng - startLng);
+    
+    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    bearing = (bearing + 360) % 360;
+    
+    return bearing;
+};
 
 // Function to check if a point is near a route
 const isPointNearRoute = (
@@ -129,6 +148,67 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
     const [modalOpen, setModalOpen] = useState(false);
     const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
     const [currentPhotoSet, setCurrentPhotoSet] = useState('route'); // 'route' or 'nearby'
+    const { map } = useMapContext();
+    
+    // Function to start the flyby animation
+    const startFlyby = (route) => {
+        if (!map || !route?.geojson?.features?.[0]?.geometry?.coordinates) {
+            console.error('[Flyby] No map or route coordinates available');
+            return;
+        }
+        
+        // Get route coordinates
+        const allCoords = route.geojson.features[0].geometry.coordinates;
+        
+        // Sample every Nth point (to reduce number of animation steps)
+        const sampleRate = Math.max(1, Math.floor(allCoords.length / 30)); // ~30 points total
+        const sampledCoords = allCoords.filter((_, i) => i % sampleRate === 0);
+        
+        console.log('[Flyby] Starting flyby with', sampledCoords.length, 'points');
+        
+        // Set initial camera position
+        map.easeTo({
+            center: sampledCoords[0],
+            zoom: 14, // Original zoom level
+            pitch: 45, // Tilted view
+            bearing: 0,
+            duration: 1000
+        });
+        
+        // Animate through points
+        let currentIndex = 1;
+        
+        const flyToNextPoint = () => {
+            if (currentIndex >= sampledCoords.length) {
+                console.log('[Flyby] Flyby complete');
+                return;
+            }
+            
+            // Calculate bearing to face direction of travel
+            const currentPoint = sampledCoords[currentIndex];
+            const nextPoint = sampledCoords[Math.min(currentIndex + 1, sampledCoords.length - 1)];
+            const bearing = calculateBearing(currentPoint, nextPoint);
+            
+            console.log('[Flyby] Moving to point', currentIndex, 'of', sampledCoords.length);
+            
+            // Move camera to next point
+            map.easeTo({
+                center: currentPoint,
+                bearing: bearing,
+                pitch: 60,
+                duration: 1000,
+                easing: (t) => t, // Linear easing
+                essential: true
+            });
+            
+            // Schedule next point
+            currentIndex++;
+            setTimeout(flyToNextPoint, 1200); // Slightly longer than animation to avoid jerky movement
+        };
+        
+        // Start animation after initial positioning
+        setTimeout(flyToNextPoint, 1200);
+    };
     
     // Filter photos that are near the current route
     const nearbyPhotos = useMemo(() => {
@@ -192,15 +272,43 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                             mr: 3
                         },
                         children: [
-                            _jsx(Typography, {
-                                variant: "subtitle2",
-                                color: "white",
+                            _jsxs(Box, {
                                 sx: {
-                                    fontSize: '0.8rem',
-                                    fontWeight: 500,
-                                    fontFamily: 'Futura'
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
                                 },
-                                children: `Overview: ${route?.name}`
+                                children: [
+                                    _jsx(Typography, {
+                                        variant: "subtitle2",
+                                        color: "white",
+                                        sx: {
+                                            fontSize: '0.8rem',
+                                            fontWeight: 500,
+                                            fontFamily: 'Futura'
+                                        },
+                                        children: `Overview: ${route?.name}`
+                                    }),
+                                    _jsx(Tooltip, {
+                                        title: "Start Flyby Tour",
+                                        children: _jsx(IconButton, {
+                                            onClick: () => startFlyby(route),
+                                            size: "small",
+                                            sx: {
+                                                color: 'white',
+                                                backgroundColor: '#0288d1',
+                                                padding: '4px',
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                '&:hover': {
+                                                    backgroundColor: '#0277bd'
+                                                }
+                                            },
+                                            children: _jsx(PlayArrowIcon, { fontSize: "small" })
+                                        })
+                                    })
+                                ]
                             }),
                             _jsxs(Box, {
                                 sx: {
