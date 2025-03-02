@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
-import { DraggablePOI, PlaceNamePOI, POI_CATEGORIES, POIType } from '../../../poi/types/poi.types';
+import { DraggablePOI, PlaceNamePOI, POI_CATEGORIES, POIType, StoredPOIs } from '../../../poi/types/poi.types';
 import { LoadedRoute } from '../../../map/types/route.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import { ICON_PATHS } from '../../../poi/constants/icon-paths';
@@ -72,7 +72,7 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
 
   // Memoize POI data to prevent unnecessary recalculations
   // Memoize POI data based on the actual POIs from context
-  const poiData = useMemo(() => getPOIsForRoute(), [getPOIsForRoute]); // Will update when POIs change since getPOIsForRoute is memoized with [pois]
+  const poiData = useMemo(() => getPOIsForRoute() as unknown as StoredPOIs, [getPOIsForRoute]); // Will update when POIs change since getPOIsForRoute is memoized with [pois]
 
   // Memoize marker creation function
   const createMarker = useCallback((poi: DraggablePOI) => {
@@ -99,7 +99,7 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
       rotationAlignment: 'viewport',
       pitchAlignment: 'viewport',
       anchor: 'center',
-      offset: [0, -14] // Half the height of marker-bubble to center it
+      offset: [0, -20] // Half the height of marker-bubble to center it (adjusted for larger size)
     })
       .setLngLat(poi.coordinates)
       .addTo(map);
@@ -168,9 +168,9 @@ export const PresentationPOILayer: React.FC<PresentationPOILayerProps> = ({ map 
         },
         totalPositions,
         {
-          iconSize: 16,
-          spacing: 5.5,
-          maxPerRow: 4,
+          iconSize: 20, // Increased to match larger POI size
+          spacing: 30, // Dramatically increased spacing for complete separation
+          maxPerRow: 2,
           baseOffset
         }
       );

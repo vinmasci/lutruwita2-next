@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, IconButton, Snackbar, Alert } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, TextField, Button, IconButton, Snackbar, Alert, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { ProcessedRoute } from '../../../../features/map/types/route.types';
 import { RichTextEditor } from './RichTextEditor.js';
 import { ProcessedPhoto } from '../../../../features/photo/components/Uploader/PhotoUploader.types';
 import { fileToProcessedPhoto, deserializePhoto, serializePhoto } from '../../../../features/photo/utils';
 import { useRouteContext } from '../../../../features/map/context/RouteContext.js';
 import { usePhotoService } from '../../../../features/photo/services/photoService';
+import { usePhotoContext } from '../../../../features/photo/context/PhotoContext';
 
 interface PhotoWithFile extends ProcessedPhoto {
   file?: File;
@@ -22,16 +24,133 @@ interface RouteDescription {
   photos: ProcessedPhoto[];
 }
 
+// Function to check if a point is near a route
+const isPointNearRoute = (
+  point: { lat: number; lng: number },
+  route: ProcessedRoute,
+  threshold: number = 0.001 // Approximately 100 meters at the equator
+): boolean => {
+  if (!route.geojson || !route.geojson.features || route.geojson.features.length === 0) {
+    return false;
+  }
+
+  // Find LineString features in the GeoJSON
+  const lineFeatures = route.geojson.features.filter(
+    feature => feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString'
+  );
+
+  if (lineFeatures.length === 0) {
+    return false;
+  }
+
+  // Check each line feature
+  for (const feature of lineFeatures) {
+    let coordinates: number[][];
+
+    if (feature.geometry.type === 'LineString') {
+      coordinates = feature.geometry.coordinates as number[][];
+    } else if (feature.geometry.type === 'MultiLineString') {
+      // Flatten MultiLineString coordinates
+      coordinates = (feature.geometry.coordinates as number[][][]).flat();
+    } else {
+      continue;
+    }
+
+    // Check each segment of the line
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const [lng1, lat1] = coordinates[i];
+      const [lng2, lat2] = coordinates[i + 1];
+
+      // Check if point is near this segment
+      if (isPointNearSegment(point, { lat: lat1, lng: lng1 }, { lat: lat2, lng: lng2 }, threshold)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+// Helper function to check if a point is near a line segment
+const isPointNearSegment = (
+  point: { lat: number; lng: number },
+  start: { lat: number; lng: number },
+  end: { lat: number; lng: number },
+  threshold: number
+): boolean => {
+  // Calculate the squared distance from point to line segment
+  const squaredDistance = getSquaredDistanceToSegment(point, start, end);
+  
+  // Compare with threshold squared (to avoid taking square root)
+  return squaredDistance <= threshold * threshold;
+};
+
+// Calculate squared distance from point to line segment
+const getSquaredDistanceToSegment = (
+  point: { lat: number; lng: number },
+  start: { lat: number; lng: number },
+  end: { lat: number; lng: number }
+): number => {
+  const { lat: x, lng: y } = point;
+  const { lat: x1, lng: y1 } = start;
+  const { lat: x2, lng: y2 } = end;
+
+  const A = x - x1;
+  const B = y - y1;
+  const C = x2 - x1;
+  const D = y2 - y1;
+
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  let param = -1;
+
+  if (lenSq !== 0) {
+    param = dot / lenSq;
+  }
+
+  let xx, yy;
+
+  if (param < 0) {
+    xx = x1;
+    yy = y1;
+  } else if (param > 1) {
+    xx = x2;
+    yy = y2;
+  } else {
+    xx = x1 + param * C;
+    yy = y1 + param * D;
+  }
+
+  const dx = x - xx;
+  const dy = y - yy;
+
+  return dx * dx + dy * dy;
+};
+
 export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
   route
 }) => {
   const { updateRoute, routes } = useRouteContext();
   const photoService = usePhotoService();
+  const { photos: globalPhotos } = usePhotoContext();
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [photos, setPhotos] = useState<PhotoWithFile[]>([]);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [mapPhotosAdded, setMapPhotosAdded] = useState(false);
+
+  // Filter photos that are near the current route
+  const nearbyPhotos = useMemo(() => {
+    if (!route || !globalPhotos.length) {
+      return [];
+    }
+
+    return globalPhotos.filter(photo => 
+      photo.coordinates && 
+      isPointNearRoute(photo.coordinates, route)
+    );
+  }, [route, globalPhotos]);
 
   // Keep local state in sync with route changes
   useEffect(() => {
@@ -46,8 +165,28 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
       setTitle(route.description.title ?? '');
       setDescription(route.description.description ?? '');
       setPhotos((route.description.photos || []).map(deserializePhoto));
+      setMapPhotosAdded(false); // Reset flag when route changes
     }
   }, [route?.description]);
+
+  // Add nearby photos from the map to the description panel
+  useEffect(() => {
+    if (!route || mapPhotosAdded || nearbyPhotos.length === 0) {
+      return;
+    }
+
+    // Get IDs of photos already in the description
+    const existingPhotoIds = new Set(photos.map(p => p.id));
+    
+    // Filter out photos that are already in the description
+    const newPhotos = nearbyPhotos.filter(p => !existingPhotoIds.has(p.id));
+    
+    if (newPhotos.length > 0) {
+      console.debug('[RouteDescriptionPanel] Adding nearby photos from map:', newPhotos.length);
+      setPhotos(prev => [...prev, ...newPhotos]);
+      setMapPhotosAdded(true);
+    }
+  }, [route, photos, nearbyPhotos, mapPhotosAdded]);
 
   // Debounced update to route
   useEffect(() => {
@@ -172,78 +311,95 @@ export const RouteDescriptionPanel: React.FC<RouteDescriptionPanelProps> = ({
           flexDirection: 'column',
           gap: 1
         }}>
-          <Button
-            component="label"
-            variant="outlined"
-            color="info"
-            fullWidth
-            sx={{ 
-              backgroundColor: 'rgb(35, 35, 35)',
-              borderColor: 'rgb(41, 182, 246)',
-              color: 'rgb(41, 182, 246)',
-              borderWidth: 2,
-              '&:hover': {
-                borderColor: 'rgb(41, 182, 246)',
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
+            {/* Info box about GPS photos */}
+            <Box
+              sx={{
                 backgroundColor: 'rgba(41, 182, 246, 0.1)',
-                borderWidth: 2
-              }
-            }}
-          >
-            Add Photos
-            <input
-              type="file"
-              hidden
-              multiple
-              accept="image/*"
-              onChange={handlePhotoChange}
-            />
-          </Button>
+                border: '1px solid rgba(41, 182, 246, 0.3)',
+                borderRadius: 1,
+                padding: 1,
+                mb: 1
+              }}
+            >
+              <Typography variant="caption" sx={{ color: 'rgb(41, 182, 246)', fontSize: '0.75rem' }}>
+                If you have already added photos using the "Add GPS Photo" service, your photos will be automatically displayed in view mode.
+              </Typography>
+            </Box>
+            
+            <Button
+              component="label"
+              variant="outlined"
+              color="info"
+              fullWidth
+              sx={{ 
+                backgroundColor: 'rgb(35, 35, 35)',
+                borderColor: 'rgb(41, 182, 246)',
+                color: 'rgb(41, 182, 246)',
+                borderWidth: 2,
+                '&:hover': {
+                  borderColor: 'rgb(41, 182, 246)',
+                  backgroundColor: 'rgba(41, 182, 246, 0.1)',
+                  borderWidth: 2
+                }
+              }}
+            >
+              Add Photos
+              <input
+                type="file"
+                hidden
+                multiple
+                accept="image/*"
+                onChange={handlePhotoChange}
+              />
+            </Button>
 
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: 1,
-            overflowY: 'auto',
-            flex: 1
-          }}>
-            {photos.map((photo, index) => (
-              <Box
-                key={photo.id}
-                sx={{
-                  width: '100%',
-                  aspectRatio: '1',
-                  backgroundColor: 'rgb(35, 35, 35)',
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}
-              >
-                <img
-                  src={photo.url}
-                  alt={`Upload ${index + 1}`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
-                <IconButton
-                  onClick={() => handleDeletePhoto(photo.id)}
+            <Box sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 1,
+              overflowY: 'auto',
+              flex: 1
+            }}>
+              {photos.map((photo, index) => (
+                <Box
+                  key={photo.id}
                   sx={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 4,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.7)'
-                    }
+                    width: '100%',
+                    aspectRatio: '1',
+                    backgroundColor: 'rgb(35, 35, 35)',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    position: 'relative'
                   }}
-                  size="small"
                 >
-                  <DeleteIcon sx={{ color: 'white', fontSize: 16 }} />
-                </IconButton>
-              </Box>
-            ))}
+                  <img
+                    src={photo.url}
+                    alt={`Upload ${index + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                  <IconButton
+                    onClick={() => handleDeletePhoto(photo.id)}
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                      }
+                    }}
+                    size="small"
+                  >
+                    <DeleteIcon sx={{ color: 'white', fontSize: 16 }} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
           </Box>
         </Box>
 

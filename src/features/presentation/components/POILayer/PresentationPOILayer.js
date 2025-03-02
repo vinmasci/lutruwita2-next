@@ -81,7 +81,7 @@ export const PresentationPOILayer = ({ map }) => {
             rotationAlignment: 'viewport',
             pitchAlignment: 'viewport',
             anchor: 'center',
-            offset: [0, -14] // Half the height of marker-bubble to center it
+            offset: [0, -20] // Half the height of marker-bubble to center it (adjusted for larger size)
         })
             .setLngLat(poi.coordinates)
             .addTo(map);
@@ -138,8 +138,8 @@ export const PresentationPOILayer = ({ map }) => {
                 name: locationPois[0].name,
                 coordinates: [lng, lat]
             }, totalPositions, {
-                iconSize: 16,
-                spacing: 5.5,
+                iconSize: 24, // Increased to match larger POI size
+                spacing: 7, // Dramatically increased spacing for complete separation
                 maxPerRow: 4,
                 baseOffset
             });

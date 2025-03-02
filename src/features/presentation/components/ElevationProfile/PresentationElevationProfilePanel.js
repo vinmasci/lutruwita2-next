@@ -6,6 +6,8 @@ import { Box, ButtonBase } from '@mui/material';
 import { IconButton } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { PresentationRouteDescriptionPanel } from '../RouteDescription';
 import { PresentationWeatherProfilePanel } from '../WeatherProfile';
 
@@ -52,18 +54,30 @@ const TabButton = ({ tab, label, activeTab, onClick, isCollapsed, setIsCollapsed
 export const PresentationElevationProfilePanel = ({ route, header }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState('elevation'); // 'elevation' | 'description' | 'weather'
+    const [isMaximized, setIsMaximized] = useState(false);
+    
+    // Default height is 300px, maximized height is 600px
+    const panelHeight = isMaximized ? 600 : 300;
 
     return _jsxs(ElevationPanel, { 
-        className: isCollapsed ? 'collapsed' : '', 
+        className: isCollapsed ? 'collapsed' : '',
+        sx: { 
+            height: panelHeight,
+            '&.collapsed': {
+                transform: `translateY(${panelHeight}px)`
+            }
+        },
         children: [
+            // Tab buttons - no background container
             _jsxs("div", { 
                 style: {
                     position: 'absolute',
                     top: '-24px',
-                    left: '16px',
+                    right: '80px', // Position to the left of the control buttons
                     display: 'flex',
                     alignItems: 'flex-end',
                     zIndex: 103
+                    // No background or border styling
                 }, 
                 children: [
                     _jsx(TabButton, {
@@ -92,7 +106,8 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                     })
                 ]
             }),
-            _jsx("div", { 
+            // Control buttons (maximize/minimize) with background
+            _jsxs("div", { 
                 style: {
                     position: 'absolute',
                     top: '-24px',
@@ -101,20 +116,38 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                     borderRadius: '4px 4px 0 0',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderBottom: 'none',
+                    display: 'flex',
+                    alignItems: 'flex-end',
                     zIndex: 103
                 }, 
-                children: _jsx(IconButton, { 
-                    onClick: () => setIsCollapsed(!isCollapsed), 
-                    size: "small", 
-                    sx: {
-                        color: 'white',
-                        padding: '2px',
-                        '&:hover': {
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                        }
-                    }, 
-                    children: isCollapsed ? _jsx(KeyboardArrowUpIcon, {}) : _jsx(KeyboardArrowDownIcon, {}) 
-                }) 
+                children: [
+                    _jsx(IconButton, { 
+                        onClick: () => setIsMaximized(!isMaximized), 
+                        size: "small",
+                        disabled: isCollapsed,
+                        sx: {
+                            color: 'white',
+                            padding: '2px',
+                            opacity: isCollapsed ? 0.5 : 1,
+                            '&:hover': {
+                                backgroundColor: isCollapsed ? 'transparent' : 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }, 
+                        children: isMaximized ? _jsx(FullscreenExitIcon, { fontSize: "small" }) : _jsx(FullscreenIcon, { fontSize: "small" }) 
+                    }),
+                    _jsx(IconButton, { 
+                        onClick: () => setIsCollapsed(!isCollapsed), 
+                        size: "small", 
+                        sx: {
+                            color: 'white',
+                            padding: '2px',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }, 
+                        children: isCollapsed ? _jsx(KeyboardArrowUpIcon, {}) : _jsx(KeyboardArrowDownIcon, {}) 
+                    })
+                ] 
             }),
             header,
             _jsx(Box, {

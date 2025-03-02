@@ -140,30 +140,72 @@ export const RouteDescriptionPanel = ({ route }) => {
                             gap: 2
                         },
                         children: [
-                            _jsxs(Button, {
-                                component: "label",
-                                variant: "outlined",
-                                fullWidth: true,
+                            _jsxs(Box, {
                                 sx: {
-                                    borderColor: BUTTON_COLOR,
-                                    color: BUTTON_COLOR,
-                                    borderWidth: 2,
-                                    fontFamily: 'Futura, sans-serif',
-                                    '&:hover': {
-                                        borderColor: BUTTON_COLOR,
-                                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                                        borderWidth: 2
-                                    }
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1
                                 },
                                 children: [
-                                    "Add Photos",
-                                    _jsx("input", {
-                                        type: "file",
-                                        hidden: true,
-                                        multiple: true,
-                                        accept: "image/*",
-                                        onChange: handlePhotoChange
-                                    })
+                                    _jsxs(Box, {
+                                        sx: {
+                                            backgroundColor: '#1e1e1e',
+                                            borderRadius: '12px',
+                                            padding: '12px 16px',
+                                            mb: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 2
+                                        },
+                                        children: [
+                                            _jsx("i", {
+                                                className: "fa-solid fa-circle-info",
+                                                style: {
+                                                    color: '#2196f3',
+                                                    fontSize: '1.2rem'
+                                                }
+                                            }),
+                                            _jsxs("div", {
+                                                style: {
+                                                    color: '#a8c7fa',
+                                                    fontSize: '0.85rem',
+                                                    fontFamily: 'Futura, sans-serif'
+                                                },
+                                                children: [
+                                                    "If you have already added photos using the \"Add GPS Photo\" service, your photos will be automatically displayed in view mode.",
+                                                    _jsx("br", {}),
+                                                    _jsx("br", {}),
+                                                    "Add photos here if they do not have GPS information attributed to them."
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    _jsxs(Button, {
+                                        component: "label",
+                                        variant: "outlined",
+                                        fullWidth: true,
+                                        sx: {
+                                            borderColor: BUTTON_COLOR,
+                                            color: BUTTON_COLOR,
+                                            borderWidth: 2,
+                                            fontFamily: 'Futura, sans-serif',
+                                            '&:hover': {
+                                                borderColor: BUTTON_COLOR,
+                                                backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                                                borderWidth: 2
+                                            }
+                                        },
+                                        children: [
+                                            "Add Photos",
+                                            _jsx("input", {
+                                                type: "file",
+                                                hidden: true,
+                                                multiple: true,
+                                                accept: "image/*",
+                                                onChange: handlePhotoChange
+                                            })
+                                        ]
+                                    }),
                                 ]
                             }),
                             _jsx(Box, {

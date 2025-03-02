@@ -32,6 +32,10 @@ const RouteSchema = new mongoose.Schema({
     color: { type: String, required: true, default: '#ee5253' },
     isVisible: { type: Boolean, required: true, default: true },
     geojson: { type: mongoose.Schema.Types.Mixed },
+    description: {
+      title: { type: String },
+      description: { type: String }
+    },
     surface: {
       surfaceTypes: [{ 
         type: { type: String },
