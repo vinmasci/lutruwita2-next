@@ -52,6 +52,9 @@ export const adjustPresentationScale = (container) => {
     mapArea.style.width = '100%';
     mapArea.style.height = '100%';
   }
+  
+  // Ensure the page is scrolled to the top after scaling
+  window.scrollTo(0, 0);
 };
 
 /**

@@ -79,6 +79,9 @@ export const adjustMapScale = (container) => {
   if (elevationPanel && elevationPanel.style && elevationPanel.style.zIndex === '102') {
     elevationPanel.style.zIndex = '1002';
   }
+  
+  // Ensure the page is scrolled to the top after scaling
+  window.scrollTo(0, 0);
 };
 
 /**
