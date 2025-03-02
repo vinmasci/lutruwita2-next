@@ -17,12 +17,18 @@ export const adjustMapScale = (container) => {
   let scale = 0.8; // Default scale
   
   // Adjust scale based on window width
-  if (windowWidth <= 900) {
-    scale = 0.65;
+  if (windowWidth <= 320) {
+    scale = 0.45; // Very small screens (iPhone SE size)
+  } else if (windowWidth <= 480) {
+    scale = 0.5;  // Small mobile screens
+  } else if (windowWidth <= 600) {
+    scale = 0.55; // Medium mobile screens
+  } else if (windowWidth <= 900) {
+    scale = 0.65; // Large mobile/small tablet screens (unchanged)
   } else if (windowWidth <= 1200) {
-    scale = 0.7;
+    scale = 0.7;  // Tablet/small desktop (unchanged)
   } else if (windowWidth <= 1600) {
-    scale = 0.75;
+    scale = 0.75; // Desktop (unchanged)
   }
   
   // Apply the scale to the container but use transform-style: preserve-3d

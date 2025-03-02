@@ -31,3 +31,9 @@
 .map-layers {
   z-index: 1 !important; /* Keep consistent with MapView.css */
 }
+
+/* Fix for drawer visibility in presentation mode */
+.MuiDrawer-paperHidden {
+  visibility: hidden !important;
+  display: none !important;
+}

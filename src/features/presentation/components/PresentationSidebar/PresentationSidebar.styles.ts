@@ -28,6 +28,8 @@ export const StyledDrawer = styled(Drawer)({
 export const NestedDrawer = styled(Drawer)((props: { theme: Theme }) => {
   const { theme } = props;
   return {
+    position: 'absolute',
+    left: 0,
     [theme.breakpoints.up('xs')]: {
       width: '100%'
     },
@@ -36,6 +38,7 @@ export const NestedDrawer = styled(Drawer)((props: { theme: Theme }) => {
     },
     flexShrink: 0,
     whiteSpace: 'nowrap',
+    zIndex: 100,
     '& .MuiDrawer-paper': {
       [theme.breakpoints.up('xs')]: {
         width: '100%',
@@ -49,8 +52,12 @@ export const NestedDrawer = styled(Drawer)((props: { theme: Theme }) => {
       borderRight: '1px solid #333',
       color: '#ffffff',
       overflowX: 'hidden',
-      transition: 'margin-left 0.2s ease-in-out',
-      zIndex: 99  // Lower than default Drawer z-index of 1200
+      transition: 'transform 0.2s ease-in-out, visibility 0.2s ease-in-out',
+      '&.MuiDrawer-paperAnchorLeft.MuiDrawer-paperHidden': {
+        visibility: 'hidden !important',
+        transform: 'translateX(-100%) !important',
+        display: 'none !important'
+      }
     }
   };
 });

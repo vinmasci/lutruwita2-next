@@ -26,6 +26,7 @@ export const NestedDrawer = styled(Drawer)(({ theme }) => {
         width: theme.breakpoints.values.sm ? '264px' : '100%',
         flexShrink: 0,
         whiteSpace: 'nowrap',
+        position: 'absolute',
         '& .MuiDrawer-paper': {
             width: theme.breakpoints.values.sm ? '264px' : '100%',
             backgroundColor: '#1a1a1a',
@@ -33,11 +34,11 @@ export const NestedDrawer = styled(Drawer)(({ theme }) => {
             color: '#ffffff',
             overflowX: 'hidden',
             marginLeft: theme.breakpoints.values.sm ? '56px' : 0,
-            transition: 'margin-left 0.2s ease-in-out',
+            transition: 'transform 0.3s ease-in-out',
             zIndex: 90, // Lower than elevation profile (102) and sidebar (101)
-            transform: 'translateX(0)', // Ensure it's properly hidden when closed
+            transform: 'translateX(0)', // Visible when open
             '&.MuiDrawer-paperAnchorLeft.MuiDrawer-paperHidden': {
-                transform: 'translateX(-100%)', // Ensure it's fully hidden when closed
+                transform: 'translateX(-100%)', // Hidden when closed
                 visibility: 'hidden'
             }
         }

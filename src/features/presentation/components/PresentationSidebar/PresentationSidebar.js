@@ -102,7 +102,7 @@ export const PresentationSidebar = ({ isOpen }) => {
                     })
                 ] 
             }) 
-        }), 
+        }),
         _jsx(NestedDrawer, { 
             variant: "persistent", 
             anchor: "left", 
