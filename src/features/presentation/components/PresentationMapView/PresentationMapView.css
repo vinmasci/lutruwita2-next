@@ -33,7 +33,7 @@
 .route-filename {
   position: absolute;
   top: 20px;
-  left: 70%;
+  left: 50%;
   transform: translateX(-50%);
   font-family: 'Fraunces', serif;
   font-weight: 700;
@@ -41,6 +41,13 @@
   color: white;
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 1);
   z-index: 1000;
+}
+
+/* Move the title 20% to the right only on mobile devices */
+@media only screen and (max-width: 650px) {
+  .route-filename {
+    left: 70%;
+  }
 }
 
 .elevation-container {

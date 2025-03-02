@@ -124,7 +124,7 @@ export const LandingPage = () => {
                         backgroundImage: 'url(/images/hero.png)',
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        backgroundAttachment: 'fixed', // This creates the parallax effect
+                        backgroundAttachment: { xs: 'scroll', sm: 'fixed' }, // Parallax only on non-mobile
                         filter: 'brightness(0.55)',
                         zIndex: 0
                     }
