@@ -401,7 +401,7 @@ export default function PresentationMapView() {
                 _jsx(PresentationPhotoLayer, {}),
                 currentRoute && (_jsxs(_Fragment, { children: [
                     _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),
-                    _jsx("div", { className: "route-filename", children: currentRoute.name || "Unnamed Route" })
+                    _jsx("div", { className: "route-filename", children: currentRoute._loadedState?.name || currentRoute.name || "Unnamed Route" })
                 ] })),
                 currentRoute && (_jsx("div", { className: "elevation-container", children: _jsx(PresentationElevationProfilePanel, { route: currentRoute }) }))
             ] }))
