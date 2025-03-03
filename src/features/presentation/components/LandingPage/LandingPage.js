@@ -69,13 +69,23 @@ const calculateTotalElevation = (routes) => {
 export const LandingPage = () => {
     const navigate = useNavigate();
     const { loginWithRedirect } = useAuth0();
-    const [featuredRoutes, setFeaturedRoutes] = useState([]);
+    const [allRoutes, setAllRoutes] = useState([]);
+    const [displayedRoutes, setDisplayedRoutes] = useState([]);
+    const [visibleCount, setVisibleCount] = useState(3);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
     const featuredRoutesRef = React.useRef(null);
     
     const scrollToFeaturedRoutes = () => {
         featuredRoutesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+    
+    const loadMoreRoutes = () => {
+        const nextVisibleCount = visibleCount + 3;
+        setVisibleCount(nextVisibleCount);
+        setDisplayedRoutes(allRoutes.slice(0, nextVisibleCount));
+        setHasMore(nextVisibleCount < allRoutes.length);
     };
     
     useEffect(() => {
@@ -84,7 +94,9 @@ export const LandingPage = () => {
                 setLoading(true);
                 setError(null);
                 const routes = await publicRouteService.listRoutes();
-                setFeaturedRoutes(routes.slice(0, 3));
+                setAllRoutes(routes);
+                setDisplayedRoutes(routes.slice(0, visibleCount));
+                setHasMore(routes.length > visibleCount);
             }
             catch (error) {
                 setError('Failed to load featured routes');
@@ -210,5 +222,16 @@ export const LandingPage = () => {
                                 fontWeight: 'bold',
                                 fontSize: { xs: '2.5rem', md: '3.75rem' },
                                 textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8)'
-                            }, children: "Featured Routes" }), loading ? (_jsx(Box, { display: "flex", justifyContent: "center", p: 4, children: _jsx(CircularProgress, {}) })) : error ? (_jsx(Alert, { severity: "error", sx: { maxWidth: 'sm', mx: 'auto' }, children: error })) : (_jsx(Grid, { container: true, spacing: 4, children: featuredRoutes.map((route) => (_jsx(Grid, { item: true, xs: 12, sm: 6, md: 4, children: _jsxs(StyledCard, { onClick: () => navigate(`/preview/route/${route.persistentId}`), sx: { cursor: 'pointer' }, children: [_jsx(MapPreviewWrapper, { children: _jsx(MapPreview, { center: route.mapState.center, zoom: route.mapState.zoom, routes: route.routes }) }), _jsxs(CardContent, { children: [_jsx(Typography, { variant: "h6", gutterBottom: true, sx: { fontFamily: 'Montserrat' }, children: route.name }), _jsxs(Stack, { spacing: 1, sx: { mt: 1 }, children: [_jsx(LocationDisplay, { geojson: route.routes[0].geojson }), _jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", children: [_jsx(StraightenIcon, { sx: { fontSize: 16, color: 'text.secondary' } }), _jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [calculateTotalDistance(route.routes), "km"] })] }), _jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", children: [_jsx(TerrainIcon, { sx: { fontSize: 16, color: 'text.secondary' } }), _jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [calculateTotalElevation(route.routes), "m"] })] })] }), _jsxs(Stack, { spacing: 1, sx: { mt: 2 }, children: [_jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", divider: _jsx(Typography, { color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: "\u2022" }), children: [_jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [route.viewCount, " views"] }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: new Date(route.createdAt).toLocaleDateString() })] }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: route.type.charAt(0).toUpperCase() + route.type.slice(1) })] })] })] }) }, route.id))) }))] }) })] }));
+                            }, children: "Featured Routes" }), loading ? (_jsx(Box, { display: "flex", justifyContent: "center", p: 4, children: _jsx(CircularProgress, {}) })) : error ? (_jsx(Alert, { severity: "error", sx: { maxWidth: 'sm', mx: 'auto' }, children: error })) : (_jsxs(_Fragment, { children: [_jsx(Grid, { container: true, spacing: 4, children: displayedRoutes.map((route) => (_jsx(Grid, { item: true, xs: 12, sm: 6, md: 4, children: _jsxs(StyledCard, { onClick: () => navigate(`/preview/route/${route.persistentId}`), sx: { cursor: 'pointer' }, children: [_jsx(MapPreviewWrapper, { children: _jsx(MapPreview, { center: route.mapState.center, zoom: route.mapState.zoom, routes: route.routes }) }), _jsxs(CardContent, { children: [_jsx(Typography, { variant: "h6", gutterBottom: true, sx: { fontFamily: 'Montserrat' }, children: route.name }), _jsxs(Stack, { spacing: 1, sx: { mt: 1 }, children: [_jsx(LocationDisplay, { geojson: route.routes[0].geojson }), _jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", children: [_jsx(StraightenIcon, { sx: { fontSize: 16, color: 'text.secondary' } }), _jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [calculateTotalDistance(route.routes), "km"] })] }), _jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", children: [_jsx(TerrainIcon, { sx: { fontSize: 16, color: 'text.secondary' } }), _jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [calculateTotalElevation(route.routes), "m"] })] })] }), _jsxs(Stack, { spacing: 1, sx: { mt: 2 }, children: [_jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", divider: _jsx(Typography, { color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: "\u2022" }), children: [_jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [route.viewCount, " views"] }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: new Date(route.createdAt).toLocaleDateString() })] }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: route.type.charAt(0).toUpperCase() + route.type.slice(1) })] })] })] }) }, route.id))) }), hasMore && !loading && !error && (_jsx(Box, { display: "flex", justifyContent: "center", mt: 4, children: _jsx(Button, { variant: "contained", color: "primary", onClick: loadMoreRoutes, sx: {
+                                    px: 4,
+                                    py: 1.5,
+                                    fontSize: '1rem',
+                                    fontFamily: 'Montserrat',
+                                    minWidth: '200px',
+                                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                    '&:hover': {
+                                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                                    }
+                                }, children: "Load More Routes" }) }))] }))] }) })] }));
 };

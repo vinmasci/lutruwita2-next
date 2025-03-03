@@ -1,3 +1,9 @@
+/**
+ * IMPORTANT: This file is redundant and not used in production.
+ * The actual implementation is in LandingPage.js.
+ * Any changes should be made to the JavaScript file, not this TypeScript file.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
@@ -110,13 +116,23 @@ const calculateTotalElevation = (routes: any[]) => {
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { loginWithRedirect } = useAuth0();
-  const [featuredRoutes, setFeaturedRoutes] = useState<PublicRouteMetadata[]>([]);
+  const [allRoutes, setAllRoutes] = useState<PublicRouteMetadata[]>([]);
+  const [displayedRoutes, setDisplayedRoutes] = useState<PublicRouteMetadata[]>([]);
+  const [visibleCount, setVisibleCount] = useState(3);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const featuredRoutesRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToFeaturedRoutes = () => {
     featuredRoutesRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const loadMoreRoutes = () => {
+    const nextVisibleCount = visibleCount + 3;
+    setVisibleCount(nextVisibleCount);
+    setDisplayedRoutes(allRoutes.slice(0, nextVisibleCount));
+    setHasMore(nextVisibleCount < allRoutes.length);
   };
 
   useEffect(() => {
@@ -125,7 +141,9 @@ export const LandingPage: React.FC = () => {
         setLoading(true);
         setError(null);
         const routes = await publicRouteService.listRoutes();
-        setFeaturedRoutes(routes.slice(0, 3));
+        setAllRoutes(routes);
+        setDisplayedRoutes(routes.slice(0, visibleCount));
+        setHasMore(routes.length > visibleCount);
       } catch (error) {
         setError('Failed to load featured routes');
         console.error('Error fetching featured routes:', error);
@@ -135,7 +153,7 @@ export const LandingPage: React.FC = () => {
     };
 
     fetchFeaturedRoutes();
-  }, []);
+  }, [visibleCount]);
 
   return (
     <Box sx={{ 
@@ -308,7 +326,7 @@ export const LandingPage: React.FC = () => {
             </Alert>
           ) : (
             <Grid container spacing={4}>
-              {featuredRoutes.map((route) => (
+              {displayedRoutes.map((route) => (
                 <Grid item xs={12} sm={6} md={4} key={route.id}>
                   <StyledCard 
                     onClick={() => navigate(`/preview/route/${route.persistentId}`)}
@@ -363,6 +381,30 @@ export const LandingPage: React.FC = () => {
                 </Grid>
               ))}
             </Grid>
+          )}
+          
+          {hasMore && !loading && !error && (
+            <Box display="flex" justifyContent="center" mt={4}>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={loadMoreRoutes}
+                sx={{ 
+                  px: 4, 
+                  py: 1.5,
+                  fontSize: '1rem',
+                  fontFamily: 'Montserrat',
+                  minWidth: '200px',
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  }
+                }}
+              >
+                Load More Routes
+              </Button>
+            </Box>
           )}
         </Container>
       </Box>
