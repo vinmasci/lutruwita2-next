@@ -43,10 +43,10 @@
   z-index: 1000;
 }
 
-/* Move the title 20% to the right only on mobile devices */
+/* Position the title on mobile devices */
 @media only screen and (max-width: 650px) {
   .route-filename {
-    left: 70%;
+    left: 60%;
   }
 }
 
