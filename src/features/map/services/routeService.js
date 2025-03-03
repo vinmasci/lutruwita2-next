@@ -1,6 +1,7 @@
 import { useAuth0 } from '@auth0/auth0-react';
 export const useRouteService = () => {
-    const { getAccessTokenSilently } = useAuth0();
+    const { getAccessTokenSilently, user } = useAuth0();
+    const userId = user?.sub;
     // Always use relative URL for serverless deployment
     const API_BASE = '/api/routes';
     const getAuthHeaders = async () => {
@@ -58,19 +59,26 @@ export const useRouteService = () => {
                 places: routeData.pois.places.length + ' POIs'
             });
             console.log('[routeService] POI details:', routeData.pois);
+            
+            // Add userId to the routeData
+            const routeDataWithUserId = {
+                ...routeData,
+                userId: userId // Use the userId from Auth0
+            };
+            
             const headers = await getAuthHeaders();
             console.log('[routeService] Making API call to:', API_BASE);
             console.log('[routeService] Request headers:', headers);
-            console.log('[routeService] Request body:', JSON.stringify(routeData, null, 2));
+            console.log('[routeService] Request body:', JSON.stringify(routeDataWithUserId, null, 2));
             console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
-            console.log('[routeService] Full route data:', JSON.stringify(routeData, null, 2));
+            console.log('[routeService] Full route data:', JSON.stringify(routeDataWithUserId, null, 2));
             
             // Transform the data structure to match what the API expects
             // The API requires a 'data' field, but our client uses 'routes'
             const transformedData = {
-                ...routeData,
+                ...routeDataWithUserId,
                 // Ensure persistentId is in UUID format if not already set
-                persistentId: routeData.persistentId || generateUUID(),
+                persistentId: routeDataWithUserId.persistentId || generateUUID(),
                 data: {
                     // Store all routes in the data structure
                     allRoutes: routeData.routes || [],
@@ -173,8 +181,8 @@ export const useRouteService = () => {
             console.log('[routeService] Transformed data for API:', JSON.stringify(transformedData, null, 2));
             
             // If routeData has a persistentId, it's an update to an existing route
-            const endpoint = routeData.persistentId ? `${API_BASE}/${routeData.persistentId}` : `${API_BASE}/save`;
-            const method = routeData.persistentId ? 'PUT' : 'POST';
+            const endpoint = routeDataWithUserId.persistentId ? `${API_BASE}/${routeDataWithUserId.persistentId}` : `${API_BASE}/save`;
+            const method = routeDataWithUserId.persistentId ? 'PUT' : 'POST';
             const response = await fetch(endpoint, {
                 method,
                 headers,
@@ -296,6 +304,12 @@ export const useRouteService = () => {
     const listRoutes = async (filters) => {
         try {
             const queryParams = new URLSearchParams();
+            
+            // Add userId to query params to filter routes by the current user
+            if (userId) {
+                queryParams.append('userId', userId);
+            }
+            
             if (filters?.type) {
                 queryParams.append('type', filters.type);
             }

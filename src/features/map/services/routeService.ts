@@ -8,7 +8,8 @@ import {
 } from '../types/route.types';
 
 export const useRouteService = () => {
-  const { getAccessTokenSilently } = useAuth0();
+  const { getAccessTokenSilently, user } = useAuth0();
+  const userId = user?.sub;
   
   // Always use relative URL for serverless deployment
   const API_BASE = '/api/routes';
@@ -82,14 +83,20 @@ export const useRouteService = () => {
       });
       console.log('[routeService] POI details:', routeData.pois);
       
+      // Add userId to the routeData
+      const routeDataWithUserId = {
+        ...routeData,
+        userId: userId // Use the userId from Auth0
+      };
+      
       const headers = await getAuthHeaders();
       console.log('[routeService] Making API call to:', API_BASE);
       console.log('[routeService] Request headers:', headers);
-      console.log('[routeService] Request body:', JSON.stringify(routeData, null, 2));
+      console.log('[routeService] Request body:', JSON.stringify(routeDataWithUserId, null, 2));
 
       console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
       console.log('[routeService] Route descriptions raw data:', JSON.stringify(routeData.routes.map(r => r.description), null, 2));
-      console.log('[routeService] Full route data:', JSON.stringify(routeData, null, 2));
+      console.log('[routeService] Full route data:', JSON.stringify(routeDataWithUserId, null, 2));
       
 // If routeData has a persistentId, it's an update to an existing route
 const endpoint = routeData.persistentId ? `${API_BASE}/${routeData.persistentId}` : `${API_BASE}/save`;
@@ -98,7 +105,7 @@ const method = routeData.persistentId ? 'PUT' : 'POST';
 const response = await fetch(endpoint, {
   method,
   headers,
-  body: JSON.stringify(routeData),
+  body: JSON.stringify(routeDataWithUserId),
   credentials: 'include'
 });
 
@@ -155,6 +162,12 @@ const response = await fetch(endpoint, {
   ): Promise<ListRoutesResponse> => {
     try {
       const queryParams = new URLSearchParams();
+      
+      // Add userId to query params to filter routes by the current user
+      if (userId) {
+        queryParams.append('userId', userId);
+      }
+      
       if (filters?.type) {
         queryParams.append('type', filters.type);
       }

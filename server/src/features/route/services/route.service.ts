@@ -304,11 +304,8 @@ export class RouteService {
         query.isPublic = filter.isPublic;
       }
 
-      // Show user's own routes and public routes
-      query.$or = [
-        { userId },
-        { isPublic: true }
-      ];
+    // Only show the current user's routes
+    query.userId = userId;
 
       const routes = await RouteModel.find(query)
         .select('_id persistentId name type isPublic viewCount lastViewed createdAt updatedAt')

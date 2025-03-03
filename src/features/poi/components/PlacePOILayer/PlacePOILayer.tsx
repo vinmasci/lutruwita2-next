@@ -380,8 +380,8 @@ export const PlacePOILayer: React.FC<Props> = () => {
         },
         totalPositions,
         {
-          iconSize: 17,
-          spacing: 5.5,
+          iconSize: 10,
+          spacing: 22, // Increased spacing from 5.5 to 10 for better separation
           maxPerRow: 4, // Always use 4 to ensure space for plus badge
           baseOffset
         }

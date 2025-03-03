@@ -38,11 +38,13 @@ export const ElevationProfilePanel = ({
       sx={{
         backgroundColor: 'rgba(26, 26, 26, 0.9)',
         color: 'white',
-        padding: '4px 12px',
+        padding: '8px 16px', // Increased padding for bigger tabs
+        fontSize: '16px', // Increased font size for better readability
+        fontWeight: activeTab === tab ? 'bold' : 'normal', // Bold text for active tab
         borderRadius: '4px 4px 0 0',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderBottom: activeTab === tab ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-        marginRight: '4px',
+        marginRight: '8px', // Increased margin for better spacing
         '&:hover': {
           backgroundColor: 'rgba(45, 45, 45, 0.9)'
         }
@@ -57,58 +59,65 @@ export const ElevationProfilePanel = ({
       className={isCollapsed ? 'collapsed' : ''} 
       sx={{ height: `${panelHeight}px`, '&.collapsed': { transform: `translateY(${panelHeight}px)` } }}
     >
-      {/* Tab buttons on the right side - no background container */}
+      {/* Tab buttons - no background container */}
       <Box sx={{ 
         position: 'absolute', 
-        top: '-24px', 
-        right: '80px', // Position to the left of the control buttons
+        top: '-32px', // Adjusted to accommodate larger buttons
+        right: '100px', // Position to the left of the control buttons
         display: 'flex',
         alignItems: 'flex-end',
+        zIndex: 103
         // No background or border styling
       }}>
         <TabButton tab="elevation" label="Elevation" />
         <TabButton tab="description" label="Description" />
       </Box>
       
-      {/* Control buttons (maximize/minimize) */}
+      {/* Control buttons (maximize/minimize) as separate circular buttons */}
       <Box sx={{ 
         position: 'absolute', 
-        top: '-24px', 
+        top: '-32px', // Adjusted to accommodate larger buttons
         right: '16px',
         display: 'flex',
         alignItems: 'flex-end',
-        backgroundColor: 'rgba(26, 26, 26, 0.9)',
-        borderRadius: '4px 4px 0 0',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderBottom: 'none'
+        gap: '10px', // Space between buttons
+        zIndex: 103
       }}>
         <IconButton
           onClick={() => setIsMaximized(!isMaximized)}
-          size="small"
           disabled={isCollapsed}
           sx={{ 
             color: 'white',
-            padding: '2px',
+            backgroundColor: 'rgba(26, 26, 26, 0.9)',
+            border: '1px solid rgba(255, 255, 255, 0.8)', // Thin white stroke
+            borderRadius: '50%', // Make it circular
+            padding: '8px', // Larger button
+            width: '36px', // Fixed width
+            height: '36px', // Fixed height
             opacity: isCollapsed ? 0.5 : 1,
             '&:hover': {
-              backgroundColor: isCollapsed ? 'transparent' : 'rgba(255, 255, 255, 0.1)'
+              backgroundColor: isCollapsed ? 'rgba(26, 26, 26, 0.9)' : 'rgba(45, 45, 45, 0.9)'
             }
           }}
         >
-          {isMaximized ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+          {isMaximized ? <FullscreenExitIcon fontSize="medium" /> : <FullscreenIcon fontSize="medium" />}
         </IconButton>
         <IconButton
           onClick={() => setIsCollapsed(!isCollapsed)}
-          size="small"
           sx={{ 
             color: 'white',
-            padding: '2px',
+            backgroundColor: 'rgba(26, 26, 26, 0.9)',
+            border: '1px solid rgba(255, 255, 255, 0.8)', // Thin white stroke
+            borderRadius: '50%', // Make it circular
+            padding: '8px', // Larger button
+            width: '36px', // Fixed width
+            height: '36px', // Fixed height
             '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+              backgroundColor: 'rgba(45, 45, 45, 0.9)'
             }
           }}
         >
-          {isCollapsed ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          {isCollapsed ? <KeyboardArrowUpIcon fontSize="medium" /> : <KeyboardArrowDownIcon fontSize="medium" />}
         </IconButton>
       </Box>
 

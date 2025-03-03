@@ -1,3 +1,8 @@
+/**
+ * NOTE: This TypeScript version is redundant. 
+ * The JavaScript version (PresentationElevationProfilePanel.js) is the one being used in production.
+ * Any changes should be made to the JS version instead.
+ */
 import { ReactNode, useState, useEffect } from 'react';
 import { ProcessedRoute } from '../../../gpx/types/gpx.types';
 import { PresentationElevationProfile } from './PresentationElevationProfile';

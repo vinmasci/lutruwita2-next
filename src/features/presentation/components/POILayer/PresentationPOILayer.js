@@ -138,8 +138,8 @@ export const PresentationPOILayer = ({ map }) => {
                 name: locationPois[0].name,
                 coordinates: [lng, lat]
             }, totalPositions, {
-                iconSize: 24, // Increased to match larger POI size
-                spacing: 7, // Dramatically increased spacing for complete separation
+                iconSize: 20, // Increased to match larger POI size
+                spacing: 12, // Further increased spacing for better separation
                 maxPerRow: 4,
                 baseOffset
             });
