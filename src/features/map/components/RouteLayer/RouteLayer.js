@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
+import { useRouteContext } from "../../context/RouteContext";
 
 // Material UI colors
 const DEFAULT_COLORS = {
@@ -11,9 +12,20 @@ const DEFAULT_COLORS = {
 export const RouteLayer = ({ map, route }) => {
     const isStyleLoaded = useMapStyle(map);
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
+    const { currentRoute } = useRouteContext();
 
     // Keep track of the previous color to detect changes
     const prevColorRef = useRef(route?.color);
+    
+    // Animation interval reference
+    const animationIntervalRef = useRef(null);
+    
+    // Track animation state
+    const animationState = useRef({
+        growing: true,
+        mainWidth: 3,
+        borderWidth: 5
+    });
 
     useEffect(() => {
         try {
@@ -296,6 +308,87 @@ export const RouteLayer = ({ map, route }) => {
             prevColorRef.current = currentColor;
         }
     }, [map, route, isStyleLoaded, route?.color]); // Add route.color as a direct dependency
+
+    // Animation effect for the current route
+    useEffect(() => {
+        // Clear any existing animation interval
+        if (animationIntervalRef.current) {
+            clearInterval(animationIntervalRef.current);
+            animationIntervalRef.current = null;
+        }
+        
+        // Only animate for the current route when map is ready
+        if (!map || !route || !isStyleLoaded || !currentRoute) {
+            return;
+        }
+        
+        // Check if this is the current route
+        const isCurrentRoute = currentRoute.routeId === route.routeId;
+        
+        if (!isCurrentRoute) {
+            return;
+        }
+        
+        console.log('[RouteLayer] Setting up animation for current route:', route.routeId);
+        
+        const routeId = route.routeId;
+        const mainLayerId = `${routeId}-main-line`;
+        const borderLayerId = `${routeId}-main-border`;
+        
+        // Reset animation state
+        animationState.current = {
+            growing: true,
+            mainWidth: 3,
+            borderWidth: 5
+        };
+        
+        // Start the animation interval - using a slower interval for more visible effect
+        animationIntervalRef.current = setInterval(() => {
+            const state = animationState.current;
+            
+            // Calculate new widths with larger steps for more visible effect
+            if (state.growing) {
+                state.mainWidth += 0.2;
+                state.borderWidth += 0.2;
+                if (state.mainWidth >= 6) {
+                    state.growing = false;
+                }
+            } else {
+                state.mainWidth -= 0.2;
+                state.borderWidth -= 0.2;
+                if (state.mainWidth <= 3) {
+                    state.growing = true;
+                }
+            }
+            
+            // Apply new widths to layers
+            if (map.getLayer(mainLayerId)) {
+                map.setPaintProperty(mainLayerId, 'line-width', state.mainWidth);
+            }
+            
+            if (map.getLayer(borderLayerId)) {
+                map.setPaintProperty(borderLayerId, 'line-width', state.borderWidth);
+            }
+        }, 50); // 50ms interval for smoother animation
+        
+        // Cleanup function
+        return () => {
+            if (animationIntervalRef.current) {
+                clearInterval(animationIntervalRef.current);
+                animationIntervalRef.current = null;
+                console.log('[RouteLayer] Animation cleaned up');
+            }
+            
+            // Reset widths when unmounting
+            if (map && map.getLayer(mainLayerId)) {
+                map.setPaintProperty(mainLayerId, 'line-width', 3);
+            }
+            
+            if (map && map.getLayer(borderLayerId)) {
+                map.setPaintProperty(borderLayerId, 'line-width', 5);
+            }
+        };
+    }, [map, route, isStyleLoaded, route?.isFocused]);
 
     return null;
 };

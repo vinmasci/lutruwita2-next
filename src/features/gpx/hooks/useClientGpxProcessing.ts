@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useMapContext } from '../../map/context/MapContext';
 import { parseGpx } from '../utils/gpxParser';
 import { GPXProcessingError } from '../types/gpx.types';
@@ -11,6 +11,7 @@ export const useClientGpxProcessing = () => {
   const { map } = useMapContext(); // Get map instance for surface detection
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<GPXProcessingError | null>(null);
+  const [showSurfaceProcessingAlert, setShowSurfaceProcessingAlert] = useState(false);
 
   const processGpx = async (file: File): Promise<ProcessedRoute | null> => {
     setIsLoading(true);
@@ -109,8 +110,15 @@ export const useClientGpxProcessing = () => {
               routeId: route.routeId || route.id
             }
           };
+          
+          // Show surface processing alert
+          setShowSurfaceProcessingAlert(true);
+          
           // Detect and save unpaved sections
           const sections = await addSurfaceOverlay(map, featureWithRouteId);
+          
+          // Hide alert when processing is complete
+          setShowSurfaceProcessingAlert(false);
           route.unpavedSections = sections.map(section => ({
             startIndex: section.startIndex,
             endIndex: section.endIndex,
@@ -138,9 +146,15 @@ export const useClientGpxProcessing = () => {
     }
   };
 
+  const handleCloseAlert = useCallback(() => {
+    setShowSurfaceProcessingAlert(false);
+  }, []);
+
   return {
     processGpx,
     isLoading,
-    error
+    error,
+    showSurfaceProcessingAlert,
+    handleCloseAlert
   };
 };

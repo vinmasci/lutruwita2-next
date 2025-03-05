@@ -11,7 +11,7 @@ import { PresentationPOIViewer } from '../POIViewer';
 import './PresentationPOILayer.css';
 export const PresentationPOILayer = ({ map }) => {
     const { currentRoute } = useRouteContext();
-    const { loadPOIsFromRoute, getPOIsForRoute } = usePOIContext();
+    const { loadPOIsFromRoute, getPOIsForRoute, visibleCategories } = usePOIContext();
     const markersRef = useRef([]);
     const placeMarkersRef = useRef([]);
     const [selectedPOI, setSelectedPOI] = useState(null);
@@ -56,8 +56,14 @@ export const PresentationPOILayer = ({ map }) => {
         loadPOIsFromRoute(currentRoute._loadedState.pois);
     }, [currentRoute]); // Remove loadPOIsFromRoute from deps since it's a stable context function
     // Memoize POI data to prevent unnecessary recalculations
-    // Memoize POI data based on the actual POIs from context
-    const poiData = useMemo(() => getPOIsForRoute(), [getPOIsForRoute]); // Will update when POIs change since getPOIsForRoute is memoized with [pois]
+    // Memoize POI data based on the actual POIs from context and filter by visible categories
+    const poiData = useMemo(() => {
+        const allPOIs = getPOIsForRoute();
+        return {
+            draggable: allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category)),
+            places: allPOIs.places.filter(poi => visibleCategories.includes(poi.category))
+        };
+    }, [getPOIsForRoute, visibleCategories]); // Will update when POIs or visible categories change
     // Memoize marker creation function
     const createMarker = useCallback((poi) => {
         const el = document.createElement('div');
@@ -66,10 +72,16 @@ export const PresentationPOILayer = ({ map }) => {
         const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
         // Set up marker HTML with bubble-pin style and initial zoom level
         const initialZoom = Math.floor(map.getZoom());
+        
+        // Special handling for HC icon which has two icons side by side
+        const iconContent = poi.icon === 'ClimbHC' 
+          ? `<span style="font-size: 14px; color: white;"><i class="fa-solid fa-h"></i><i class="fa-solid fa-c"></i></span>`
+          : `<i class="${ICON_PATHS[poi.icon]} marker-icon"></i>`;
+          
         el.innerHTML = `
       <div class="marker-container" data-zoom="${initialZoom}">
         <div class="marker-bubble" style="background-color: ${markerColor}">
-          <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
+          ${iconContent}
         </div>
         <div class="marker-point" style="border-top-color: ${markerColor}"></div>
       </div>

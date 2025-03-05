@@ -1,3 +1,11 @@
+
+
+/**
+ * THIS FILE IS LIKELY REDUNDANT
+ * Please use the version in src/theme/responsive.ts if it exists.
+ * This file may be part of an incomplete migration.
+ */
+
 import { Theme } from '@mui/material/styles';
 
 export const responsiveDrawerWidth = (theme: Theme) => ({

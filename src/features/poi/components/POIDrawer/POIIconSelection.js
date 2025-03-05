@@ -30,7 +30,8 @@ const POIIconSelection = ({ mode, selectedIcon, onIconSelect, onBack, startDrag 
                 { category: 'natural-features', label: 'Natural Features', iconGroups: [['Mountain', 'TreePine', 'Binoculars', 'MountainBikePark', 'Swimming']] },
                 { category: 'town-services', label: 'Town Services', iconGroups: [['Hospital', 'Toilet', 'ShowerHead', 'ParkingSquare', 'Fuel', 'Mail', 'Bike']] },
                 { category: 'transportation', label: 'Transportation', iconGroups: [['Bus', 'TrainStation', 'Plane', 'Ship']] },
-                { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'Wrench', 'Flag']] }
+                { category: 'event-information', label: 'Event Information', iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'Wrench', 'Flag']] },
+                { category: 'climb-category', label: 'Climb Categories', iconGroups: [['ClimbHC', 'ClimbCat1', 'ClimbCat2', 'ClimbCat3', 'ClimbCat4']] }
             ].map(({ category: categoryKey, label, iconGroups }) => {
                 return (_jsxs(Box, { sx: { mb: 2 }, children: [_jsx(Typography, { variant: "caption", sx: {
                                 color: 'white',
@@ -62,7 +63,15 @@ const POIIconSelection = ({ mode, selectedIcon, onIconSelect, onBack, startDrag 
                                         '&:hover': {
                                             transform: 'scale(1.1)'
                                         }
-                                    }, children: [_jsx("i", { className: ICON_PATHS[icon.name], style: { fontSize: '12px', color: 'white' } }), hoveredIcon === icon.name && (_jsx(StyledTooltip, { children: icon.label }))] }, icon.name));
+                                    }, children: [
+                                        icon.name === 'ClimbHC' ? 
+                                        _jsx("span", { style: { fontSize: '11px', color: 'white' }, children: [
+                                            _jsx("i", { className: "fa-solid fa-h" }),
+                                            _jsx("i", { className: "fa-solid fa-c" })
+                                        ]}) : 
+                                        _jsx("i", { className: ICON_PATHS[icon.name], style: { fontSize: '12px', color: 'white' } }),
+                                        hoveredIcon === icon.name && (_jsx(StyledTooltip, { children: icon.label }))
+                                    ] }, icon.name));
                             }) }, groupIndex)))] }, `${categoryKey}-${iconGroups[0][0]}`));
             }), _jsx("div", { style: { marginTop: 'auto', display: 'flex', gap: '8px' }, children: _jsx(Button, { variant: "text", color: "inherit", onClick: onBack, fullWidth: true, children: "Back" }) })] }));
 };

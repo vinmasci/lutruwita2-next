@@ -104,3 +104,8 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Hide cursor when dragging POI */
+.hide-cursor {
+  cursor: none !important;
+}

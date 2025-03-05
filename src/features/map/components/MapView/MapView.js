@@ -436,10 +436,47 @@ function MapViewContent() {
         setSelectedPOI(poi);
     };
     const handlePOICreation = (icon, category, coordinates) => {
-        setSelectedPOIDetails({ iconName: icon, category, coordinates });
-        setDetailsDrawerOpen(true);
-        setPoiMode('none');
-        setIsPOIDrawerOpen(false);
+        console.log('handlePOICreation called with:', {
+            icon,
+            category,
+            coordinates,
+            coordinatesString: `${coordinates[0].toFixed(6)}, ${coordinates[1].toFixed(6)}`
+        });
+        
+        // Check if coordinates are valid
+        if (!coordinates || coordinates.length !== 2 || 
+            typeof coordinates[0] !== 'number' || 
+            typeof coordinates[1] !== 'number') {
+            console.error('Invalid coordinates:', coordinates);
+            return;
+        }
+        
+        // Log the current map center for comparison
+        if (mapInstance.current) {
+            const center = mapInstance.current.getCenter();
+            console.log('Map center vs POI coordinates:', {
+                mapCenter: [center.lng, center.lat],
+                mapCenterString: `${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}`,
+                poiCoordinates: coordinates,
+                poiCoordinatesString: `${coordinates[0].toFixed(6)}, ${coordinates[1].toFixed(6)}`,
+                difference: {
+                    lng: coordinates[0] - center.lng,
+                    lat: coordinates[1] - center.lat
+                }
+            });
+        }
+        
+        // Clear any existing temporary POI details
+        setSelectedPOIDetails(null);
+        
+        // Wait a moment for the UI to update before setting new details
+        setTimeout(() => {
+            console.log('Setting selectedPOIDetails with coordinates:', coordinates);
+            setSelectedPOIDetails({ iconName: icon, category, coordinates });
+            setDetailsDrawerOpen(true);
+            setPoiMode('none');
+            setIsPOIDrawerOpen(false);
+        }, 0);
     };
     const handlePOIDetailsSave = async (details) => {
         if (!selectedPOIDetails)
@@ -447,6 +484,13 @@ function MapViewContent() {
         try {
             // Get current route ID
             const currentRouteId = currentRoute?.routeId || `route-${currentRoute?.id}`;
+            
+            console.log('POI details before saving:', {
+                selectedPOIDetails,
+                details,
+                coordinatesString: `${selectedPOIDetails.coordinates[0].toFixed(6)}, ${selectedPOIDetails.coordinates[1].toFixed(6)}`
+            });
+            
             // Create POI with all details
             const poiDetails = {
                 type: 'draggable',
@@ -456,8 +500,17 @@ function MapViewContent() {
                 category: selectedPOIDetails.category,
                 icon: selectedPOIDetails.iconName,
             };
+            
             console.log('[POI_DETAILS_FOR_MONGODB]', JSON.stringify(poiDetails, null, 2));
+            
+            // Add POI to context
+            console.log('Adding POI to context with coordinates:', {
+                coordinates: poiDetails.coordinates,
+                coordinatesString: `${poiDetails.coordinates[0].toFixed(6)}, ${poiDetails.coordinates[1].toFixed(6)}`
+            });
+            
             addPOI(poiDetails);
+            
             // Clear temporary marker and close drawer
             setSelectedPOIDetails(null);
             setDetailsDrawerOpen(false);
@@ -579,7 +632,7 @@ function MapViewContent() {
       pitch: 0,
       bearing: 0
     },
-    projection: 'globe',
+    projection: 'mercator', // Changed from 'globe' to 'mercator' for flat projection
     maxPitch: 85,
     width: '100%',
     height: '100%'  // Explicitly setting width and height to match presentation mode

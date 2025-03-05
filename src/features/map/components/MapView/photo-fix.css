@@ -1,6 +1,6 @@
-/* Modified approach to keep photos behind UI components without extreme z-index values */
+/* Modified approach to keep photos behind UI components and POI markers without extreme z-index values */
 
-/* Target all photo-related elements and place them behind UI */
+/* Target all photo-related elements and place them behind UI and POI markers */
 .photo-layer,
 .photo-marker,
 .photo-cluster,
@@ -10,7 +10,16 @@
 .photo-cluster-bubble,
 .photo-marker img,
 .photo-cluster img {
-  z-index: 5 !important; /* Higher than map layers (1) but lower than UI (100+) */
+  z-index: 5 !important; /* Higher than map layers (1) but lower than POI markers (10) and UI (100+) */
+}
+
+/* Ensure POI markers appear above photos but below UI components */
+.poi-marker,
+.marker-container,
+.marker-bubble,
+.marker-point,
+.marker-icon {
+  z-index: 10 !important; /* Higher than photos (5) but lower than UI (100+) */
 }
 
 /* Ensure UI components maintain their proper z-index hierarchy */

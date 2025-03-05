@@ -58,5 +58,11 @@ export const ICON_PATHS = {
     'X': 'fa-solid fa-xmark',
     'CircleDot': 'fa-regular fa-tower-control',
     'Wrench': 'fa-solid fa-wrench',
-    'Flag': 'fa-solid fa-flag'
+    'Flag': 'fa-solid fa-flag',
+    // Climb Categories
+    'ClimbCat1': 'fa-solid fa-1',
+    'ClimbCat2': 'fa-solid fa-2',
+    'ClimbCat3': 'fa-solid fa-3',
+    'ClimbCat4': 'fa-solid fa-4',
+    'ClimbHC': '<span><i class="fa-solid fa-h"></i><i class="fa-solid fa-c"></i></span>'
 };

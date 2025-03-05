@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Box, Typography, IconButton, CircularProgress, Tooltip, Divider } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { useMapContext } from '../../../map/context/MapContext';
@@ -9,13 +9,13 @@ import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { ListOrdered, Camera, CameraOff } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
 
 export const PresentationSidebar = ({ isOpen }) => {
     const { routes, currentRoute, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
-    const { loadPOIsFromRoute } = usePOIContext();
+    const { loadPOIsFromRoute, visibleCategories, toggleCategoryVisibility } = usePOIContext();
     const { addPhoto, isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
     const [isNestedOpen, setIsNestedOpen] = useState(true);
     const currentIndex = routes.findIndex(route => route.id === currentRoute?.id);
@@ -64,8 +64,11 @@ export const PresentationSidebar = ({ isOpen }) => {
                                 '&:hover': {
                                     backgroundColor: 'rgba(255, 255, 255, 0.1)'
                                 },
-                                '&:hover .MuiListItemIcon-root svg, &[data-active="true"] .MuiListItemIcon-root svg': {
+                                '&:hover .MuiListItemIcon-root svg': {
                                     color: '#ff4d4f'
+                                },
+                                '&[data-active="true"] .MuiListItemIcon-root svg': {
+                                    color: '#4caf50'
                                 }
                             }, 
                             children: _jsx(ListItemIcon, { 
@@ -97,6 +100,152 @@ export const PresentationSidebar = ({ isOpen }) => {
                                 children: isPhotosVisible ? 
                                     _jsx(Camera, { color: '#4caf50' }) : 
                                     _jsx(CameraOff, { color: '#ff4d4f' }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    // POI Category Toggles
+                    _jsx(Tooltip, { 
+                        title: "Road Information", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('road-information'),
+                            sx: {
+                                marginTop: '8px',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(AlertTriangle, { 
+                                    color: visibleCategories.includes('road-information') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Accommodation", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('accommodation'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Tent, { 
+                                    color: visibleCategories.includes('accommodation') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Food & Drink", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('food-drink'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Coffee, { 
+                                    color: visibleCategories.includes('food-drink') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Natural Features", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('natural-features'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Mountain, { 
+                                    color: visibleCategories.includes('natural-features') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Town Services", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('town-services'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Building, { 
+                                    color: visibleCategories.includes('town-services') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Transportation", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('transportation'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Bus, { 
+                                    color: visibleCategories.includes('transportation') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Event Information", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('event-information'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Flag, { 
+                                    color: visibleCategories.includes('event-information') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Climb Categories", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('climb-category'),
+                            sx: {
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(TrendingUp, { 
+                                    color: visibleCategories.includes('climb-category') ? '#4caf50' : '#ff4d4f' 
+                                }) 
                             }) 
                         }) 
                     })

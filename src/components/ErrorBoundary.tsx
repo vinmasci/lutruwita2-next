@@ -1,3 +1,9 @@
+/**
+ * THIS FILE IS LIKELY REDUNDANT
+ * Please use the JavaScript version (ErrorBoundary.js) if it exists.
+ * This TypeScript file may be part of an incomplete migration.
+ */
+
 import React from 'react';
 
 interface Props {

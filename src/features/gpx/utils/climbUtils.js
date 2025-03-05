@@ -6,7 +6,7 @@ const CLIMB_CONFIG = {
     PEAK_THRESHOLD: 10, // Minimum elevation difference to consider as a peak (meters)
     VALLEY_MERGE_DIST: 20000, // Maximum distance between valleys to merge climbs (meters)
     MIN_DOWNHILL_GRADIENT: -1, // Minimum gradient to consider as significant downhill (percent)
-    MIN_DOWNHILL_LENGTH: 1200, // Minimum length for a downhill section to reset climb (meters)
+    MIN_DOWNHILL_LENGTH: 600, // Minimum length for a downhill section to reset climb (meters)
 };
 // Category configuration
 const CATEGORY_CONFIG = {
@@ -68,159 +68,203 @@ const calculateGradient = (point1, point2) => {
     return (elevationChange / distance) * 100;
 };
 /**
- * Detects climbs by identifying significant elevation gains between valleys
+ * Detects climbs by identifying sections with consistent steep gradients
  */
 export const detectClimbs = (data) => {
     if (data.length < 2)
         return [];
     console.log('[ClimbUtils] Starting climb detection with data points:', data.length);
+    
     // Smooth the elevation data to reduce noise
     const smoothedData = smoothElevationData(data, CLIMB_CONFIG.SMOOTHING_WINDOW);
-    // Find valleys (potential climb start/end points)
-    const valleys = [0]; // Always include start point
-    const peaks = [];
-    for (let i = 1; i < smoothedData.length - 1; i++) {
-        const prev = smoothedData[i - 1].elevation;
-        const curr = smoothedData[i].elevation;
-        const next = smoothedData[i + 1].elevation;
-        // Identify local minimums (valleys)
-        if (prev > curr && curr <= next) {
-            valleys.push(i);
-        }
-        // Identify local maximums (peaks)
-        if (prev < curr && curr >= next) {
-            peaks.push(i);
+    
+    // Find steep sections (2.5% or greater)
+    const steepSections = [];
+    let currentSection = null;
+    
+    // Scan through the data to find continuous steep sections
+    for (let i = 1; i < smoothedData.length; i++) {
+        const gradient = calculateGradient(smoothedData[i-1], smoothedData[i]);
+        
+        // If we find a steep section
+        if (gradient >= CLIMB_CONFIG.MIN_GRADIENT) {
+            // If we're not already tracking a section, start a new one
+            if (!currentSection) {
+                currentSection = {
+                    startIdx: i-1,
+                    points: [smoothedData[i-1], smoothedData[i]],
+                    gradients: [gradient]
+                };
+            } else {
+                // Otherwise add to the current section
+                currentSection.points.push(smoothedData[i]);
+                currentSection.gradients.push(gradient);
+            }
+        } 
+        // If we're not in a steep section but were tracking one
+        else if (currentSection) {
+            // If the section is long enough, save it
+            const sectionDistance = smoothedData[i-1].distance - smoothedData[currentSection.startIdx].distance;
+            if (sectionDistance >= CLIMB_CONFIG.MIN_LENGTH) {
+                steepSections.push(currentSection);
+            }
+            currentSection = null;
         }
     }
-    valleys.push(smoothedData.length - 1); // Always include end point
-    // Process valleys to identify climbs
-    const climbs = [];
-    for (let i = 0; i < valleys.length - 1; i++) {
-        const startIdx = valleys[i];
-        const endIdx = valleys[i + 1];
-        const segment = smoothedData.slice(startIdx, endIdx + 1);
-        // Find highest point in segment
-        let maxElevation = -Infinity;
-        let maxElevationIdx = startIdx;
-        for (let j = 0; j < segment.length; j++) {
-            if (segment[j].elevation > maxElevation) {
-                maxElevation = segment[j].elevation;
-                maxElevationIdx = startIdx + j;
+    
+    // Don't forget to add the last section if we were tracking one
+    if (currentSection) {
+        const lastIdx = smoothedData.length - 1;
+        const sectionDistance = smoothedData[lastIdx].distance - smoothedData[currentSection.startIdx].distance;
+        if (sectionDistance >= CLIMB_CONFIG.MIN_LENGTH) {
+            steepSections.push(currentSection);
+        }
+    }
+    
+    console.log(`[ClimbUtils] Found ${steepSections.length} steep sections`);
+    
+    // Merge nearby steep sections if they're part of the same climb
+    const mergedSections = [];
+    for (let i = 0; i < steepSections.length; i++) {
+        const currentSection = steepSections[i];
+        
+        // If this is the first section or we can't merge with the previous one
+        if (i === 0) {
+            mergedSections.push(currentSection);
+            continue;
+        }
+        
+        const prevSection = mergedSections[mergedSections.length - 1];
+        const lastPointPrev = prevSection.points[prevSection.points.length - 1];
+        const firstPointCurrent = currentSection.points[0];
+        
+        // Calculate distance between sections
+        const distanceBetween = firstPointCurrent.distance - lastPointPrev.distance;
+        
+        // Only merge if sections are close AND the connecting segment isn't a significant downhill
+        if (distanceBetween <= 10000) { // 10km max gap between steep sections
+            // Check if there's a significant downhill between sections
+            let hasSignificantDownhill = false;
+            
+            // Find the actual data points between the sections
+            const betweenStartIdx = smoothedData.findIndex(p => p.distance >= lastPointPrev.distance);
+            const betweenEndIdx = smoothedData.findIndex(p => p.distance >= firstPointCurrent.distance);
+            
+            if (betweenStartIdx < betweenEndIdx) {
+                const betweenPoints = smoothedData.slice(betweenStartIdx, betweenEndIdx + 1);
+                
+                // Check if there's a significant downhill
+                let downhillLength = 0;
+                for (let j = 1; j < betweenPoints.length; j++) {
+                    const gradient = calculateGradient(betweenPoints[j-1], betweenPoints[j]);
+                    if (gradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
+                        downhillLength += betweenPoints[j].distance - betweenPoints[j-1].distance;
+                        if (downhillLength >= CLIMB_CONFIG.MIN_DOWNHILL_LENGTH) {
+                            hasSignificantDownhill = true;
+                            break;
+                        }
+                    } else {
+                        downhillLength = 0;
+                    }
+                }
+                
+                // If no significant downhill, merge the sections
+                if (!hasSignificantDownhill) {
+                    // Add the points between sections to maintain continuity
+                    prevSection.points = prevSection.points.concat(betweenPoints.slice(1), currentSection.points.slice(1));
+                    prevSection.gradients = prevSection.gradients.concat(
+                        // Calculate gradients for the between points
+                        betweenPoints.slice(1).map((p, idx) => 
+                            calculateGradient(betweenPoints[idx], p)
+                        ),
+                        currentSection.gradients
+                    );
+                    continue;
+                }
             }
         }
-        // Check for significant downhill sections that would reset the climb
-        let hasSignificantDownhill = false;
-        let currentDownhillLength = 0;
-        let lastGradient = 0;
-        for (let j = 1; j < segment.length; j++) {
-            const gradient = calculateGradient(segment[j - 1], segment[j]);
-            if (gradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
-                if (lastGradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
-                    // Accumulate downhill length if consecutive points are downhill
-                    currentDownhillLength += segment[j].distance - segment[j - 1].distance;
+        
+        // If we couldn't merge, add as a new section
+        mergedSections.push(currentSection);
+    }
+    
+    console.log(`[ClimbUtils] Merged into ${mergedSections.length} climb sections`);
+    
+    // Convert merged sections to climb objects and filter out climbs with average gradient < 1.5%
+    const climbs = mergedSections.map(section => {
+        const startPoint = section.points[0];
+        let endPoint = section.points[section.points.length - 1];
+        
+        // Look ahead for higher elevation points within 5km of the end point
+        const lookAheadDistance = 5000; // 5km in meters
+        const endPointDistance = endPoint.distance;
+        const endPointElevation = endPoint.elevation;
+        
+        // Find the index of the end point in the smoothed data
+        const endPointIdx = smoothedData.findIndex(p => p.distance >= endPointDistance);
+        
+        if (endPointIdx !== -1 && endPointIdx < smoothedData.length - 1) {
+            // Look ahead up to 5km
+            let highestPoint = endPoint;
+            let currentIdx = endPointIdx + 1;
+            
+            while (currentIdx < smoothedData.length && 
+                   smoothedData[currentIdx].distance <= endPointDistance + lookAheadDistance) {
+                // If we find a higher point, update the highest point
+                if (smoothedData[currentIdx].elevation > highestPoint.elevation) {
+                    highestPoint = smoothedData[currentIdx];
                 }
-                else {
-                    // Start new downhill section
-                    currentDownhillLength = segment[j].distance - segment[j - 1].distance;
-                }
-                if (currentDownhillLength >= CLIMB_CONFIG.MIN_DOWNHILL_LENGTH) {
-                    hasSignificantDownhill = true;
-                    break;
-                }
+                currentIdx++;
             }
-            else {
-                currentDownhillLength = 0;
+            
+            // If we found a higher point, use it as the end point
+            if (highestPoint.elevation > endPointElevation) {
+                console.log(`[ClimbUtils] Extended climb to higher point ${(highestPoint.distance - endPointDistance) / 1000}km ahead`);
+                endPoint = highestPoint;
             }
-            lastGradient = gradient;
         }
+        
         // Calculate climb characteristics
-        const elevationGain = maxElevation - smoothedData[startIdx].elevation;
-        const totalDistance = smoothedData[maxElevationIdx].distance - smoothedData[startIdx].distance;
+        const elevationGain = endPoint.elevation - startPoint.elevation;
+        const totalDistance = endPoint.distance - startPoint.distance;
         const averageGradient = (elevationGain / totalDistance) * 100;
-        // Check if this segment qualifies as a climb and doesn't have significant downhill sections
-        if (!hasSignificantDownhill &&
-            elevationGain >= CLIMB_CONFIG.PEAK_THRESHOLD &&
-            totalDistance >= CLIMB_CONFIG.MIN_LENGTH &&
-            averageGradient >= CLIMB_CONFIG.MIN_GRADIENT) {
-            // Calculate FIETS score and determine category
-            const distanceKm = totalDistance / 1000;
-            const fietsScore = calculateFietsScore(elevationGain, distanceKm);
-            const { category, color } = determineCategory(fietsScore);
-            // Create climb object
-            const climb = {
-                startPoint: {
-                    distance: data[startIdx].distance,
-                    elevation: data[startIdx].elevation,
-                    gradient: averageGradient
-                },
-                endPoint: {
-                    distance: data[maxElevationIdx].distance,
-                    elevation: data[maxElevationIdx].elevation,
-                    gradient: averageGradient
-                },
-                totalDistance,
-                elevationGain,
-                averageGradient,
-                fietsScore,
-                category,
-                color
-            };
-            // Check if we should merge with previous climb
-            if (climbs.length > 0) {
-                const prevClimb = climbs[climbs.length - 1];
-                const distanceBetweenClimbs = climb.startPoint.distance - prevClimb.endPoint.distance;
-                if (distanceBetweenClimbs <= CLIMB_CONFIG.VALLEY_MERGE_DIST) {
-                    // Check for significant downhill sections between climbs
-                    let hasSignificantDownhillBetweenClimbs = false;
-                    let currentDownhillLength = 0;
-                    let lastGradient = 0;
-                    // Get the data points between the two climbs
-                    const betweenClimbsStartIdx = smoothedData.findIndex(p => p.distance >= prevClimb.endPoint.distance);
-                    const betweenClimbsEndIdx = smoothedData.findIndex(p => p.distance >= climb.startPoint.distance);
-                    const betweenClimbsSegment = smoothedData.slice(betweenClimbsStartIdx, betweenClimbsEndIdx + 1);
-                    for (let j = 1; j < betweenClimbsSegment.length; j++) {
-                        const gradient = calculateGradient(betweenClimbsSegment[j - 1], betweenClimbsSegment[j]);
-                        if (gradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
-                            if (lastGradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
-                                currentDownhillLength += betweenClimbsSegment[j].distance - betweenClimbsSegment[j - 1].distance;
-                            }
-                            else {
-                                currentDownhillLength = betweenClimbsSegment[j].distance - betweenClimbsSegment[j - 1].distance;
-                            }
-                            if (currentDownhillLength >= CLIMB_CONFIG.MIN_DOWNHILL_LENGTH) {
-                                hasSignificantDownhillBetweenClimbs = true;
-                                break;
-                            }
-                        }
-                        else {
-                            currentDownhillLength = 0;
-                        }
-                        lastGradient = gradient;
-                    }
-                    // Only merge if there's no significant downhill between climbs
-                    if (!hasSignificantDownhillBetweenClimbs) {
-                        // Merge climbs by updating end point of previous climb
-                        prevClimb.endPoint = climb.endPoint;
-                        prevClimb.totalDistance = prevClimb.endPoint.distance - prevClimb.startPoint.distance;
-                        prevClimb.elevationGain = prevClimb.endPoint.elevation - prevClimb.startPoint.elevation;
-                        prevClimb.averageGradient = (prevClimb.elevationGain / prevClimb.totalDistance) * 100;
-                        // Recalculate FIETS score and category for merged climb
-                        const mergedDistanceKm = prevClimb.totalDistance / 1000;
-                        prevClimb.fietsScore = calculateFietsScore(prevClimb.elevationGain, mergedDistanceKm);
-                        const { category, color } = determineCategory(prevClimb.fietsScore);
-                        prevClimb.category = category;
-                        prevClimb.color = color;
-                        console.log(`[ClimbUtils] Merged climb with previous: ${mergedDistanceKm.toFixed(1)}km at ${prevClimb.averageGradient.toFixed(1)}% (${prevClimb.category})`);
-                        continue;
-                    }
-                    else {
-                        console.log(`[ClimbUtils] Skipped merge due to significant downhill between climbs`);
-                    }
-                }
-            }
-            console.log(`[ClimbUtils] Found climb: ${(totalDistance / 1000).toFixed(1)}km at ${averageGradient.toFixed(1)}% (${category})`);
-            climbs.push(climb);
-        }
-    }
-    return climbs;
+        
+        // Calculate FIETS score and determine category
+        const distanceKm = totalDistance / 1000;
+        const fietsScore = calculateFietsScore(elevationGain, distanceKm);
+        const { category, color } = determineCategory(fietsScore);
+        
+        // Find the original data points for more accurate start/end values
+        const startIdx = data.findIndex(p => p.distance >= startPoint.distance);
+        const endIdx = data.findIndex(p => p.distance >= endPoint.distance);
+        
+        // Create climb object
+        const climb = {
+            startPoint: {
+                distance: data[startIdx].distance,
+                elevation: data[startIdx].elevation,
+                gradient: averageGradient
+            },
+            endPoint: {
+                distance: data[endIdx].distance,
+                elevation: data[endIdx].elevation,
+                gradient: averageGradient
+            },
+            totalDistance,
+            elevationGain,
+            averageGradient,
+            fietsScore,
+            category,
+            color
+        };
+        
+        console.log(`[ClimbUtils] Found climb: ${distanceKm.toFixed(1)}km at ${averageGradient.toFixed(1)}% (${category})`);
+        return climb;
+    });
+    
+    // Filter out climbs with average gradient less than 1.5%
+    const filteredClimbs = climbs.filter(climb => climb.averageGradient >= 1.5);
+    console.log(`[ClimbUtils] Filtered out ${climbs.length - filteredClimbs.length} climbs with average gradient < 1.5%`);
+    
+    return filteredClimbs;
 };

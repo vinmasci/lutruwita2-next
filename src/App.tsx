@@ -1,3 +1,9 @@
+/**
+ * THIS FILE IS LIKELY REDUNDANT
+ * Please use the JavaScript version (App.js) if it exists.
+ * This TypeScript file may be part of an incomplete migration.
+ */
+
 import { ThemeProvider } from '@mui/material/styles';
 import { Box, Button, Typography } from '@mui/material';
 import { theme } from './theme';

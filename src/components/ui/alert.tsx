@@ -1,3 +1,9 @@
+/**
+ * THIS FILE IS LIKELY REDUNDANT
+ * Please use the JavaScript version (alert.js) if it exists.
+ * This TypeScript file may be part of an incomplete migration.
+ */
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"

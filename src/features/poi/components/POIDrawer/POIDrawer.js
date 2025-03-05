@@ -137,12 +137,17 @@ const POIDrawer = ({ isOpen, onClose }) => {
             console.log('[POIDrawer] Setting drag preview for map POI:', { icon, category });
             // Set drag preview for map POI
             setDragPreview({ icon, category });
+            
+            console.log('[POIDrawer] Drag preview set, waiting for user to drag and drop');
         }
     };
     const { setDragPreview } = useMapContext();
     const handleStartDrag = (icon, category) => {
         if (!icon || !category)
             return;
+            
+        console.log('[POIDrawer] Starting drag for icon:', { icon, category });
+        
         // Set drag preview with POI data
         const dragPreviewData = {
             icon,
@@ -150,34 +155,57 @@ const POIDrawer = ({ isOpen, onClose }) => {
             type: 'draggable',
             name: getIconDefinition(icon)?.label || 'New POI'
         };
+        
+        console.log('[POIDrawer] Setting drag preview data:', dragPreviewData);
+        
         setDragPreview(dragPreviewData);
+        
         // Add to draggable POI data array that will be displayed
         setDraggablePoiData(prev => [...prev, dragPreviewData]);
+        
+        console.log('[POIDrawer] Drag preview set, waiting for drop event');
     };
     // Handle when a draggable POI is dropped on the map
     useEffect(() => {
         const handleDrop = (e) => {
+            console.log('[POIDrawer] POI drop event received:', e.detail);
+            
             const { lat, lng } = e.detail;
             const lastPoi = draggablePoiData[draggablePoiData.length - 1];
+            
+            console.log('[POIDrawer] Last POI in draggable data:', lastPoi);
+            
             if (lastPoi && lastPoi.type === 'draggable') {
                 // Update the last POI with its final position
                 const updatedPoi = {
                     ...lastPoi,
                     coordinates: [lng, lat]
                 };
+                
+                console.log('[POIDrawer] Updated POI with coordinates:', {
+                    updatedPoi,
+                    coordinatesString: `${lng.toFixed(6)}, ${lat.toFixed(6)}`
+                });
+                
                 setDraggablePoiData(prev => [...prev.slice(0, -1), updatedPoi]);
-                setSelectedPoi(updatedPoi);
-                setState(prev => ({
-                    ...prev,
-                    step: 'details'
-                }));
+                
+                // Don't set selectedPoi or change state to 'details' here
+                // Let MapView handle the POI details drawer
+                
+                console.log('[POIDrawer] POI updated, letting MapView handle details entry');
+            } else {
+                console.log('[POIDrawer] No valid POI found for drop event');
             }
         };
+        
+        console.log('[POIDrawer] Adding poi-dropped event listener');
         window.addEventListener('poi-dropped', handleDrop);
+        
         return () => {
+            console.log('[POIDrawer] Removing poi-dropped event listener');
             window.removeEventListener('poi-dropped', handleDrop);
         };
-    }, [draggablePoiData, addPOI]);
+    }, [draggablePoiData]);
     const handleIconBack = () => {
         setState(prev => ({
             ...prev,

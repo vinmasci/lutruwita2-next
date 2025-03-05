@@ -1,3 +1,9 @@
+/**
+ * THIS FILE IS LIKELY REDUNDANT
+ * Please use the JavaScript version (theme.js) if it exists.
+ * This TypeScript file may be part of an incomplete migration.
+ */
+
 import { createTheme } from '@mui/material/styles';
 
 export const theme = createTheme({

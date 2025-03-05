@@ -11,7 +11,7 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
     const iconDefinition = getIconDefinition(poi.icon);
     const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
     const { map } = useMapContext();
-    // Create or recreate marker when position changes
+
     // Effect to update zoom-based scaling
     useEffect(() => {
         if (!map)
@@ -34,12 +34,14 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
             map.off('zoom', updateZoomScale);
         };
     }, [map]);
+
+    // We're not using dynamic offsets anymore as they cause issues when zooming
+
     useEffect(() => {
         if (!map)
             return;
         // Remove existing marker if it exists
         if (markerRef.current) {
-            const oldPos = markerRef.current.getLngLat();
             markerRef.current.remove();
             markerRef.current = null;
         }
@@ -47,26 +49,46 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
         el.className = `poi-marker ${className || ''} ${selected ? 'selected' : ''}`;
         // Set up marker HTML with bubble-pin style and initial zoom level
         const initialZoom = Math.floor(map.getZoom());
+        // Special handling for HC icon which has two icons side by side
+        const iconContent = poi.icon === 'ClimbHC' 
+          ? `<span style="font-size: 14px; color: white;"><i class="fa-solid fa-h"></i><i class="fa-solid fa-c"></i></span>`
+          : `<i class="${ICON_PATHS[poi.icon]} marker-icon"></i>`;
+          
         el.innerHTML = `
       <div class="marker-container" data-zoom="${initialZoom}">
         <div class="marker-bubble" style="background-color: ${markerColor}">
-          <i class="${ICON_PATHS[poi.icon]} marker-icon"></i>
+          ${iconContent}
         </div>
         <div class="marker-point" style="border-top-color: ${markerColor}"></div>
       </div>
     `;
         try {
-            // Create marker with viewport alignment
+            console.log('Creating marker with coordinates:', {
+                lng: poi.coordinates[0],
+                lat: poi.coordinates[1],
+                coordinatesString: `${poi.coordinates[0].toFixed(6)}, ${poi.coordinates[1].toFixed(6)}`,
+                anchor: 'bottom',
+                offset: [0, -14], // Log the correct offset
+                poiId: poi.id
+            });
+            
+            // Create marker with viewport alignment and center anchor
             markerRef.current = new mapboxgl.Marker({
                 element: el,
                 draggable: isDraggable,
                 rotationAlignment: 'viewport',
                 pitchAlignment: 'viewport',
-                anchor: 'center',
-                offset: [0, -14] // Half the height of marker-bubble to center it
+                anchor: 'center', // Use center anchor which might be more reliable
+                offset: [0, 0]    // No offset needed
             })
                 .setLngLat({ lng: poi.coordinates[0], lat: poi.coordinates[1] })
                 .addTo(map);
+                
+            console.log('Marker created and added to map:', {
+                poiId: poi.id,
+                position: markerRef.current.getLngLat(),
+                positionString: `${markerRef.current.getLngLat().lng.toFixed(6)}, ${markerRef.current.getLngLat().lat.toFixed(6)}`
+            });
         }
         catch (error) {
             console.error('Error creating marker:', error);

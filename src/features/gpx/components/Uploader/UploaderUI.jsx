@@ -321,6 +321,21 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
                     </>
                 )}
             </Paper>
+            
+            {/* Info alert */}
+            <Alert 
+                severity="info" 
+                sx={{
+                    mt: 2,
+                    mb: 3,
+                    borderRadius: 3,
+                    backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}
+            >
+                For the moment, uploading a combination of files more than 850kb won't save. <br />
+                Multiple saves of 850kb will work, save and upload.
+            </Alert>
 
             <Divider sx={{ my: 2, backgroundColor: 'rgba(255, 255, 255, 0.1)', width: '100%' }} />
 

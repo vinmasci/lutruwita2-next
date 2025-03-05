@@ -1,5 +1,5 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import React, { createContext, useContext, useReducer, useState } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useState, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 // Reducer
 const poiReducer = (state, action) => {
@@ -8,23 +8,39 @@ const poiReducer = (state, action) => {
             const now = new Date().toISOString();
             // Generate a temporary ID for frontend state management
             const tempId = `temp-${uuidv4()}`;
+            
+            console.log('[poiReducer] Adding POI to state:', {
+                tempId,
+                coordinates: action.payload.poi.coordinates,
+                coordinatesString: `${action.payload.poi.coordinates[0].toFixed(6)}, ${action.payload.poi.coordinates[1].toFixed(6)}`
+            });
+            
             const base = {
                 ...action.payload.poi,
                 id: tempId // Add temporary ID
             };
+            
+            let result;
             if (action.payload.poi.type === 'place') {
-                return [...state, {
-                        ...base,
-                        type: 'place',
-                        placeId: action.payload.poi.placeId,
-                    }];
+                result = [...state, {
+                    ...base,
+                    type: 'place',
+                    placeId: action.payload.poi.placeId,
+                }];
             }
             else {
-                return [...state, {
-                        ...base,
-                        type: 'draggable',
-                    }];
+                result = [...state, {
+                    ...base,
+                    type: 'draggable',
+                }];
             }
+            
+            console.log('[poiReducer] New state after adding POI:', {
+                newPoiCount: result.length,
+                lastAddedPoi: result[result.length - 1]
+            });
+            
+            return result;
         }
         case 'REMOVE_POI':
             return state.filter((poi) => poi.id !== action.payload);
@@ -72,10 +88,19 @@ export const POIProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [poiMode, setPoiMode] = useState('none');
+    const [visibleCategories, setVisibleCategories] = useState(Object.keys({}));
     const addPOI = async (poi) => {
         try {
+            console.log('[POIContext] Adding POI with coordinates:', {
+                coordinates: poi.coordinates,
+                coordinatesString: `${poi.coordinates[0].toFixed(6)}, ${poi.coordinates[1].toFixed(6)}`,
+                poi
+            });
+            
             // Add POI to local state only
             dispatch({ type: 'ADD_POI', payload: { poi } });
+            
+            console.log('[POIContext] POI added to state with ID:', `temp-${uuidv4()}`);
         }
         catch (error) {
             console.error('[POIContext] Error:', error);
@@ -167,6 +192,31 @@ export const POIProvider = ({ children }) => {
             setError(error instanceof Error ? error : new Error('Failed to clear POIs'));
         }
     };
+    // Initialize visible categories with all categories when POIs are loaded
+    useEffect(() => {
+        if (pois.length > 0) {
+            // Get unique categories from POIs
+            const categories = [...new Set(pois.map(poi => poi.category))];
+            setVisibleCategories(categories);
+        }
+    }, [pois]);
+
+    // Toggle category visibility
+    const toggleCategoryVisibility = (category) => {
+        setVisibleCategories(prev => {
+            if (prev.includes(category)) {
+                return prev.filter(cat => cat !== category);
+            } else {
+                return [...prev, category];
+            }
+        });
+    };
+
+    // Get visible POIs based on category filters
+    const getVisiblePOIs = useMemo(() => {
+        return pois.filter(poi => visibleCategories.includes(poi.category));
+    }, [pois, visibleCategories]);
+
     return (_jsx(POIContext.Provider, { value: {
             pois,
             isLoading,
@@ -180,6 +230,10 @@ export const POIProvider = ({ children }) => {
             getPOIsForRoute,
             loadPOIsFromRoute,
             clearPOIs,
+            visibleCategories,
+            setVisibleCategories,
+            toggleCategoryVisibility,
+            getVisiblePOIs
         }, children: children }));
 };
 // Custom hook for using POI context
