@@ -26,7 +26,10 @@ const POIDragPreview = ({ icon, category, onPlace, }) => {
         
         // Create marker content
         const iconDefinition = getIconDefinition(icon);
-        const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[category].color;
+        // Add fallback color in case the category doesn't exist in POI_CATEGORIES
+        const markerColor = iconDefinition?.style?.color || 
+                           (POI_CATEGORIES[category]?.color) || 
+                           '#777777'; // Default gray color if category not found
         
         const markerContainer = document.createElement('div');
         markerContainer.className = 'marker-container';

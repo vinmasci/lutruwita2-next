@@ -9,7 +9,10 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
     const markerRef = useRef(null);
     const isDraggable = poi.type === 'draggable';
     const iconDefinition = getIconDefinition(poi.icon);
-    const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
+    // Add fallback color in case the category doesn't exist in POI_CATEGORIES
+    const markerColor = iconDefinition?.style?.color || 
+                       (POI_CATEGORIES[poi.category]?.color) || 
+                       '#777777'; // Default gray color if category not found
     const { map } = useMapContext();
 
     // Effect to update zoom-based scaling

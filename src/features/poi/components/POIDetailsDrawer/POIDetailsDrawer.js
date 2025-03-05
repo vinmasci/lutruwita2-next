@@ -9,7 +9,8 @@ import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoP
 const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
     // Get the icon definition for default name
     const iconDef = getIconDefinition(iconName);
-    const categoryColor = POI_CATEGORIES[category].color;
+    // Add fallback color in case the category doesn't exist in POI_CATEGORIES
+    const categoryColor = POI_CATEGORIES[category]?.color || '#777777'; // Default gray color if category not found
     // State for form fields
     const [name, setName] = useState(iconDef?.label || '');
     const [description, setDescription] = useState('');
@@ -48,7 +49,7 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
                                         }, children: [_jsx("i", { className: iconDef?.name, style: {
                                                     color: categoryColor,
                                                     fontSize: '24px'
-                                                } }), _jsx(Typography, { variant: "body2", color: "text.secondary", children: POI_CATEGORIES[category].label })] }), _jsx(TextField, { label: "Name", value: name, onChange: (e) => setName(e.target.value), fullWidth: true, variant: "outlined", size: "small", sx: {
+                                                } }), _jsx(Typography, { variant: "body2", color: "text.secondary", children: POI_CATEGORIES[category]?.label || 'Unknown Category' })] }), _jsx(TextField, { label: "Name", value: name, onChange: (e) => setName(e.target.value), fullWidth: true, variant: "outlined", size: "small", sx: {
                                             backgroundColor: 'rgb(35, 35, 35)',
                                             '& .MuiOutlinedInput-root': {
                                                 '& fieldset': {
@@ -122,9 +123,9 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
                                                     height: '100%',
                                                     objectFit: 'cover'
                                                 } }) }, index))) })), _jsxs(DrawerFooter, { children: [_jsx(Button, { variant: "text", onClick: onClose, fullWidth: true, sx: { color: 'white' }, children: "Cancel" }), _jsx(Button, { type: "submit", variant: "contained", fullWidth: true, sx: {
-                                                    backgroundColor: POI_CATEGORIES[category].color,
+                                                    backgroundColor: POI_CATEGORIES[category]?.color || '#777777',
                                                     '&:hover': {
-                                                        backgroundColor: POI_CATEGORIES[category].color
+                                                        backgroundColor: POI_CATEGORIES[category]?.color || '#777777'
                                                     }
                                                 }, children: "Save" })] })] }) }) })] }), selectedPhoto && (_jsx(PhotoPreviewModal, { photo: selectedPhoto, onClose: () => setSelectedPhoto(null) }))] }));
 };

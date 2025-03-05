@@ -69,7 +69,10 @@ export const PresentationPOILayer = ({ map }) => {
         const el = document.createElement('div');
         el.className = 'poi-marker';
         const iconDefinition = getIconDefinition(poi.icon);
-        const markerColor = iconDefinition?.style?.color || POI_CATEGORIES[poi.category].color;
+        // Add fallback color in case the category doesn't exist in POI_CATEGORIES
+        const markerColor = iconDefinition?.style?.color || 
+                           (POI_CATEGORIES[poi.category]?.color) || 
+                           '#777777'; // Default gray color if category not found
         // Set up marker HTML with bubble-pin style and initial zoom level
         const initialZoom = Math.floor(map.getZoom());
         

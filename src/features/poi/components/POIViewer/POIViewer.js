@@ -84,7 +84,8 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
     };
 
     const iconDef = getIconDefinition(poi.icon);
-    const categoryColor = POI_CATEGORIES[poi.category].color;
+    // Add fallback color in case the category doesn't exist in POI_CATEGORIES
+    const categoryColor = POI_CATEGORIES[poi.category]?.color || '#777777'; // Default gray color if category not found
 
     return _jsxs(_Fragment, { children: [
         _jsx(NestedDrawer, {
@@ -169,7 +170,7 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
                                     _jsx(Typography, {
                                         variant: "body2",
                                         color: "text.secondary",
-                                        children: POI_CATEGORIES[poi.category].label
+                                        children: POI_CATEGORIES[poi.category]?.label || 'Unknown Category'
                                     })
                                 ]
                             }),

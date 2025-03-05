@@ -11,7 +11,8 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
     if (!poi)
         return null;
     const iconDef = getIconDefinition(poi.icon);
-    const categoryColor = POI_CATEGORIES[poi.category].color;
+    // Add fallback color in case the category doesn't exist in POI_CATEGORIES
+    const categoryColor = POI_CATEGORIES[poi.category]?.color || '#777777'; // Default gray color if category not found
     return (_jsxs(_Fragment, { children: [_jsx(NestedDrawer, { anchor: "left", open: Boolean(poi), onClose: onClose, variant: "temporary", sx: {
                     '& .MuiDrawer-paper': {
                         backgroundColor: 'rgba(0, 0, 0, 0.9)',
@@ -41,7 +42,7 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
                                     }, children: [_jsx("i", { className: `lucide-${iconDef?.name}`, style: {
                                                 color: categoryColor,
                                                 fontSize: '24px'
-                                            } }), _jsx(Typography, { variant: "body2", color: "text.secondary", children: POI_CATEGORIES[poi.category].label })] }), _jsxs(Box, { sx: {
+                                            } }), _jsx(Typography, { variant: "body2", color: "text.secondary", children: POI_CATEGORIES[poi.category]?.label || 'Unknown Category' })] }), _jsxs(Box, { sx: {
                                         mb: 3,
                                         p: 2,
                                         borderRadius: 1,
