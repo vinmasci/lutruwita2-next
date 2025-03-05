@@ -77,10 +77,17 @@ class StyleControl {
                     maxzoom: 14
                 });
             }
-            // Re-apply terrain settings
+            // Re-apply terrain settings with device-specific exaggeration
+            const isMobile = window.innerWidth <= 768;
+            console.log('[StyleControl] Re-applying terrain with device detection:', { 
+                isMobile, 
+                width: window.innerWidth,
+                projection: this.map?.getProjection()?.name
+            });
+            
             this.map?.setTerrain({
                 source: 'mapbox-dem',
-                exaggeration: 1.5
+                exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
             });
             // Re-add custom roads layer
             if (!this.map?.getSource('australia-roads')) {

@@ -407,8 +407,8 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
             background: 'rgba(2, 136, 209, 0.2)',
             color: 'rgba(2, 136, 209, 0.3)',
             rotation: -65,
-            lineWidth: 1,
-            spacing: 2
+            lineWidth: 3,
+            spacing: 6
         }
     ];
 
@@ -428,8 +428,8 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
             background: climb.color.replace('99', '33'),
             color: climb.color.replace('99', '66'),
             rotation: -60,
-            lineWidth: 1,
-            spacing: 2
+            lineWidth: 3,
+            spacing: 6
         });
     });
 

@@ -5,6 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import SearchControl from '../SearchControl/SearchControl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import StyleControl, { MAP_STYLES } from '../StyleControl';
+import PitchControl from '../../../map/components/PitchControl/PitchControl';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { RouteLayer } from '../../../map/components/RouteLayer';
@@ -25,6 +26,7 @@ export default function PresentationMapView() {
     const { currentRoute, routes, currentLoadedState } = useRouteContext();
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
+    const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
     
     // Set up scaling
     useEffect(() => {
@@ -127,21 +129,74 @@ export default function PresentationMapView() {
             }
         }
     }, [isMapReady, currentRoute]);
+    // Function to handle device type changes (e.g., orientation changes)
+    const handleDeviceTypeChange = useCallback(() => {
+        if (!mapInstance.current) return;
+        
+        const isMobile = window.innerWidth <= 768;
+        const map = mapInstance.current;
+        
+        console.log('[PresentationMapView] Device type change detected:', { 
+            isMobile, 
+            width: window.innerWidth,
+            height: window.innerHeight
+        });
+        
+        // Update projection if needed
+        const currentProjection = map.getProjection().name;
+        const targetProjection = isMobile ? 'mercator' : 'globe';
+        
+        if (currentProjection !== targetProjection) {
+            console.log('[PresentationMapView] Updating projection from', currentProjection, 'to', targetProjection);
+            map.setProjection(targetProjection);
+        }
+        
+        // Update terrain exaggeration
+        if (map.getTerrain()) {
+            console.log('[PresentationMapView] Updating terrain exaggeration for', isMobile ? 'mobile' : 'desktop');
+            map.setTerrain({
+                source: 'mapbox-dem',
+                exaggeration: isMobile ? 1.0 : 1.5
+            });
+        }
+        
+        // Update pitch if needed
+        const currentPitch = map.getPitch();
+        const targetPitch = isMobile ? 0 : 45;
+        
+        if (Math.abs(currentPitch - targetPitch) > 5) {
+            console.log('[PresentationMapView] Updating pitch from', currentPitch, 'to', targetPitch);
+            map.setPitch(targetPitch);
+        }
+    }, []);
+    
+    // Add resize listener to handle orientation changes
+    useEffect(() => {
+        window.addEventListener('resize', handleDeviceTypeChange);
+        return () => {
+            window.removeEventListener('resize', handleDeviceTypeChange);
+        };
+    }, [handleDeviceTypeChange]);
+    
     // Initialize map
     useEffect(() => {
         if (!mapRef.current)
             return;
         console.log('[PresentationMapView] Initializing map...');
+        // Check if device is mobile
+        const initialIsMobile = window.innerWidth <= 768;
+        console.log('[PresentationMapView] Device detection:', { isMobile: initialIsMobile, width: window.innerWidth });
+        
         const map = new mapboxgl.Map({
             container: mapRef.current,
             style: MAP_STYLES.satellite.url,
             bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
             fitBoundsOptions: {
                 padding: 0,
-                pitch: 45,
+                pitch: initialIsMobile ? 0 : 45, // Use flat view on mobile
                 bearing: 0
             },
-            projection: 'globe',
+            projection: initialIsMobile ? 'mercator' : 'globe', // Use mercator on mobile for better performance
             maxPitch: 85,
             width: '100%',
             height: '100%'
@@ -149,17 +204,37 @@ export default function PresentationMapView() {
         // Log map initialization events
         map.on('load', () => {
             console.log('[PresentationMapView] Map loaded');
-            // Add terrain synchronously
-            map.addSource('mapbox-dem', {
-                type: 'raster-dem',
-                url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                tileSize: 512,
-                maxzoom: 14
-            });
-            map.setTerrain({
-                source: 'mapbox-dem',
-                exaggeration: 1.5
-            });
+            
+            try {
+                // Add terrain synchronously
+                console.log('[PresentationMapView] Adding terrain source and configuration');
+                
+                map.addSource('mapbox-dem', {
+                    type: 'raster-dem',
+                    url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                    tileSize: 512,
+                    maxzoom: 14
+                });
+                
+                // Get current device type
+                const isCurrentlyMobile = window.innerWidth <= 768;
+                
+                // Set terrain with appropriate exaggeration based on device
+                map.setTerrain({
+                    source: 'mapbox-dem',
+                    exaggeration: isCurrentlyMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
+                });
+                
+                console.log('[PresentationMapView] Terrain configuration complete:', {
+                    isMobile: isCurrentlyMobile,
+                    projection: map.getProjection().name,
+                    pitch: map.getPitch(),
+                    terrainEnabled: !!map.getTerrain()
+                });
+            } catch (error) {
+                console.error('[PresentationMapView] Error setting up terrain:', error);
+            }
+            
             setIsMapReady(true);
         });
         map.on('style.load', () => {
@@ -330,6 +405,17 @@ export default function PresentationMapView() {
             trackUserLocation: true,
             showUserHeading: true
         }), 'top-right');
+        
+        // Check if device is mobile to add pitch control
+        const controlIsMobile = window.innerWidth <= 768;
+        if (controlIsMobile) {
+            console.log('[PresentationMapView] Adding pitch control for mobile device');
+            map.addControl(new PitchControl({
+                isMobile: true,
+                pitchStep: 15
+            }), 'top-right');
+        }
+        
         // Add custom controls after
         map.addControl(new SearchControl(), 'top-right');
         map.addControl(new StyleControl(), 'top-right');
@@ -379,7 +465,11 @@ export default function PresentationMapView() {
         setPoiPlacementMode: () => { }
     }), [isMapReady, hoverCoordinates]);
     return (_jsx(MapProvider, { value: mapContextValue, children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
-        _jsx(PresentationSidebar, { isOpen: true }),
+                _jsx(PresentationSidebar, { 
+                    isOpen: true,
+                    isDistanceMarkersVisible: isDistanceMarkersVisible,
+                    toggleDistanceMarkersVisibility: () => setIsDistanceMarkersVisible(!isDistanceMarkersVisible)
+                }),
         _jsxs("div", { className: "presentation-map-area", children: [
             _jsx("div", { ref: mapRef, className: "map-container" }),
             !isMapReady && (_jsxs(Box, { sx: {
@@ -400,7 +490,7 @@ export default function PresentationMapView() {
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
                 _jsx(PresentationPhotoLayer, {}),
                 currentRoute && (_jsxs(_Fragment, { children: [
-                    _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),
+                    isDistanceMarkersVisible && _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),
                     _jsx("div", { className: "route-filename", children: currentRoute._loadedState?.name || currentRoute.name || "Unnamed Route" })
                 ] })),
                 currentRoute && (_jsx("div", { className: "elevation-container", children: _jsx(PresentationElevationProfilePanel, { route: currentRoute }) }))

@@ -9,10 +9,10 @@ import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp, Ruler } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
 
-export const PresentationSidebar = ({ isOpen }) => {
+export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDistanceMarkersVisibility }) => {
     const { routes, currentRoute, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
     const { loadPOIsFromRoute, visibleCategories, toggleCategoryVisibility } = usePOIContext();
@@ -100,6 +100,28 @@ export const PresentationSidebar = ({ isOpen }) => {
                                 children: isPhotosVisible ? 
                                     _jsx(Camera, { color: '#4caf50' }) : 
                                     _jsx(CameraOff, { color: '#ff4d4f' }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: isDistanceMarkersVisible ? "Hide Distance Markers" : "Show Distance Markers", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: toggleDistanceMarkersVisibility,
+                            sx: {
+                                marginTop: '8px',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                '&:hover .MuiListItemIcon-root svg': {
+                                    color: '#ff4d4f'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Ruler, { 
+                                    color: isDistanceMarkersVisible ? '#4caf50' : '#ff4d4f' 
+                                }) 
                             }) 
                         }) 
                     }),

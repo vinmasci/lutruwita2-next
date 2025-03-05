@@ -6,6 +6,7 @@ import { setupMapScaleListener } from '../../utils/mapScaleUtils';
 import { DistanceMarkers } from '../DistanceMarkers/DistanceMarkers';
 import StyleControl, { MAP_STYLES } from '../StyleControl/StyleControl';
 import SearchControl from '../SearchControl/SearchControl';
+import PitchControl from '../PitchControl/PitchControl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
@@ -78,6 +79,37 @@ function MapViewContent() {
             };
         }
     }, []);
+    
+    // Function to handle device type changes (e.g., orientation changes)
+    const handleDeviceTypeChange = useCallback(() => {
+        if (!mapInstance.current || !isMapReady) return;
+        
+        const isMobile = window.innerWidth <= 768;
+        const map = mapInstance.current;
+        
+        console.log('[MapView] Device type change detected:', { 
+            isMobile, 
+            width: window.innerWidth,
+            height: window.innerHeight
+        });
+        
+        // Update terrain exaggeration if terrain is enabled
+        if (map.getTerrain()) {
+            console.log('[MapView] Updating terrain exaggeration for', isMobile ? 'mobile' : 'desktop');
+            map.setTerrain({
+                source: 'mapbox-dem',
+                exaggeration: isMobile ? 1.0 : 1.5
+            });
+        }
+    }, [isMapReady]);
+    
+    // Add resize listener to handle orientation changes
+    useEffect(() => {
+        window.addEventListener('resize', handleDeviceTypeChange);
+        return () => {
+            window.removeEventListener('resize', handleDeviceTypeChange);
+        };
+    }, [handleDeviceTypeChange]);
     // Function to add route click handler
     const addRouteClickHandler = useCallback((map, routeId) => {
         const mainLayerId = `${routeId}-main-line`;
@@ -707,10 +739,18 @@ function MapViewContent() {
       tileSize: 512,
       maxzoom: 14
     });
-            // Set terrain configuration
+            // Check if device is mobile
+            const isMobile = window.innerWidth <= 768;
+            console.log('[MapView] Setting terrain with device detection:', { 
+                isMobile, 
+                width: window.innerWidth,
+                projection: map.getProjection().name
+            });
+            
+            // Set terrain configuration with device-specific exaggeration
             map.setTerrain({
                 source: 'mapbox-dem',
-                exaggeration: 1.5
+                exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
             });
             map.on('zoom', () => {
                 console.log('[MapView] Zoom changed:', map.getZoom());
@@ -774,6 +814,17 @@ function MapViewContent() {
             trackUserLocation: true,
             showUserHeading: true
         }), 'top-right');
+        
+        // Check if device is mobile to add pitch control
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            console.log('[MapView] Adding pitch control for mobile device');
+            map.addControl(new PitchControl({
+                isMobile: true,
+                pitchStep: 15
+            }), 'top-right');
+        }
+        
         // Add style control last so it appears at bottom
         map.addControl(new StyleControl(), 'top-right');
         

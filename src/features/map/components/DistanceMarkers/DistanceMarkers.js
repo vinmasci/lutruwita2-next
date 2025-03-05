@@ -55,10 +55,11 @@ export const DistanceMarkers = ({ map }) => {
         // Create start marker (0km)
         const startEl = document.createElement('div');
         startEl.className = 'distance-marker';
-        startEl.innerHTML = '0km <i class="fa-solid fa-play"></i>';
+        startEl.innerHTML = '0km <i class="fa-solid fa-play" style="font-size: 1.1em;"></i>';
         const startMarker = new mapboxgl.Marker({
             element: startEl,
-            anchor: 'center'
+            anchor: 'center',
+            offset: [0, -3] // Offset to account for larger marker size
         })
             .setLngLat(coordinates[0])
             .addTo(map);
@@ -74,7 +75,8 @@ export const DistanceMarkers = ({ map }) => {
                     el.textContent = `${(index + 1) * interval}km`;
                     const marker = new mapboxgl.Marker({
                         element: el,
-                        anchor: 'center'
+                        anchor: 'center',
+                        offset: [0, -3] // Offset to account for larger marker size
                     })
                         .setLngLat(point)
                         .addTo(map);
@@ -85,10 +87,11 @@ export const DistanceMarkers = ({ map }) => {
         // Create end marker with total distance
         const endEl = document.createElement('div');
         endEl.className = 'distance-marker';
-        endEl.innerHTML = `${Math.round(totalDistanceKm)}km <i class="fa-solid fa-flag-checkered"></i>`;
+        endEl.innerHTML = `${Math.round(totalDistanceKm)}km <i class="fa-solid fa-flag-checkered" style="font-size: 1.1em;"></i>`;
         const endMarker = new mapboxgl.Marker({
             element: endEl,
-            anchor: 'center'
+            anchor: 'center',
+            offset: [0, -3] // Offset to account for larger marker size
         })
             .setLngLat(coordinates[coordinates.length - 1])
             .addTo(map);
