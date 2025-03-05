@@ -9,7 +9,9 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'; // Added Play icon for fly-by
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'; // Play icon for fly-by
+import DownloadIcon from '@mui/icons-material/Download'; // Download icon for GPX export
+import { downloadRouteAsGpx } from '../../../../utils/gpx/export'; // Import GPX export utility
 import { PresentationRouteDescriptionPanel } from '../RouteDescription';
 import { PresentationWeatherProfilePanel } from '../WeatherProfile';
 
@@ -320,7 +322,7 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                 style: {
                     position: 'absolute',
                     top: '-32px', // Adjusted to accommodate larger buttons
-                    right: '150px', // Increased to make room for the new fly-by button
+                    right: '200px', // Increased to make room for the new buttons
                     display: 'flex',
                     alignItems: 'flex-end',
                     zIndex: 103
@@ -387,6 +389,25 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                             sx: { 
                                 transform: isFlyByActive ? 'scale(1.2)' : 'none' // Scale up icon when active
                             }
+                        })
+                    }),
+                    // Download GPX button (black background)
+                    _jsx(IconButton, { 
+                        onClick: () => downloadRouteAsGpx(route),
+                        sx: {
+                            color: 'white',
+                            backgroundColor: 'rgba(26, 26, 26, 0.9)', // Black background to match other buttons
+                            border: '1px solid rgba(255, 255, 255, 0.8)', // Thin white stroke
+                            borderRadius: '50%', // Make it circular
+                            padding: '8px', // Larger button
+                            width: '36px', // Fixed width
+                            height: '36px', // Fixed height
+                            '&:hover': {
+                                backgroundColor: 'rgba(45, 45, 45, 0.9)' // Darker on hover
+                            }
+                        }, 
+                        children: _jsx(DownloadIcon, { 
+                            fontSize: "medium"
                         })
                     }),
                     _jsx(IconButton, { 

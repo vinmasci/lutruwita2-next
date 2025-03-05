@@ -359,6 +359,7 @@ export default function PresentationMapView() {
         // Add custom controls after
         map.addControl(new SearchControl(), 'top-right');
         map.addControl(new StyleControl(), 'top-right');
+        
         // Style controls
         const style = document.createElement('style');
         style.textContent = `
