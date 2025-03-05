@@ -753,7 +753,7 @@ function MapViewContent() {
                 exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
             });
             map.on('zoom', () => {
-                console.log('[MapView] Zoom changed:', map.getZoom());
+                // Zoom change handler
             });
             // Add custom roads layer
             const tileUrl = 'https://api.maptiler.com/tiles/5dd3666f-1ce4-4df6-9146-eda62a200bcb/{z}/{x}/{y}.pbf?key=DFSAZFJXzvprKbxHrHXv';

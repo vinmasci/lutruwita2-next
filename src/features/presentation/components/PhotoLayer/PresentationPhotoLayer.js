@@ -30,7 +30,6 @@ export const PresentationPhotoLayer = () => {
             return;
         const handleZoom = () => {
             const newZoom = map.getZoom();
-            console.log('[PresentationPhotoLayer] Zoom changed:', newZoom);
             setZoom(newZoom);
         };
         map.on('zoom', handleZoom);
@@ -73,7 +72,6 @@ export const PresentationPhotoLayer = () => {
     const clusteredItems = useMemo(() => {
         if (!map || zoom === null)
             return [];
-        console.log('[PresentationPhotoLayer] Clustering with zoom:', zoom, 'Floor:', Math.floor(zoom));
         return clusterPhotosPresentation(validPhotos, zoom);
     }, [validPhotos, map, zoom]); // Remove photos.length dependency as it's already included in validPhotos
     const handleClusterClick = useCallback((cluster) => {

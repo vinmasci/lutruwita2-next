@@ -33,7 +33,6 @@ export const useRouteState = () => {
                     };
                 }
             });
-            console.debug('[useRouteState] Updated visibility state:', newVisibility);
             return newVisibility;
         });
     }, [routes]);

@@ -93,7 +93,6 @@ export const useRouteState = (): UseRouteStateReturn => {
           };
         }
       });
-      console.debug('[useRouteState] Updated visibility state:', newVisibility);
       return newVisibility;
     });
   }, [routes]);

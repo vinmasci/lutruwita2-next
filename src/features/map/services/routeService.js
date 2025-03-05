@@ -53,12 +53,6 @@ export const useRouteService = () => {
     };
     const saveRoute = async (routeData) => {
         try {
-            console.log('[routeService] Starting save route...');
-            console.log('[routeService] POIs to save:', {
-                draggable: routeData.pois.draggable.length + ' POIs',
-                places: routeData.pois.places.length + ' POIs'
-            });
-            console.log('[routeService] POI details:', routeData.pois);
             
             // Add userId to the routeData
             const routeDataWithUserId = {
@@ -67,11 +61,6 @@ export const useRouteService = () => {
             };
             
             const headers = await getAuthHeaders();
-            console.log('[routeService] Making API call to:', API_BASE);
-            console.log('[routeService] Request headers:', headers);
-            console.log('[routeService] Request body:', JSON.stringify(routeDataWithUserId, null, 2));
-            console.log('[routeService] POI raw data:', JSON.stringify(routeData.pois, null, 2));
-            console.log('[routeService] Full route data:', JSON.stringify(routeDataWithUserId, null, 2));
             
             // Transform the data structure to match what the API expects
             // The API requires a 'data' field, but our client uses 'routes'
@@ -178,7 +167,6 @@ export const useRouteService = () => {
                 return defaultBounds;
             }
             
-            console.log('[routeService] Transformed data for API:', JSON.stringify(transformedData, null, 2));
             
             // If routeData has a persistentId, it's an update to an existing route
             const endpoint = routeDataWithUserId.persistentId ? `${API_BASE}/${routeDataWithUserId.persistentId}` : `${API_BASE}/save`;
@@ -189,10 +177,7 @@ export const useRouteService = () => {
                 body: JSON.stringify(transformedData),
                 credentials: 'include'
             });
-            console.log('[routeService] Save response status:', response.status);
             const result = await handleResponse(response);
-            console.log('[routeService] Server response:', result);
-            console.log('[routeService] POIs have been saved to MongoDB');
             return result;
         }
         catch (error) {
@@ -203,26 +188,21 @@ export const useRouteService = () => {
     const loadRoute = async (persistentId) => {
         try {
             const headers = await getAuthHeaders();
-            console.log('[routeService] Loading route:', persistentId);
             const response = await fetch(`${API_BASE}/${persistentId}`, {
                 method: 'GET',
                 headers,
                 credentials: 'include'
             });
-            console.log('[routeService] Load response status:', response.status);
             const data = await handleResponse(response);
-            console.log('[routeService] Loaded route data:', data);
             
             // Transform the API response to match what the client expects
             let transformedData = data;
             
             // Check if this is the new API format (with data field but no routes array)
             if (data.data && !data.routes) {
-                console.log('[routeService] Detected new API format, transforming data');
                 
                 // Check if we have allRoutes in the data field (our new format)
                 if (data.data.allRoutes && Array.isArray(data.data.allRoutes) && data.data.allRoutes.length > 0) {
-                    console.log('[routeService] Found allRoutes in data, using these routes');
                     
                     // Use the allRoutes array directly
                     transformedData = {
@@ -231,7 +211,6 @@ export const useRouteService = () => {
                     };
                 } else {
                     // Fallback to creating a single route from the data field
-                    console.log('[routeService] No allRoutes found, creating a single route from data');
                     
                     // Create a route object from the data field
                     const routeObject = {
@@ -263,7 +242,6 @@ export const useRouteService = () => {
                     };
                 }
                 
-                console.log('[routeService] Transformed data:', transformedData);
             }
             
             // Handle both formats: data.route (old format) or data directly (new format)
@@ -272,13 +250,6 @@ export const useRouteService = () => {
             
             // Add detailed logging for route data
             if (routeData && routeData.routes && routeData.routes.length > 0) {
-                console.log('[routeService] First route details:', {
-                    id: routeData.routes[0].id,
-                    routeId: routeData.routes[0].routeId,
-                    hasGeojson: Boolean(routeData.routes[0].geojson),
-                    geojsonFeatures: routeData.routes[0].geojson?.features?.length || 0,
-                    persistentId: routeData.persistentId
-                });
                 
                 if (!routeData.routes[0].geojson) {
                     console.error('[routeService] Missing GeoJSON data in route');

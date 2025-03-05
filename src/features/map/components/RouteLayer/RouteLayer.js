@@ -29,20 +29,7 @@ export const RouteLayer = ({ map, route }) => {
 
     useEffect(() => {
         try {
-            console.log('[RouteLayer] Initializing with:', {
-                map: !!map,
-                routeId: route?.routeId,
-                hasGeojson: !!route?.geojson,
-                isStyleLoaded,
-                color: route?.color
-            });
             if (!map || !route || !isStyleLoaded || !route.geojson) {
-                console.log('[RouteLayer] Missing required props:', {
-                    map: !!map,
-                    route: !!route,
-                    isStyleLoaded,
-                    hasGeojson: !!route?.geojson
-                });
                 return;
             }
 
@@ -81,13 +68,6 @@ export const RouteLayer = ({ map, route }) => {
                 return;
             }
 
-            console.log('[RouteLayer] Source check:', {
-                sourceId: mainSourceId,
-                exists: sourceExists,
-                mapStyle: style.name,
-                layerCount: style.layers.length,
-                terrain: !!map.getTerrain()
-            });
 
             // Clean up existing layers and source if they exist
             if (sourceExists) {
@@ -107,7 +87,6 @@ export const RouteLayer = ({ map, route }) => {
             }
 
             // Add new source and layers
-            console.log('[RouteLayer] Adding source:', mainSourceId);
             try {
                 // Add main route source
                 map.addSource(mainSourceId, {
@@ -115,7 +94,6 @@ export const RouteLayer = ({ map, route }) => {
                     data: route.geojson,
                     tolerance: 0.5
                 });
-                console.log('[RouteLayer] Source added successfully');
             }
             catch (error) {
                 console.error('[RouteLayer] Error adding source:', error);
@@ -267,24 +245,14 @@ export const RouteLayer = ({ map, route }) => {
         const currentColor = route.color;
         const prevColor = prevColorRef.current;
         
-        console.log('[RouteLayer] Checking color:', {
-            current: currentColor,
-            previous: prevColor,
-            routeId: route.routeId,
-            hasChanged: currentColor !== prevColor
-        });
-        
         // Only update if the color has changed
         if (currentColor !== prevColor) {
-            console.log('[RouteLayer] Color changed from', prevColor, 'to', currentColor);
-            
             const routeId = route.routeId;
             const mainLayerId = `${routeId}-main-line`;
             const hoverLayerId = `${routeId}-hover`;
             
             // Update main layer color
             if (map.getLayer(mainLayerId)) {
-                console.log(`[RouteLayer] Updating main layer (${mainLayerId}) color to`, currentColor || DEFAULT_COLORS.main);
                 map.setPaintProperty(
                     mainLayerId,
                     'line-color',
@@ -296,7 +264,6 @@ export const RouteLayer = ({ map, route }) => {
             
             // Update hover layer color if it exists
             if (map.getLayer(hoverLayerId)) {
-                console.log(`[RouteLayer] Updating hover layer (${hoverLayerId}) color to`, currentColor ? `${currentColor}99` : DEFAULT_COLORS.hover);
                 map.setPaintProperty(
                     hoverLayerId,
                     'line-color',
@@ -329,7 +296,6 @@ export const RouteLayer = ({ map, route }) => {
             return;
         }
         
-        console.log('[RouteLayer] Setting up animation for current route:', route.routeId);
         
         const routeId = route.routeId;
         const mainLayerId = `${routeId}-main-line`;
@@ -376,7 +342,6 @@ export const RouteLayer = ({ map, route }) => {
             if (animationIntervalRef.current) {
                 clearInterval(animationIntervalRef.current);
                 animationIntervalRef.current = null;
-                console.log('[RouteLayer] Animation cleaned up');
             }
             
             // Reset widths when unmounting

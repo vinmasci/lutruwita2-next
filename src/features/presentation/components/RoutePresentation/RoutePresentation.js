@@ -20,12 +20,7 @@ export const RoutePresentation = () => {
             try {
                 setLoading(true);
                 setError(null);
-                console.log('[RoutePresentation] Fetching route with ID:', id);
                 const routeData = await publicRouteService.loadRoute(id);
-                console.log('[RoutePresentation] Fetched route data:', routeData);
-                console.log('[RoutePresentation] Route data type:', typeof routeData);
-                console.log('[RoutePresentation] Is null?', routeData === null);
-                console.log('[RoutePresentation] Is undefined?', routeData === undefined);
                 
                 if (!routeData) {
                     console.error('[RoutePresentation] Route data is null or undefined');
@@ -40,7 +35,6 @@ export const RoutePresentation = () => {
                 }
                 
                 // The API now returns the route data directly
-                console.log('[RoutePresentation] Using direct route data object');
                 setRoute(routeData);
             }
             catch (error) {
@@ -57,13 +51,6 @@ export const RoutePresentation = () => {
     const routes = useMemo(() => {
         if (!route)
             return [];
-        console.log('[RoutePresentation] Using server routes:', route.name);
-        console.log('[RoutePresentation] Route data structure:', {
-            persistentId: route.persistentId,
-            routeCount: route.routes?.length,
-            hasRoutes: !!route.routes,
-            isRoutesArray: Array.isArray(route.routes)
-        });
         
         if (!route.routes || !Array.isArray(route.routes) || route.routes.length === 0) {
             console.error('[RoutePresentation] Invalid routes array:', route.routes);
@@ -76,7 +63,6 @@ export const RoutePresentation = () => {
                 return null;
             }
             
-            console.log('[RoutePresentation] Processing route:', routeData.routeId);
             
             // Ensure the route object has the persistentId property
             return {
@@ -112,11 +98,9 @@ export const RoutePresentation = () => {
             const initializeRoutes = () => {
                 // Add all routes in a single batch
                 routes.forEach((route) => {
-                    console.log('[RoutePresentation] Adding route to context:', route.routeId);
                     addRoute(route);
                 });
                 // Set initial route once all routes are added
-                console.log('[RoutePresentation] Setting initial route:', routes[0].routeId);
                 // Set initial route
                 setCurrentRoute(routes[0]);
                 // Load photos and POIs

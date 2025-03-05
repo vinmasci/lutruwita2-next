@@ -19,11 +19,9 @@ let isProcessing = false;
  * @param {mapboxgl.Map} map - The Mapbox GL map instance
  */
 export const setMapInstance = (map) => {
-  console.log('[MapOperationsQueue] Setting map instance');
   mapInstance = map;
   
   if (!map) {
-    console.log('[MapOperationsQueue] Map instance is null, clearing instance');
     mapInstance = null;
     return;
   }
@@ -31,13 +29,11 @@ export const setMapInstance = (map) => {
   // Always set up a load event handler to ensure we catch the load event
   // even if the map.loaded() check returns a false negative
   map.once('load', () => {
-    console.log('[MapOperationsQueue] Map load event fired, processing pending operations');
     processPendingOperations();
   });
   
   // Also try to process immediately in case the map is already loaded
   // or the loaded() method is not reliable
-  console.log('[MapOperationsQueue] Attempting to process operations immediately');
   setTimeout(() => {
     processPendingOperations();
   }, 500);
@@ -53,7 +49,6 @@ export const queueMapOperation = (operation, name = 'unnamed') => {
   // If map is available and loaded, execute immediately
   if (mapInstance && mapInstance.loaded && mapInstance.loaded()) {
     try {
-      console.log(`[MapOperationsQueue] Executing operation immediately: ${name}`);
       operation(mapInstance);
       return true;
     } catch (error) {
@@ -63,12 +58,10 @@ export const queueMapOperation = (operation, name = 'unnamed') => {
   }
   
   // Otherwise, queue the operation
-  console.log(`[MapOperationsQueue] Queueing operation: ${name}`);
   pendingOperations.push({ operation, name });
   
   // Schedule a retry in case the map is available but not reporting as loaded correctly
   if (mapInstance) {
-    console.log('[MapOperationsQueue] Map instance exists, scheduling a retry in 1 second');
     setTimeout(() => {
       processPendingOperations();
     }, 1000);
@@ -83,26 +76,22 @@ export const queueMapOperation = (operation, name = 'unnamed') => {
 const processPendingOperations = () => {
   // Prevent concurrent processing
   if (isProcessing) {
-    console.log('[MapOperationsQueue] Already processing operations, skipping');
     return;
   }
   
   // Check if map is available
   if (!mapInstance) {
-    console.log('[MapOperationsQueue] Map not available, deferring operation processing');
     return;
   }
   
   // Log the map's loaded state for debugging
   const isLoaded = mapInstance.loaded ? mapInstance.loaded() : false;
-  console.log(`[MapOperationsQueue] Map loaded state: ${isLoaded}`);
   
   // Even if the map reports as not loaded, we'll still try to process operations
   // after a certain number of retries, as the loaded() method might not be reliable
   const forceProcess = pendingOperations.length > 0 && pendingOperations[0].retryCount >= 3;
   
   if (!isLoaded && !forceProcess) {
-    console.log('[MapOperationsQueue] Map not ready, incrementing retry count and deferring processing');
     // Increment retry count for all operations
     pendingOperations.forEach(op => {
       op.retryCount = (op.retryCount || 0) + 1;
@@ -116,7 +105,6 @@ const processPendingOperations = () => {
   }
   
   isProcessing = true;
-  console.log(`[MapOperationsQueue] Processing ${pendingOperations.length} pending operations`);
   
   // Process all pending operations
   const operationsToProcess = [...pendingOperations];
@@ -124,7 +112,6 @@ const processPendingOperations = () => {
   
   for (const { operation, name } of operationsToProcess) {
     try {
-      console.log(`[MapOperationsQueue] Executing queued operation: ${name}`);
       operation(mapInstance);
     } catch (error) {
       console.error(`[MapOperationsQueue] Error executing operation ${name}:`, error);
@@ -134,11 +121,9 @@ const processPendingOperations = () => {
   }
   
   isProcessing = false;
-  console.log('[MapOperationsQueue] Finished processing operations');
   
   // If there are still operations in the queue (due to errors), try again later
   if (pendingOperations.length > 0) {
-    console.log(`[MapOperationsQueue] ${pendingOperations.length} operations remain in queue, retrying in 1 second`);
     setTimeout(processPendingOperations, 1000);
   }
 };
@@ -147,7 +132,6 @@ const processPendingOperations = () => {
  * Clear all pending operations
  */
 export const clearOperations = () => {
-  console.log(`[MapOperationsQueue] Clearing ${pendingOperations.length} pending operations`);
   pendingOperations.length = 0;
 };
 

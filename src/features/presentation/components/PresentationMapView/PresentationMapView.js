@@ -39,7 +39,7 @@ export default function PresentationMapView() {
     const { initialized: routesInitialized } = usePresentationRouteInit({
         routes,
         onInitialized: () => {
-            console.log('[PresentationMapView] Routes initialized');
+            // Routes initialized
         }
     });
     // Update hover marker when coordinates change
@@ -77,8 +77,6 @@ export default function PresentationMapView() {
     // Update currentRouteIdRef when currentRoute changes
     useEffect(() => {
         if (currentRoute?.routeId) {
-            console.log('[PresentationMapView] Updating currentRouteIdRef from', 
-                currentRouteIdRef.current, 'to', currentRoute.routeId);
             currentRouteIdRef.current = currentRoute.routeId;
         }
     }, [currentRoute]);
@@ -87,13 +85,6 @@ export default function PresentationMapView() {
     useEffect(() => {
         if (!isMapReady || !mapInstance.current || !currentRoute?.geojson)
             return;
-        console.log('[PresentationMapView] Handling route change:', {
-            routeId: currentRoute.routeId,
-            geojsonType: currentRoute.geojson.type,
-            featureCount: currentRoute.geojson.features?.length,
-            isPreviousRoute: previousRouteRef.current !== null,
-            currentRouteIdRef: currentRouteIdRef.current
-        });
         // Get route bounds
         if (currentRoute.geojson?.features?.[0]?.geometry?.type === 'LineString') {
             const feature = currentRoute.geojson.features[0];
@@ -136,24 +127,17 @@ export default function PresentationMapView() {
         const isMobile = window.innerWidth <= 768;
         const map = mapInstance.current;
         
-        console.log('[PresentationMapView] Device type change detected:', { 
-            isMobile, 
-            width: window.innerWidth,
-            height: window.innerHeight
-        });
         
         // Update projection if needed
         const currentProjection = map.getProjection().name;
         const targetProjection = isMobile ? 'mercator' : 'globe';
         
         if (currentProjection !== targetProjection) {
-            console.log('[PresentationMapView] Updating projection from', currentProjection, 'to', targetProjection);
             map.setProjection(targetProjection);
         }
         
         // Update terrain exaggeration
         if (map.getTerrain()) {
-            console.log('[PresentationMapView] Updating terrain exaggeration for', isMobile ? 'mobile' : 'desktop');
             map.setTerrain({
                 source: 'mapbox-dem',
                 exaggeration: isMobile ? 1.0 : 1.5
@@ -165,7 +149,6 @@ export default function PresentationMapView() {
         const targetPitch = isMobile ? 0 : 45;
         
         if (Math.abs(currentPitch - targetPitch) > 5) {
-            console.log('[PresentationMapView] Updating pitch from', currentPitch, 'to', targetPitch);
             map.setPitch(targetPitch);
         }
     }, []);
@@ -182,10 +165,8 @@ export default function PresentationMapView() {
     useEffect(() => {
         if (!mapRef.current)
             return;
-        console.log('[PresentationMapView] Initializing map...');
         // Check if device is mobile
         const initialIsMobile = window.innerWidth <= 768;
-        console.log('[PresentationMapView] Device detection:', { isMobile: initialIsMobile, width: window.innerWidth });
         
         const map = new mapboxgl.Map({
             container: mapRef.current,
@@ -203,11 +184,8 @@ export default function PresentationMapView() {
         });
         // Log map initialization events
         map.on('load', () => {
-            console.log('[PresentationMapView] Map loaded');
-            
             try {
                 // Add terrain synchronously
-                console.log('[PresentationMapView] Adding terrain source and configuration');
                 
                 map.addSource('mapbox-dem', {
                     type: 'raster-dem',
@@ -225,12 +203,6 @@ export default function PresentationMapView() {
                     exaggeration: isCurrentlyMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
                 });
                 
-                console.log('[PresentationMapView] Terrain configuration complete:', {
-                    isMobile: isCurrentlyMobile,
-                    projection: map.getProjection().name,
-                    pitch: map.getPitch(),
-                    terrainEnabled: !!map.getTerrain()
-                });
             } catch (error) {
                 console.error('[PresentationMapView] Error setting up terrain:', error);
             }
@@ -238,11 +210,10 @@ export default function PresentationMapView() {
             setIsMapReady(true);
         });
         map.on('style.load', () => {
-            console.log('[PresentationMapView] Style loaded');
+            // Style loaded
         });
         map.on('zoom', () => {
             const zoom = map.getZoom();
-            console.log('[PresentationMapView] Zoom changed:', zoom, 'Floor:', Math.floor(zoom));
         });
         map.on('error', (e) => {
             console.error('[PresentationMapView] Map error:', e);
@@ -252,12 +223,10 @@ export default function PresentationMapView() {
         map.on('mousemove', (e) => {
             // Get mouse coordinates
             const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
-            console.log('[PresentationMapView] Mouse move:', mouseCoords);
             
             // Get all route sources directly from the map
             const style = map.getStyle();
             if (!style || !style.sources) {
-                console.log('[PresentationMapView] No style or sources available');
                 return;
             }
             
@@ -278,7 +247,6 @@ export default function PresentationMapView() {
                     return false;
                 });
             
-            console.log('[PresentationMapView] Found route sources:', routeSources.map(([id]) => id));
             
             // Try to find the active route
             let activeRouteSource = null;
@@ -286,8 +254,6 @@ export default function PresentationMapView() {
             
             // First check if we have a current route ID from the ref
             if (currentRouteIdRef.current) {
-                console.log('[PresentationMapView] Current route ID from ref:', currentRouteIdRef.current);
-                
                 const currentSourceId = `${currentRouteIdRef.current}-main`;
                 
                 // Find this source in our routeSources
@@ -295,56 +261,35 @@ export default function PresentationMapView() {
                 if (foundSource) {
                     activeRouteSource = foundSource[1];
                     activeRouteId = currentRouteIdRef.current;
-                    console.log('[PresentationMapView] Found active route from ref:', currentRouteIdRef.current);
-                } else {
-                    console.log('[PresentationMapView] Could not find source for current route ID from ref:', currentSourceId);
                 }
             }
             
             // If we couldn't find the route from the ref, try from the context
             if (!activeRouteSource && currentRoute) {
-                console.log('[PresentationMapView] Current route from context:', {
-                    id: currentRoute.id,
-                    routeId: currentRoute.routeId,
-                    name: currentRoute.name || 'Unnamed'
-                });
-                
                 const routeId = currentRoute.routeId || `route-${currentRoute.id}`;
                 const sourceId = `${routeId}-main`;
-                
-                console.log('[PresentationMapView] Looking for source ID from context:', sourceId);
                 
                 // Find this source in our routeSources
                 const foundSource = routeSources.find(([id]) => id === sourceId);
                 if (foundSource) {
                     activeRouteSource = foundSource[1];
                     activeRouteId = routeId;
-                    console.log('[PresentationMapView] Found active route from context:', routeId);
-                    
                     // Update the ref if it's different
                     if (currentRouteIdRef.current !== routeId) {
-                        console.log('[PresentationMapView] Updating currentRouteIdRef from', currentRouteIdRef.current, 'to', routeId);
                         currentRouteIdRef.current = routeId;
                     }
-                } else {
-                    console.log('[PresentationMapView] Could not find source for current route from context:', sourceId);
                 }
-            } else if (!activeRouteSource) {
-                console.log('[PresentationMapView] No current route in context or ref');
             }
             
             // If we couldn't find the active route from context or ref, try to find it another way
             if (!activeRouteSource && routeSources.length > 0) {
                 // Fallback to first route if no current route
-                console.log('[PresentationMapView] No active route found, using first route source as fallback');
                 activeRouteSource = routeSources[0][1];
                 activeRouteId = routeSources[0][0].replace('-main', '');
-                console.log('[PresentationMapView] Using first route as active (fallback):', activeRouteId);
             }
             
             // If we don't have an active route, clear any marker and return
             if (!activeRouteSource) {
-                console.log('[PresentationMapView] No active route source found');
                 if (hoverCoordinates) {
                     setHoverCoordinates(null);
                 }
@@ -355,7 +300,6 @@ export default function PresentationMapView() {
             const geoJsonData = activeRouteSource.data;
             const coordinates = geoJsonData.features[0].geometry.coordinates;
             
-            console.log('[PresentationMapView] Route has', coordinates.length, 'coordinates');
             
             // Find the closest point on the active route
             let closestPoint = null;
@@ -375,19 +319,16 @@ export default function PresentationMapView() {
                 }
             });
             
-            console.log('[PresentationMapView] Closest point:', closestPoint, 'with distance:', minDistance);
             
             // Define a threshold distance - only show marker when close to the route
             const distanceThreshold = 0.005; // Approximately 500m at the equator
             
             // If we found a closest point on the active route and it's within the threshold
             if (closestPoint && minDistance < distanceThreshold) {
-                console.log('[PresentationMapView] Setting hover coordinates:', closestPoint);
                 setHoverCoordinates(closestPoint);
             } else {
                 // If no point found or too far from route, clear the marker
                 if (hoverCoordinates) {
-                    console.log('[PresentationMapView] Clearing hover coordinates');
                     setHoverCoordinates(null);
                 }
             }
@@ -409,7 +350,6 @@ export default function PresentationMapView() {
         // Check if device is mobile to add pitch control
         const controlIsMobile = window.innerWidth <= 768;
         if (controlIsMobile) {
-            console.log('[PresentationMapView] Adding pitch control for mobile device');
             map.addControl(new PitchControl({
                 isMobile: true,
                 pitchStep: 15

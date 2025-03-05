@@ -36,24 +36,8 @@ export const RouteProvider = ({ children, }) => {
         setShowAuthAlert(true);
     }, []);
     const setCurrentRouteWithDebug = useCallback((route) => {
-        console.debug('[RouteContext] Setting current route:', {
-            from: currentRoute ? {
-                routeId: currentRoute.routeId,
-                type: currentRoute._type,
-                hasLoadedState: isLoadedRoute(currentRoute) && !!currentRoute._loadedState,
-                hasGeojson: !!currentRoute.geojson,
-                loadedStateId: isLoadedRoute(currentRoute) ? currentRoute._loadedState?.persistentId : undefined
-            } : 'none',
-            to: route ? {
-                routeId: route.routeId,
-                type: route._type,
-                hasLoadedState: isLoadedRoute(route) && !!route._loadedState,
-                hasGeojson: !!route.geojson,
-                loadedStateId: isLoadedRoute(route) ? route._loadedState?.persistentId : undefined
-            } : 'none'
-        });
         setCurrentRoute(route);
-    }, [currentRoute]);
+    }, []);
     // Saved routes state
     const [savedRoutes, setSavedRoutes] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -141,13 +125,6 @@ export const RouteProvider = ({ children, }) => {
       return updatedPhotos;
     };
     const addRoute = useCallback((route) => {
-        console.debug('[RouteContext] Adding route:', {
-            routeId: route.routeId,
-            type: route._type,
-            hasLoadedState: !!currentLoadedState,
-            existingRoutes: routes.length,
-            hasGeojson: !!route.geojson
-        });
         setRoutes((prev) => {
             // Process the new route
             const processedRoute = currentLoadedState ? {
@@ -162,20 +139,13 @@ export const RouteProvider = ({ children, }) => {
             const existingRoutes = prev.filter(r => r.routeId !== route.routeId);
             // Add the new route
             const updatedRoutes = [...existingRoutes, processedRoute];
-            console.debug('[RouteContext] Updated routes:', {
-                previousCount: prev.length,
-                newCount: updatedRoutes.length,
-                routeIds: updatedRoutes.map(r => r.routeId)
-            });
             return updatedRoutes;
         });
         setHasUnsavedChanges(true);
     }, [currentLoadedState]);
     const deleteRoute = useCallback((routeId) => {
-        console.debug('[RouteContext][DELETE] Starting deletion process for route:', routeId);
         // Clean up map layers first if we have access to the map
         if (map) {
-            console.debug('[RouteContext][DELETE] Cleaning up map layers for route:', routeId);
             const cleanupLayers = (routeId) => {
                 const style = map.getStyle();
                 if (!style)
@@ -187,7 +157,6 @@ export const RouteProvider = ({ children, }) => {
                 routeLayers.forEach(layerId => {
                     if (map.getLayer(layerId)) {
                         try {
-                            console.debug('[RouteContext][DELETE] Removing layer:', layerId);
                             map.removeLayer(layerId);
                         }
                         catch (error) {
@@ -200,7 +169,6 @@ export const RouteProvider = ({ children, }) => {
                 routeSources.forEach(sourceId => {
                     if (map.getSource(sourceId)) {
                         try {
-                            console.debug('[RouteContext][DELETE] Removing source:', sourceId);
                             map.removeSource(sourceId);
                         }
                         catch (error) {

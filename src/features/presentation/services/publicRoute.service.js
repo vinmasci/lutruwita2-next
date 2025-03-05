@@ -31,8 +31,6 @@ class PublicRouteService {
     
     async loadRoute(persistentId) {
         try {
-            console.log(`[publicRoute.service] Fetching route with persistentId: ${persistentId}`);
-            
             // Add Accept header to ensure we get JSON back
             const response = await fetch(`/api/routes/public/${persistentId}`, {
                 headers: {
@@ -45,8 +43,6 @@ class PublicRouteService {
                 throw new Error(`Failed to load public route: ${response.status} ${response.statusText}`);
             }
             
-            console.log(`[publicRoute.service] Response received, status: ${response.status}`);
-            
             // Check content type to ensure we're getting JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -56,7 +52,6 @@ class PublicRouteService {
             
             // Get the data directly using response.json()
             const data = await response.json();
-            console.log(`[publicRoute.service] Parsed JSON data:`, data);
             
             // Validate the data structure
             if (!data) {
@@ -71,10 +66,8 @@ class PublicRouteService {
                 // If the API returns a different structure, try to adapt it
                 // This is a fallback in case the API response format has changed
                 if (data.route && typeof data.route === 'object') {
-                    console.log('[publicRoute.service] Found route object, adapting data structure');
                     data.routes = [data.route];
                 } else if (Array.isArray(data)) {
-                    console.log('[publicRoute.service] Data is an array, adapting data structure');
                     return { routes: data };
                 }
             }

@@ -49,14 +49,7 @@ export const PlacePOILayer: React.FC<Props> = () => {
         
         const hasSettlementLayers = settlementLayers.every(layer => map.getLayer(layer));
         
-        console.debug('[PlacePOILayer] Checking settlement layers:', {
-          layers: settlementLayers,
-          hasAll: hasSettlementLayers,
-          availableLayers: map?.getStyle()?.layers?.map(l => l.id)
-        });
-
         if (hasSettlementLayers) {
-          console.debug('[PlacePOILayer] All settlement layers ready');
           // Move settlement layers to the top
           settlementLayers.forEach(layerId => {
             if (map.getLayer(layerId)) {
@@ -65,7 +58,6 @@ export const PlacePOILayer: React.FC<Props> = () => {
           });
           setIsLayerReady(true);
         } else {
-          console.debug('[PlacePOILayer] Waiting for settlement layers...');
           setTimeout(checkLayers, 100);
         }
       };
@@ -240,25 +232,11 @@ export const PlacePOILayer: React.FC<Props> = () => {
   // Handle POI markers - now dependent on isLayerReady
   useEffect(() => {
     const setupMarkers = async () => {
-    console.debug('[PlacePOILayer] Marker effect running:', { 
-      hasMap: !!map, 
-      isLayerReady,
-      poiCount: pois.length,
-      zoom: map?.getZoom(),
-      poiMode,
-      places: Object.keys(places).length
-    });
 
     if (!map || !isLayerReady) {
       return;
     }
 
-    console.debug('[PlacePOILayer] Rendering POIs:', {
-      poiCount: pois.length,
-      zoom: map.getZoom(),
-      poiMode,
-      places: Object.keys(places).length
-    });
 
     // Clear existing markers
     markersRef.current.forEach(({ marker }) => marker.remove());
@@ -274,10 +252,6 @@ export const PlacePOILayer: React.FC<Props> = () => {
         ) as PlaceNamePOI | undefined;
 
         if (existingPOI) {
-          console.debug('[PlacePOILayer] Found existing POI:', {
-            coordinates,
-            placeId: existingPOI.placeId
-          });
           return existingPOI.placeId;
         }
 
@@ -286,11 +260,6 @@ export const PlacePOILayer: React.FC<Props> = () => {
         const placeLabel = getPlaceLabelAtPoint(map, point);
         
         if (placeLabel) {
-          console.debug('[PlacePOILayer] Found place label:', {
-            coordinates,
-            labelId: placeLabel.id,
-            name: placeLabel.name
-          });
           return placeLabel.id;
         }
 
@@ -299,20 +268,11 @@ export const PlacePOILayer: React.FC<Props> = () => {
           place => place.coordinates[0] === coordinates[0] && place.coordinates[1] === coordinates[1]
         );
         if (existingPlace) {
-          console.debug('[PlacePOILayer] Found existing place:', {
-            coordinates,
-            existingId: existingPlace.id,
-            description: existingPlace.description
-          });
           return existingPlace.id;
         }
 
         // If no existing place found, use coordinate format as fallback
         const coordinateId = `${coordinates[0]},${coordinates[1]}`;
-        console.debug('[PlacePOILayer] No place found:', {
-          coordinates,
-          usingCoordinateId: coordinateId
-        });
         return coordinateId;
       };
 
@@ -332,16 +292,6 @@ export const PlacePOILayer: React.FC<Props> = () => {
         }
       }
 
-    console.debug('[PlacePOILayer] Filtering POIs:', {
-      totalPois: pois.length,
-      placePois: placePois.length,
-      allPois: pois.map(poi => ({
-        id: poi.id,
-        type: poi.type,
-        name: poi.name,
-        coordinates: poi.coordinates
-      }))
-    });
 
     // Group POIs by location to show them together
     const poiGroups = placePois
@@ -358,7 +308,6 @@ export const PlacePOILayer: React.FC<Props> = () => {
     const currentZoom = map.getZoom();
 
     // Only show markers when zoomed in enough
-    console.debug('[PlacePOILayer] Current zoom:', currentZoom);
     
     if (currentZoom <= 8.071) {
       return;

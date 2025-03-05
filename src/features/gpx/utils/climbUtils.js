@@ -73,7 +73,6 @@ const calculateGradient = (point1, point2) => {
 export const detectClimbs = (data) => {
     if (data.length < 2)
         return [];
-    console.log('[ClimbUtils] Starting climb detection with data points:', data.length);
     
     // Smooth the elevation data to reduce noise
     const smoothedData = smoothElevationData(data, CLIMB_CONFIG.SMOOTHING_WINDOW);
@@ -121,7 +120,6 @@ export const detectClimbs = (data) => {
         }
     }
     
-    console.log(`[ClimbUtils] Found ${steepSections.length} steep sections`);
     
     // Merge nearby steep sections if they're part of the same climb
     const mergedSections = [];
@@ -188,7 +186,6 @@ export const detectClimbs = (data) => {
         mergedSections.push(currentSection);
     }
     
-    console.log(`[ClimbUtils] Merged into ${mergedSections.length} climb sections`);
     
     // Convert merged sections to climb objects and filter out climbs with average gradient < 1.5%
     const climbs = mergedSections.map(section => {
@@ -219,7 +216,6 @@ export const detectClimbs = (data) => {
             
             // If we found a higher point, use it as the end point
             if (highestPoint.elevation > endPointElevation) {
-                console.log(`[ClimbUtils] Extended climb to higher point ${(highestPoint.distance - endPointDistance) / 1000}km ahead`);
                 endPoint = highestPoint;
             }
         }
@@ -258,13 +254,11 @@ export const detectClimbs = (data) => {
             color
         };
         
-        console.log(`[ClimbUtils] Found climb: ${distanceKm.toFixed(1)}km at ${averageGradient.toFixed(1)}% (${category})`);
         return climb;
     });
     
     // Filter out climbs with average gradient less than 1.5%
     const filteredClimbs = climbs.filter(climb => climb.averageGradient >= 1.5);
-    console.log(`[ClimbUtils] Filtered out ${climbs.length - filteredClimbs.length} climbs with average gradient < 1.5%`);
     
     return filteredClimbs;
 };

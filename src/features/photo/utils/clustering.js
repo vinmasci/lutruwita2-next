@@ -44,19 +44,9 @@ const getClusteredPhotos = (photos, zoom) => {
     const clusters = index.getClusters(bounds, Math.floor(zoom));
     // Store the index in a WeakMap for expansion zoom lookups
     indexMap.set(clusters, index);
-    console.log('[Clustering] Final result:', {
-        totalClusters: clusters.length,
-        clusterSizes: clusters.map(c => isCluster(c) ? c.properties.point_count : 1)
-    });
     return clusters;
 };
 export const clusterPhotos = (photos, radius, zoom) => {
-    console.log('[Clustering] Starting with:', {
-        photoCount: photos.length,
-        radius,
-        zoom,
-        validPhotos: photos.filter(p => p.coordinates && p.coordinates.lat && p.coordinates.lng).length
-    });
     return getClusteredPhotos(photos, Math.floor(zoom));
 };
 // WeakMap to store the index for each set of clusters

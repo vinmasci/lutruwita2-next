@@ -211,10 +211,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
 
     // Effect to update the current profile point based on hover coordinates
     useEffect(() => {
-        console.log('[PresentationElevationProfile] hoverCoordinates changed:', hoverCoordinates);
-        
         if (!hoverCoordinates || !data.length || !route?.geojson?.features?.[0]) {
-            console.log('[PresentationElevationProfile] No hover coordinates, data, or route features');
             setCurrentProfilePoint(null);
             return;
         }
@@ -222,14 +219,11 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
         // Find the closest point in the elevation data to the hover coordinates
         const feature = route.geojson.features[0];
         if (feature.geometry.type !== 'LineString') {
-            console.log('[PresentationElevationProfile] Feature is not a LineString');
             return;
         }
 
         const coordinates = feature.geometry.coordinates;
         const totalDistance = route.statistics.totalDistance;
-
-        console.log('[PresentationElevationProfile] Processing route with', coordinates.length, 'coordinates');
 
         // Find the index of the closest coordinate
         let closestIndex = -1;
@@ -246,17 +240,13 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
             }
         });
 
-        console.log('[PresentationElevationProfile] Closest index:', closestIndex, 'with distance:', minDistance);
-
         if (closestIndex >= 0) {
             // Convert to distance along the route (in km)
             const distance = (closestIndex / (coordinates.length - 1)) * totalDistance / 1000;
             const elevation = data[closestIndex]?.elevation || 0;
             
-            console.log('[PresentationElevationProfile] Setting current profile point:', { distance, elevation });
             setCurrentProfilePoint({ x: distance, y: elevation });
         } else {
-            console.log('[PresentationElevationProfile] No closest point found');
             setCurrentProfilePoint(null);
         }
     }, [hoverCoordinates, data, route]);
@@ -279,13 +269,6 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                 return;
             }
 
-            // Log unpaved sections
-            console.log('Unpaved sections:', route.unpavedSections?.map(section => ({
-                startIndex: section.startIndex,
-                endIndex: section.endIndex,
-                startDistance: (section.startIndex / (elevations.length - 1)) * totalDistance / 1000,
-                endDistance: (section.endIndex / (elevations.length - 1)) * totalDistance / 1000
-            })));
 
             // Create elevation data with surface type
             const elevationData: ElevationPoint[] = [];
@@ -327,7 +310,6 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                 });
             }
 
-            console.log('Total elevation points:', elevations.length);
 
             // Calculate elevation stats
             let elevationGained = 0;
@@ -356,7 +338,6 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                 elevation: point.elevation
             }));
             const detectedClimbs = detectClimbs(climbData);
-            console.log('Detected climbs:', detectedClimbs);
             setClimbs(detectedClimbs);
         } catch (err) {
             console.error('Error processing elevation data:', err);

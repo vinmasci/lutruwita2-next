@@ -11,16 +11,13 @@ export const usePresentationRouteInit = ({ routes, onInitialized }) => {
     useEffect(() => {
         if (initialized || !routes.length)
             return;
-        console.log('[PresentationRouteInit] Starting route initialization');
         // Initialize all routes in a single batch
         const initializeRoutes = () => {
             routes.forEach(route => {
                 const normalizedRoute = normalizeRoute(route);
-                console.log('[PresentationRouteInit] Adding route:', normalizedRoute.routeId);
                 addRoute(normalizedRoute);
             });
             // Set initial route
-            console.log('[PresentationRouteInit] Setting initial route');
             setCurrentRoute(routes[0]);
             setInitialized(true);
             onInitialized?.();

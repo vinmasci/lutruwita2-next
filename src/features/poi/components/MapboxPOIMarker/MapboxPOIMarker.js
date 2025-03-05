@@ -66,14 +66,6 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
       </div>
     `;
         try {
-            console.log('Creating marker with coordinates:', {
-                lng: poi.coordinates[0],
-                lat: poi.coordinates[1],
-                coordinatesString: `${poi.coordinates[0].toFixed(6)}, ${poi.coordinates[1].toFixed(6)}`,
-                anchor: 'bottom',
-                offset: [0, -14], // Log the correct offset
-                poiId: poi.id
-            });
             
             // Create marker with viewport alignment and center anchor
             markerRef.current = new mapboxgl.Marker({
@@ -87,11 +79,6 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
                 .setLngLat({ lng: poi.coordinates[0], lat: poi.coordinates[1] })
                 .addTo(map);
                 
-            console.log('Marker created and added to map:', {
-                poiId: poi.id,
-                position: markerRef.current.getLngLat(),
-                positionString: `${markerRef.current.getLngLat().lng.toFixed(6)}, ${markerRef.current.getLngLat().lat.toFixed(6)}`
-            });
         }
         catch (error) {
             console.error('Error creating marker:', error);
@@ -110,37 +97,16 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
                 isMoving = true;
                 hasBeenDragged = false;
                 dragStartPos = markerRef.current?.getLngLat() || null;
-                console.log('Drag start:', {
-                    poiId: poi.id,
-                    position: dragStartPos
-                });
             })
                 .on('drag', () => {
                 hasBeenDragged = true;
                 const currentPos = markerRef.current?.getLngLat();
-                console.log('Dragging:', {
-                    poiId: poi.id,
-                    startPos: dragStartPos,
-                    currentPos,
-                    delta: currentPos ? {
-                        lng: currentPos.lng - (dragStartPos?.lng || 0),
-                        lat: currentPos.lat - (dragStartPos?.lat || 0)
-                    } : null
-                });
             })
                 .on('dragend', () => {
                 isMoving = false;
                 if (hasBeenDragged && onDragEnd) {
                     const lngLat = markerRef.current?.getLngLat();
                     if (lngLat) {
-                        console.log('Drag end:', {
-                            poiId: poi.id,
-                            finalPosition: lngLat,
-                            totalDelta: dragStartPos ? {
-                                lng: lngLat.lng - dragStartPos.lng,
-                                lat: lngLat.lat - dragStartPos.lat
-                            } : null
-                        });
                         onDragEnd(poi, [lngLat.lng, lngLat.lat]);
                     }
                 }

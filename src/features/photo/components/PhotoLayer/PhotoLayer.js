@@ -19,7 +19,6 @@ export const PhotoLayer = () => {
             return;
         const handleZoom = () => {
             const newZoom = map.getZoom();
-            console.log('[PhotoLayer] Zoom changed:', newZoom);
             setZoom(newZoom);
         };
         map.on('zoom', handleZoom);
