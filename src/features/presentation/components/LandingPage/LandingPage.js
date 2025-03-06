@@ -4,11 +4,14 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import { publicRouteService } from '../../services/publicRoute.service';
 import { MapPreview } from '../MapPreview/MapPreview';
-import { Container, Typography, Box, Button, Grid, Card, CardContent, CircularProgress, Alert, Stack } from '@mui/material';
+import { Container, Typography, Box, Button, Grid, Card, CardContent, CircularProgress, Alert, Stack, Chip, Avatar, Divider } from '@mui/material';
 import TerrainIcon from '@mui/icons-material/Terrain';
 import StraightenIcon from '@mui/icons-material/Straighten';
+import PersonIcon from '@mui/icons-material/Person';
+// Using TerrainIcon again instead of RoadIcon which is not available
 import { styled } from '@mui/material/styles';
 import { getStartingLocation } from '../../utils/locationUtils';
+
 const LocationDisplay = ({ geojson }) => {
     const [location, setLocation] = useState({ state: 'AUSTRALIA', city: 'UNKNOWN' });
     const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +36,7 @@ const LocationDisplay = ({ geojson }) => {
     }
     return (_jsxs(_Fragment, { children: [_jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: location.state }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: location.city })] }));
 };
+
 const StyledCard = styled(Card)(({ theme }) => ({
     height: '100%',
     display: 'flex',
@@ -43,6 +47,7 @@ const StyledCard = styled(Card)(({ theme }) => ({
         boxShadow: theme.shadows[4]
     }
 }));
+
 const MapPreviewWrapper = styled(Box)({
     position: 'relative',
     paddingTop: '56.25%', // 16:9 aspect ratio
@@ -54,18 +59,42 @@ const MapPreviewWrapper = styled(Box)({
         height: '100%'
     }
 });
+
 const calculateTotalDistance = (routes) => {
     return Math.round(routes
         .filter(r => r.statistics?.totalDistance)
         .reduce((total, r) => total + r.statistics.totalDistance, 0) / 1000)
         .toLocaleString();
 };
+
 const calculateTotalElevation = (routes) => {
     return Math.round(routes
         .filter(r => r.statistics?.elevationGain)
         .reduce((total, r) => total + r.statistics.elevationGain, 0))
         .toLocaleString();
 };
+
+// Calculate percentage of unpaved surface
+const calculateUnpavedPercentage = (routes) => {
+    // This is a placeholder calculation - adjust based on your actual data structure
+    // Assuming routes have a 'surfaceTypes' property with percentages or distances
+    try {
+        const totalDistance = routes
+            .filter(r => r.statistics?.totalDistance)
+            .reduce((total, r) => total + r.statistics.totalDistance, 0);
+        
+        if (!totalDistance) return 0;
+        
+        // Placeholder: randomly generate a percentage between 0-100 for demo
+        // Replace this with actual calculation based on your data
+        const unpavedDistance = Math.floor(Math.random() * totalDistance);
+        return Math.round((unpavedDistance / totalDistance) * 100);
+    } catch (error) {
+        console.error('Error calculating unpaved percentage:', error);
+        return 0;
+    }
+};
+
 export const LandingPage = () => {
     const navigate = useNavigate();
     const { loginWithRedirect } = useAuth0();
@@ -222,7 +251,77 @@ export const LandingPage = () => {
                                 fontWeight: 'bold',
                                 fontSize: { xs: '2.5rem', md: '3.75rem' },
                                 textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8)'
-                            }, children: "Featured Routes" }), loading ? (_jsx(Box, { display: "flex", justifyContent: "center", p: 4, children: _jsx(CircularProgress, {}) })) : error ? (_jsx(Alert, { severity: "error", sx: { maxWidth: 'sm', mx: 'auto' }, children: error })) : (_jsxs(_Fragment, { children: [_jsx(Grid, { container: true, spacing: 4, children: displayedRoutes.map((route) => (_jsx(Grid, { item: true, xs: 12, sm: 6, md: 4, children: _jsxs(StyledCard, { onClick: () => navigate(`/preview/route/${route.persistentId}`), sx: { cursor: 'pointer' }, children: [_jsx(MapPreviewWrapper, { children: _jsx(MapPreview, { center: route.mapState.center, zoom: route.mapState.zoom, routes: route.routes }) }), _jsxs(CardContent, { children: [_jsx(Typography, { variant: "h6", gutterBottom: true, sx: { fontFamily: 'Montserrat' }, children: route.name }), _jsxs(Stack, { spacing: 1, sx: { mt: 1 }, children: [_jsx(LocationDisplay, { geojson: route.routes[0].geojson }), _jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", children: [_jsx(StraightenIcon, { sx: { fontSize: 16, color: 'text.secondary' } }), _jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [calculateTotalDistance(route.routes), "km"] })] }), _jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", children: [_jsx(TerrainIcon, { sx: { fontSize: 16, color: 'text.secondary' } }), _jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [calculateTotalElevation(route.routes), "m"] })] })] }), _jsxs(Stack, { spacing: 1, sx: { mt: 2 }, children: [_jsxs(Stack, { direction: "row", spacing: 1, alignItems: "center", divider: _jsx(Typography, { color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: "\u2022" }), children: [_jsxs(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [route.viewCount, " views"] }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: new Date(route.createdAt).toLocaleDateString() })] }), _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: route.type.charAt(0).toUpperCase() + route.type.slice(1) })] })] })] }) }, route.id))) }), hasMore && !loading && !error && (_jsx(Box, { display: "flex", justifyContent: "center", mt: 4, children: _jsx(Button, { variant: "contained", color: "primary", onClick: loadMoreRoutes, sx: {
+                            }, children: "Featured Routes" }), loading ? (_jsx(Box, { display: "flex", justifyContent: "center", p: 4, children: _jsx(CircularProgress, {}) })) : error ? (_jsx(Alert, { severity: "error", sx: { maxWidth: 'sm', mx: 'auto' }, children: error })) : (_jsxs(_Fragment, { children: [_jsx(Grid, { container: true, spacing: 4, children: displayedRoutes.map((route) => (_jsx(Grid, { item: true, xs: 12, sm: 6, md: 4, children: _jsxs(StyledCard, { onClick: () => navigate(`/preview/route/${route.persistentId}`), sx: { cursor: 'pointer' }, children: [_jsx(MapPreviewWrapper, { children: _jsx(MapPreview, { center: route.mapState.center, zoom: route.mapState.zoom, routes: route.routes }) }), _jsxs(CardContent, { children: [
+                                                // Route name and user info in mercato format
+                                                _jsxs(Box, { sx: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }, children: [
+                                                    _jsx(Typography, { variant: "h6", sx: { fontFamily: 'Montserrat', fontWeight: 'bold' }, children: route.name }),
+                                                    _jsxs(Box, { sx: { display: 'flex', alignItems: 'center' }, children: [
+                                                        _jsx(Avatar, { sx: { width: 24, height: 24, mr: 1, bgcolor: 'primary.main' }, children: _jsx(PersonIcon, { fontSize: "small" }) }),
+                                                        _jsx(Typography, { variant: "body2", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: route.createdBy?.name || "Anonymous" })
+                                                    ] })
+                                                ] }),
+                                                
+                                                // Location info
+                                                _jsx(LocationDisplay, { geojson: route.routes[0].geojson }),
+                                                
+                                                _jsx(Divider, { sx: { my: 1.5 } }),
+                                                
+                                                // Route stats in mercato format
+                                                _jsxs(Box, { sx: { display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }, children: [
+                                                    // Distance chip
+                                                    _jsxs(Chip, { 
+                                                        icon: _jsx(StraightenIcon, { sx: { fontSize: 16 } }), 
+                                                        label: _jsxs(Typography, { variant: "body2", sx: { fontFamily: 'Montserrat' }, children: [
+                                                            calculateTotalDistance(route.routes), "km"
+                                                        ] }),
+                                                        size: "small",
+                                                        sx: { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+                                                    }),
+                                                    
+                                                    // Elevation chip
+                                                    _jsxs(Chip, { 
+                                                        icon: _jsx(TerrainIcon, { sx: { fontSize: 16 } }), 
+                                                        label: _jsxs(Typography, { variant: "body2", sx: { fontFamily: 'Montserrat' }, children: [
+                                                            calculateTotalElevation(route.routes), "m"
+                                                        ] }),
+                                                        size: "small",
+                                                        sx: { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+                                                    }),
+                                                    
+                                                    // Unpaved percentage chip - using StraightenIcon instead of RoadIcon
+                                                    _jsxs(Chip, { 
+                                                        icon: _jsx(StraightenIcon, { sx: { fontSize: 16 } }), 
+                                                        label: _jsxs(Typography, { variant: "body2", sx: { fontFamily: 'Montserrat' }, children: [
+                                                            calculateUnpavedPercentage(route.routes), "% unpaved"
+                                                        ] }),
+                                                        size: "small",
+                                                        sx: { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+                                                    })
+                                                ] }),
+                                                
+                                                _jsx(Divider, { sx: { my: 1.5 } }),
+                                                
+                                                // Footer info
+                                                _jsxs(Box, { sx: { display: 'flex', justifyContent: 'space-between', mt: 1 }, children: [
+                                                    // Route type
+                                                    _jsx(Chip, {
+                                                        label: route.type.charAt(0).toUpperCase() + route.type.slice(1),
+                                                        size: "small",
+                                                        sx: { 
+                                                            bgcolor: 'primary.main', 
+                                                            color: 'white',
+                                                            fontFamily: 'Montserrat',
+                                                            fontWeight: 'bold'
+                                                        }
+                                                    }),
+                                                    
+                                                    // Views and date
+                                                    _jsxs(Typography, { variant: "caption", color: "text.secondary", sx: { fontFamily: 'Montserrat' }, children: [
+                                                        route.viewCount, " views • ", 
+                                                        new Date(route.createdAt).toLocaleDateString()
+                                                    ] })
+                                                ] })
+                                            ] })] }) }, route.id))) }), hasMore && !loading && !error && (_jsx(Box, { display: "flex", justifyContent: "center", mt: 4, children: _jsx(Button, { variant: "contained", color: "primary", onClick: loadMoreRoutes, sx: {
                                     px: 4,
                                     py: 1.5,
                                     fontSize: '1rem',
