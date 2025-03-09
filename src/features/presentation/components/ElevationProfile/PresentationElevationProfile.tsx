@@ -656,18 +656,86 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                                 strokeLinejoin="round"
                             />
                         </g>
-                        <text
-                            x={xScale(currentProfilePoint.x)}
-                            y={yScale(currentProfilePoint.y) - 12}
-                            textAnchor="middle"
-                            fill="white"
-                            strokeWidth={1.5}
-                            fontSize="10px"
-                            fontWeight="bold"
-                            paintOrder="stroke"
-                        >
-                            {Math.round(currentProfilePoint.y)}m
-                        </text>
+                        {/* Elevation and distance text with higher z-index - positioned far to the right */}
+                        <g style={{ zIndex: 1000 }}>
+                            <foreignObject
+                                x={xScale(currentProfilePoint.x) > props.innerWidth * 0.7 ? xScale(currentProfilePoint.x) - 100 : xScale(currentProfilePoint.x) + 80}
+                                y={yScale(currentProfilePoint.y)}
+                                width="110"
+                                height="70"
+                                style={{ overflow: 'visible' }}
+                            >
+                                <div
+                                    style={{
+                                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                        color: 'white',
+                                        padding: '6px 10px',
+                                        borderRadius: '4px',
+                                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                                        fontFamily: 'Arial, sans-serif',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold',
+                                        letterSpacing: '0.2px',
+                                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                                        zIndex: 1000,
+                                        position: 'relative',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '4px'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <i className="fa-solid fa-arrow-up-right" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
+                                        <span>{Math.round(currentProfilePoint.y)}m</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <i className="fa-solid fa-arrow-right" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
+                                        <span>{currentProfilePoint.x.toFixed(1)}km</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <i className="fa-solid fa-percent" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
+                                        <span>
+                                            {(() => {
+                                                // Use the chartData structure which is similar to ElevationProfile.tsx
+                                                const profileData = chartData[0].data;
+                                                
+                                                // Find the closest point in the profile data to the current profile point
+                                                let closestIndex = -1;
+                                                let minDistance = Infinity;
+                                                
+                                                for (let i = 0; i < profileData.length; i++) {
+                                                    const dist = Math.abs(profileData[i].x - currentProfilePoint.x) + 
+                                                                Math.abs(profileData[i].y - currentProfilePoint.y);
+                                                    if (dist < minDistance) {
+                                                        minDistance = dist;
+                                                        closestIndex = i;
+                                                    }
+                                                }
+                                                
+                                                // If we found a point and it's not the first point
+                                                if (closestIndex > 0) {
+                                                    const point = profileData[closestIndex];
+                                                    const prevPoint = profileData[closestIndex - 1];
+                                                    
+                                                    // Calculate elevation change
+                                                    const elevChange = point.y - prevPoint.y;
+                                                    // Calculate distance change (in meters)
+                                                    const distChange = (point.x - prevPoint.x) * 1000;
+                                                    
+                                                    if (distChange > 0) {
+                                                        // Calculate gradient as percentage
+                                                        const gradient = (elevChange / distChange) * 100;
+                                                        return `${Math.round(gradient)}%`;
+                                                    }
+                                                }
+                                                
+                                                return '0.0%';
+                                            })()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </foreignObject>
+                        </g>
                     </g>
                 )}
                 {/* Debug info */}

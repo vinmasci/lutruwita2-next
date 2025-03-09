@@ -58,10 +58,20 @@ createDirectory(uploadsDir, 'uploads');
 const app = (0, express_1.default)();
 // Middleware
 app.use((0, cors_1.default)(server_config_1.SERVER_CONFIG.cors));
-app.use(express_1.default.json({ limit: '50mb' }));
-app.use(express_1.default.urlencoded({ limit: '50mb', extended: true }));
+app.use(express_1.default.json({ limit: '300mb' }));
+app.use(express_1.default.urlencoded({ limit: '300mb', extended: true }));
 app.use((0, morgan_1.default)('combined', { stream: { write: (message) => logger_config_1.logger.info(message.trim()) } }));
-// Health check endpoint
+// Serve static files from the React app in production
+if (process.env.NODE_ENV === 'production') {
+    const distPath = path_1.default.join(__dirname, '../../../dist');
+    logger_config_1.logger.info(`Serving static files from: ${distPath}`);
+    app.use(express_1.default.static(distPath));
+}
+// Health check endpoint for DigitalOcean App Platform
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+// API health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
 });
@@ -77,13 +87,20 @@ app.use((req, res, next) => {
     next();
 });
 // Feature Routes
+app.use('/api/routes/public', public_route_routes_1.default); // Register public routes first
 app.use('/api/gpx', gpx_routes_1.gpxRoutes);
 app.use('/api/routes', route_routes_1.default);
-app.use('/api/routes/public', public_route_routes_1.default);
 app.use('/api/photos', photo_routes_1.photoRoutes);
+// In production, serve the React app for any routes not matched by API routes
+if (process.env.NODE_ENV === 'production') {
+    app.get('*', (req, res) => {
+        res.sendFile(path_1.default.join(__dirname, '../../../dist/index.html'));
+    });
+}
 // Error handling
 app.use(error_handling_1.errorHandler);
-// Start server
-app.listen(server_config_1.SERVER_CONFIG.port, () => {
-    logger_config_1.logger.info(`Server running on port ${server_config_1.SERVER_CONFIG.port}`);
+// Start server - listen on all interfaces for DigitalOcean App Platform
+const port = typeof server_config_1.SERVER_CONFIG.port === 'string' ? parseInt(server_config_1.SERVER_CONFIG.port, 10) : server_config_1.SERVER_CONFIG.port;
+app.listen(port, '0.0.0.0', () => {
+    logger_config_1.logger.info(`Server running on port ${port} (0.0.0.0)`);
 });

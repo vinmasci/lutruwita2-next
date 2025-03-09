@@ -56,11 +56,12 @@ export default function PresentationMapView() {
         if (hoverCoordinates) {
             const el = document.createElement('div');
             el.className = 'hover-marker';
-            el.style.width = '10px';
-            el.style.height = '10px';
+            el.style.width = '16px';
+            el.style.height = '16px';
             el.style.borderRadius = '50%';
             el.style.backgroundColor = '#ff0000';
             el.style.border = '2px solid white';
+            el.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
             el.style.pointerEvents = 'none'; // Make marker non-interactive to allow clicks to pass through
             
             // Create and add the marker without popup
@@ -321,17 +322,21 @@ export default function PresentationMapView() {
             
             
             // Define a threshold distance - only show marker when close to the route
-            const distanceThreshold = 0.005; // Approximately 500m at the equator
+            const distanceThreshold = 0.0009; // Approximately 100m at the equator
             
             // If we found a closest point on the active route and it's within the threshold
             if (closestPoint && minDistance < distanceThreshold) {
                 setHoverCoordinates(closestPoint);
             } else {
                 // If no point found or too far from route, clear the marker
-                if (hoverCoordinates) {
-                    setHoverCoordinates(null);
-                }
+                setHoverCoordinates(null); // Always clear coordinates when outside threshold
             }
+        });
+        
+        // Add mouseout event to clear hover coordinates when cursor leaves the map
+        map.on('mouseout', () => {
+            // Clear hover coordinates when mouse leaves the map
+            setHoverCoordinates(null);
         });
 
         // Add Mapbox controls first
@@ -427,7 +432,20 @@ export default function PresentationMapView() {
                         zIndex: 1000
                     }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })),
             isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [
-                routes.map(route => (_jsx(RouteLayer, { map: mapInstance.current, route: route }, route.routeId))),
+                routes.map(route => {
+                    // Debug route IDs
+                    console.log('[PresentationMapView] Route:', {
+                        id: route.id,
+                        routeId: route.routeId,
+                        name: route.name,
+                        layerId: `${route.id || route.routeId}-main-line`
+                    });
+                    return _jsx(RouteLayer, { 
+                        map: mapInstance.current, 
+                        route: route,
+                        key: route.id || route.routeId // Ensure we have a stable key
+                    }, route.id || route.routeId);
+                }),
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
                 _jsx(PresentationPhotoLayer, {}),
                 currentRoute && (_jsxs(_Fragment, { children: [

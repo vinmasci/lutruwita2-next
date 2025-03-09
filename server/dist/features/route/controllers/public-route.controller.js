@@ -26,14 +26,14 @@ class PublicRouteController {
     }
     async loadPublicRoute(req, res) {
         try {
-            const { id } = req.params;
-            if (!id) {
+            const { persistentId } = req.params;
+            if (!persistentId) {
                 return res.status(400).json({
                     error: 'Invalid request',
-                    details: 'Route ID is required'
+                    details: 'Route persistent ID is required'
                 });
             }
-            const result = await this.routeService.loadPublicRoute(id);
+            const result = await this.routeService.loadPublicRoute(persistentId);
             res.json(result);
         }
         catch (error) {

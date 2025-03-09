@@ -7,7 +7,27 @@ import { ElevationContent } from './ElevationProfile.styles';
 import { Alert, AlertTitle, AlertDescription } from "../../../../components/ui/alert";
 import { useMapContext } from '../../../map/context/MapContext';
 import { detectClimbs } from '../../utils/climbUtils';
-import type { Climb } from '../../utils/climbUtils';
+
+// Define the Climb interface based on the return value of detectClimbs
+interface Climb {
+  startPoint: {
+    distance: number;
+    elevation: number;
+    gradient: number;
+  };
+  endPoint: {
+    distance: number;
+    elevation: number;
+    gradient: number;
+  };
+  totalDistance: number;
+  elevationGain: number;
+  averageGradient: number;
+  fietsScore: number;
+  category: string;
+  color: string;
+  number?: number;
+}
 
 interface ElevationProfileProps {
   route: ProcessedRoute;
@@ -354,10 +374,10 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
       id: 'unpavedPattern',
       type: 'patternLines',
       background: 'rgba(2, 136, 209, 0.2)',
-      color: 'rgba(2, 136, 209, 0.3)',
+      color: 'rgba(2, 136, 209, 0.5)',
       rotation: -65,
-      lineWidth: 1,
-      spacing: 2
+      lineWidth: 3,
+      spacing: 6
     }
   ];
 
@@ -373,8 +393,8 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
       background: climb.color.replace('99', '33'),
       color: climb.color.replace('99', '66'),
       rotation: -60,
-      lineWidth: 1,
-      spacing: 2
+      lineWidth: 3,
+      spacing: 6
     });
   });
 
@@ -701,7 +721,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
             <Box sx={{ 
               width: 8, 
               height: 8, 
-              background: 'repeating-linear-gradient(-60deg, rgba(2, 136, 209, 0.4), rgba(2, 136, 209, 0.4) 2px, transparent 2px, transparent 4px)'
+              background: 'repeating-linear-gradient(-60deg, rgba(2, 136, 209, 0.4), rgba(2, 136, 209, 0.4) 3px, transparent 3px, transparent 6px)'
             }} />
             Unpaved
           </Typography>
@@ -743,27 +763,86 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                         strokeDasharray="3,3"
                       />
                       
-                      {/* Circle at the current position - LUTRUWITA MAP TRACER */}
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={4}
-                        fill="#ff0000"
-                        stroke="white"
-                        strokeWidth={1.5}
-                      />
-                      <text
-                        x={x}
-                        y={y - 12}
-                        textAnchor="middle"
-                        fill="white"
-                        strokeWidth={1.5}
-                        fontSize="10px"
-                        fontWeight="bold"
-                        paintOrder="stroke"
-                      >
-                        {currentProfilePoint.y.toFixed(0)}m
-                      </text>
+                      {/* Map Pin at the current position - LUTRUWITA MAP TRACER */}
+                      <g transform={`translate(${x}, ${y})`}>
+                        {/* White stroke for the pin */}
+                        <path
+                          d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"
+                          transform="translate(-8, -16)"
+                          stroke="white"
+                          strokeWidth={1.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                        {/* Red fill for the pin */}
+                        <path
+                          d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"
+                          transform="translate(-8, -16)"
+                          fill="#ff0000"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </g>
+                      {/* Elevation and distance text with higher z-index - positioned far to the right */}
+                      <g style={{ zIndex: 1000 }}>
+                        <foreignObject
+                          x={x > innerWidth * 0.7 ? x - 100 : x + 80}
+                          y={y}
+                          width="110"
+                          height="70"
+                          style={{ overflow: 'visible' }}
+                        >
+                          <div
+                            style={{
+                              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                              color: 'white',
+                              padding: '6px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(255, 255, 255, 0.4)',
+                              fontFamily: 'Arial, sans-serif',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              letterSpacing: '0.2px',
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                              zIndex: 1000,
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <i className="fa-solid fa-arrow-up-right" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
+                              <span>{currentProfilePoint.y.toFixed(0)}m</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <i className="fa-solid fa-arrow-right" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
+                              <span>{currentProfilePoint.x.toFixed(1)}km</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <i className="fa-solid fa-percent" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
+                              <span>
+                                {(() => {
+                                  // Calculate gradient if possible
+                                  const profileData = data[0].data;
+                                  const currentPointIndex = profileData.findIndex(p => 
+                                    p.x === currentProfilePoint.x && p.y === currentProfilePoint.y);
+                                  
+                                  if (currentPointIndex > 0) {
+                                    const prevPoint = profileData[currentPointIndex - 1];
+                                    const elevationChange = currentProfilePoint.y - prevPoint.y;
+                                    const distanceChange = (currentProfilePoint.x - prevPoint.x) * 1000; // convert to meters
+                                    const gradientValue = (elevationChange / distanceChange) * 100;
+                                    return `${Math.round(gradientValue)}%`;
+                                  }
+                                  return '0.0%';
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        </foreignObject>
+                      </g>
                     </g>
                   );
                 }
@@ -821,8 +900,8 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                 }
               }
             }}
-            onClick={() => {}}
-            onMouseEnter={() => {}}
+            onClick={(point, event) => {/* No action needed */}}
+            onMouseEnter={(point, event) => {/* No action needed */}}
             onMouseMove={(point, event) => {
               if (point?.data) {
                 const pointData = point.data as { x: number; y: number };

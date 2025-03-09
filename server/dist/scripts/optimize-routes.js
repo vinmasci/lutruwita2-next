@@ -27,24 +27,27 @@ async function optimizeRoutes() {
         console.log('Connecting to MongoDB...');
         await mongoose_1.default.connect(MONGODB_URI);
         console.log('Connected successfully');
-        const routes = await route_model_1.RouteModel.find({});
+        const routes = await route_model_1.RouteModel.find({}).lean();
         console.log(`Found ${routes.length} routes to optimize`);
         let processed = 0;
         for (const route of routes) {
             console.log(`\nProcessing route: ${route.name} (${processed + 1}/${routes.length})`);
             let modified = false;
+            // Create new object to store optimized route
+            const updatedRoute = { ...route };
             // Process each route in the routes array
-            if (route.routes) {
-                route.routes = route.routes.map(subRoute => {
+            if (updatedRoute.routes) {
+                updatedRoute.routes = updatedRoute.routes.map(subRoute => {
+                    const optimizedSubRoute = { ...subRoute };
                     // Remove rawGpx
-                    if ('rawGpx' in subRoute) {
-                        const { rawGpx, ...rest } = subRoute;
+                    if ('rawGpx' in optimizedSubRoute) {
+                        const { rawGpx, ...rest } = optimizedSubRoute;
                         modified = true;
                         return rest;
                     }
                     // Round coordinates in geojson
-                    if (subRoute.geojson) {
-                        const geojson = subRoute.geojson;
+                    if (optimizedSubRoute.geojson) {
+                        const geojson = optimizedSubRoute.geojson;
                         const feature = geojson.features[0];
                         if (feature?.geometry?.coordinates) {
                             feature.geometry.coordinates = roundCoordinates(feature.geometry.coordinates);
@@ -52,85 +55,64 @@ async function optimizeRoutes() {
                         }
                     }
                     // Round elevations in surface.elevationProfile
-                    if (subRoute.surface?.elevationProfile) {
-                        subRoute.surface.elevationProfile = subRoute.surface.elevationProfile.map(point => ({
+                    if (optimizedSubRoute.surface?.elevationProfile) {
+                        optimizedSubRoute.surface.elevationProfile = optimizedSubRoute.surface.elevationProfile.map(point => ({
                             ...point,
                             elevation: roundElevation(point.elevation)
                         }));
                         modified = true;
                     }
                     // Round coordinates in unpavedSections
-                    if (subRoute.unpavedSections) {
-                        subRoute.unpavedSections = subRoute.unpavedSections.map(section => ({
+                    if (optimizedSubRoute.unpavedSections) {
+                        optimizedSubRoute.unpavedSections = optimizedSubRoute.unpavedSections.map(section => ({
                             ...section,
                             coordinates: roundCoordinates(section.coordinates)
                         }));
                         modified = true;
                     }
-                    return subRoute;
+                    return optimizedSubRoute;
                 });
             }
             // Round coordinates in mapState
-            if (route.mapState?.center) {
-                route.mapState.center = route.mapState.center.map(roundCoordinate);
+            if (updatedRoute.mapState?.center) {
+                updatedRoute.mapState.center = updatedRoute.mapState.center.map(roundCoordinate);
                 modified = true;
             }
-            // Process photos
-            if (route.photos?.length === 0) {
-                route.photos = undefined;
-                modified = true;
-            }
-            else if (route.photos) {
-                route.photos = route.photos.map(photo => {
-                    if (photo.coordinates) {
-                        photo.coordinates.lat = roundCoordinate(photo.coordinates.lat);
-                        photo.coordinates.lng = roundCoordinate(photo.coordinates.lng);
-                        modified = true;
-                    }
-                    return photo;
-                });
-            }
-            // Process POIs
-            if (!route.pois?.draggable?.length && !route.pois?.places?.length) {
-                route.pois = undefined;
-                modified = true;
-            }
-            else if (route.pois) {
-                const pois = route.pois;
-                // Process draggable POIs
-                if (pois.draggable?.length === 0) {
-                    pois.draggable = undefined;
-                    modified = true;
+            // Initialize or optimize photos array
+            updatedRoute.photos = route.photos?.map(photo => {
+                if (photo.coordinates) {
+                    return {
+                        ...photo,
+                        coordinates: {
+                            lat: roundCoordinate(photo.coordinates.lat),
+                            lng: roundCoordinate(photo.coordinates.lng)
+                        }
+                    };
                 }
-                else if (pois.draggable) {
-                    pois.draggable = pois.draggable.map((poi) => ({
-                        ...poi,
-                        coordinates: [
-                            roundCoordinate(poi.coordinates[0]),
-                            roundCoordinate(poi.coordinates[1])
-                        ]
-                    }));
-                    modified = true;
-                }
-                // Process place POIs
-                if (pois.places?.length === 0) {
-                    pois.places = undefined;
-                    modified = true;
-                }
-                else if (pois.places) {
-                    pois.places = pois.places.map((poi) => ({
-                        ...poi,
-                        coordinates: [
-                            roundCoordinate(poi.coordinates[0]),
-                            roundCoordinate(poi.coordinates[1])
-                        ]
-                    }));
-                    modified = true;
-                }
-            }
+                return photo;
+            }) || [];
+            modified = true;
+            // Initialize or optimize POIs
+            updatedRoute.pois = {
+                draggable: route.pois?.draggable?.map(poi => ({
+                    ...poi,
+                    coordinates: [
+                        roundCoordinate(poi.coordinates[0]),
+                        roundCoordinate(poi.coordinates[1])
+                    ]
+                })) || [],
+                places: route.pois?.places?.map(poi => ({
+                    ...poi,
+                    coordinates: [
+                        roundCoordinate(poi.coordinates[0]),
+                        roundCoordinate(poi.coordinates[1])
+                    ]
+                })) || []
+            };
+            modified = true;
             if (modified) {
                 try {
-                    await route.save();
+                    await route_model_1.RouteModel.findByIdAndUpdate(route._id, updatedRoute, { new: true });
                     console.log('Route optimized and saved successfully');
                 }
                 catch (error) {

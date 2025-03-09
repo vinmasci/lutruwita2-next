@@ -14,5 +14,5 @@ const asyncHandler = (fn) => (req, res, next) => {
 // List public routes with optional type filter
 router.get('/', asyncHandler(controller.listPublicRoutes.bind(controller)));
 // Get a specific public route
-router.get('/:id', asyncHandler(controller.loadPublicRoute.bind(controller)));
+router.get('/:persistentId', asyncHandler(controller.loadPublicRoute.bind(controller)));
 exports.default = router;

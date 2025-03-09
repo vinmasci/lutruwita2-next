@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
 import { useRouteContext } from "../../context/RouteContext";
@@ -27,13 +27,100 @@ export const RouteLayer = ({ map, route }) => {
         borderWidth: 5
     });
 
+    // Function to find and update layer visibility
+    const updateLayerVisibility = useCallback(() => {
+        if (!map || !route || !isStyleLoaded) return;
+        
+        // Get the stable route ID
+        const routeId = route.id || route.routeId;
+        
+        // Get all layers in the map
+        const allLayers = map.getStyle().layers.map(layer => layer.id);
+        console.log('[RouteLayer] All map layers:', allLayers);
+        
+        // Find all layers that might be related to this route
+        const routeLayers = allLayers.filter(layerId => 
+            layerId.includes(routeId) || 
+            (route.routeId && layerId.includes(route.routeId))
+        );
+        
+        console.log(`[RouteLayer] Found ${routeLayers.length} layers for route ${routeId}:`, routeLayers);
+        
+        // Find main line and border layers
+        const mainLineLayers = routeLayers.filter(layerId => layerId.includes('-main-line'));
+        const borderLayers = routeLayers.filter(layerId => layerId.includes('-main-border'));
+        const surfaceLayers = routeLayers.filter(layerId => layerId.includes('unpaved-sections-layer'));
+        
+        // Get visibility state
+        const visibility = routeVisibility[routeId] || { mainRoute: true, unpavedSections: true };
+        
+        console.log(`[RouteLayer] Updating visibility for route ${routeId}:`, {
+            visibility,
+            mainLineLayers,
+            borderLayers,
+            surfaceLayers
+        });
+        
+        // Update main line layers
+        mainLineLayers.forEach(layerId => {
+            console.log(`[RouteLayer] Setting ${layerId} visibility to ${visibility.mainRoute ? 'visible' : 'none'}`);
+            map.setLayoutProperty(
+                layerId,
+                'visibility',
+                visibility.mainRoute ? 'visible' : 'none'
+            );
+        });
+        
+        // Update border layers
+        borderLayers.forEach(layerId => {
+            console.log(`[RouteLayer] Setting ${layerId} visibility to ${visibility.mainRoute ? 'visible' : 'none'}`);
+            map.setLayoutProperty(
+                layerId,
+                'visibility',
+                visibility.mainRoute ? 'visible' : 'none'
+            );
+        });
+        
+        // Update surface layers
+        surfaceLayers.forEach(layerId => {
+            console.log(`[RouteLayer] Setting ${layerId} visibility to ${visibility.unpavedSections ? 'visible' : 'none'}`);
+            map.setLayoutProperty(
+                layerId,
+                'visibility',
+                visibility.unpavedSections ? 'visible' : 'none'
+            );
+        });
+    }, [map, route, isStyleLoaded, routeVisibility]);
+    
+    // Effect to update layer visibility when routeVisibility changes
+    useEffect(() => {
+        updateLayerVisibility();
+    }, [updateLayerVisibility]);
+    
+    // Also update visibility when the map style changes
+    useEffect(() => {
+        if (!map) return;
+        
+        const styleChangeHandler = () => {
+            console.log('[RouteLayer] Map style changed, updating layer visibility');
+            // Wait for the style to load before updating visibility
+            setTimeout(updateLayerVisibility, 500);
+        };
+        
+        map.on('style.load', styleChangeHandler);
+        
+        return () => {
+            map.off('style.load', styleChangeHandler);
+        };
+    }, [map, updateLayerVisibility]);
+
     useEffect(() => {
         try {
             if (!map || !route || !isStyleLoaded || !route.geojson) {
                 return;
             }
 
-            const routeId = route.routeId;
+            const routeId = route.id || route.routeId;
             const mainLayerId = `${routeId}-main-line`;
             const borderLayerId = `${routeId}-main-border`;
             const hoverLayerId = `${routeId}-hover`;
@@ -108,7 +195,7 @@ export const RouteLayer = ({ map, route }) => {
                 layout: {
                     'line-join': 'round',
                     'line-cap': 'round',
-                    visibility: 'visible'
+                    visibility: visibility.mainRoute ? 'visible' : 'none'
                 },
                 paint: {
                     'line-color': '#ffffff',
@@ -133,6 +220,9 @@ export const RouteLayer = ({ map, route }) => {
                     'line-opacity': 1
                 }
             });
+
+            // Log the layer ID for debugging
+            console.log(`[RouteLayer] Added layer with ID: ${mainLayerId}`);
 
             // Add hover layer (initially hidden) only for focused routes
             if (route.isFocused) {
@@ -242,12 +332,12 @@ export const RouteLayer = ({ map, route }) => {
     useEffect(() => {
         if (!map || !route || !isStyleLoaded) return;
         
-        const currentColor = route.color;
-        const prevColor = prevColorRef.current;
-        
-        // Only update if the color has changed
-        if (currentColor !== prevColor) {
-            const routeId = route.routeId;
+            const currentColor = route.color;
+            const prevColor = prevColorRef.current;
+            
+            // Only update if the color has changed
+            if (currentColor !== prevColor) {
+                const routeId = route.id || route.routeId;
             const mainLayerId = `${routeId}-main-line`;
             const hoverLayerId = `${routeId}-hover`;
             
@@ -290,14 +380,16 @@ export const RouteLayer = ({ map, route }) => {
         }
         
         // Check if this is the current route
-        const isCurrentRoute = currentRoute.routeId === route.routeId;
+        const isCurrentRoute = currentRoute && (
+            currentRoute.id === route.id || 
+            currentRoute.routeId === route.routeId
+        );
         
         if (!isCurrentRoute) {
             return;
         }
         
-        
-        const routeId = route.routeId;
+        const routeId = route.id || route.routeId;
         const mainLayerId = `${routeId}-main-line`;
         const borderLayerId = `${routeId}-main-border`;
         

@@ -7,7 +7,7 @@ exports.SERVER_CONFIG = void 0;
 const path_1 = __importDefault(require("path"));
 exports.SERVER_CONFIG = {
     port: process.env.PORT || 8080,
-    uploadsDir: path_1.default.join(__dirname, '../../../../uploads'),
+    uploadsDir: process.env.NODE_ENV === 'production' ? '/tmp/uploads' : path_1.default.join(__dirname, '../../../../uploads'),
     maxFileSize: 100 * 1024 * 1024, // 100MB for photos
     allowedFileTypes: ['.gpx', '.jpg', '.jpeg', '.png', '.heic'],
     cors: {

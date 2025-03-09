@@ -5,11 +5,12 @@ import { useRouteContext } from '../../../map/context/RouteContext';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
+import { useRouteState } from '../../../map/hooks/useRouteState';
 import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp, Ruler } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp, Ruler, Eye, EyeOff } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
 
 export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDistanceMarkersVisibility }) => {
@@ -17,6 +18,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
     const { map } = useMapContext();
     const { loadPOIsFromRoute, visibleCategories, toggleCategoryVisibility } = usePOIContext();
     const { addPhoto, isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
+    const { routeVisibility, toggleRouteVisibility } = useRouteState();
     const [isNestedOpen, setIsNestedOpen] = useState(true);
     const currentIndex = routes.findIndex(route => route.id === currentRoute?.id);
 
@@ -343,8 +345,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         _jsx(List, { 
                             sx: { flex: 1, overflowY: 'auto', px: 3, py: 2, pb: 40 }, 
                             children: routes.map((route) => (
-                                _jsx(ListItem, { 
-                                    onClick: () => updateRouteAndMap(route), 
+                                _jsxs(ListItem, { 
                                     sx: {
                                         backgroundColor: currentRoute?.id === route.id ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
                                         mb: 1.5,
@@ -362,19 +363,41 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                         '& i': {
                                             transition: 'color 0.2s ease-in-out',
                                             color: currentRoute?.id === route.id ? '#4a9eff !important' : '#0288d1'
-                                        }
-                                    }, 
-                                    children: _jsx(ListItemText, { 
-                                        primary: route.name, 
-                                        sx: { 
-                                            color: 'white',
-                                            '& .MuiTypography-root': {
-                                                wordWrap: 'break-word',
-                                                wordBreak: 'break-word',
-                                                overflowWrap: 'break-word',
-                                                whiteSpace: 'normal'
-                                            }
                                         },
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 16px'
+                                    }, 
+                                    children: [
+                                        _jsx("div", {
+                                            style: { flex: 1, cursor: 'pointer', minWidth: '0', width: '100%' },
+                                            onClick: () => updateRouteAndMap(route),
+                                            children: _jsx(ListItemText, { 
+                                            primary: _jsxs("div", {
+                                                style: { display: 'flex', alignItems: 'center', gap: '10px', minWidth: '0' },
+                                                children: [
+                                                    _jsx("div", {
+                                                        style: {
+                                                            width: '8px',
+                                                            height: '16px',
+                                                            backgroundColor: route.color || '#f44336', // Use route color or default red
+                                                            borderRadius: '2px',
+                                                            border: '1px solid rgba(255, 255, 255, 0.5)'
+                                                        }
+                                                    }),
+                                                    _jsx("span", { children: route.name })
+                                                ]
+                                            }),
+                                            sx: { 
+                                                color: 'white',
+                                                '& .MuiTypography-root': {
+                                                    wordWrap: 'break-word',
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                    whiteSpace: 'normal'
+                                                }
+                                            },
                                         secondary: _jsxs("div", {
                                             style: { 
                                                 display: 'flex',
@@ -443,7 +466,133 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                                 })
                                             ]
                                         })
-                                    }) 
+                                        })
+                                        }),
+                                        _jsx(Tooltip, {
+                                            title: (routeVisibility[route.id || route.routeId]?.mainRoute ?? true) ? "Hide Route" : "Show Route",
+                                            placement: "left",
+                                            children: _jsx(IconButton, {
+                                                onClick: (e) => {
+                                                    e.stopPropagation();
+                                                    
+                                                    // Use the stable ID (id first, then routeId)
+                                                    const stableId = route.id || route.routeId;
+                                                    
+                                                    // Log the route ID for debugging
+                                                    console.log('[PresentationSidebar] Toggling visibility for route:', {
+                                                        id: route.id,
+                                                        routeId: route.routeId,
+                                                        name: route.name,
+                                                        stableId,
+                                                        currentVisibility: routeVisibility[stableId]
+                                                    });
+                                                    
+                                                    // Toggle visibility
+                                                    toggleRouteVisibility(stableId, 'mainRoute');
+                                                    
+                                                    // Direct manipulation of the map layers
+                                                    if (map) {
+                                                        // Try different layer ID formats for the main route
+                                                        const possibleMainLayerIds = [
+                                                            `${stableId}-main-line`,
+                                                            `route-${stableId}-main-line`
+                                                        ];
+                                                        
+                                                        // Try different layer ID formats for the unpaved sections
+                                                        const possibleUnpavedLayerIds = [
+                                                            `unpaved-sections-layer-${stableId}`,
+                                                            `unpaved-sections-layer-route-${stableId}`
+                                                        ];
+                                                        
+                                                        const newVisibility = !(routeVisibility[stableId]?.mainRoute ?? true);
+                                                        console.log(`[PresentationSidebar] Setting route visibility to ${newVisibility ? 'visible' : 'none'}`);
+                                                        
+                                                        // Find and update the main route layers
+                                                        let foundMainLayer = false;
+                                                        for (const layerId of possibleMainLayerIds) {
+                                                            if (map.getLayer(layerId)) {
+                                                                console.log(`[PresentationSidebar] Found main layer: ${layerId}`);
+                                                                
+                                                                // Update main line visibility
+                                                                map.setLayoutProperty(
+                                                                    layerId,
+                                                                    'visibility',
+                                                                    newVisibility ? 'visible' : 'none'
+                                                                );
+                                                                
+                                                                // Also update border visibility
+                                                                const borderLayerId = layerId.replace('-main-line', '-main-border');
+                                                                if (map.getLayer(borderLayerId)) {
+                                                                    map.setLayoutProperty(
+                                                                        borderLayerId,
+                                                                        'visibility',
+                                                                        newVisibility ? 'visible' : 'none'
+                                                                    );
+                                                                }
+                                                                
+                                                                foundMainLayer = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                        
+                                                        // Find and update the unpaved sections layers
+                                                        let foundUnpavedLayer = false;
+                                                        for (const layerId of possibleUnpavedLayerIds) {
+                                                            if (map.getLayer(layerId)) {
+                                                                console.log(`[PresentationSidebar] Found unpaved layer: ${layerId}`);
+                                                                
+                                                                // Update unpaved sections visibility
+                                                                map.setLayoutProperty(
+                                                                    layerId,
+                                                                    'visibility',
+                                                                    newVisibility ? 'visible' : 'none'
+                                                                );
+                                                                
+                                                                foundUnpavedLayer = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                        
+                                                        // If we couldn't find the layers by ID, try searching all layers
+                                                        if (!foundMainLayer || !foundUnpavedLayer) {
+                                                            // Get all layers in the map
+                                                            const allLayers = map.getStyle().layers.map(layer => layer.id);
+                                                            console.log('[PresentationSidebar] All map layers:', allLayers);
+                                                            
+                                                            // Find layers that might be related to this route
+                                                            const routeLayers = allLayers.filter(layerId => 
+                                                                layerId.includes(stableId) || 
+                                                                (route.routeId && layerId.includes(route.routeId))
+                                                            );
+                                                            
+                                                            console.log(`[PresentationSidebar] Found ${routeLayers.length} layers for route ${stableId}:`, routeLayers);
+                                                            
+                                                            // Update all found layers
+                                                            routeLayers.forEach(layerId => {
+                                                                console.log(`[PresentationSidebar] Setting ${layerId} visibility to ${newVisibility ? 'visible' : 'none'}`);
+                                                                map.setLayoutProperty(
+                                                                    layerId,
+                                                                    'visibility',
+                                                                    newVisibility ? 'visible' : 'none'
+                                                                );
+                                                            });
+                                                        }
+                                                    }
+                                                },
+                                                size: "small",
+                                                sx: {
+                                                    color: 'white',
+                                                    padding: '4px',
+                                                    '&:hover': {
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                                    }
+                                                },
+                                                children: (routeVisibility[route.id || route.routeId]?.mainRoute ?? true) ? 
+                                                    _jsx(Eye, { size: 18, color: '#4caf50' }) : 
+                                                    _jsx(EyeOff, { size: 18, color: '#ff4d4f' })
+                                            })
+                                        })
+                                    ] 
                                 }, route.id)
                             )) 
                         })
