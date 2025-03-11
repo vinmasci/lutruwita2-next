@@ -1,7 +1,7 @@
 import { createApiHandler } from '../lib/middleware.js';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '../lib/db.js';
-import { deleteFile } from '../lib/cloudinary.js';
+import { deleteFile, uploadJsonData } from '../lib/cloudinary.js';
 
 // Define Route schema to match the original structure
 const RouteSchema = new mongoose.Schema({
@@ -14,6 +14,7 @@ const RouteSchema = new mongoose.Schema({
   viewCount: { type: Number, default: 0 },
   lastViewed: { type: Date },
   publicId: { type: String, index: true, sparse: true },
+  embedUrl: { type: String }, // URL to the pre-processed embed data in Cloudinary
   
   // Map state
   mapState: {
@@ -212,6 +213,53 @@ async function handleCreateRoute(req, res) {
     
     console.log(`[API] Route saved successfully with ID: ${route._id}`);
     
+    // Generate and upload embed data to Cloudinary
+    try {
+      console.log(`[API] Generating embed data for route: ${route.name}`);
+      
+      // Create the embed data package
+      const embedData = {
+        id: route._id,
+        persistentId: route.persistentId,
+        name: route.name,
+        routes: route.routes.map(r => ({
+          routeId: r.routeId,
+          name: r.name,
+          color: r.color,
+          geojson: r.geojson,
+          surface: r.surface,
+          unpavedSections: r.unpavedSections,
+          description: r.description // Include the description field
+        })),
+        mapState: route.mapState,
+        pois: route.pois || { draggable: [], places: [] },
+        photos: route.photos || [],
+        elevation: route.routes.map(r => r.surface?.elevationProfile || []),
+        description: route.description, // Include the top-level description field
+        _type: 'loaded',
+        _loadedState: {
+          name: route.name,
+          pois: route.pois || { draggable: [], places: [] },
+          photos: route.photos || []
+        }
+      };
+      
+      // Upload to Cloudinary
+      const publicId = `embed-${route.persistentId}`;
+      console.log(`[API] Uploading embed data to Cloudinary with public ID: ${publicId}`);
+      
+      const result = await uploadJsonData(embedData, publicId);
+      
+      // Update the route with the embed URL
+      route.embedUrl = result.url;
+      await route.save();
+      
+      console.log(`[API] Embed data uploaded successfully: ${result.url}`);
+    } catch (embedError) {
+      console.error(`[API] Error generating embed data:`, embedError);
+      // Continue even if embed data generation fails
+    }
+    
     return res.status(201).json(route);
   } catch (error) {
     console.error('Create route error:', error);
@@ -341,6 +389,60 @@ async function handleUpdateRoute(req, res) {
     
     console.log(`[API] Route updated successfully`);
     
+    // Generate and upload embed data to Cloudinary
+    try {
+      console.log(`[API] Generating updated embed data for route: ${route.name}`);
+      
+      // Create the embed data package
+      const embedData = {
+        id: route._id,
+        persistentId: route.persistentId,
+        name: route.name,
+        routes: route.routes.map(r => ({
+          routeId: r.routeId,
+          name: r.name,
+          color: r.color,
+          geojson: r.geojson,
+          surface: r.surface,
+          unpavedSections: r.unpavedSections,
+          description: r.description // Include the description field
+        })),
+        mapState: route.mapState,
+        pois: route.pois || { draggable: [], places: [] },
+        photos: route.photos || [],
+        elevation: route.routes.map(r => r.surface?.elevationProfile || []),
+        description: route.description, // Include the top-level description field
+        _type: 'loaded',
+        _loadedState: {
+          name: route.name,
+          pois: route.pois || { draggable: [], places: [] },
+          photos: route.photos || []
+        }
+      };
+      
+      // Upload to Cloudinary with the same public ID to replace the existing file
+      const publicId = `embed-${route.persistentId}`;
+      console.log(`[API] Uploading updated embed data to Cloudinary with public ID: ${publicId}`);
+      
+      // Add a timestamp to force a version update
+      const options = {
+        timestamp: Date.now()
+      };
+      
+      const result = await uploadJsonData(embedData, publicId, options);
+      
+      // Update the route with the embed URL if it changed
+      if (route.embedUrl !== result.url) {
+        route.embedUrl = result.url;
+        await route.save();
+      }
+      
+      console.log(`[API] Updated embed data uploaded successfully: ${result.url}`);
+    } catch (embedError) {
+      console.error(`[API] Error generating updated embed data:`, embedError);
+      // Continue even if embed data generation fails
+    }
+    
     return res.status(200).json(route);
   } catch (error) {
     console.error('Update route error:', error);
@@ -432,6 +534,19 @@ async function handleDeleteRoute(req, res) {
           console.error(`[API] Error deleting photo: ${photoError.message}`);
           // Continue with other photos even if one fails
         }
+      }
+    }
+    
+    // Delete the embed data from Cloudinary if it exists
+    if (route.embedUrl) {
+      try {
+        const publicId = `embeds/embed-${route.persistentId}`;
+        console.log(`[API] Deleting embed data from Cloudinary: ${publicId}`);
+        await deleteFile(publicId);
+        console.log(`[API] Deleted embed data: ${publicId}`);
+      } catch (embedError) {
+        console.error(`[API] Error deleting embed data: ${embedError.message}`);
+        // Continue with route deletion even if embed data deletion fails
       }
     }
     

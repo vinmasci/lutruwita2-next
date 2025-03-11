@@ -92,10 +92,57 @@ export const RouteLayer = ({ map, route }) => {
         });
     }, [map, route, isStyleLoaded, routeVisibility]);
     
+    // Function to move route layers to front
+    const moveRouteToFront = useCallback(() => {
+        if (!map || !route || !isStyleLoaded) return;
+        
+        // Get the stable route ID
+        const routeId = route.id || route.routeId;
+        
+        // Check if this is the current route
+        const isCurrentRoute = currentRoute && (
+            currentRoute.id === route.id || 
+            currentRoute.routeId === route.routeId
+        );
+        
+        // Only move to front if this is the current route
+        if (isCurrentRoute) {
+            console.log(`[RouteLayer] Moving route ${routeId} to front`);
+            
+            // Get all layers in the map
+            const style = map.getStyle();
+            if (!style || !style.layers) return;
+            
+            // Find all layers for this route
+            const mainLayerId = `${routeId}-main-line`;
+            const borderLayerId = `${routeId}-main-border`;
+            const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
+            
+            // Move layers to front in correct order (border first, then main line, then surface)
+            // This ensures proper stacking order
+            if (map.getLayer(borderLayerId)) {
+                map.moveLayer(borderLayerId);
+            }
+            
+            if (map.getLayer(mainLayerId)) {
+                map.moveLayer(mainLayerId);
+            }
+            
+            if (map.getLayer(surfaceLayerId)) {
+                map.moveLayer(surfaceLayerId);
+            }
+        }
+    }, [map, route, isStyleLoaded, currentRoute]);
+
     // Effect to update layer visibility when routeVisibility changes
     useEffect(() => {
         updateLayerVisibility();
     }, [updateLayerVisibility]);
+    
+    // Effect to move current route to front when currentRoute changes
+    useEffect(() => {
+        moveRouteToFront();
+    }, [moveRouteToFront, currentRoute]);
     
     // Also update visibility when the map style changes
     useEffect(() => {
@@ -116,7 +163,16 @@ export const RouteLayer = ({ map, route }) => {
 
     useEffect(() => {
         try {
-            if (!map || !route || !isStyleLoaded || !route.geojson) {
+            // Skip rendering if the route has an error flag or is missing geojson data
+            if (!map || !route || !isStyleLoaded || !route.geojson || route.error) {
+                console.log(`[RouteLayer] Skipping route rendering:`, {
+                    routeId: route?.id || route?.routeId,
+                    hasMap: !!map,
+                    hasRoute: !!route,
+                    isStyleLoaded,
+                    hasGeojson: !!route?.geojson,
+                    hasError: !!route?.error
+                });
                 return;
             }
 
@@ -285,6 +341,9 @@ export const RouteLayer = ({ map, route }) => {
                         'line-dasharray': [1, 3]
                     }
                 });
+                
+                // Log that unpaved sections were added
+                console.log(`[RouteLayer] Added unpaved sections layer for route ${routeId} with ${features.length} sections`);
             }
 
             // Add hover handlers only for focused routes
@@ -388,6 +447,9 @@ export const RouteLayer = ({ map, route }) => {
         if (!isCurrentRoute) {
             return;
         }
+        
+        // Move this route to front when it becomes the current route
+        moveRouteToFront();
         
         const routeId = route.id || route.routeId;
         const mainLayerId = `${routeId}-main-line`;

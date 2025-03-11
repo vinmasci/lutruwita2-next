@@ -9,6 +9,7 @@ import { usePlaceContext } from '../../../place/context/PlaceContext';
 import { SidebarIcons, RefreshIcon } from './icons';
 import { SaveDialog } from './SaveDialog.jsx';
 import { LoadDialog } from './LoadDialog';
+import { EmbedDialog } from './EmbedDialog.jsx';
 
 export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemClick }) => {
     const { routes, savedRoutes, saveCurrentState, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
@@ -18,11 +19,17 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
     const { clearPlaces } = usePlaceContext();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+    const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
     const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info');
     const [activeItem, setActiveItem] = useState(null);
+
+    const handleEmbedClick = () => {
+        console.log('Embed map clicked');
+        setEmbedDialogOpen(true);
+    };
 
     const handleSaveClick = () => {
         console.log('Save clicked, current routes:', routes);
@@ -266,6 +273,13 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
             text: 'Save GPX',
             onClick: handleSaveClick,
             disabled: routes.length === 0
+        },
+        {
+            id: 'embed',
+            icon: SidebarIcons.actions.embed,
+            text: 'Embed Map',
+            onClick: handleEmbedClick,
+            disabled: routes.length === 0
         }
     ];
 
@@ -377,6 +391,10 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
                 }, 
                 onDelete: deleteSavedRoute, 
                 hasUnsavedChanges: hasUnsavedChanges 
+            }),
+            _jsx(EmbedDialog, {
+                open: embedDialogOpen,
+                onClose: () => setEmbedDialogOpen(false)
             })
         ] 
     }));

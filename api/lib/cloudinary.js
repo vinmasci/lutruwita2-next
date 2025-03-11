@@ -166,6 +166,41 @@ export function generateImageUrl(publicId, transformations = {}) {
   return cloudinary.url(publicId, transformations);
 }
 
+/**
+ * Upload JSON data to Cloudinary as a raw file
+ * @param {Object} jsonData - The JSON data to upload
+ * @param {string} publicId - The public ID to use for the file
+ * @param {Object} options - Additional upload options
+ * @returns {Promise<Object>} - The upload result with URLs
+ */
+export async function uploadJsonData(jsonData, publicId, options = {}) {
+  // Convert JSON to string
+  const jsonString = JSON.stringify(jsonData);
+  
+  // Convert string to Buffer
+  const buffer = Buffer.from(jsonString);
+  
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      {
+        resource_type: 'raw', // Important: specify raw for JSON files
+        public_id: publicId,
+        folder: 'embeds',
+        format: 'json',
+        ...options
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+          version: result.version
+        });
+      }
+    ).end(buffer);
+  });
+}
+
 export default {
   generateUploadSignature,
   uploadFile,
@@ -175,5 +210,6 @@ export default {
   generateMediumThumbnailUrl,
   generateLargeImageUrl,
   generateThumbnailUrl,
-  generateImageUrl
+  generateImageUrl,
+  uploadJsonData
 };

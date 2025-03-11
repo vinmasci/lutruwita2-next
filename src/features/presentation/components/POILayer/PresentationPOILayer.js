@@ -9,7 +9,7 @@ import { ICON_PATHS } from '../../../poi/constants/icon-paths';
 import { calculatePOIPositions } from '../../../poi/utils/placeDetection';
 import { PresentationPOIViewer } from '../POIViewer';
 import './PresentationPOILayer.css';
-export const PresentationPOILayer = ({ map }) => {
+export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     const { currentRoute } = useRouteContext();
     const { loadPOIsFromRoute, getPOIsForRoute, visibleCategories } = usePOIContext();
     const markersRef = useRef([]);
@@ -102,7 +102,11 @@ export const PresentationPOILayer = ({ map }) => {
             .addTo(map);
         // Add click handler to show drawer
         el.addEventListener('click', () => {
-            setSelectedPOI(poi);
+            if (onSelectPOI) {
+                onSelectPOI(poi);
+            } else {
+                setSelectedPOI(poi);
+            }
         });
         // Add hover effect
         el.addEventListener('mouseenter', () => {
@@ -120,7 +124,7 @@ export const PresentationPOILayer = ({ map }) => {
             }
         });
         return { marker, poiId: poi.id };
-    }, [map, setSelectedPOI]);
+    }, [map, setSelectedPOI, onSelectPOI]);
     // Effect to update markers when POI data changes
     useEffect(() => {
         if (!map)
@@ -187,7 +191,11 @@ export const PresentationPOILayer = ({ map }) => {
                     .setLngLat(position.coordinates);
                 // Add click handler to show drawer
                 el.addEventListener('click', () => {
-                    setSelectedPOI(poi);
+                    if (onSelectPOI) {
+                        onSelectPOI(poi);
+                    } else {
+                        setSelectedPOI(poi);
+                    }
                 });
                 // Only add marker if we're zoomed in enough
                 if (map.getZoom() > 8.071) {
@@ -231,5 +239,6 @@ export const PresentationPOILayer = ({ map }) => {
             placeMarkersRef.current = [];
         };
     }, [map, poiData, createMarker]); // Use memoized poiData instead of getPOIsForRoute
-    return (_jsx(PresentationPOIViewer, { poi: selectedPOI, onClose: () => setSelectedPOI(null) }));
+    // Only render the POI viewer if we're not using an external onSelectPOI handler
+    return onSelectPOI ? null : (_jsx(PresentationPOIViewer, { poi: selectedPOI, onClose: () => setSelectedPOI(null) }));
 };

@@ -5,12 +5,12 @@ import Supercluster from 'supercluster';
 // This creates the clustering engine with specific settings
 const createIndex = () => {
     return new Supercluster({
-        radius: 40, // Fixed clustering radius in pixels
-        maxZoom: 12, // Maximum zoom level to cluster points
+        radius: 80, // Increased clustering radius for more aggressive clustering
+        maxZoom: 12, // Decreased maximum zoom level to cluster points at higher zoom levels
         minZoom: 0, // Minimum zoom level to cluster points
         map: props => ({
-            cluster: true, // THIS MARKS EVERYTHING AS A CLUSTER
-            cluster_id: 0,
+            // Let supercluster handle clustering itself
+            // Don't set cluster: true here
             point_count: 1,
             point_count_abbreviated: 1,
             photos: [props.photo]
@@ -78,5 +78,9 @@ export const getClusterExpansionZoom = (clusterId, clusters) => {
 };
 // Helper to check if something is a cluster
 export const isCluster = (feature) => {
-    return 'cluster' in feature.properties && feature.properties.cluster === true;
+    // Supercluster adds 'cluster' property to cluster features
+    // and 'point_count' property indicating the number of points in the cluster
+    return feature.properties && 
+           'cluster' in feature.properties && 
+           feature.properties.cluster === true;
 };

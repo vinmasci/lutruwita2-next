@@ -6,7 +6,7 @@
  * Adjusts the scale of the presentation container based on window size
  * @param {HTMLElement} container - The presentation container element
  */
-export const adjustPresentationScale = (container) => {
+export const adjustPresentationScale = (container, onScaleChange) => {
   if (!container) return;
   
   // Get window dimensions
@@ -31,8 +31,11 @@ export const adjustPresentationScale = (container) => {
     scale = 0.75; // Desktop (unchanged)
   }
   
-  // Apply the scale
+  // Apply the scale and notify if callback provided
   container.style.transform = `scale(${scale})`;
+  if (onScaleChange) {
+    onScaleChange(scale);
+  }
   
   // Ensure the container fills the viewport
   container.style.width = '100vw';
@@ -61,15 +64,15 @@ export const adjustPresentationScale = (container) => {
  * Sets up a resize listener to adjust scale when window size changes
  * @param {HTMLElement} container - The presentation container element
  */
-export const setupScaleListener = (container) => {
+export const setupScaleListener = (container, onScaleChange) => {
   if (!container) return;
   
   // Initial adjustment
-  adjustPresentationScale(container);
+  adjustPresentationScale(container, onScaleChange);
   
   // Create a named handler function so we can properly remove it later
   const handleResize = () => {
-    adjustPresentationScale(container);
+    adjustPresentationScale(container, onScaleChange);
   };
   
   // Add resize listener

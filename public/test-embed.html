@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lutruwita Map Embed Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+        .embed-container {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .embed-container h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lutruwita Map Embed Test</h1>
+        <p>
+            This page demonstrates how the Lutruwita map can be embedded in external websites.
+            The iframe below shows a map with routes that can be interacted with just like in the main application.
+        </p>
+        
+        <div class="embed-container">
+            <h2>Example Embed</h2>
+            <p>This is an example of an embedded map:</p>
+            
+            <iframe 
+              src="http://localhost:3000/embed/eyJyb3V0ZXMiOlt7ImlkIjoicm91dGUtYTdjNmEzYzYtYTNmNy00OWNmLTlhNjgtZmZmMDk2ZjkxNzQ0IiwidmlzaWJsZSI6dHJ1ZX0seyJpZCI6InJvdXRlLTU4OWNlMDkwLTQ5YTQtNDU4MC05NTUyLTc4NDliZWM3MWZlMiIsInZpc2libGUiOnRydWV9LHsiaWQiOiJyb3V0ZS02MmU0MjBiZi1hZjQzLTQyZTctYjRiZS03OTAzN2E5YjM5YzgiLCJ2aXNpYmxlIjp0cnVlfSx7ImlkIjoicm91dGUtMTE2MjE1MzYtZjcyNS00MmVlLThjY2QtNjU5OGNlM2E1ZWQ4IiwidmlzaWJsZSI6dHJ1ZX1dLCJtYXBTdGF0ZSI6eyJjZW50ZXIiOlsxNDIuNDc0MjE1MDAwMDAwMDcsLTM3LjA5Njg2NjY1MTM3ODg4XSwiem9vbSI6MTEuOTQ4OTE3MzAyMTgwMTIsImJlYXJpbmciOjAsInBpdGNoIjowLCJzdHlsZSI6Ik1hcGJveCBTYXRlbGxpdGUgU3RyZWV0cyJ9fQ==" 
+              width="800" 
+              height="600" 
+              style="border:0;" 
+              allowfullscreen="" 
+              loading="lazy">
+            </iframe>
+            
+            <p><em>Note: This iframe now uses our new Cloudinary-based implementation for faster loading. The system automatically generated and uploaded the pre-processed data to Cloudinary!</em></p>
+        </div>
+        
+        <h2>How to Embed</h2>
+        <ol>
+            <li>Open the Lutruwita map application</li>
+            <li>Add routes to the map</li>
+            <li>Click the "Embed" icon in the sidebar</li>
+            <li>Customize the embed size if needed</li>
+            <li>Copy the generated embed code</li>
+            <li>Paste the code into your website's HTML</li>
+        </ol>
+        
+        <h2>Features</h2>
+        <ul>
+            <li>Interactive 3D map with terrain</li>
+            <li>Display routes with detailed information</li>
+            <li>Points of Interest (POIs) with detailed information</li>
+            <li>Elevation profile display</li>
+            <li>Sidebar with route information</li>
+            <li>Zoom, pan, and rotate controls</li>
+            <li>Fullscreen mode</li>
+            <li>Responsive design</li>
+            <li>Optimized performance with caching</li>
+        </ul>
+        
+        <h2>New Implementation Improvements</h2>
+        <ul>
+            <li><strong>Pre-processed data stored in Cloudinary</strong> for ultra-fast CDN delivery</li>
+            <li>Single API request for all data (routes, POIs, elevation data)</li>
+            <li>Simplified component architecture for better performance</li>
+            <li>Progressive loading for better user experience</li>
+            <li>Server-side caching for faster loading</li>
+            <li>Direct rendering of POIs without complex context providers</li>
+            <li>Automatic updates to embed data when routes are modified</li>
+        </ul>
+    </div>
+</body>
+</html>

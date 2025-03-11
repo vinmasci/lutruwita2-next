@@ -24,6 +24,15 @@
       "dest": "/api/poi"
     },
     {
+      "src": "/api/routes/embed/([^/]+)",
+      "dest": "/api/routes/embed?routeId=$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
       "src": "/api/routes/public/([^/]+)",
       "dest": "/api/routes/public?publicId=$1"
     },
@@ -77,6 +86,10 @@
       "maxDuration": 30
     },
     "api/routes/public/index.js": {
+      "memory": 512,
+      "maxDuration": 30
+    },
+    "api/routes/embed/index.js": {
       "memory": 512,
       "maxDuration": 30
     }

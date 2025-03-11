@@ -274,7 +274,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                 className: "fa-solid fa-up-right",
                                                 style: { color: '#0288d1' }
                                             }),
-                                            `${Math.round(getElevationGain(route)).toLocaleString()} m`
+                                            `${Math.round(route?.statistics?.elevationGained || 0).toLocaleString()} m`
                                         ]
                                     }),
                                     _jsx(Typography, {

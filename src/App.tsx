@@ -66,6 +66,14 @@ export default function App() {
                     >
                       <Route path="route/:id" element={<RoutePresentation />} />
                     </Route>
+                    <Route path="/embed/:stateId" element={
+                      <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
+                        <React.Suspense fallback={<div>Loading...</div>}>
+                          {/* Lazy load the embed view */}
+                          {React.createElement(React.lazy(() => import('./features/presentation/components/EmbedMapView/EmbedMapView')))}
+                        </React.Suspense>
+                      </Box>
+                    } />
                   </Routes>
                 </POIProvider>
               </PlaceProvider>
