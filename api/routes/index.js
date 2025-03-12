@@ -695,11 +695,218 @@ import { getRedisClient } from '../lib/redis.js';
 // Initialize Redis client
 global.redisClient = getRedisClient();
 
+// Define ChunkedUploadSession schema for MongoDB fallback
+const ChunkedUploadSessionSchema = new mongoose.Schema({
+  sessionId: { type: String, required: true, unique: true, index: true },
+  persistentId: { type: String },
+  totalChunks: { type: Number, required: true },
+  totalSize: { type: Number, required: true },
+  receivedChunks: { type: Number, default: 0 },
+  isUpdate: { type: Boolean, default: false },
+  chunks: { type: Map, of: Boolean, default: new Map() },
+  createdAt: { type: Date, default: Date.now, expires: 3600 } // Auto-expire after 1 hour
+});
+
+// Define ChunkedUploadChunk schema for MongoDB fallback
+const ChunkedUploadChunkSchema = new mongoose.Schema({
+  sessionId: { type: String, required: true, index: true },
+  chunkIndex: { type: Number, required: true },
+  data: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 3600 } // Auto-expire after 1 hour
+});
+
+// Create compound index for sessionId + chunkIndex
+ChunkedUploadChunkSchema.index({ sessionId: 1, chunkIndex: 1 }, { unique: true });
+
+// Initialize the models
+let ChunkedUploadSession;
+let ChunkedUploadChunk;
+try {
+  // Try to get the models if they exist
+  ChunkedUploadSession = mongoose.model('ChunkedUploadSession');
+  ChunkedUploadChunk = mongoose.model('ChunkedUploadChunk');
+} catch (e) {
+  // Create the models if they don't exist
+  ChunkedUploadSession = mongoose.model('ChunkedUploadSession', ChunkedUploadSessionSchema);
+  ChunkedUploadChunk = mongoose.model('ChunkedUploadChunk', ChunkedUploadChunkSchema);
+}
+
 // In-memory storage for serverless environments where Redis might not be available
-const memoryStorage = {
-  sessions: {},
-  chunks: {}
-};
+// Using global object to ensure persistence across function invocations
+if (!global.memoryStorage) {
+  global.memoryStorage = {
+    sessions: {},
+    chunks: {}
+  };
+}
+const memoryStorage = global.memoryStorage;
+
+// Debug function to log memory storage state
+function logMemoryStorageState() {
+  console.log(`[API] Memory storage state: ${Object.keys(memoryStorage.sessions).length} sessions`);
+  for (const sessionId in memoryStorage.sessions) {
+    console.log(`[API] Session ${sessionId}: ${JSON.stringify(memoryStorage.sessions[sessionId])}`);
+  }
+}
+
+// Helper function to get session info from storage (Redis, MongoDB, or memory)
+async function getSessionInfo(sessionId) {
+  // Try Redis first
+  let sessionInfo = await getCache(`chunked:${sessionId}:info`);
+  if (sessionInfo) {
+    return { sessionInfo, source: 'redis' };
+  }
+  
+  // Try MongoDB next
+  try {
+    const session = await ChunkedUploadSession.findOne({ sessionId });
+    if (session) {
+      // Convert MongoDB document to plain object
+      sessionInfo = session.toObject();
+      // Convert Map to plain object for chunks
+      sessionInfo.chunks = Object.fromEntries(session.chunks);
+      return { sessionInfo, source: 'mongodb' };
+    }
+  } catch (error) {
+    console.error('[API] Error getting session from MongoDB:', error);
+  }
+  
+  // Try memory storage last
+  if (memoryStorage.sessions[sessionId]) {
+    return { sessionInfo: memoryStorage.sessions[sessionId], source: 'memory' };
+  }
+  
+  // Session not found in any storage
+  return { sessionInfo: null, source: null };
+}
+
+// Helper function to store session info in storage (Redis, MongoDB, or memory)
+async function storeSessionInfo(sessionId, sessionInfo) {
+  // Try Redis first
+  const redisSuccess = await setCache(`chunked:${sessionId}:info`, sessionInfo, 3600);
+  
+  // If Redis successful, return
+  if (redisSuccess) {
+    return { success: true, source: 'redis' };
+  }
+  
+  // Try MongoDB next
+  try {
+    // Convert chunks object to Map for MongoDB
+    const chunksMap = new Map(Object.entries(sessionInfo.chunks));
+    
+    // Create or update session in MongoDB
+    await ChunkedUploadSession.findOneAndUpdate(
+      { sessionId },
+      { 
+        ...sessionInfo,
+        chunks: chunksMap
+      },
+      { upsert: true, new: true }
+    );
+    
+    return { success: true, source: 'mongodb' };
+  } catch (error) {
+    console.error('[API] Error storing session in MongoDB:', error);
+  }
+  
+  // Fall back to memory storage
+  memoryStorage.sessions[sessionId] = sessionInfo;
+  return { success: true, source: 'memory' };
+}
+
+// Helper function to get chunk data from storage (Redis, MongoDB, or memory)
+async function getChunkData(sessionId, chunkIndex) {
+  // Try Redis first
+  let chunkData = await getCache(`chunked:${sessionId}:chunk:${chunkIndex}`);
+  if (chunkData) {
+    return { chunkData, source: 'redis' };
+  }
+  
+  // Try MongoDB next
+  try {
+    const chunk = await ChunkedUploadChunk.findOne({ sessionId, chunkIndex });
+    if (chunk) {
+      return { chunkData: chunk.data, source: 'mongodb' };
+    }
+  } catch (error) {
+    console.error('[API] Error getting chunk from MongoDB:', error);
+  }
+  
+  // Try memory storage last
+  if (memoryStorage.chunks && 
+      memoryStorage.chunks[sessionId] && 
+      memoryStorage.chunks[sessionId][chunkIndex] !== undefined) {
+    return { chunkData: memoryStorage.chunks[sessionId][chunkIndex], source: 'memory' };
+  }
+  
+  // Chunk not found in any storage
+  return { chunkData: null, source: null };
+}
+
+// Helper function to store chunk data in storage (Redis, MongoDB, or memory)
+async function storeChunkData(sessionId, chunkIndex, data) {
+  // Try Redis first
+  const redisSuccess = await setCache(`chunked:${sessionId}:chunk:${chunkIndex}`, data, 3600);
+  
+  // If Redis successful, return
+  if (redisSuccess) {
+    return { success: true, source: 'redis' };
+  }
+  
+  // Try MongoDB next
+  try {
+    // Create or update chunk in MongoDB
+    await ChunkedUploadChunk.findOneAndUpdate(
+      { sessionId, chunkIndex },
+      { sessionId, chunkIndex, data },
+      { upsert: true, new: true }
+    );
+    
+    return { success: true, source: 'mongodb' };
+  } catch (error) {
+    console.error('[API] Error storing chunk in MongoDB:', error);
+  }
+  
+  // Fall back to memory storage
+  if (!memoryStorage.chunks) {
+    memoryStorage.chunks = {};
+  }
+  if (!memoryStorage.chunks[sessionId]) {
+    memoryStorage.chunks[sessionId] = {};
+  }
+  memoryStorage.chunks[sessionId][chunkIndex] = data;
+  return { success: true, source: 'memory' };
+}
+
+// Helper function to clean up session data from all storage
+async function cleanupSessionData(sessionId, totalChunks) {
+  // Clean up Redis
+  try {
+    await deleteCache(`chunked:${sessionId}:info`);
+    for (let i = 0; i < totalChunks; i++) {
+      await deleteCache(`chunked:${sessionId}:chunk:${i}`);
+    }
+  } catch (error) {
+    console.error('[API] Error cleaning up Redis data:', error);
+  }
+  
+  // Clean up MongoDB
+  try {
+    await ChunkedUploadSession.deleteOne({ sessionId });
+    await ChunkedUploadChunk.deleteMany({ sessionId });
+  } catch (error) {
+    console.error('[API] Error cleaning up MongoDB data:', error);
+  }
+  
+  // Clean up memory storage
+  if (memoryStorage.sessions && memoryStorage.sessions[sessionId]) {
+    delete memoryStorage.sessions[sessionId];
+  }
+  if (memoryStorage.chunks && memoryStorage.chunks[sessionId]) {
+    delete memoryStorage.chunks[sessionId];
+  }
+}
 
 // Start a chunked upload session
 async function handleStartChunkedUpload(req, res) {
@@ -722,26 +929,18 @@ async function handleStartChunkedUpload(req, res) {
     
     console.log(`[API] Creating chunked upload session: ${sessionId}`);
     
-    // Try to store in Redis first
-    const redisSuccess = await setCache(`chunked:${sessionId}:info`, sessionInfo, 3600);
+    // Store session info using helper function
+    const { success, source } = await storeSessionInfo(sessionId, sessionInfo);
     
-    // Check if Redis is available
-    if (!redisSuccess) {
-      console.log(`[API] Redis unavailable, using in-memory storage for session ${sessionId}`);
-      
-      // Initialize memory storage if needed
-      if (!memoryStorage.sessions) {
-        memoryStorage.sessions = {};
-      }
-      if (!memoryStorage.chunks) {
-        memoryStorage.chunks = {};
-      }
-      
-      // Store session info in memory
-      memoryStorage.sessions[sessionId] = sessionInfo;
-      console.log(`[API] Session stored in memory storage`);
-    } else {
-      console.log(`[API] Session stored in Redis`);
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to create upload session' });
+    }
+    
+    console.log(`[API] Session stored in ${source} storage`);
+    
+    // Log memory storage state for debugging if using memory storage
+    if (source === 'memory') {
+      logMemoryStorageState();
     }
     
     console.log(`[API] Chunked upload session created: ${sessionId} for ${isUpdate ? 'update' : 'new'} route`);
@@ -763,65 +962,47 @@ async function handleUploadChunk(req, res) {
     
     console.log(`[API] Processing chunk ${chunkIndex} for session ${sessionId}`);
     
-    // Try to get session info from Redis first
-    let sessionInfo = await getCache(`chunked:${sessionId}:info`);
-    let usingMemoryStorage = false;
+    // Log memory storage state before processing
+    console.log(`[API] Memory storage state BEFORE processing chunk:`);
+    logMemoryStorageState();
     
-    // If not in Redis, check in-memory storage
-    if (!sessionInfo && memoryStorage.sessions[sessionId]) {
-      console.log(`[API] Session ${sessionId} found in memory storage`);
-      sessionInfo = memoryStorage.sessions[sessionId];
-      usingMemoryStorage = true;
-    }
+    // Get session info using helper function
+    const { sessionInfo, source: sessionSource } = await getSessionInfo(sessionId);
     
-    // If session not found in either storage
+    // If session not found in any storage
     if (!sessionInfo) {
-      console.log(`[API] Session ${sessionId} not found in Redis or memory storage`);
+      console.log(`[API] Session ${sessionId} not found in any storage`);
       return res.status(404).json({ error: 'Upload session not found or expired' });
     }
     
-    console.log(`[API] Session info retrieved, using ${usingMemoryStorage ? 'memory storage' : 'Redis'}`);
+    console.log(`[API] Session info retrieved from ${sessionSource} storage`);
     
-    // Store the chunk (try Redis first, then fallback to memory)
-    if (!usingMemoryStorage) {
-      // Try to store the chunk in Redis
-      const redisSuccess = await setCache(`chunked:${sessionId}:chunk:${chunkIndex}`, data, 3600);
-      
-      // If Redis fails, use in-memory storage
-      if (!redisSuccess) {
-        console.log(`[API] Redis storage failed for chunk ${chunkIndex}, using in-memory storage`);
-        usingMemoryStorage = true;
-      }
+    // Store chunk data using helper function
+    const { success, source: chunkSource } = await storeChunkData(sessionId, chunkIndex, data);
+    
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to store chunk data' });
     }
     
-    // If using memory storage or Redis failed
-    if (usingMemoryStorage) {
-      if (!memoryStorage.chunks[sessionId]) {
-        memoryStorage.chunks[sessionId] = {};
-      }
-      memoryStorage.chunks[sessionId][chunkIndex] = data;
-      console.log(`[API] Chunk ${chunkIndex} stored in memory`);
-    }
+    console.log(`[API] Chunk ${chunkIndex} stored in ${chunkSource} storage`);
     
     // Update session info
     sessionInfo.receivedChunks += 1;
     sessionInfo.chunks[chunkIndex] = true;
     
-    // Update session info in the appropriate storage
-    if (usingMemoryStorage) {
-      memoryStorage.sessions[sessionId] = sessionInfo;
-      console.log(`[API] Updated session info in memory storage`);
-    } else {
-      const sessionUpdateSuccess = await setCache(`chunked:${sessionId}:info`, sessionInfo, 3600);
-      
-      // If Redis update fails, fall back to memory storage
-      if (!sessionUpdateSuccess) {
-        console.log(`[API] Redis update failed, falling back to memory storage`);
-        memoryStorage.sessions[sessionId] = sessionInfo;
-      }
+    // Update session info using helper function
+    const updateResult = await storeSessionInfo(sessionId, sessionInfo);
+    
+    if (!updateResult.success) {
+      return res.status(500).json({ error: 'Failed to update session info' });
     }
     
+    console.log(`[API] Session info updated in ${updateResult.source} storage`);
     console.log(`[API] Received chunk ${chunkIndex + 1}/${sessionInfo.totalChunks} for session ${sessionId}`);
+    
+    // Log memory storage state after processing
+    console.log(`[API] Memory storage state AFTER processing chunk:`);
+    logMemoryStorageState();
     
     return res.status(200).json({ 
       success: true,
@@ -844,24 +1025,16 @@ async function handleCompleteChunkedUpload(req, res) {
     
     console.log(`[API] Processing completion request for session ${sessionId}`);
     
-    // Try to get session info from Redis first
-    let sessionInfo = await getCache(`chunked:${sessionId}:info`);
-    let usingMemoryStorage = false;
+    // Get session info using helper function
+    const { sessionInfo, source: sessionSource } = await getSessionInfo(sessionId);
     
-    // If not in Redis, check in-memory storage
-    if (!sessionInfo && memoryStorage.sessions && memoryStorage.sessions[sessionId]) {
-      console.log(`[API] Session ${sessionId} found in memory storage for completion`);
-      sessionInfo = memoryStorage.sessions[sessionId];
-      usingMemoryStorage = true;
-    }
-    
-    // If session not found in either storage
+    // If session not found in any storage
     if (!sessionInfo) {
-      console.log(`[API] Session ${sessionId} not found in Redis or memory storage`);
+      console.log(`[API] Session ${sessionId} not found in any storage`);
       return res.status(404).json({ error: 'Upload session not found or expired' });
     }
     
-    console.log(`[API] Session info retrieved, using ${usingMemoryStorage ? 'memory storage' : 'Redis'}`);
+    console.log(`[API] Session info retrieved from ${sessionSource} storage`);
     
     // Check if all chunks are received
     if (sessionInfo.receivedChunks !== sessionInfo.totalChunks) {
@@ -878,31 +1051,16 @@ async function handleCompleteChunkedUpload(req, res) {
     // Reassemble the data
     let completeData = '';
     for (let i = 0; i < sessionInfo.totalChunks; i++) {
-      let chunkData = null;
+      // Get chunk data using helper function
+      const { chunkData, source: chunkSource } = await getChunkData(sessionId, i);
       
-      // Get chunk from the appropriate storage
-      if (usingMemoryStorage) {
-        if (memoryStorage.chunks && memoryStorage.chunks[sessionId] && memoryStorage.chunks[sessionId][i] !== undefined) {
-          chunkData = memoryStorage.chunks[sessionId][i];
-          console.log(`[API] Chunk ${i} retrieved from memory storage`);
-        }
-      } else {
-        // Try to get chunk from Redis
-        chunkData = await getCache(`chunked:${sessionId}:chunk:${i}`);
-        
-        // If not in Redis but we have it in memory storage as fallback
-        if (!chunkData && memoryStorage.chunks && memoryStorage.chunks[sessionId] && memoryStorage.chunks[sessionId][i] !== undefined) {
-          chunkData = memoryStorage.chunks[sessionId][i];
-          console.log(`[API] Chunk ${i} not in Redis, retrieved from memory storage fallback`);
-        }
-      }
-      
-      // If chunk not found in either storage
+      // If chunk not found in any storage
       if (!chunkData) {
         console.log(`[API] Chunk ${i} not found in any storage`);
         return res.status(500).json({ error: `Chunk ${i} not found or expired` });
       }
       
+      console.log(`[API] Chunk ${i} retrieved from ${chunkSource} storage`);
       completeData += chunkData;
     }
     
@@ -955,27 +1113,9 @@ async function handleCompleteChunkedUpload(req, res) {
       });
     }
     
-    // Clean up Redis/Vercel KV keys
-    try {
-      // Clean up Redis
-      await deleteCache(`chunked:${sessionId}:info`);
-      for (let i = 0; i < sessionInfo.totalChunks; i++) {
-        await deleteCache(`chunked:${sessionId}:chunk:${i}`);
-      }
-      
-      // Clean up memory storage
-      if (memoryStorage.sessions[sessionId]) {
-        delete memoryStorage.sessions[sessionId];
-      }
-      if (memoryStorage.chunks[sessionId]) {
-        delete memoryStorage.chunks[sessionId];
-      }
-      
-      console.log(`[API] Cleaned up temporary data for session ${sessionId}`);
-    } catch (cleanupError) {
-      console.error(`[API] Error cleaning up temporary data:`, cleanupError);
-      // Continue even if cleanup fails
-    }
+    // Clean up all storage using helper function
+    await cleanupSessionData(sessionId, sessionInfo.totalChunks);
+    console.log(`[API] Cleaned up temporary data for session ${sessionId}`);
     
     // If we get here, the response has already been sent by the handler
     return result;

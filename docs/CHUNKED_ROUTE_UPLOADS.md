@@ -55,22 +55,27 @@ The solution is to implement a chunked upload system that:
 
 1. **Session Management**:
    - Creates a unique session ID for each chunked upload
-   - Stores session metadata in Redis/Vercel KV or in-memory fallback
+   - Stores session metadata in a three-tier storage system:
+     1. Redis/Vercel KV (primary)
+     2. MongoDB (secondary fallback)
+     3. In-memory storage (tertiary fallback)
    - Tracks received chunks and validates completeness
 
 2. **Chunk Storage**:
-   - Stores each chunk in Redis/Vercel KV or in-memory fallback
-   - Uses a consistent key pattern: `chunked:{sessionId}:chunk:{index}`
+   - Stores each chunk in the same three-tier storage system
+   - Uses consistent key patterns for each storage tier
+   - Automatically expires data after 1 hour in all storage tiers
 
 3. **Reassembly Process**:
-   - Retrieves all chunks in order
+   - Retrieves all chunks in order from the available storage
    - Concatenates them into a complete JSON string
    - Parses the JSON and processes it using existing route handlers
 
 4. **Serverless Optimizations**:
-   - Implements in-memory fallback when Redis is unavailable
-   - Uses proper cleanup to prevent resource leaks
-   - Handles connection issues gracefully
+   - Implements MongoDB fallback when Redis is unavailable
+   - Uses TTL indexes for automatic cleanup in MongoDB
+   - Falls back to in-memory storage only as a last resort
+   - Handles connection issues gracefully with multiple fallback options
 
 ## API Endpoints
 
@@ -136,8 +141,12 @@ The implementation includes robust error handling:
 
 1. **Session Expiration**: Sessions expire after 1 hour to prevent resource leaks
 2. **Missing Chunks**: Validates that all chunks are received before processing
-3. **Redis Failures**: Falls back to in-memory storage when Redis is unavailable
+3. **Storage Failures**: 
+   - Redis failures trigger fallback to MongoDB
+   - MongoDB failures trigger fallback to in-memory storage
+   - All storage options are tried before returning an error
 4. **JSON Parsing Errors**: Validates reassembled data before processing
+5. **Automatic Cleanup**: TTL indexes in MongoDB and expiration in Redis ensure cleanup even if the complete endpoint is never called
 
 ## Vercel Configuration
 
@@ -157,7 +166,9 @@ This ensures that all chunked upload requests are routed to the main routes API 
 1. **Unlimited Route Size**: Users can now save routes of any size
 2. **Improved Reliability**: Reduces failures due to payload size limitations
 3. **Serverless Compatibility**: Works within Vercel's serverless constraints
-4. **Graceful Degradation**: Falls back to in-memory storage when Redis is unavailable
+4. **Multi-tier Storage**: Uses Redis, MongoDB, and in-memory storage for maximum reliability
+5. **Graceful Degradation**: Falls back to alternative storage options when primary storage is unavailable
+6. **Automatic Cleanup**: TTL indexes and expiration policies prevent resource leaks
 
 ## Future Improvements
 
