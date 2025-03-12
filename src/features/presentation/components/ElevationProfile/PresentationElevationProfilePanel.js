@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { PresentationElevationProfile } from './PresentationElevationProfile';
 import { styled } from '@mui/material/styles';
 import { Box, ButtonBase } from '@mui/material';
@@ -10,10 +10,12 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'; // Play icon for fly-by
+import StopIcon from '@mui/icons-material/Stop'; // Stop icon for fly-by
 import DownloadIcon from '@mui/icons-material/Download'; // Download icon for GPX export
 import { downloadRouteAsGpx } from '../../../../utils/gpx/export'; // Import GPX export utility
 import { PresentationRouteDescriptionPanel } from '../RouteDescription';
 import { PresentationWeatherProfilePanel } from '../WeatherProfile';
+import mapboxgl from 'mapbox-gl'; // Import mapboxgl
 
 const ElevationPanel = styled(Box)(({ theme }) => ({
     position: 'fixed',
@@ -74,105 +76,106 @@ const TabButton = ({ tab, label, activeTab, onClick, isCollapsed, setIsCollapsed
     children: label
 });
 
-export const PresentationElevationProfilePanel = ({ route, header }) => {
+export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive: externalIsFlyByActive, handleFlyByClick: externalHandleFlyByClick }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState('elevation'); // 'elevation' | 'description' | 'weather'
     const [isMaximized, setIsMaximized] = useState(false);
-    const [isFlyByActive, setIsFlyByActive] = useState(false); // Added state for fly-by functionality
+    const [internalIsFlyByActive, setInternalIsFlyByActive] = useState(false); // Internal state for fly-by functionality
     const { map } = useMapContext();
+    
+    // Refs to store animation timeouts so we can cancel them
+    const animationTimeoutsRef = useRef([]);
+    const routeBoundsRef = useRef(null);
+    
+    // Use external state and handler if provided, otherwise use internal ones
+    const isFlyByActive = externalIsFlyByActive !== undefined ? externalIsFlyByActive : internalIsFlyByActive;
+    const setIsFlyByActive = externalIsFlyByActive !== undefined ? () => {} : setInternalIsFlyByActive;
     
     // Default height is 300px, maximized height is 600px
     const panelHeight = isMaximized ? 600 : 300;
 
-    // Function to start the flyby animation - improved TDF-style implementation
+    // Function to stop the flyby animation
+    const stopFlyby = () => {
+        // Clear all pending animation timeouts
+        animationTimeoutsRef.current.forEach(timeoutId => {
+            clearTimeout(timeoutId);
+        });
+        animationTimeoutsRef.current = [];
+        
+        console.log('[Flyby] Flyby stopped by user');
+        
+        // If we have stored route bounds, fit to them
+        if (routeBoundsRef.current && map) {
+            map.fitBounds(routeBoundsRef.current, {
+                padding: 200,
+                pitch: 45,
+                duration: 1000,
+                easing: (t) => {
+                    // Ease out cubic - smooth deceleration
+                    return 1 - Math.pow(1 - t, 3);
+                }
+            });
+        }
+        
+        // Reset the active state
+        setIsFlyByActive(false);
+    };
+
+    // Function to start the flyby animation - improved implementation with reduced spinning
     const startFlyby = (route) => {
         if (!map || !route?.geojson?.features?.[0]?.geometry?.coordinates) {
             console.error('[Flyby] No map or route coordinates available');
             return;
         }
         
+        // Clear any existing timeouts
+        animationTimeoutsRef.current.forEach(timeoutId => {
+            clearTimeout(timeoutId);
+        });
+        animationTimeoutsRef.current = [];
+        
         // Get route coordinates
         const allCoords = route.geojson.features[0].geometry.coordinates;
         
-        // Adaptive sampling based on route complexity and length
-        // For longer routes, we sample more aggressively
-        // Increased sampling density for smoother animation
+        // Sample coordinates for smoother animation
         const routeLength = allCoords.length;
-        const targetPoints = Math.min(150, Math.max(60, Math.floor(routeLength / 15))); // More points for smoother animation
+        const targetPoints = Math.min(100, Math.max(40, Math.floor(routeLength / 20))); 
         const sampleRate = Math.max(1, Math.floor(routeLength / targetPoints));
         
-        // Sample coordinates but ensure we keep points where direction changes significantly
+        // Sample coordinates evenly
         let sampledCoords = [];
-        let lastDirection = null;
-        
-        for (let i = 0; i < allCoords.length; i++) {
-            // Always include first and last points
-            if (i === 0 || i === allCoords.length - 1) {
-                sampledCoords.push(allCoords[i]);
-                continue;
-            }
-            
-            // Regular sampling
-            if (i % sampleRate === 0) {
-                // Check if this is a significant direction change
-                if (i > 0 && i < allCoords.length - 1) {
-                    const prevPoint = allCoords[i-1];
-                    const currentPoint = allCoords[i];
-                    const nextPoint = allCoords[i+1];
-                    
-                    const prevBearing = calculateBearing(prevPoint, currentPoint);
-                    const nextBearing = calculateBearing(currentPoint, nextPoint);
-                    
-                    // If direction changes significantly, include this point
-                    const bearingDiff = Math.abs(prevBearing - nextBearing);
-                    const normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff;
-                    
-                    if (normalizedDiff > 20) { // Significant turn
-                        sampledCoords.push(allCoords[i]);
-                    } else if (i % sampleRate === 0) {
-                        sampledCoords.push(allCoords[i]);
-                    }
-                } else {
-                    sampledCoords.push(allCoords[i]);
-                }
-            }
+        for (let i = 0; i < allCoords.length; i += sampleRate) {
+            sampledCoords.push(allCoords[i]);
         }
         
-        // Ensure we have enough points for a smooth animation
-        if (sampledCoords.length < 40) { // Increased minimum points for smoother animation
-            const newSampleRate = Math.floor(routeLength / 40);
-            sampledCoords = allCoords.filter((_, i) => i % newSampleRate === 0 || i === 0 || i === allCoords.length - 1);
+        // Always include the last point
+        if (sampledCoords[sampledCoords.length - 1] !== allCoords[allCoords.length - 1]) {
+            sampledCoords.push(allCoords[allCoords.length - 1]);
         }
         
-        console.log('[Flyby] Starting TDF-style flyby with', sampledCoords.length, 'points');
+        console.log('[Flyby] Starting flyby with', sampledCoords.length, 'points');
         
-        // Calculate look-ahead points for smoother camera movement
-        // Looking much further ahead with stronger weighting for smoother turns
-        const lookAheadPoints = sampledCoords.map((coord, i) => {
-            if (i >= sampledCoords.length - 1) return coord;
-            
-            // Look ahead 3-4 points if possible for a more forward-facing view
-            const lookAheadIndex = Math.min(i + 4, sampledCoords.length - 1);
-            const lookAheadPoint = sampledCoords[lookAheadIndex];
-            
-            // Weight look-ahead position more heavily (40% instead of 30%)
-            // This creates a more forward-facing camera that anticipates turns
-            return [
-                coord[0] * 0.6 + lookAheadPoint[0] * 0.4,
-                coord[1] * 0.6 + lookAheadPoint[1] * 0.4
-            ];
+        // Calculate the overall bearing from start to end
+        const overallBearing = calculateBearing(
+            sampledCoords[0], 
+            sampledCoords[sampledCoords.length - 1]
+        );
+        
+        // Calculate bounds for the intro and outro animations
+        const bounds = new mapboxgl.LngLatBounds();
+        allCoords.forEach(coord => {
+            bounds.extend(coord);
         });
         
-        // Set initial camera position with a more dramatic entry
-        // and more forward-looking perspective
+        // Store the bounds for later use when stopping
+        routeBoundsRef.current = bounds;
+        
+        // Set initial camera position
         map.easeTo({
             center: sampledCoords[0],
-            zoom: 15, // Slightly closer zoom for more detail
-            pitch: 80, // Even more dramatic tilt to look further into the distance
-            bearing: calculateBearing(
-                sampledCoords[0], 
-                sampledCoords[Math.min(3, sampledCoords.length - 1)] // Look further ahead for initial bearing
-            ),
+            zoom: 15,
+            pitch: 75, // High pitch to look ahead
+            bearing: overallBearing, // Use the overall bearing for consistent direction
             duration: 1500,
             easing: (t) => {
                 // Cubic easing for smoother acceleration
@@ -182,51 +185,20 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
         
         // Animate through points
         let currentIndex = 1;
+        let prevBearing = overallBearing;
         
         const flyToNextPoint = () => {
             if (currentIndex >= sampledCoords.length) {
                 console.log('[Flyby] Flyby complete');
                 
-                // Calculate the bounds of the entire route
-                const bounds = new mapboxgl.LngLatBounds();
-                allCoords.forEach(coord => {
-                    bounds.extend(coord);
-                });
-                
-                // Calculate the center of the route
-                const center = bounds.getCenter();
-                
-                // Calculate a bearing that looks back at the route
-                // If we're at the end, look back toward the start
-                const endPoint = sampledCoords[sampledCoords.length - 1];
-                const startPoint = sampledCoords[0];
-                const midPoint = sampledCoords[Math.floor(sampledCoords.length / 2)];
-                
-                // Calculate bearing from end to start (reversed to look back)
-                const bearingToStart = (calculateBearing(endPoint, startPoint) + 180) % 360;
-                
-                // First transition: Turn around to look back at the route
-                map.easeTo({
-                    center: endPoint,
-                    bearing: bearingToStart,
-                    pitch: 60,
-                    duration: 1500,
+                // Simply zoom out to show the entire route
+                map.fitBounds(bounds, {
+                    padding: 200,
+                    pitch: 45,
+                    duration: 2500,
                     easing: (t) => {
-                        // Ease in-out cubic for smooth turn
-                        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-                    },
-                    // When this transition completes, zoom out to show the entire route
-                    callback: () => {
-                        // Second transition: Zoom out more to show the entire route with more context
-                        map.fitBounds(bounds, {
-                            padding: 250, // Increased padding for more zoom out (100 → 250)
-                            pitch: 35, // Lower pitch for more overhead view (45 → 35)
-                            duration: 3000, // Longer duration for more dramatic effect (2500 → 3000)
-                            easing: (t) => {
-                                // Ease out cubic - smooth deceleration
-                                return 1 - Math.pow(1 - t, 3);
-                            }
-                        });
+                        // Ease out cubic - smooth deceleration
+                        return 1 - Math.pow(1 - t, 3);
                     }
                 });
                 
@@ -234,23 +206,26 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                 return;
             }
             
-            // Calculate bearing with a smoother, more forward-facing approach
             const currentPoint = sampledCoords[currentIndex];
             
-            // Look ahead multiple points for bearing calculation
-            const lookAheadBearingIndex = Math.min(currentIndex + 3, sampledCoords.length - 1);
-            const bearingTargetPoint = sampledCoords[lookAheadBearingIndex];
+            // Look ahead for bearing calculation
+            const lookAheadIndex = Math.min(currentIndex + 5, sampledCoords.length - 1);
             
-            // Calculate the direct bearing to the look-ahead point
-            const directBearing = calculateBearing(currentPoint, bearingTargetPoint);
+            // Calculate bearing to look-ahead point
+            let targetBearing;
             
-            // If we have a previous bearing, smooth the transition
-            const prevBearing = currentIndex > 1 ? map.getBearing() : directBearing;
+            // If we're near the end, use the overall bearing to avoid spinning
+            if (currentIndex > sampledCoords.length - 10) {
+                targetBearing = overallBearing;
+            } else {
+                targetBearing = calculateBearing(currentPoint, sampledCoords[lookAheadIndex]);
+            }
             
-            // Smooth bearing changes by blending previous and new bearings
-            // This creates less sharp turns and a more forward-facing camera
-            const bearingBlendFactor = 0.7; // Higher value = smoother turns, less responsive
-            const bearing = prevBearing * bearingBlendFactor + directBearing * (1 - bearingBlendFactor);
+            // Smooth bearing changes with very heavy weighting to previous bearing
+            // This creates much less spinning
+            const bearingBlendFactor = 0.9; // Very high value = minimal turning
+            const bearing = prevBearing * bearingBlendFactor + targetBearing * (1 - bearingBlendFactor);
+            prevBearing = bearing; // Save for next iteration
             
             // Calculate distance to next point to adjust speed
             const nextPoint = sampledCoords[Math.min(currentIndex + 1, sampledCoords.length - 1)];
@@ -258,53 +233,51 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
             const dy = nextPoint[1] - currentPoint[1];
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            // Adjust duration based on distance (faster for longer segments)
-            // This creates a more consistent apparent speed
-            // Reduced durations for more continuous movement
-            const baseDuration = 600; // Reduced from 800ms to 600ms for faster transitions
-            const duration = Math.max(400, Math.min(800, baseDuration * (distance * 5000))); // Reduced min/max durations
+            // More consistent duration for smoother movement
+            const baseDuration = 400; // Faster base duration
+            const duration = Math.max(300, Math.min(600, baseDuration * (distance * 5000)));
             
-            // Dynamic pitch based on position in route
-            // Higher pitch throughout for a more "looking into the distance" effect
-            const routeProgress = currentIndex / sampledCoords.length;
-            const pitch = 75 + Math.sin(routeProgress * Math.PI) * -5; // Higher base pitch (75 vs 60)
+            // Keep pitch consistent to avoid bobbing
+            const pitch = 75;
             
-            // Use the look-ahead point for smoother camera movement
-            const cameraTarget = lookAheadPoints[currentIndex];
-            
-            // Move camera to next point with dynamic parameters
+            // Move camera to next point with smooth parameters
             map.easeTo({
-                center: cameraTarget,
+                center: currentPoint,
                 bearing: bearing,
                 pitch: pitch,
                 duration: duration,
-                easing: (t) => {
-                    // Smoother easing function (ease in-out quad)
-                    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-                },
+                easing: (t) => t, // Linear easing for more consistent speed
                 essential: true
             });
             
             // Schedule next point with more overlap for smoother transitions
             currentIndex++;
-            setTimeout(flyToNextPoint, duration * 0.7); // Increased overlap (0.9 → 0.7) for more continuous movement
+            const timeoutId = setTimeout(flyToNextPoint, duration * 0.7);
+            animationTimeoutsRef.current.push(timeoutId); // Store timeout ID for cancellation
         };
         
         // Start animation after initial positioning
-        setTimeout(flyToNextPoint, 1500);
+        const initialTimeoutId = setTimeout(flyToNextPoint, 1500);
+        animationTimeoutsRef.current.push(initialTimeoutId); // Store timeout ID for cancellation
     };
 
     // Function to handle fly-by button click
     const handleFlyByClick = () => {
-        const newState = !isFlyByActive;
-        setIsFlyByActive(newState);
-        
-        if (newState) {
-            // Start the flyby animation
-            startFlyby(route);
+        if (externalHandleFlyByClick) {
+            // Use external handler if provided
+            externalHandleFlyByClick();
         } else {
-            // If we want to cancel an in-progress flyby, we could add that logic here
-            console.log('[Flyby] Flyby cancelled by user');
+            // Otherwise use internal handler
+            const newState = !internalIsFlyByActive;
+            setInternalIsFlyByActive(newState);
+            
+            if (newState) {
+                // Start the flyby animation
+                startFlyby(route);
+            } else {
+                // Stop the flyby animation
+                stopFlyby();
+            }
         }
     };
 
@@ -367,7 +340,7 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                     zIndex: 103
                 }, 
                 children: [
-                    // Fly-by button (blue play button)
+                    // Fly-by button (blue play/stop button)
                     _jsx(IconButton, { 
                         onClick: handleFlyByClick,
                         // Change appearance based on active state
@@ -384,12 +357,9 @@ export const PresentationElevationProfilePanel = ({ route, header }) => {
                                 backgroundColor: isFlyByActive ? '#0d47a1' : '#1976d2' // Darker blue on hover
                             }
                         }, 
-                        children: _jsx(PlayArrowIcon, { 
-                            fontSize: "medium",
-                            sx: { 
-                                transform: isFlyByActive ? 'scale(1.2)' : 'none' // Scale up icon when active
-                            }
-                        })
+                        children: isFlyByActive 
+                            ? _jsx(StopIcon, { fontSize: "medium" }) // Show stop icon when active
+                            : _jsx(PlayArrowIcon, { fontSize: "medium" }) // Show play icon when inactive
                     }),
                     // Download GPX button (black background)
                     _jsx(IconButton, { 

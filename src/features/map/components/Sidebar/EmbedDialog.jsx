@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
     Dialog, DialogTitle, DialogContent, DialogActions, 
-    Button, TextField, Grid, InputAdornment, Typography 
+    Button, TextField, Grid, InputAdornment, Typography,
+    Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
@@ -12,7 +13,12 @@ export const EmbedDialog = ({ open, onClose }) => {
     const { routes, currentRoute } = useRouteContext();
     const { map } = useMapContext();
     const [copied, setCopied] = useState(false);
-    const [embedSize, setEmbedSize] = useState({ width: 800, height: 600 });
+    const [embedSize, setEmbedSize] = useState({ 
+        width: 800, 
+        height: 600,
+        widthUnit: 'px',
+        heightUnit: 'px'
+    });
     
     // Get current map state
     const mapState = map ? {
@@ -39,11 +45,23 @@ export const EmbedDialog = ({ open, onClose }) => {
         }));
     }, [routes, mapState]);
     
+    // Update dimensions when unit changes
+    useEffect(() => {
+        // When switching to percentage, set width to 100%
+        if (embedSize.widthUnit === '%') {
+            setEmbedSize(prev => ({ ...prev, width: 100 }));
+        }
+        // When switching to percentage, set height to maintain aspect ratio or 100%
+        if (embedSize.heightUnit === '%') {
+            setEmbedSize(prev => ({ ...prev, height: 100 }));
+        }
+    }, [embedSize.widthUnit, embedSize.heightUnit]);
+    
     // Generate embed code
     const embedCode = `<iframe 
   src="${window.location.origin}/embed/${stateId}" 
-  width="${embedSize.width}" 
-  height="${embedSize.height}" 
+  width="${embedSize.width}${embedSize.widthUnit}" 
+  height="${embedSize.height}${embedSize.heightUnit}" 
   style="border:0;" 
   allowfullscreen="" 
   loading="lazy">
@@ -66,27 +84,51 @@ export const EmbedDialog = ({ open, onClose }) => {
                 
                 {/* Size controls */}
                 <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={6}>
+                    <Grid item xs={8}>
                         <TextField
                             label="Width"
                             type="number"
                             value={embedSize.width}
                             onChange={(e) => setEmbedSize({...embedSize, width: e.target.value})}
-                            InputProps={{
-                                endAdornment: <InputAdornment position="end">px</InputAdornment>,
-                            }}
+                            fullWidth
                         />
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid item xs={4}>
+                        <FormControl fullWidth>
+                            <InputLabel id="width-unit-label">Unit</InputLabel>
+                            <Select
+                                labelId="width-unit-label"
+                                value={embedSize.widthUnit}
+                                label="Unit"
+                                onChange={(e) => setEmbedSize({...embedSize, widthUnit: e.target.value})}
+                            >
+                                <MenuItem value="px">px</MenuItem>
+                                <MenuItem value="%">%</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={8}>
                         <TextField
                             label="Height"
                             type="number"
                             value={embedSize.height}
                             onChange={(e) => setEmbedSize({...embedSize, height: e.target.value})}
-                            InputProps={{
-                                endAdornment: <InputAdornment position="end">px</InputAdornment>,
-                            }}
+                            fullWidth
                         />
+                    </Grid>
+                    <Grid item xs={4}>
+                        <FormControl fullWidth>
+                            <InputLabel id="height-unit-label">Unit</InputLabel>
+                            <Select
+                                labelId="height-unit-label"
+                                value={embedSize.heightUnit}
+                                label="Unit"
+                                onChange={(e) => setEmbedSize({...embedSize, heightUnit: e.target.value})}
+                            >
+                                <MenuItem value="px">px</MenuItem>
+                                <MenuItem value="%">%</MenuItem>
+                            </Select>
+                        </FormControl>
                     </Grid>
                 </Grid>
                 

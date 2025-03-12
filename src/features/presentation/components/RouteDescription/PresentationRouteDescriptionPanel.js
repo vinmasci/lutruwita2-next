@@ -3,13 +3,15 @@ import { useState, useMemo } from 'react';
 import { Box, ImageList, ImageListItem, Modal, IconButton, Typography, useTheme, Chip, Tooltip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { deserializePhoto } from '../../../../features/photo/utils/photoUtils';
-import { getRouteDistance, getElevationGain, getUnpavedPercentage } from '../../../gpx/utils/routeUtils';
+// Import route utility functions
+import { getRouteDistance, getUnpavedPercentage } from '../../../gpx/utils/routeUtils';
 import { usePhotoContext } from '../../../../features/photo/context/PhotoContext';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoIcon from '@mui/icons-material/Photo';
 import { useMapContext } from '../../../map/context/MapContext';
+
 
 const EDITOR_BACKGROUND = 'rgb(35, 35, 35)';
 
@@ -203,118 +205,29 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
             _jsxs(DescriptionContent, {
                 children: [
                     _jsxs(Box, {
-                        sx: {
-                            px: 2,
-                            py: 1,
-                            display: 'flex',
-                            alignItems: 'center',
+                        sx: { 
+                            px: 2, 
+                            py: 1, 
+                            display: 'flex', 
+                            alignItems: 'center', 
                             backgroundColor: '#1a1a1a',
-                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                            gap: 3,
-                            mr: 3
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)' 
                         },
                         children: [
-                            _jsxs(Box, {
-                                sx: {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1
-                                },
-                                children: [
-                                    _jsx(Typography, {
-                                        variant: "subtitle2",
-                                        color: "white",
-                                        sx: {
-                                            fontSize: '0.8rem',
-                                            fontWeight: 500,
-                                            fontFamily: 'Futura'
-                                        },
-                                        children: `Overview: ${route?.name}`
-                                    })
-                                    // Fly-by button removed - now only available in the elevation panel
-                                ]
-                            }),
-                            _jsxs(Box, {
-                                sx: {
-                                    display: 'flex',
-                                    gap: 3,
-                                    ml: 'auto'
-                                },
-                                children: [
-                                    _jsx(Typography, {
-                                        variant: "body2",
-                                        sx: { 
-                                            fontSize: '0.75rem',
-                                            fontFamily: 'Futura',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                            color: 'rgba(255, 255, 255, 0.7)'
-                                        },
-                                        children: [
-                                            _jsx("i", { 
-                                                className: "fa-solid fa-route",
-                                                style: { color: '#0288d1' }
-                                            }),
-                                            `${(getRouteDistance(route) / 1000).toFixed(1)} km`
-                                        ]
-                                    }),
-                                    _jsx(Typography, {
-                                        variant: "body2",
-                                        sx: { 
-                                            fontSize: '0.75rem',
-                                            fontFamily: 'Futura',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                            color: 'rgba(255, 255, 255, 0.7)'
-                                        },
-                                        children: [
-                                            _jsx("i", { 
-                                                className: "fa-solid fa-up-right",
-                                                style: { color: '#0288d1' }
-                                            }),
-                                            `${Math.round(route?.statistics?.elevationGained || 0).toLocaleString()} m`
-                                        ]
-                                    }),
-                                    _jsx(Typography, {
-                                        variant: "body2",
-                                        sx: { 
-                                            fontSize: '0.75rem',
-                                            fontFamily: 'Futura',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                            color: 'rgba(255, 255, 255, 0.7)'
-                                        },
-                                        children: [
-                                            _jsx("i", { 
-                                                className: "fa-solid fa-down-right",
-                                                style: { color: '#0288d1' }
-                                            }),
-                                            `${Math.round(route?.statistics?.elevationLost || 0).toLocaleString()} m`
-                                        ]
-                                    }),
-                                    _jsx(Typography, {
-                                        variant: "body2",
-                                        sx: { 
-                                            fontSize: '0.75rem',
-                                            fontFamily: 'Futura',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                            color: 'rgba(255, 255, 255, 0.7)'
-                                        },
-                                        children: [
-                                            _jsx("i", { 
-                                                className: "fa-solid fa-person-biking-mountain",
-                                                style: { color: '#0288d1' }
-                                            }),
-                                            `${getUnpavedPercentage(route)}%`
-                                        ]
-                                    })
-                                ]
-                            })
+                            _jsx(Typography, 
+                                {
+                                    variant: "subtitle2", 
+                                    color: "white", 
+                                    sx: { 
+                                        fontSize: '0.8rem', 
+                                        fontWeight: 500, 
+                                        mr: 3, 
+                                        fontFamily: 'Futura' 
+                                    },
+                                    children: `Overview: ${route?.name}`
+                                }
+                            ),
+                            // Route statistics removed from description panel
                         ]
                     }),
                     _jsxs(Box, {
@@ -374,7 +287,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                     children: "Route Photos"
                                                 }),
                                                 _jsx(ImageList, {
-                                                    variant: "masonry",
+                                                    variant: "standard",
                                                     cols: 2,
                                                     gap: 8,
                                                     sx: {
@@ -444,7 +357,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                     ]
                                                 }),
                                                 _jsx(ImageList, {
-                                                    variant: "masonry",
+                                                    variant: "standard",
                                                     cols: 2,
                                                     gap: 8,
                                                     sx: {

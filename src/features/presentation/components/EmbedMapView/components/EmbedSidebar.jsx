@@ -4,59 +4,8 @@ import {
   List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   Tooltip, Divider, IconButton 
 } from '@mui/material';
-
-// Helper functions for elevation calculations
-const calculateElevationGained = (route) => {
-  // Check if we have elevation data in the surface
-  if (route.surface?.elevationProfile && route.surface.elevationProfile.length > 0) {
-    let gained = 0;
-    const elevations = route.surface.elevationProfile.map(point => point.elevation);
-    
-    // Calculate elevation gained
-    for (let i = 1; i < elevations.length; i++) {
-      const diff = elevations[i] - elevations[i-1];
-      if (diff > 0) {
-        gained += diff;
-      }
-    }
-    
-    return gained;
-  }
-  
-  // Check if we have elevation data in the statistics
-  if (route.statistics?.elevationGained !== undefined) {
-    return route.statistics.elevationGained;
-  }
-  
-  // Default value if no elevation data is found
-  return 0;
-};
-
-const calculateElevationLost = (route) => {
-  // Check if we have elevation data in the surface
-  if (route.surface?.elevationProfile && route.surface.elevationProfile.length > 0) {
-    let lost = 0;
-    const elevations = route.surface.elevationProfile.map(point => point.elevation);
-    
-    // Calculate elevation lost
-    for (let i = 1; i < elevations.length; i++) {
-      const diff = elevations[i] - elevations[i-1];
-      if (diff < 0) {
-        lost += Math.abs(diff);
-      }
-    }
-    
-    return lost;
-  }
-  
-  // Check if we have elevation data in the statistics
-  if (route.statistics?.elevationLost !== undefined) {
-    return route.statistics.elevationLost;
-  }
-  
-  // Default value if no elevation data is found
-  return 0;
-};
+import { filterPhotosByRoute } from '../hooks/useRouteDataLoader';
+import { calculateElevationGained, calculateElevationLost } from '../utils/elevationUtils';
 
 import { 
   ListOrdered, Camera, CameraOff, Ruler, AlertTriangle, 
@@ -131,12 +80,23 @@ const EmbedSidebar = ({
         description: {
           description: nextRoute.description?.description || nextRoute.description || '',
           title: nextRoute.description?.title || '',
-          photos: nextRoute.description?.photos || []
+          photos: nextRoute.description?.photos?.length > 0 
+            ? nextRoute.description.photos 
+            : filterPhotosByRoute(routeData?.photos?.map(photo => ({
+                ...photo,
+                id: photo.id || photo._id,
+                url: photo.url,
+                thumbnailUrl: photo.thumbnailUrl || photo.url,
+                coordinates: photo.coordinates
+            })) || [], nextRoute)
         },
         statistics: {
           totalDistance: totalDistance,
           elevationGained: calculateElevationGained(nextRoute),
-          elevationLost: calculateElevationLost(nextRoute)
+          elevationLost: calculateElevationLost(nextRoute),
+          // Add aliases for compatibility with different naming conventions
+          elevationGain: calculateElevationGained(nextRoute),
+          elevationLoss: calculateElevationLost(nextRoute)
         }
       };
       
@@ -508,13 +468,24 @@ const EmbedSidebar = ({
                       description: {
                         description: route.description?.description || route.description || '',
                         title: route.description?.title || '',
-                        photos: route.description?.photos || []
+                        photos: route.description?.photos?.length > 0 
+                          ? route.description.photos 
+                          : filterPhotosByRoute(routeData?.photos?.map(photo => ({
+                              ...photo,
+                              id: photo.id || photo._id,
+                              url: photo.url,
+                              thumbnailUrl: photo.thumbnailUrl || photo.url,
+                              coordinates: photo.coordinates
+                          })) || [], route)
                       },
-                      statistics: {
-                        totalDistance: totalDistance,
-                        elevationGained: calculateElevationGained(route),
-                        elevationLost: calculateElevationLost(route)
-                      }
+                                    statistics: {
+                                        totalDistance: totalDistance,
+                                        elevationGained: calculateElevationGained(route),
+                                        elevationLost: calculateElevationLost(route),
+                                        // Add aliases for compatibility with different naming conventions
+                                        elevationGain: calculateElevationGained(route),
+                                        elevationLoss: calculateElevationLost(route)
+                                    }
                     };
                     
                     // Ensure geojson has the required structure

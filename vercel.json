@@ -24,6 +24,10 @@
       "dest": "/api/poi"
     },
     {
+      "src": "/api/routes/chunked/(.*)",
+      "dest": "/api/routes"
+    },
+    {
       "src": "/api/routes/embed/([^/]+)",
       "dest": "/api/routes/embed?routeId=$1",
       "headers": {

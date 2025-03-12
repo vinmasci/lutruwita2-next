@@ -689,6 +689,305 @@ async function handleGetRoute(req, res) {
   }
 }
 
+import { getCache, setCache, deleteCache, CACHE_DURATIONS } from '../lib/redis.js';
+import { getRedisClient } from '../lib/redis.js';
+
+// Initialize Redis client
+global.redisClient = getRedisClient();
+
+// In-memory storage for serverless environments where Redis might not be available
+const memoryStorage = {
+  sessions: {},
+  chunks: {}
+};
+
+// Start a chunked upload session
+async function handleStartChunkedUpload(req, res) {
+  try {
+    const { persistentId, totalChunks, totalSize, isUpdate } = req.body;
+    
+    // Generate a session ID
+    const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    
+    // Session info object
+    const sessionInfo = {
+      persistentId,
+      totalChunks,
+      totalSize,
+      receivedChunks: 0,
+      isUpdate,
+      chunks: {},
+      createdAt: Date.now()
+    };
+    
+    console.log(`[API] Creating chunked upload session: ${sessionId}`);
+    
+    // Try to store in Redis first
+    const redisSuccess = await setCache(`chunked:${sessionId}:info`, sessionInfo, 3600);
+    
+    // Check if Redis is available
+    if (!redisSuccess) {
+      console.log(`[API] Redis unavailable, using in-memory storage for session ${sessionId}`);
+      
+      // Initialize memory storage if needed
+      if (!memoryStorage.sessions) {
+        memoryStorage.sessions = {};
+      }
+      if (!memoryStorage.chunks) {
+        memoryStorage.chunks = {};
+      }
+      
+      // Store session info in memory
+      memoryStorage.sessions[sessionId] = sessionInfo;
+      console.log(`[API] Session stored in memory storage`);
+    } else {
+      console.log(`[API] Session stored in Redis`);
+    }
+    
+    console.log(`[API] Chunked upload session created: ${sessionId} for ${isUpdate ? 'update' : 'new'} route`);
+    
+    return res.status(200).json({ sessionId });
+  } catch (error) {
+    console.error('Start chunked upload error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to start chunked upload',
+      details: error.message
+    });
+  }
+}
+
+// Handle a chunk upload
+async function handleUploadChunk(req, res) {
+  try {
+    const { sessionId, chunkIndex, data } = req.body;
+    
+    console.log(`[API] Processing chunk ${chunkIndex} for session ${sessionId}`);
+    
+    // Try to get session info from Redis first
+    let sessionInfo = await getCache(`chunked:${sessionId}:info`);
+    let usingMemoryStorage = false;
+    
+    // If not in Redis, check in-memory storage
+    if (!sessionInfo && memoryStorage.sessions[sessionId]) {
+      console.log(`[API] Session ${sessionId} found in memory storage`);
+      sessionInfo = memoryStorage.sessions[sessionId];
+      usingMemoryStorage = true;
+    }
+    
+    // If session not found in either storage
+    if (!sessionInfo) {
+      console.log(`[API] Session ${sessionId} not found in Redis or memory storage`);
+      return res.status(404).json({ error: 'Upload session not found or expired' });
+    }
+    
+    console.log(`[API] Session info retrieved, using ${usingMemoryStorage ? 'memory storage' : 'Redis'}`);
+    
+    // Store the chunk (try Redis first, then fallback to memory)
+    if (!usingMemoryStorage) {
+      // Try to store the chunk in Redis
+      const redisSuccess = await setCache(`chunked:${sessionId}:chunk:${chunkIndex}`, data, 3600);
+      
+      // If Redis fails, use in-memory storage
+      if (!redisSuccess) {
+        console.log(`[API] Redis storage failed for chunk ${chunkIndex}, using in-memory storage`);
+        usingMemoryStorage = true;
+      }
+    }
+    
+    // If using memory storage or Redis failed
+    if (usingMemoryStorage) {
+      if (!memoryStorage.chunks[sessionId]) {
+        memoryStorage.chunks[sessionId] = {};
+      }
+      memoryStorage.chunks[sessionId][chunkIndex] = data;
+      console.log(`[API] Chunk ${chunkIndex} stored in memory`);
+    }
+    
+    // Update session info
+    sessionInfo.receivedChunks += 1;
+    sessionInfo.chunks[chunkIndex] = true;
+    
+    // Update session info in the appropriate storage
+    if (usingMemoryStorage) {
+      memoryStorage.sessions[sessionId] = sessionInfo;
+      console.log(`[API] Updated session info in memory storage`);
+    } else {
+      const sessionUpdateSuccess = await setCache(`chunked:${sessionId}:info`, sessionInfo, 3600);
+      
+      // If Redis update fails, fall back to memory storage
+      if (!sessionUpdateSuccess) {
+        console.log(`[API] Redis update failed, falling back to memory storage`);
+        memoryStorage.sessions[sessionId] = sessionInfo;
+      }
+    }
+    
+    console.log(`[API] Received chunk ${chunkIndex + 1}/${sessionInfo.totalChunks} for session ${sessionId}`);
+    
+    return res.status(200).json({ 
+      success: true,
+      receivedChunks: sessionInfo.receivedChunks,
+      totalChunks: sessionInfo.totalChunks
+    });
+  } catch (error) {
+    console.error('Upload chunk error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to upload chunk',
+      details: error.message
+    });
+  }
+}
+
+// Complete a chunked upload
+async function handleCompleteChunkedUpload(req, res) {
+  try {
+    const { sessionId } = req.body;
+    
+    console.log(`[API] Processing completion request for session ${sessionId}`);
+    
+    // Try to get session info from Redis first
+    let sessionInfo = await getCache(`chunked:${sessionId}:info`);
+    let usingMemoryStorage = false;
+    
+    // If not in Redis, check in-memory storage
+    if (!sessionInfo && memoryStorage.sessions && memoryStorage.sessions[sessionId]) {
+      console.log(`[API] Session ${sessionId} found in memory storage for completion`);
+      sessionInfo = memoryStorage.sessions[sessionId];
+      usingMemoryStorage = true;
+    }
+    
+    // If session not found in either storage
+    if (!sessionInfo) {
+      console.log(`[API] Session ${sessionId} not found in Redis or memory storage`);
+      return res.status(404).json({ error: 'Upload session not found or expired' });
+    }
+    
+    console.log(`[API] Session info retrieved, using ${usingMemoryStorage ? 'memory storage' : 'Redis'}`);
+    
+    // Check if all chunks are received
+    if (sessionInfo.receivedChunks !== sessionInfo.totalChunks) {
+      console.log(`[API] Not all chunks received: ${sessionInfo.receivedChunks}/${sessionInfo.totalChunks}`);
+      return res.status(400).json({ 
+        error: 'Not all chunks received',
+        receivedChunks: sessionInfo.receivedChunks,
+        totalChunks: sessionInfo.totalChunks
+      });
+    }
+    
+    console.log(`[API] Reassembling ${sessionInfo.totalChunks} chunks for session ${sessionId}`);
+    
+    // Reassemble the data
+    let completeData = '';
+    for (let i = 0; i < sessionInfo.totalChunks; i++) {
+      let chunkData = null;
+      
+      // Get chunk from the appropriate storage
+      if (usingMemoryStorage) {
+        if (memoryStorage.chunks && memoryStorage.chunks[sessionId] && memoryStorage.chunks[sessionId][i] !== undefined) {
+          chunkData = memoryStorage.chunks[sessionId][i];
+          console.log(`[API] Chunk ${i} retrieved from memory storage`);
+        }
+      } else {
+        // Try to get chunk from Redis
+        chunkData = await getCache(`chunked:${sessionId}:chunk:${i}`);
+        
+        // If not in Redis but we have it in memory storage as fallback
+        if (!chunkData && memoryStorage.chunks && memoryStorage.chunks[sessionId] && memoryStorage.chunks[sessionId][i] !== undefined) {
+          chunkData = memoryStorage.chunks[sessionId][i];
+          console.log(`[API] Chunk ${i} not in Redis, retrieved from memory storage fallback`);
+        }
+      }
+      
+      // If chunk not found in either storage
+      if (!chunkData) {
+        console.log(`[API] Chunk ${i} not found in any storage`);
+        return res.status(500).json({ error: `Chunk ${i} not found or expired` });
+      }
+      
+      completeData += chunkData;
+    }
+    
+    console.log(`[API] All chunks retrieved successfully`);
+    
+    // Parse the reassembled data
+    let routeData;
+    try {
+      routeData = JSON.parse(completeData);
+      console.log(`[API] Successfully reassembled data for session ${sessionId}, size: ${completeData.length} bytes`);
+    } catch (parseError) {
+      console.error(`[API] Error parsing reassembled data:`, parseError);
+      return res.status(400).json({ 
+        error: 'Failed to parse reassembled data',
+        details: parseError.message
+      });
+    }
+    
+    // Process the route data using existing handlers
+    let result;
+    
+    // Save the original request body and query
+    const originalBody = req.body;
+    const originalQuery = req.query;
+    
+    try {
+      if (sessionInfo.isUpdate) {
+        // Update existing route
+        req.body = routeData;
+        req.query.id = sessionInfo.persistentId;
+        await handleUpdateRoute(req, res);
+      } else {
+        // Create new route
+        req.body = routeData;
+        await handleCreateRoute(req, res);
+      }
+      
+      // The response has already been sent by the handler
+      result = true;
+    } catch (error) {
+      console.error(`[API] Error processing reassembled data:`, error);
+      
+      // Restore the original request body and query
+      req.body = originalBody;
+      req.query = originalQuery;
+      
+      return res.status(500).json({ 
+        error: 'Failed to process reassembled data',
+        details: error.message
+      });
+    }
+    
+    // Clean up Redis/Vercel KV keys
+    try {
+      // Clean up Redis
+      await deleteCache(`chunked:${sessionId}:info`);
+      for (let i = 0; i < sessionInfo.totalChunks; i++) {
+        await deleteCache(`chunked:${sessionId}:chunk:${i}`);
+      }
+      
+      // Clean up memory storage
+      if (memoryStorage.sessions[sessionId]) {
+        delete memoryStorage.sessions[sessionId];
+      }
+      if (memoryStorage.chunks[sessionId]) {
+        delete memoryStorage.chunks[sessionId];
+      }
+      
+      console.log(`[API] Cleaned up temporary data for session ${sessionId}`);
+    } catch (cleanupError) {
+      console.error(`[API] Error cleaning up temporary data:`, cleanupError);
+      // Continue even if cleanup fails
+    }
+    
+    // If we get here, the response has already been sent by the handler
+    return result;
+  } catch (error) {
+    console.error('Complete chunked upload error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to complete chunked upload',
+      details: error.message
+    });
+  }
+}
+
 // Route handler
 const handler = async (req, res) => {
   // Ensure database connection
@@ -703,6 +1002,31 @@ const handler = async (req, res) => {
   console.log(`[API] Request: ${req.method} ${url.pathname}`);
   console.log(`[API] Path parts after filtering:`, pathParts);
   
+  // Handle chunked upload endpoints
+  if (pathParts.includes('chunked')) {
+    console.log(`[API] Handling chunked upload request: ${url.pathname}`);
+    
+    // Find the index of 'chunked' in the path
+    const chunkedIndex = pathParts.indexOf('chunked');
+    
+    // Get the action (the part after 'chunked')
+    const action = chunkedIndex < pathParts.length - 1 ? pathParts[chunkedIndex + 1] : null;
+    
+    console.log(`[API] Chunked upload action: ${action}`);
+    
+    if (req.method === 'POST') {
+      if (action === 'start') {
+        return handleStartChunkedUpload(req, res);
+      } else if (action === 'upload') {
+        return handleUploadChunk(req, res);
+      } else if (action === 'complete') {
+        return handleCompleteChunkedUpload(req, res);
+      }
+    }
+    
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
   // Extract persistentId from path if present (e.g., /api/routes/[persistentId])
   let persistentId = null;
   
@@ -714,7 +1038,7 @@ const handler = async (req, res) => {
     // If the last part is not 'routes', 'save', or contains a query string,
     // it's likely a persistentId
     if (lastPart && 
-        !['routes', 'save', 'public'].includes(lastPart) && 
+        !['routes', 'save', 'public', 'chunked', 'start', 'upload', 'complete'].includes(lastPart) && 
         lastPart.indexOf('?') === -1) {
       persistentId = decodeURIComponent(lastPart);
       console.log(`[API] Detected persistentId from path: ${persistentId}`);

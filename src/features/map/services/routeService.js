@@ -51,140 +51,234 @@ export const useRouteService = () => {
             throw new Error('Failed to parse server response');
         }
     };
-    const saveRoute = async (routeData) => {
-        try {
-            
-            // Add userId to the routeData
-            const routeDataWithUserId = {
-                ...routeData,
-                userId: userId // Use the userId from Auth0
+const saveRoute = async (routeData) => {
+    try {
+        console.log('[routeService] Starting save route...');
+        
+        // Add userId to the routeData
+        const routeDataWithUserId = {
+            ...routeData,
+            userId: userId // Use the userId from Auth0
+        };
+        
+        const headers = await getAuthHeaders();
+        
+        // Transform the data structure to match what the API expects
+        // The API requires a 'data' field, but our client uses 'routes'
+        const transformedData = {
+            ...routeDataWithUserId,
+            // Ensure persistentId is in UUID format if not already set
+            persistentId: routeDataWithUserId.persistentId || generateUUID(),
+            data: {
+                // Store all routes in the data structure
+                allRoutes: routeData.routes || [],
+                
+                // For backward compatibility, keep the first route's data in the expected fields
+                geojson: routeData.routes && routeData.routes.length > 0 ? routeData.routes[0].geojson : null,
+                
+                // Extract points from the geojson if available
+                points: routeData.routes && routeData.routes.length > 0 && 
+                        routeData.routes[0].geojson && 
+                        routeData.routes[0].geojson.features && 
+                        routeData.routes[0].geojson.features.length > 0 ? 
+                        routeData.routes[0].geojson.features[0].geometry.coordinates : [],
+                
+                // Include other statistics if available
+                distance: routeData.routes && routeData.routes.length > 0 && 
+                          routeData.routes[0].statistics ? 
+                          routeData.routes[0].statistics.totalDistance : 0,
+                
+                elevation: {
+                    gain: routeData.routes && routeData.routes.length > 0 && 
+                          routeData.routes[0].statistics ? 
+                          routeData.routes[0].statistics.elevationGain : 0,
+                    loss: routeData.routes && routeData.routes.length > 0 && 
+                          routeData.routes[0].statistics ? 
+                          routeData.routes[0].statistics.elevationLoss : 0,
+                    min: routeData.routes && routeData.routes.length > 0 && 
+                         routeData.routes[0].statistics ? 
+                         routeData.routes[0].statistics.minElevation : 0,
+                    max: routeData.routes && routeData.routes.length > 0 && 
+                         routeData.routes[0].statistics ? 
+                         routeData.routes[0].statistics.maxElevation : 0
+                },
+                
+                // Add bounds data - required by the MongoDB schema
+                bounds: calculateBounds(routeData)
+            }
+        };
+        
+        // Helper function to generate a UUID
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        
+        // Helper function to calculate bounds from route data
+        function calculateBounds(routeData) {
+            // Default bounds if we can't calculate from coordinates
+            const defaultBounds = {
+                north: 90,
+                south: -90,
+                east: 180,
+                west: -180
             };
             
-            const headers = await getAuthHeaders();
-            
-            // Transform the data structure to match what the API expects
-            // The API requires a 'data' field, but our client uses 'routes'
-            const transformedData = {
-                ...routeDataWithUserId,
-                // Ensure persistentId is in UUID format if not already set
-                persistentId: routeDataWithUserId.persistentId || generateUUID(),
-                data: {
-                    // Store all routes in the data structure
-                    allRoutes: routeData.routes || [],
+            // Try to extract coordinates from the route's geojson
+            if (routeData.routes && 
+                routeData.routes.length > 0 && 
+                routeData.routes[0].geojson && 
+                routeData.routes[0].geojson.features && 
+                routeData.routes[0].geojson.features.length > 0 &&
+                routeData.routes[0].geojson.features[0].geometry &&
+                routeData.routes[0].geojson.features[0].geometry.coordinates &&
+                routeData.routes[0].geojson.features[0].geometry.coordinates.length > 0) {
+                
+                const coordinates = routeData.routes[0].geojson.features[0].geometry.coordinates;
+                
+                // Initialize bounds with the first coordinate
+                let north = coordinates[0][1]; // latitude
+                let south = coordinates[0][1]; // latitude
+                let east = coordinates[0][0];  // longitude
+                let west = coordinates[0][0];  // longitude
+                
+                // Find min/max values from all coordinates
+                coordinates.forEach(coord => {
+                    const lon = coord[0];
+                    const lat = coord[1];
                     
-                    // For backward compatibility, keep the first route's data in the expected fields
-                    geojson: routeData.routes && routeData.routes.length > 0 ? routeData.routes[0].geojson : null,
-                    
-                    // Extract points from the geojson if available
-                    points: routeData.routes && routeData.routes.length > 0 && 
-                            routeData.routes[0].geojson && 
-                            routeData.routes[0].geojson.features && 
-                            routeData.routes[0].geojson.features.length > 0 ? 
-                            routeData.routes[0].geojson.features[0].geometry.coordinates : [],
-                    
-                    // Include other statistics if available
-                    distance: routeData.routes && routeData.routes.length > 0 && 
-                              routeData.routes[0].statistics ? 
-                              routeData.routes[0].statistics.totalDistance : 0,
-                    
-                    elevation: {
-                        gain: routeData.routes && routeData.routes.length > 0 && 
-                              routeData.routes[0].statistics ? 
-                              routeData.routes[0].statistics.elevationGain : 0,
-                        loss: routeData.routes && routeData.routes.length > 0 && 
-                              routeData.routes[0].statistics ? 
-                              routeData.routes[0].statistics.elevationLoss : 0,
-                        min: routeData.routes && routeData.routes.length > 0 && 
-                             routeData.routes[0].statistics ? 
-                             routeData.routes[0].statistics.minElevation : 0,
-                        max: routeData.routes && routeData.routes.length > 0 && 
-                             routeData.routes[0].statistics ? 
-                             routeData.routes[0].statistics.maxElevation : 0
-                    },
-                    
-                    // Add bounds data - required by the MongoDB schema
-                    bounds: calculateBounds(routeData)
-                }
-            };
-            
-            // Helper function to generate a UUID
-            function generateUUID() {
-                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                    const r = Math.random() * 16 | 0;
-                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                    return v.toString(16);
+                    north = Math.max(north, lat);
+                    south = Math.min(south, lat);
+                    east = Math.max(east, lon);
+                    west = Math.min(west, lon);
                 });
-            }
-            
-            // Helper function to calculate bounds from route data
-            function calculateBounds(routeData) {
-                // Default bounds if we can't calculate from coordinates
-                const defaultBounds = {
-                    north: 90,
-                    south: -90,
-                    east: 180,
-                    west: -180
+                
+                return {
+                    north,
+                    south,
+                    east,
+                    west
                 };
-                
-                // Try to extract coordinates from the route's geojson
-                if (routeData.routes && 
-                    routeData.routes.length > 0 && 
-                    routeData.routes[0].geojson && 
-                    routeData.routes[0].geojson.features && 
-                    routeData.routes[0].geojson.features.length > 0 &&
-                    routeData.routes[0].geojson.features[0].geometry &&
-                    routeData.routes[0].geojson.features[0].geometry.coordinates &&
-                    routeData.routes[0].geojson.features[0].geometry.coordinates.length > 0) {
-                    
-                    const coordinates = routeData.routes[0].geojson.features[0].geometry.coordinates;
-                    
-                    // Initialize bounds with the first coordinate
-                    let north = coordinates[0][1]; // latitude
-                    let south = coordinates[0][1]; // latitude
-                    let east = coordinates[0][0];  // longitude
-                    let west = coordinates[0][0];  // longitude
-                    
-                    // Find min/max values from all coordinates
-                    coordinates.forEach(coord => {
-                        const lon = coord[0];
-                        const lat = coord[1];
-                        
-                        north = Math.max(north, lat);
-                        south = Math.min(south, lat);
-                        east = Math.max(east, lon);
-                        west = Math.min(west, lon);
-                    });
-                    
-                    return {
-                        north,
-                        south,
-                        east,
-                        west
-                    };
-                }
-                
-                // If we couldn't extract coordinates, return default bounds
-                return defaultBounds;
             }
             
-            
-            // If routeData has a persistentId, it's an update to an existing route
-            const endpoint = routeDataWithUserId.persistentId ? `${API_BASE}/${routeDataWithUserId.persistentId}` : `${API_BASE}/save`;
+            // If we couldn't extract coordinates, return default bounds
+            return defaultBounds;
+        }
+        
+        // Convert to JSON string to measure size
+        const jsonData = JSON.stringify(transformedData);
+        const payloadSizeInBytes = new Blob([jsonData]).size;
+        const payloadSizeInMB = payloadSizeInBytes / (1024 * 1024);
+        
+        console.log(`[routeService] Payload size: ${payloadSizeInMB.toFixed(2)}MB`);
+        
+        // If payload is larger than 500KB (0.5MB), use chunked upload
+        if (payloadSizeInBytes > 500 * 1024) {
+            console.log('[routeService] Large payload detected, using chunked upload');
+            return await saveRouteChunked(transformedData, routeDataWithUserId.persistentId);
+        } else {
+            // Use existing direct upload for smaller payloads
+            const endpoint = routeDataWithUserId.persistentId ? 
+                `${API_BASE}/${routeDataWithUserId.persistentId}` : 
+                `${API_BASE}/save`;
             const method = routeDataWithUserId.persistentId ? 'PUT' : 'POST';
+            
             const response = await fetch(endpoint, {
                 method,
                 headers,
                 body: JSON.stringify(transformedData),
                 credentials: 'include'
             });
+            
+            console.log('[routeService] Save response status:', response.status);
             const result = await handleResponse(response);
+            console.log('[routeService] Server response:', result);
             return result;
         }
-        catch (error) {
-            console.error('Save route error:', error);
-            throw error;
+    }
+    catch (error) {
+        console.error('Save route error:', error);
+        throw error;
+    }
+};
+
+// New function to handle chunked uploads
+const saveRouteChunked = async (routeData, persistentId) => {
+    try {
+        const headers = await getAuthHeaders();
+        const jsonData = JSON.stringify(routeData);
+        
+        // Create chunks of 500KB each
+        const chunkSize = 500 * 1024; // 500KB in bytes
+        const totalChunks = Math.ceil(jsonData.length / chunkSize);
+        const chunks = [];
+        
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, jsonData.length);
+            chunks.push(jsonData.slice(start, end));
         }
-    };
+        
+        console.log(`[routeService] Splitting data into ${chunks.length} chunks`);
+        
+        // Start a chunked upload session
+        console.log('[routeService] Starting chunked upload session');
+        const sessionResponse = await fetch(`${API_BASE}/chunked/start`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                persistentId,
+                totalChunks: chunks.length,
+                totalSize: jsonData.length,
+                isUpdate: !!persistentId
+            }),
+            credentials: 'include'
+        });
+        
+        const { sessionId } = await handleResponse(sessionResponse);
+        console.log(`[routeService] Chunked upload session created: ${sessionId}`);
+        
+        // Upload each chunk
+        for (let i = 0; i < chunks.length; i++) {
+            console.log(`[routeService] Uploading chunk ${i+1}/${chunks.length}`);
+            
+            const chunkResponse = await fetch(`${API_BASE}/chunked/upload`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    sessionId,
+                    chunkIndex: i,
+                    data: chunks[i]
+                }),
+                credentials: 'include'
+            });
+            
+            await handleResponse(chunkResponse);
+            console.log(`[routeService] Chunk ${i+1}/${chunks.length} uploaded successfully`);
+        }
+        
+        // Complete the chunked upload
+        console.log('[routeService] Completing chunked upload');
+        const completeResponse = await fetch(`${API_BASE}/chunked/complete`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                sessionId
+            }),
+            credentials: 'include'
+        });
+        
+        const result = await handleResponse(completeResponse);
+        console.log('[routeService] Chunked upload completed successfully');
+        return result;
+    } catch (error) {
+        console.error('[routeService] Chunked upload error:', error);
+        throw error;
+    }
+};
     const loadRoute = async (persistentId) => {
         try {
             const headers = await getAuthHeaders();
