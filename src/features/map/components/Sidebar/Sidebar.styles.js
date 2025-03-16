@@ -3,9 +3,11 @@ import MuiDrawer from '@mui/material/Drawer';
 export const NestedDrawer = styled(MuiDrawer)(({ theme }) => ({
     position: 'absolute',
     left: 0,
+    top: 64, // Add top position to account for header height
     width: 264,
     flexShrink: 0,
     zIndex: 100,
+    height: 'calc(100% - 64px)', // Adjust height to account for header
     '& .MuiDrawer-paper': {
         width: 264,
         backgroundColor: 'rgb(35, 35, 35)',
@@ -13,6 +15,9 @@ export const NestedDrawer = styled(MuiDrawer)(({ theme }) => ({
         color: '#ffffff',
         marginLeft: 56,
         boxSizing: 'border-box',
+        height: '100%', // Full height of the adjusted container
+        paddingBottom: '320px', // Add padding to allow scrolling past elevation panel
+        overflowY: 'auto', // Ensure content is scrollable
     },
 }));
 export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
@@ -21,6 +26,7 @@ export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
     whiteSpace: 'nowrap',
     boxSizing: 'border-box',
     zIndex: 101,
+    marginTop: 64, // Add margin top to account for header height
     '& .MuiDrawer-paper': {
         width: 56,
         backgroundColor: '#1a1a1a',
@@ -29,6 +35,8 @@ export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({
         overflowX: 'hidden',
         display: 'flex',
         flexDirection: 'column',
+        height: 'calc(100% - 64px)', // Adjust height to account for header
+        top: 64, // Position below the header
         transition: theme.transitions.create('width', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,

@@ -189,6 +189,27 @@ export const useRouteDataLoader = (stateId) => {
                         console.log(`Successfully loaded pre-processed data from Cloudinary: ${data.name || 'Unnamed'}`);
                         
                         // Store the route data
+                        // Log headerSettings to debug
+                        console.log('Received headerSettings from Cloudinary:', data.headerSettings);
+                        
+                        // If headerSettings is missing or empty, log a warning
+                        if (!data.headerSettings) {
+                            console.warn('No headerSettings found in Cloudinary data');
+                            
+                            // Set default headerSettings if missing
+                            data.headerSettings = {
+                                color: '#000000',
+                                logoUrl: null,
+                                username: ''
+                            };
+                        } else {
+                            console.log('HeaderSettings details:', {
+                                color: data.headerSettings.color,
+                                logoUrl: data.headerSettings.logoUrl,
+                                username: data.headerSettings.username
+                            });
+                        }
+                        
                         setRouteData(data);
                         
                         // Set the current route (first subroute or the main route)

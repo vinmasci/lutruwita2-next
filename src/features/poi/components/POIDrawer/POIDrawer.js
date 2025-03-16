@@ -257,7 +257,10 @@ const POIDrawer = ({ isOpen, onClose }) => {
                 width: '264px',
                 border: 'none',
                 backgroundColor: 'transparent',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                top: '64px', // Position below the header
+                height: 'calc(100% - 64px)', // Adjust height to account for header
+                marginTop: '56px' // Account for the sidebar width
             }
         }, children: _jsxs(StyledDrawer, { children: [renderContent(), _jsx("div", { id: "poi-data-for-mongo", style: {
                         display: 'none' // Hide the metadata display

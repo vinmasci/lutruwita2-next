@@ -97,16 +97,28 @@ export async function getCache(key) {
     }
     
     try {
+      // Check if client is connected before attempting to get data
+      if (client.status !== 'ready') {
+        console.log(`[Redis] Client not ready (status: ${client.status}), skipping getCache operation`);
+        // Mark Redis as unavailable for future operations
+        redisAvailable = false;
+        return null;
+      }
+      
       const data = await client.get(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       console.error('[Redis Get Error]', error);
+      // Mark Redis as unavailable for future operations
+      redisAvailable = false;
       // If Redis fails, we'll return null and let the application fall back to the database
       return null;
     }
   } catch (connectionError) {
     // Handle connection errors gracefully
     console.error('[Redis Connection Error]', connectionError);
+    // Mark Redis as unavailable for future operations
+    redisAvailable = false;
     return null;
   }
 }
@@ -121,15 +133,27 @@ export async function setCache(key, data, expiryInSeconds) {
     }
     
     try {
+      // Check if client is connected before attempting to set data
+      if (client.status !== 'ready') {
+        console.log(`[Redis] Client not ready (status: ${client.status}), skipping setCache operation`);
+        // Mark Redis as unavailable for future operations
+        redisAvailable = false;
+        return false;
+      }
+      
       await client.setex(key, expiryInSeconds, JSON.stringify(data));
       return true;
     } catch (error) {
       console.error('[Redis Set Error]', error);
+      // Mark Redis as unavailable for future operations
+      redisAvailable = false;
       return false;
     }
   } catch (connectionError) {
     // Handle connection errors gracefully
     console.error('[Redis Connection Error]', connectionError);
+    // Mark Redis as unavailable for future operations
+    redisAvailable = false;
     return false;
   }
 }
@@ -144,15 +168,27 @@ export async function deleteCache(key) {
     }
     
     try {
+      // Check if client is connected before attempting to delete data
+      if (client.status !== 'ready') {
+        console.log(`[Redis] Client not ready (status: ${client.status}), skipping deleteCache operation`);
+        // Mark Redis as unavailable for future operations
+        redisAvailable = false;
+        return false;
+      }
+      
       await client.del(key);
       return true;
     } catch (error) {
       console.error('[Redis Delete Error]', error);
+      // Mark Redis as unavailable for future operations
+      redisAvailable = false;
       return false;
     }
   } catch (connectionError) {
     // Handle connection errors gracefully
     console.error('[Redis Connection Error]', connectionError);
+    // Mark Redis as unavailable for future operations
+    redisAvailable = false;
     return false;
   }
 }
@@ -167,6 +203,14 @@ export async function clearCacheByPattern(pattern) {
     }
     
     try {
+      // Check if client is connected before attempting to clear cache
+      if (client.status !== 'ready') {
+        console.log(`[Redis] Client not ready (status: ${client.status}), skipping clearCacheByPattern operation`);
+        // Mark Redis as unavailable for future operations
+        redisAvailable = false;
+        return false;
+      }
+      
       const keys = await client.keys(pattern);
       if (keys.length > 0) {
         await client.del(...keys);
@@ -174,11 +218,15 @@ export async function clearCacheByPattern(pattern) {
       return true;
     } catch (error) {
       console.error('[Redis Clear Cache Error]', error);
+      // Mark Redis as unavailable for future operations
+      redisAvailable = false;
       return false;
     }
   } catch (connectionError) {
     // Handle connection errors gracefully
     console.error('[Redis Connection Error]', connectionError);
+    // Mark Redis as unavailable for future operations
+    redisAvailable = false;
     return false;
   }
 }
@@ -187,5 +235,6 @@ export async function clearCacheByPattern(pattern) {
 export const CACHE_DURATIONS = {
   publicRoutes: 60 * 5, // 5 minutes
   routeData: 60 * 60 * 24, // 24 hours
-  photos: 60 * 60 * 24 * 7 // 7 days
+  photos: 60 * 60 * 24 * 7, // 7 days
+  users: 60 * 60 * 24 // 24 hours
 };

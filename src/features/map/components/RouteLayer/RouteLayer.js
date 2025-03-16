@@ -92,44 +92,52 @@ export const RouteLayer = ({ map, route }) => {
         });
     }, [map, route, isStyleLoaded, routeVisibility]);
     
-    // Function to move route layers to front
+    // Function to move route layers to front - SIMPLE VERSION
     const moveRouteToFront = useCallback(() => {
         if (!map || !route || !isStyleLoaded) return;
         
         // Get the stable route ID
         const routeId = route.id || route.routeId;
         
-        // Check if this is the current route
+        // Check if this is the current route - using comprehensive check
         const isCurrentRoute = currentRoute && (
             currentRoute.id === route.id || 
-            currentRoute.routeId === route.routeId
+            currentRoute.routeId === route.routeId ||
+            // Additional checks for different ID formats
+            (currentRoute.id && route.routeId && currentRoute.id.toString() === route.routeId.toString()) ||
+            (currentRoute.routeId && route.id && currentRoute.routeId.toString() === route.id.toString())
         );
         
         // Only move to front if this is the current route
         if (isCurrentRoute) {
-            console.log(`[RouteLayer] Moving route ${routeId} to front`);
-            
-            // Get all layers in the map
-            const style = map.getStyle();
-            if (!style || !style.layers) return;
+            console.log(`[RouteLayer] Moving route ${routeId} to front - SIMPLE VERSION`);
             
             // Find all layers for this route
             const mainLayerId = `${routeId}-main-line`;
             const borderLayerId = `${routeId}-main-border`;
             const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
             
-            // Move layers to front in correct order (border first, then main line, then surface)
-            // This ensures proper stacking order
-            if (map.getLayer(borderLayerId)) {
-                map.moveLayer(borderLayerId);
-            }
-            
-            if (map.getLayer(mainLayerId)) {
-                map.moveLayer(mainLayerId);
-            }
-            
-            if (map.getLayer(surfaceLayerId)) {
-                map.moveLayer(surfaceLayerId);
+            // Simply move the current route layers to the front
+            // The order matters: border first, then main line, then surface
+            try {
+                if (map.getLayer(borderLayerId)) {
+                    console.log(`[RouteLayer] Moving border layer ${borderLayerId} to front`);
+                    map.moveLayer(borderLayerId); // Move to the very top
+                }
+                
+                if (map.getLayer(mainLayerId)) {
+                    console.log(`[RouteLayer] Moving main layer ${mainLayerId} to front`);
+                    map.moveLayer(mainLayerId); // Move to the very top (will be above border)
+                }
+                
+                if (map.getLayer(surfaceLayerId)) {
+                    console.log(`[RouteLayer] Moving surface layer ${surfaceLayerId} to front`);
+                    map.moveLayer(surfaceLayerId); // Move to the very top (will be above main)
+                }
+                
+                console.log(`[RouteLayer] Successfully moved route ${routeId} layers to front`);
+            } catch (error) {
+                console.error(`[RouteLayer] Error moving current route layers to front:`, error);
             }
         }
     }, [map, route, isStyleLoaded, currentRoute]);
@@ -441,8 +449,20 @@ export const RouteLayer = ({ map, route }) => {
         // Check if this is the current route
         const isCurrentRoute = currentRoute && (
             currentRoute.id === route.id || 
-            currentRoute.routeId === route.routeId
+            currentRoute.routeId === route.routeId ||
+            // Additional checks for different ID formats
+            (currentRoute.id && route.routeId && currentRoute.id.toString() === route.routeId.toString()) ||
+            (currentRoute.routeId && route.id && currentRoute.routeId.toString() === route.id.toString())
         );
+        
+        // Log for debugging
+        console.log(`[RouteLayer] Animation check for route ${route.id || route.routeId}:`, {
+            isCurrentRoute,
+            currentRouteId: currentRoute?.id,
+            currentRouteRouteId: currentRoute?.routeId,
+            routeId: route.id,
+            routeRouteId: route.routeId
+        });
         
         if (!isCurrentRoute) {
             return;
@@ -507,7 +527,7 @@ export const RouteLayer = ({ map, route }) => {
                 map.setPaintProperty(borderLayerId, 'line-width', 5);
             }
         };
-    }, [map, route, isStyleLoaded, route?.isFocused]);
+    }, [map, route, isStyleLoaded, currentRoute, moveRouteToFront]);
 
     return null;
 };

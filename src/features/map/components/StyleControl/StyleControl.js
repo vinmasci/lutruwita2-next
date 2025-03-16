@@ -21,7 +21,7 @@ export const MAP_STYLES = {
     }
 };
 class StyleControl {
-    constructor() {
+    constructor(options = {}) {
         Object.defineProperty(this, "container", {
             enumerable: true,
             configurable: true,
@@ -39,6 +39,12 @@ class StyleControl {
             configurable: true,
             writable: true,
             value: 'satellite'
+        });
+        Object.defineProperty(this, "onStyleChange", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: options.onStyleChange || null
         });
         this.container = document.createElement('div');
     }
@@ -148,6 +154,11 @@ class StyleControl {
                 button.classList.add('active');
             }
         });
+        
+        // Notify the callback if provided
+        if (this.onStyleChange && typeof this.onStyleChange === 'function') {
+            this.onStyleChange(style);
+        }
         console.debug('[StyleControl] Switching to style:', {
             style,
             url: MAP_STYLES[style].url,

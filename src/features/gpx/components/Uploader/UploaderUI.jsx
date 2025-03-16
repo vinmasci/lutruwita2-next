@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Alert, Box, Button, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider, Popover, LinearProgress } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { getRouteDistance, getUnpavedPercentage, getElevationGain, getElevationLoss } from '../../utils/routeUtils';
+import { getRouteLocationData } from '../../../../utils/geocoding';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useDropzone } from 'react-dropzone';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -43,6 +44,7 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
     const [customColor, setCustomColor] = useState('');
     const [customColorError, setCustomColorError] = useState('');
 
+    // Effect to update local routes when routes change
     useEffect(() => {
         setLocalRoutes(routes);
     }, [routes]);
@@ -242,6 +244,113 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
         );
     };
 
+    // Calculate route summary data
+    const routeSummary = useMemo(() => {
+        if (!localRoutes || localRoutes.length === 0) return null;
+
+        // Initialize summary data
+        let totalDistance = 0;
+        let totalAscent = 0;
+        let totalUnpavedDistance = 0;
+        let totalRouteDistance = 0;
+        let isLoop = true;
+        const countries = new Set(['Australia']); // Default country
+        const states = new Set();
+        const lgas = new Set();
+
+        // Variables to store first and last points for overall loop check
+        let firstRouteStart = null;
+        let lastRouteEnd = null;
+
+        // Calculate totals from all routes
+        localRoutes.forEach((route, index) => {
+            // Distance
+            const distance = getRouteDistance(route);
+            totalDistance += distance;
+            totalRouteDistance += distance;
+
+            // Elevation
+            const ascent = getElevationGain(route);
+            totalAscent += ascent;
+
+            // Unpaved sections
+            const unpavedPercentage = getUnpavedPercentage(route);
+            totalUnpavedDistance += (distance * unpavedPercentage / 100);
+
+            // Get coordinates for loop check
+            if (route.geojson?.features?.[0]?.geometry?.coordinates) {
+                const coordinates = route.geojson.features[0].geometry.coordinates;
+                if (coordinates.length > 1) {
+                    // Store first route's start point
+                    if (index === 0) {
+                        firstRouteStart = coordinates[0];
+                    }
+                    
+                    // Store last route's end point
+                    if (index === localRoutes.length - 1) {
+                        lastRouteEnd = coordinates[coordinates.length - 1];
+                    }
+                    
+                    // Individual route loop check
+                    const start = coordinates[0];
+                    const end = coordinates[coordinates.length - 1];
+                    
+                    // Calculate distance between start and end points
+                    const dx = (end[0] - start[0]) * Math.cos((start[1] + end[1]) / 2 * Math.PI / 180);
+                    const dy = end[1] - start[1];
+                    const distance = Math.sqrt(dx * dx + dy * dy) * 111.32 * 1000; // approx meters
+                    
+                    // Check if this individual route is a loop (using 5km threshold)
+                    const isRouteLoop = distance < 5000;
+                    
+                    // For a single route, set isLoop based on this route's loop status
+                    if (localRoutes.length === 1) {
+                        isLoop = isRouteLoop;
+                    } 
+                    // For multiple routes, only set isLoop to false if this route isn't a loop
+                    // (we'll check multi-route loops later)
+                    else if (!isRouteLoop) {
+                        isLoop = false;
+                    }
+                }
+            }
+
+            // Location data
+            if (route.metadata) {
+                if (route.metadata.country) countries.add(route.metadata.country);
+                if (route.metadata.state) states.add(route.metadata.state);
+                if (route.metadata.lga) lgas.add(route.metadata.lga);
+            }
+        });
+
+        // Check if the entire collection forms a loop (first route start connects to last route end)
+        if (!isLoop && firstRouteStart && lastRouteEnd && localRoutes.length > 1) {
+            const dx = (lastRouteEnd[0] - firstRouteStart[0]) * Math.cos((firstRouteStart[1] + lastRouteEnd[1]) / 2 * Math.PI / 180);
+            const dy = lastRouteEnd[1] - firstRouteStart[1];
+            const distance = Math.sqrt(dx * dx + dy * dy) * 111.32 * 1000; // approx meters
+            
+            // If the distance between first route start and last route end is small enough (within 5km), it's a loop
+            if (distance < 5000) {
+                isLoop = true;
+            }
+        }
+
+        // Calculate unpaved percentage
+        const unpavedPercentage = totalRouteDistance > 0 
+            ? Math.round((totalUnpavedDistance / totalRouteDistance) * 100) 
+            : 0;
+
+        return {
+            totalDistance: Math.round(totalDistance / 1000 * 10) / 10, // Convert to km with 1 decimal
+            totalAscent: Math.round(totalAscent),
+            unpavedPercentage,
+            isLoop,
+            countries: Array.from(countries),
+            states: Array.from(states),
+            lgas: Array.from(lgas)
+        };
+    }, [localRoutes]);
+
     return (
         <Box sx={{
             display: 'flex',
@@ -322,21 +431,6 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
                 )}
             </Paper>
             
-            {/* Info alert */}
-            <Alert 
-                severity="info" 
-                sx={{
-                    mt: 2,
-                    mb: 3,
-                    borderRadius: 3,
-                    backgroundColor: 'rgba(35, 35, 35, 0.9)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                }}
-            >
-                For the moment, uploading a combination of files more than 850kb won't save. <br />
-                Multiple saves of 850kb will work, save and upload.
-            </Alert>
-
             <Divider sx={{ my: 2, backgroundColor: 'rgba(255, 255, 255, 0.1)', width: '100%' }} />
 
             {localRoutes.length > 0 && (
@@ -385,6 +479,79 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
                         </List>
                     </SortableContext>
                 </DndContext>
+            )}
+
+            {/* Route Summary Section */}
+            {routeSummary && (
+                <Paper
+                    elevation={0}
+                    sx={{
+                        width: '240px',
+                        padding: '12px',
+                        marginTop: '16px',
+                        backgroundColor: 'rgba(35, 35, 35, 0.9)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '4px',
+                    }}
+                >
+                    <Typography 
+                        variant="subtitle2" 
+                        sx={{ 
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)', 
+                            paddingBottom: '8px',
+                            marginBottom: '8px',
+                            fontWeight: 'bold',
+                            color: '#4a9eff'
+                        }}
+                    >
+                        Route Summary
+                    </Typography>
+                    
+                    <Box sx={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: '1fr 1fr', 
+                        rowGap: '6px',
+                        columnGap: '8px',
+                        '& .label': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            fontSize: '0.75rem'
+                        },
+                        '& .value': {
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            color: 'white'
+                        }
+                    }}>
+                        <Typography className="label">Total Distance:</Typography>
+                        <Typography className="value">{routeSummary.totalDistance} km</Typography>
+                        
+                        <Typography className="label">Total Ascent:</Typography>
+                        <Typography className="value">{routeSummary.totalAscent.toLocaleString()} m</Typography>
+                        
+                        <Typography className="label">Unpaved:</Typography>
+                        <Typography className="value">{routeSummary.unpavedPercentage}%</Typography>
+                        
+                        <Typography className="label">Loop:</Typography>
+                        <Typography className="value">{routeSummary.isLoop ? "Yes" : "No"}</Typography>
+                        
+                        <Typography className="label">Country:</Typography>
+                        <Typography className="value">{routeSummary.countries.join(', ') || 'Australia'}</Typography>
+                        
+                        {routeSummary.states.length > 0 && (
+                            <>
+                                <Typography className="label">State:</Typography>
+                                <Typography className="value">{routeSummary.states.join(', ')}</Typography>
+                            </>
+                        )}
+                        
+                        {routeSummary.lgas.length > 0 && (
+                            <>
+                                <Typography className="label">LGA:</Typography>
+                                <Typography className="value">{routeSummary.lgas.join(', ')}</Typography>
+                            </>
+                        )}
+                    </Box>
+                </Paper>
             )}
 
             <Popover

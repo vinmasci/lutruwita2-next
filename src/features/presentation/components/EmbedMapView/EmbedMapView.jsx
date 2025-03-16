@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -9,8 +9,11 @@ import { PresentationPOIViewer } from '../POIViewer';
 import { setupScaleListener } from '../../utils/scaleUtils';
 import { SimpleLightbox } from '../../../photo/components/PhotoPreview/SimpleLightbox';
 import { clusterPhotosPresentation, isCluster, getClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
+import { MapProvider } from '../../../map/context/MapContext';
 import { PhotoProvider } from '../../../photo/context/PhotoContext';
 import { useRouteDataLoader, filterPhotosByRoute } from './hooks/useRouteDataLoader';
+import MapHeader from '../../../map/components/MapHeader/MapHeader';
+import { ClimbMarkers } from '../../../map/components/ClimbMarkers/ClimbMarkers';
 
 // Import extracted components
 import SimplifiedRouteLayer from './components/SimplifiedRouteLayer';
@@ -38,6 +41,8 @@ export default function EmbedMapView() {
     const [zoom, setZoom] = useState(null);
     const [scale, setScale] = useState(1);
     const [clusteredPhotos, setClusteredPhotos] = useState([]);
+    const [hoverCoordinates, setHoverCoordinates] = useState(null);
+    const hoverMarkerRef = useRef(null);
     const [visiblePOICategories, setVisiblePOICategories] = useState([
         'road-information',
         'accommodation',
@@ -384,6 +389,45 @@ export default function EmbedMapView() {
         });
     };
     
+    // Update hover marker when coordinates change
+    useEffect(() => {
+        if (!mapInstance.current) return;
+        
+        // Remove existing marker
+        if (hoverMarkerRef.current) {
+            hoverMarkerRef.current.remove();
+            hoverMarkerRef.current = null;
+        }
+        
+        // Add new marker if we have coordinates
+        if (hoverCoordinates) {
+            const el = document.createElement('div');
+            el.className = 'hover-marker';
+            el.style.width = '16px';
+            el.style.height = '16px';
+            el.style.borderRadius = '50%';
+            el.style.backgroundColor = '#ff0000';
+            el.style.border = '2px solid white';
+            el.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
+            el.style.pointerEvents = 'none'; // Make marker non-interactive to allow clicks to pass through
+            
+            // Create and add the marker without popup
+            hoverMarkerRef.current = new mapboxgl.Marker(el)
+                .setLngLat(hoverCoordinates)
+                .addTo(mapInstance.current);
+        }
+    }, [hoverCoordinates]);
+
+    // Store current route ID reference
+    const currentRouteIdRef = useRef(null);
+    
+    // Update currentRouteIdRef when currentRoute changes
+    useEffect(() => {
+        if (currentRoute?.id || currentRoute?.routeId) {
+            currentRouteIdRef.current = currentRoute.id || currentRoute.routeId;
+        }
+    }, [currentRoute]);
+
     // Initialize map
     useEffect(() => {
         if (!mapRef.current || !mapState) return;
@@ -446,6 +490,122 @@ export default function EmbedMapView() {
         // Update zoom state when map zooms
         map.on('zoom', () => {
             setZoom(map.getZoom());
+        });
+        
+        // Add mousemove event to set hover coordinates
+        map.on('mousemove', (e) => {
+            // Get mouse coordinates
+            const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
+            
+            // Get all route sources directly from the map
+            const style = map.getStyle();
+            if (!style || !style.sources) {
+                return;
+            }
+            
+            // Find all sources that might contain route data
+            let routeSources = Object.entries(style.sources)
+                .filter(([id, source]) => {
+                    if (id.includes('-main') && source.type === 'geojson') {
+                        const geoJsonSource = source;
+                        if (typeof geoJsonSource.data === 'object' && 
+                            geoJsonSource.data !== null && 
+                            'features' in geoJsonSource.data && 
+                            Array.isArray(geoJsonSource.data.features) && 
+                            geoJsonSource.data.features.length > 0 &&
+                            geoJsonSource.data.features[0].geometry?.type === 'LineString') {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+            
+            // Try to find the active route
+            let activeRouteSource = null;
+            let activeRouteId = null;
+            
+            // First check if we have a current route ID from the ref
+            if (currentRouteIdRef.current) {
+                const currentSourceId = `${currentRouteIdRef.current}-main`;
+                
+                // Find this source in our routeSources
+                const foundSource = routeSources.find(([id]) => id === currentSourceId);
+                if (foundSource) {
+                    activeRouteSource = foundSource[1];
+                    activeRouteId = currentRouteIdRef.current;
+                }
+            }
+            
+            // If we couldn't find the route from the ref, try from the current route
+            if (!activeRouteSource && currentRoute) {
+                const routeId = currentRoute.id || currentRoute.routeId;
+                const sourceId = `${routeId}-main`;
+                
+                // Find this source in our routeSources
+                const foundSource = routeSources.find(([id]) => id === sourceId);
+                if (foundSource) {
+                    activeRouteSource = foundSource[1];
+                    activeRouteId = routeId;
+                    // Update the ref if it's different
+                    if (currentRouteIdRef.current !== routeId) {
+                        currentRouteIdRef.current = routeId;
+                    }
+                }
+            }
+            
+            // If we couldn't find the active route from context or ref, try to find it another way
+            if (!activeRouteSource && routeSources.length > 0) {
+                // Fallback to first route if no current route
+                activeRouteSource = routeSources[0][1];
+                activeRouteId = routeSources[0][0].replace('-main', '');
+            }
+            
+            // If we don't have an active route, clear any marker and return
+            if (!activeRouteSource) {
+                if (hoverCoordinates) {
+                    setHoverCoordinates(null);
+                }
+                return;
+            }
+            
+            // Get coordinates from the active route
+            const geoJsonData = activeRouteSource.data;
+            const coordinates = geoJsonData.features[0].geometry.coordinates;
+            
+            // Find the closest point on the active route
+            let closestPoint = null;
+            let minDistance = Infinity;
+            
+            // Check all coordinates in the active route
+            coordinates.forEach((coord) => {
+                if (coord.length >= 2) {
+                    const dx = coord[0] - mouseCoords[0];
+                    const dy = coord[1] - mouseCoords[1];
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPoint = [coord[0], coord[1]];
+                    }
+                }
+            });
+            
+            // Define a threshold distance - only show marker when close to the route
+            const distanceThreshold = 0.0045; // Approximately 500m at the equator
+            
+            // If we found a closest point on the active route and it's within the threshold
+            if (closestPoint && minDistance < distanceThreshold) {
+                setHoverCoordinates(closestPoint);
+            } else {
+                // If no point found or too far from route, clear the marker
+                setHoverCoordinates(null);
+            }
+        });
+        
+        // Add mouseout event to clear hover coordinates when cursor leaves the map
+        map.on('mouseout', () => {
+            // Clear hover coordinates when mouse leaves the map
+            setHoverCoordinates(null);
         });
         
         // Add Mapbox controls
@@ -563,8 +723,32 @@ export default function EmbedMapView() {
         }
     }, [isMapReady, currentRoute]);
     
+    // Create MapContext value
+    const mapContextValue = useMemo(() => ({
+        map: mapInstance.current,
+        dragPreview: null,
+        setDragPreview: () => { },
+        isMapReady,
+        isInitializing: false,
+        hoverCoordinates,
+        setHoverCoordinates,
+        onPoiPlacementClick: undefined,
+        setPoiPlacementClick: () => { },
+        poiPlacementMode: false,
+        setPoiPlacementMode: () => { }
+    }), [isMapReady, hoverCoordinates]);
+
     return (
-        <div ref={containerRef} className="embed-container">
+        <MapProvider value={mapContextValue}>
+            <div ref={containerRef} className="embed-container">
+            {/* Add the header */}
+            <MapHeader 
+                title={currentRoute?.name || 'Untitled Route'}
+                color={routeData?.headerSettings?.color || '#000000'}
+                logoUrl={routeData?.headerSettings?.logoUrl}
+                username={routeData?.headerSettings?.username}
+            />
+            
             {/* Add the EmbedSidebar */}
             <EmbedSidebar 
                 isOpen={true} 
@@ -639,8 +823,17 @@ export default function EmbedMapView() {
                                 route={route}
                                 key={route.id || route.routeId}
                                 showDistanceMarkers={isDistanceMarkersVisible && route.id === currentRoute?.id}
+                                isActive={route.id === currentRoute?.id || route.routeId === currentRoute?.routeId}
                             />
                         ))}
+                        
+                        {/* Render climb markers for current route */}
+                        {currentRoute && (
+                            <ClimbMarkers 
+                                map={mapInstance.current} 
+                                route={currentRoute} 
+                            />
+                        )}
                         
                         {/* Render POIs directly without context */}
                         {routeData?.pois?.draggable && routeData.pois.draggable.map(poi => (
@@ -711,12 +904,7 @@ export default function EmbedMapView() {
                             />
                         )}
                         
-                        {/* Route name display */}
-                        {currentRoute && (
-                            <div className="route-filename">
-                                {currentRoute.name || 'Unnamed Route'}
-                            </div>
-                        )}
+                        {/* Route name display - removed since we now use the header */}
                         
                         {/* Elevation Profile with Description Tab */}
                         {currentRoute && (
@@ -754,6 +942,7 @@ export default function EmbedMapView() {
                     </>
                 )}
             </div>
-        </div>
+            </div>
+        </MapProvider>
     );
 }

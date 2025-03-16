@@ -1,0 +1,124 @@
+.climb-marker {
+  position: absolute;
+  transform-origin: center center;
+  user-select: none;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.climb-marker-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: center center;
+  will-change: transform;
+  /* Move the container up so the pole sits on the route line */
+  margin-bottom: 30px;
+}
+
+/* Zoom-based scaling for the entire container */
+.climb-marker[data-zoom="3"] .climb-marker-container { transform: scale(0.5); }
+.climb-marker[data-zoom="4"] .climb-marker-container { transform: scale(0.5); }
+.climb-marker[data-zoom="5"] .climb-marker-container { transform: scale(0.6); }
+.climb-marker[data-zoom="6"] .climb-marker-container { transform: scale(0.6); }
+.climb-marker[data-zoom="7"] .climb-marker-container { transform: scale(0.7); }
+.climb-marker[data-zoom="8"] .climb-marker-container { transform: scale(0.7); }
+.climb-marker[data-zoom="9"] .climb-marker-container { transform: scale(0.8); }
+.climb-marker[data-zoom="10"] .climb-marker-container { transform: scale(0.8); }
+.climb-marker[data-zoom="11"] .climb-marker-container { transform: scale(0.9); }
+.climb-marker[data-zoom="12"] .climb-marker-container { transform: scale(0.9); }
+.climb-marker[data-zoom="13"] .climb-marker-container { transform: scale(1.0); }
+.climb-marker[data-zoom="14"] .climb-marker-container { transform: scale(1.0); }
+.climb-marker[data-zoom="15"] .climb-marker-container { transform: scale(1.1); }
+.climb-marker[data-zoom="16"] .climb-marker-container { transform: scale(1.1); }
+.climb-marker[data-zoom="17"] .climb-marker-container { transform: scale(1.1); }
+.climb-marker[data-zoom="18"] .climb-marker-container { transform: scale(1.1); }
+.climb-marker[data-zoom="19"] .climb-marker-container { transform: scale(1.1); }
+.climb-marker[data-zoom="20"] .climb-marker-container { transform: scale(1.1); }
+
+.climb-flag {
+  position: relative;
+  height: 30px;
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+.climb-flag:hover {
+  transform: scale(1.1);
+}
+
+.climb-flag-pole {
+  width: 2px;
+  height: 30px;
+  background-color: #fff; /* Will be overridden inline */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  /* No white outline */
+}
+
+.climb-flag-start .climb-flag-pole {
+  margin-right: 0;
+}
+
+.climb-flag-end .climb-flag-pole {
+  margin-left: 0;
+}
+
+.climb-flag-banner {
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  /* Stronger shadow instead of white outline */
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+}
+
+.climb-flag-start .climb-flag-banner {
+  border-left: 16px solid #fff; /* Will be overridden inline */
+  margin-left: 2px;
+}
+
+.climb-flag-end .climb-flag-banner {
+  border-right: 16px solid #fff; /* Will be overridden inline */
+  margin-right: 2px;
+}
+
+.climb-flag-category {
+  position: relative;
+  top: 0;
+  font-weight: bold;
+  font-size: 12px;
+  /* Stronger shadow without white outline */
+  text-shadow: 0 0 3px #000, 0 0 2px #000;
+  white-space: nowrap;
+  margin: 0 4px;
+  align-self: center;
+}
+
+/* Custom styling for the popup */
+.climb-popup {
+  /* Remove the default white background */
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Style the popup tip (the little arrow) */
+.climb-popup .mapboxgl-popup-tip {
+  border-top-color: rgba(30, 30, 30, 0.95) !important;
+  border-bottom-color: rgba(30, 30, 30, 0.95) !important;
+  border-radius: 2px !important;
+}
+
+/* Style the popup content */
+.climb-popup .mapboxgl-popup-content {
+  background: none !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}

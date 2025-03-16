@@ -279,7 +279,15 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
         _jsx(NestedDrawer, { 
             variant: "persistent", 
             anchor: "left", 
-            open: isNestedOpen, 
+            open: isNestedOpen,
+            sx: {
+                '& .MuiDrawer-paper': {
+                    top: '64px', // Position below the header
+                    height: 'calc(100% - 64px)', // Adjust height to account for header
+                    marginLeft: '56px', // Account for the sidebar width
+                    paddingTop: '0px' // Remove any top padding
+                }
+            },
             children: _jsx(Suspense, { 
                 fallback: _jsx(CircularProgress, {}), 
                 children: _jsxs(Box, { 

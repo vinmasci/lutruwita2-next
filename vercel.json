@@ -8,6 +8,15 @@
       "dest": "/api/health"
     },
     {
+      "src": "/api/user",
+      "dest": "/api/routes/user",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
       "src": "/api/gpx",
       "dest": "/api/gpx"
     },
@@ -72,6 +81,14 @@
     "api/health/index.js": {
       "memory": 128,
       "maxDuration": 5
+    },
+    "api/routes/user.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/user/index.js": {
+      "memory": 1024,
+      "maxDuration": 60
     },
     "api/gpx/index.js": {
       "memory": 1024,

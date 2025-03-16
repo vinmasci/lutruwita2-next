@@ -50,8 +50,8 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
         setSnackbarMessage('Loading routes, this may take a moment...');
         setSnackbarSeverity('info');
         
-        // Fetch routes in the background
-        listRoutes()
+        // Fetch routes in the background with metadataOnly=true for better performance
+        listRoutes(undefined, true)
             .then(() => {
                 // Update the loading state when routes are fetched
                 setIsLoadingRoutes(false);

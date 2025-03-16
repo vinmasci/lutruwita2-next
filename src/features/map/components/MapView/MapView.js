@@ -10,6 +10,8 @@ import PitchControl from '../PitchControl/PitchControl';
 import { ElevationProfilePanel } from '../../../gpx/components/ElevationProfile/ElevationProfilePanel';
 import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
+import MapHeader from '../MapHeader/MapHeader';
+import HeaderCustomization from '../HeaderCustomization/HeaderCustomization';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
 import { POIViewer } from '../../../poi/components/POIViewer/POIViewer';
@@ -18,6 +20,7 @@ import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetail
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
 import PlacePOILayer from '../../../poi/components/PlacePOILayer/PlacePOILayer';
+import { ClimbMarkers } from '../ClimbMarkers/ClimbMarkers';
 import '../../../poi/components/PlacePOILayer/PlacePOILayer.css';
 import './MapView.css';
 import './photo-fix.css'; // Nuclear option to force photos behind UI components
@@ -66,7 +69,21 @@ function MapViewContent() {
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
     const { processGpx } = useClientGpxProcessing();
-    const { addRoute, deleteRoute, setCurrentRoute, currentRoute, routes } = useRouteContext();
+    const { 
+        addRoute, 
+        deleteRoute, 
+        setCurrentRoute, 
+        currentRoute, 
+        routes,
+        headerSettings,
+        updateHeaderSettings,
+        setChangedSections
+    } = useRouteContext();
+    
+    // Function to notify RouteContext of map state changes
+    const notifyMapStateChange = useCallback(() => {
+        setChangedSections(prev => ({...prev, mapState: true}));
+    }, [setChangedSections]);
     
     // Set up scaling using the same approach as in PresentationMapView
     useEffect(() => {
@@ -334,9 +351,64 @@ function MapViewContent() {
             renderRouteOnMap(currentRoute).catch(error => {
                 console.error('[MapView] Error rendering route:', error);
             });
+            
+            // Move the current route to the front
+            const map = mapInstance.current;
+            const currentRouteId = currentRoute.routeId || `route-${currentRoute.id}`;
+            const currentMainLayerId = `${currentRouteId}-main-line`;
+            const currentBorderLayerId = `${currentRouteId}-main-border`;
+            
+            // Move current route layers to front
+            if (map.getLayer(currentMainLayerId)) {
+                map.moveLayer(currentMainLayerId); // Move to the very top
+                console.log(`[MapView] Moved current route layer ${currentMainLayerId} to front`);
+            }
+            
+            if (map.getLayer(currentBorderLayerId)) {
+                map.moveLayer(currentBorderLayerId); // Move to the very top
+                console.log(`[MapView] Moved current route border layer ${currentBorderLayerId} to front`);
+            }
+            
+            // Move all other routes to the back
+            if (routes && routes.length > 0) {
+                const map = mapInstance.current;
+                routes.forEach(route => {
+                    // Skip the current route
+                    if (route.routeId === currentRoute.routeId || 
+                        route.id === currentRoute.id) {
+                        return;
+                    }
+                    
+                    const routeId = route.routeId || `route-${route.id}`;
+                    const mainLayerId = `${routeId}-main-line`;
+                    const borderLayerId = `${routeId}-main-border`;
+                    const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
+                    
+                    // Move non-current route layers to back
+                    // Note: We're NOT using the second parameter to moveLayer, which would move it BEFORE that layer
+                    // Instead, we're moving the current route to the very top
+                    if (map.getLayer(mainLayerId)) {
+                        // Move to the very back by moving before the first layer
+                        const firstLayer = map.getStyle().layers[0].id;
+                        map.moveLayer(mainLayerId, firstLayer);
+                    }
+                    
+                    if (map.getLayer(borderLayerId)) {
+                        // Move to the very back by moving before the first layer
+                        const firstLayer = map.getStyle().layers[0].id;
+                        map.moveLayer(borderLayerId, firstLayer);
+                    }
+                    
+                    if (map.getLayer(surfaceLayerId)) {
+                        // Move to the very back by moving before the first layer
+                        const firstLayer = map.getStyle().layers[0].id;
+                        map.moveLayer(surfaceLayerId, firstLayer);
+                    }
+                });
+            }
         }
         // For loaded routes (from MongoDB), RouteLayer component handles rendering
-    }, [currentRoute, isMapReady, renderRouteOnMap]);
+    }, [currentRoute, isMapReady, renderRouteOnMap, routes]);
     
     // Effect to re-render the route when its color changes
     useEffect(() => {
@@ -401,6 +473,8 @@ function MapViewContent() {
             }
         }
     }, [currentRoute, isMapReady, renderRouteOnMap, updateRouteColor]);
+    
+    // Animation effect removed as requested
     const handleUploadGpx = async (file, processedRoute) => {
         if (!file && !processedRoute) {
             setIsGpxDrawerOpen(true);
@@ -671,6 +745,12 @@ function MapViewContent() {
     height: '100%'  // Explicitly setting width and height to match presentation mode
   });
   
+  // Add event listeners to track map state changes
+  map.on('moveend', notifyMapStateChange);
+  map.on('zoomend', notifyMapStateChange);
+  map.on('pitchend', notifyMapStateChange);
+  map.on('rotateend', notifyMapStateChange);
+  
   // Set the map instance in the queue
   setMapInstance(map);
         
@@ -851,8 +931,10 @@ function MapViewContent() {
             }), 'top-right');
         }
         
-        // Add style control last so it appears at bottom
-        map.addControl(new StyleControl(), 'top-right');
+        // Add style control last so it appears at bottom with callback to notify map state changes
+        map.addControl(new StyleControl({
+            onStyleChange: () => notifyMapStateChange()
+        }), 'top-right');
         
         // Add mousemove event to set hover coordinates
         map.on('mousemove', (e) => {
@@ -943,7 +1025,7 @@ function MapViewContent() {
             });
             
             // Define a threshold distance - only show marker when close to the route
-            const distanceThreshold = 0.0009; // Approximately 100m at the equator
+            const distanceThreshold = 0.0045; // Approximately 500m at the equator
             
             // If we found a closest point on the active route and it's within the threshold
             if (closestPoint && minDistance < distanceThreshold) {
@@ -1033,7 +1115,14 @@ return (_jsx(MapProvider, { value: {
         setDragPreview,
         poiPlacementMode: poiMode === 'regular',
         setPoiPlacementMode: (mode) => setPoiMode(mode ? 'regular' : 'none')
-    }, children: _jsxs("div", { ref: containerRef, className: "w-full h-full relative", children: [_jsx("div", { className: "map-container", ref: mapRef }), !isMapReady && (_jsxs(Box, { sx: {
+    }, children: _jsxs("div", { ref: containerRef, className: "w-full h-full relative", children: [
+                _jsx(MapHeader, { 
+                    title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
+                    color: headerSettings.color,
+                    logoUrl: headerSettings.logoUrl,
+                    username: headerSettings.username
+                }),
+                _jsx("div", { className: "map-container", ref: mapRef }), !isMapReady && (_jsxs(Box, { sx: {
                     position: 'absolute',
                     top: 0,
                     left: 0,
@@ -1050,7 +1139,19 @@ return (_jsx(MapProvider, { value: {
                     _jsx("div", { children: pois
                             .filter(poi => poi.type === 'draggable')
                             .map(poi => (_jsx(MapboxPOIMarker, { poi: poi, onDragEnd: handlePOIDragEnd, onClick: () => handlePOIClick(poi) }, poi.id))) }, "draggable-pois"),
-                    _jsx(PhotoLayer, {}, "photo-layer")] })), dragPreview && (_jsx(POIDragPreview, { icon: dragPreview.icon, category: dragPreview.category, onPlace: (coordinates) => {
+                    _jsx(PhotoLayer, {}, "photo-layer"),
+                    currentRoute && (_jsx(ClimbMarkers, { map: mapInstance.current, route: currentRoute }, "climb-markers"))] })), 
+                
+                isMapReady && (_jsx("div", { className: "header-customization-container", style: { position: 'absolute', top: '75px', right: '70px', zIndex: 1000 }, children:
+                    _jsx(HeaderCustomization, {
+                        color: headerSettings.color,
+                        logoUrl: headerSettings.logoUrl,
+                        username: headerSettings.username,
+                        onSave: updateHeaderSettings
+                    })
+                })),
+                
+                dragPreview && (_jsx(POIDragPreview, { icon: dragPreview.icon, category: dragPreview.category, onPlace: (coordinates) => {
                     handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
                     setDragPreview(null);
                 } })), selectedPOIDetails && (_jsx(MapboxPOIMarker, { poi: {

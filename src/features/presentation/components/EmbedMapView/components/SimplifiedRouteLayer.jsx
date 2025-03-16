@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { along, lineString, length } from '@turf/turf';
 import mapboxgl from 'mapbox-gl';
 
@@ -18,9 +18,19 @@ const getPointsAtInterval = (coordinates, totalDistance, interval) => {
 };
 
 // Simplified version of RouteLayer that doesn't use context
-const SimplifiedRouteLayer = ({ map, route, showDistanceMarkers = false }) => {
+const SimplifiedRouteLayer = ({ map, route, showDistanceMarkers = false, isActive = false }) => {
   const markersRef = useRef([]);
   const [interval, setInterval] = useState(10); // Default 10km interval
+  
+  // Animation interval reference
+  const animationIntervalRef = useRef(null);
+  
+  // Track animation state
+  const animationState = useRef({
+    growing: true,
+    mainWidth: 3,
+    borderWidth: 5
+  });
 
   // Update interval based on zoom level
   useEffect(() => {
@@ -133,6 +143,93 @@ const SimplifiedRouteLayer = ({ map, route, showDistanceMarkers = false }) => {
       markersRef.current = [];
     };
   }, [map, route, showDistanceMarkers, interval]);
+
+  // Function to start the pulsing animation for the active route
+  const startAnimation = useCallback(() => {
+    if (!map || !route || !isActive) return;
+    
+    // Clear any existing animation interval
+    if (animationIntervalRef.current) {
+      clearInterval(animationIntervalRef.current);
+      animationIntervalRef.current = null;
+    }
+    
+    const routeId = route.id || route.routeId;
+    const mainLayerId = `${routeId}-main-line`;
+    const borderLayerId = `${routeId}-main-border`;
+    
+    // Reset animation state
+    animationState.current = {
+      growing: true,
+      mainWidth: 3,
+      borderWidth: 5
+    };
+    
+    // Start the animation interval
+    animationIntervalRef.current = setInterval(() => {
+      const state = animationState.current;
+      
+      // Calculate new widths with larger steps for more visible effect
+      if (state.growing) {
+        state.mainWidth += 0.2;
+        state.borderWidth += 0.2;
+        if (state.mainWidth >= 6) {
+          state.growing = false;
+        }
+      } else {
+        state.mainWidth -= 0.2;
+        state.borderWidth -= 0.2;
+        if (state.mainWidth <= 3) {
+          state.growing = true;
+        }
+      }
+      
+      // Apply new widths to layers
+      if (map.getLayer(mainLayerId)) {
+        map.setPaintProperty(mainLayerId, 'line-width', state.mainWidth);
+      }
+      
+      if (map.getLayer(borderLayerId)) {
+        map.setPaintProperty(borderLayerId, 'line-width', state.borderWidth);
+      }
+    }, 50); // 50ms interval for smoother animation
+  }, [map, route]);
+  
+  // Effect to start animation when component mounts or when isActive changes
+  useEffect(() => {
+    if (isActive) {
+      startAnimation();
+    } else {
+      // Clear any existing animation if not active
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current);
+        animationIntervalRef.current = null;
+        
+        // Reset to default widths
+        const routeId = route?.id || route?.routeId;
+        if (routeId && map) {
+          const mainLayerId = `${routeId}-main-line`;
+          const borderLayerId = `${routeId}-main-border`;
+          
+          if (map.getLayer(mainLayerId)) {
+            map.setPaintProperty(mainLayerId, 'line-width', 3);
+          }
+          
+          if (map.getLayer(borderLayerId)) {
+            map.setPaintProperty(borderLayerId, 'line-width', 5);
+          }
+        }
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current);
+        animationIntervalRef.current = null;
+      }
+    };
+  }, [startAnimation, isActive, map, route]);
 
   // Effect to render the route
   useEffect(() => {
@@ -294,6 +391,13 @@ const SimplifiedRouteLayer = ({ map, route, showDistanceMarkers = false }) => {
 
       // Cleanup function
       return () => {
+        // Clear animation interval
+        if (animationIntervalRef.current) {
+          clearInterval(animationIntervalRef.current);
+          animationIntervalRef.current = null;
+        }
+        
+        // Remove layers and sources
         if (map.getLayer(mainLayerId)) {
           map.removeLayer(mainLayerId);
         }
@@ -314,7 +418,7 @@ const SimplifiedRouteLayer = ({ map, route, showDistanceMarkers = false }) => {
     catch (error) {
       console.error('[SimplifiedRouteLayer] Error rendering route:', error);
     }
-  }, [map, route]);
+  }, [map, route, startAnimation]);
 
   return null;
 };

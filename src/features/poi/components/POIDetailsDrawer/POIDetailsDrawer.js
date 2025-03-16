@@ -38,7 +38,12 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
         });
     };
     return (_jsxs(NestedDrawer, { anchor: "left", open: isOpen, onClose: onClose, variant: "persistent", sx: {
-            zIndex: 1300 // Higher than POIDrawer
+            zIndex: 1300, // Higher than POIDrawer
+            '& .MuiDrawer-paper': {
+                top: '64px', // Position below the header
+                height: 'calc(100% - 64px)', // Adjust height to account for header
+                marginLeft: '320px' // Account for the sidebar width + POIDrawer width
+            }
         }, children: [_jsxs(StyledDrawer, { children: [_jsx(DrawerHeader, { children: _jsx(Typography, { variant: "h6", children: "Add POI Details" }) }), _jsx(DrawerContent, { children: _jsx("form", { onSubmit: handleSubmit, style: { height: '100%' }, children: _jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }, children: [_jsxs(Box, { sx: {
                                             display: 'flex',
                                             alignItems: 'center',

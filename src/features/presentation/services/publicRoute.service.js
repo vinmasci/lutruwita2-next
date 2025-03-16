@@ -21,6 +21,11 @@ class PublicRouteService {
             }
             
             const data = await response.json();
+            
+            if (!data.routes) {
+                return [];
+            }
+            
             return data.routes;
         }
         catch (error) {

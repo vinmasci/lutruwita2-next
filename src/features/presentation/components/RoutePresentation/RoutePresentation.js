@@ -86,7 +86,7 @@ export const RoutePresentation = () => {
     }, [route]);
     // Create a memoized component for route content
     const RouteContent = React.memo(({ route }) => {
-        const { addRoute, setCurrentRoute } = useRouteContext();
+        const { addRoute, setCurrentRoute, updateHeaderSettings } = useRouteContext();
         const { addPhoto } = usePhotoContext();
         const { loadPOIsFromRoute } = usePOIContext();
         const [initialized, setInitialized] = useState(false);
@@ -110,10 +110,19 @@ export const RoutePresentation = () => {
                 if (route.pois) {
                     loadPOIsFromRoute(route.pois);
                 }
+                
+                // Set header settings if available
+                if (route.headerSettings) {
+                    console.log('[RoutePresentation] Setting header settings:', route.headerSettings);
+                    updateHeaderSettings(route.headerSettings);
+                } else {
+                    console.warn('[RoutePresentation] No header settings found in route data');
+                }
+                
                 setInitialized(true);
             };
             initializeRoutes();
-        }, [routes, initialized, addRoute, setCurrentRoute]);
+        }, [routes, initialized, addRoute, setCurrentRoute, updateHeaderSettings]);
         return routes.length > 0 ? _jsx(PresentationMapView, {}) : null;
     });
     // Set display name for debugging

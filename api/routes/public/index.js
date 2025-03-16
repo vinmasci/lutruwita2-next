@@ -96,6 +96,24 @@ const RouteSchema = new mongoose.Schema({
   viewCount: { type: Number, default: 0 },
   lastViewed: { type: Date },
   
+  // Header settings
+  headerSettings: {
+    color: { type: String },
+    logoUrl: { type: String },
+    username: { type: String }
+  },
+  
+  // Route metadata for filtering
+  metadata: {
+    country: { type: String },
+    state: { type: String },
+    lga: { type: String },
+    totalDistance: { type: Number },
+    totalAscent: { type: Number },
+    unpavedPercentage: { type: Number },
+    isLoop: { type: Boolean }
+  },
+  
   // Map view state
   mapState: {
     zoom: { type: Number, required: true },
@@ -235,17 +253,11 @@ async function handleGetPublicRoute(req, res) {
     console.log(`[API] Request URL: ${req.url}`);
     console.log(`[API] Request headers:`, req.headers);
     
-    // Check cache first
-    let cachedRoute = null;
+    // Clear the cache to ensure we get fresh data
     const routeCacheKey = `public-route:${publicId}`;
-    cachedRoute = await getCache(routeCacheKey);
-    
-    if (cachedRoute) {
-      console.log(`[API] Found route in cache`);
-      return res.status(200).json(cachedRoute);
-    } else {
-      console.log(`[API] No cached data found, fetching from database...`);
-    }
+    console.log(`[API] Clearing cache for key: ${routeCacheKey}`);
+    await setCache(routeCacheKey, null, 0);
+    console.log(`[API] Fetching fresh data from database...`);
     
     // Log all available collections in the database
     const collections = await mongoose.connection.db.listCollections().toArray();
@@ -293,7 +305,99 @@ async function handleGetPublicRoute(req, res) {
     // Convert to JSON to apply the schema transformations
     const routeData = route.toJSON();
     
-    // Return the route document directly
+    // Get the UserData model
+    let UserData;
+    try {
+      UserData = mongoose.model('UserData');
+      console.log('[API] Successfully retrieved UserData model');
+    } catch (error) {
+      console.error('[API] Error getting UserData model:', error);
+      // Define a minimal schema if the model doesn't exist
+      const UserDataSchema = new mongoose.Schema({
+        userId: { type: String, required: true, unique: true, index: true },
+        name: String,
+        email: String
+      });
+      UserData = mongoose.model('UserData', UserDataSchema);
+    }
+    
+    // Look up the user information
+    let createdBy = null;
+    if (routeData.userId) {
+      try {
+        // First try to get user from MongoDB
+        const userData = await UserData.findOne({ userId: routeData.userId });
+        
+        // Log the route and user information for debugging
+        console.log(`[API][DEBUG] Route: ${routeData.name}, userId: ${routeData.userId}`);
+        
+        if (userData) {
+          createdBy = {
+            id: userData.userId,
+            name: userData.name || 'Anonymous'
+          };
+          console.log(`[API] Found user in MongoDB: ${userData.name} for route: ${routeData.name}`);
+        } else {
+          // If not found in MongoDB, try Auth0
+          console.log(`[API] User not found in MongoDB, trying Auth0: ${routeData.userId} for route: ${routeData.name}`);
+          const auth0User = await getUserInfo(routeData.userId);
+          
+          if (auth0User) {
+            createdBy = {
+              id: auth0User.id,
+              name: auth0User.name || 'Anonymous'
+            };
+            console.log(`[API] Found user in Auth0: ${auth0User.name} for route: ${routeData.name}`);
+          } else {
+            console.log(`[API] User not found in Auth0 either for route: ${routeData.name}`);
+            
+            // Create a user display name based on the userId
+            const parts = routeData.userId ? routeData.userId.split('|') : [];
+            if (parts.length === 2) {
+              const [provider, id] = parts;
+              if (provider === 'google-oauth2') {
+                createdBy = {
+                  id: routeData.userId,
+                  name: `Google User (${id.substring(0, 8)})`
+                };
+              } else if (provider === 'auth0') {
+                createdBy = {
+                  id: routeData.userId,
+                  name: `User ${id.substring(0, 8)}`
+                };
+              } else {
+                createdBy = {
+                  id: routeData.userId,
+                  name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User (${id.substring(0, 8)})`
+                };
+              }
+              console.log(`[API] Created display name from userId: ${createdBy.name} for route: ${routeData.name}`);
+            } else {
+              createdBy = { 
+                id: routeData.userId,
+                name: `User ${routeData.userId ? routeData.userId.substring(0, 8) : 'Anonymous'}`
+              };
+              console.log(`[API] Created generic display name: ${createdBy.name} for route: ${routeData.name}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[API] Error looking up user: ${error.message} for route: ${routeData.name}`);
+        // Default to Anonymous if there's an error
+        createdBy = { name: 'Anonymous' };
+      }
+    }
+    
+    // If we still don't have user info, default to Anonymous
+    if (!createdBy) {
+      createdBy = { name: 'Anonymous' };
+      console.log(`[API] Using default Anonymous for route: ${routeData.name}`);
+    }
+    
+    // Add the user information to the route data
+    routeData.createdBy = createdBy;
+    
+    // Return the route document with user info
     const publicRouteData = routeData;
     
     console.log('[API] Returning route data:', {
@@ -301,7 +405,8 @@ async function handleGetPublicRoute(req, res) {
       persistentId: routeData.persistentId,
       name: routeData.name,
       routeCount: routeData.routes?.length,
-      hasMapState: !!routeData.mapState
+      hasMapState: !!routeData.mapState,
+      createdBy: routeData.createdBy
     });
     
     // Cache the result - getCache/setCache functions already handle Redis errors internally
@@ -320,6 +425,9 @@ async function handleGetPublicRoute(req, res) {
   }
 }
 
+// Import the getUserInfo function from auth0.js
+import { getUserInfo } from '../../lib/auth0.js';
+
 // Handler for getting public routes
 async function handleGetPublicRoutes(req, res) {
   try {
@@ -333,30 +441,118 @@ async function handleGetPublicRoutes(req, res) {
     
     console.log(`[API] Listing public routes with filter:`, filter);
     
-    // Check cache first - getCache function already handles Redis errors internally
+    // Clear the cache to ensure we get fresh data
     const routesListCacheKey = `public-routes:${JSON.stringify(filter)}`;
-    const cachedRoutes = await getCache(routesListCacheKey);
-    
-    if (cachedRoutes) {
-      console.log(`[API] Found routes in cache`);
-      return res.status(200).json(cachedRoutes);
-    } else {
-      console.log(`[API] No cached routes found, fetching from database...`);
-    }
+    console.log(`[API] Clearing cache for key: ${routesListCacheKey}`);
+    await setCache(routesListCacheKey, null, 0);
+    console.log(`[API] Fetching fresh data from database...`);
     
     // Get routes from database
     const routes = await Route.find({ isPublic: true, ...filter })
-      .select('_id persistentId name type viewCount lastViewed createdAt updatedAt mapState routes pois photos')
+      .select('_id persistentId name type viewCount lastViewed createdAt updatedAt mapState routes pois photos userId metadata')
       .sort({ viewCount: -1, createdAt: -1 });
     
     console.log(`[API] Found ${routes.length} public routes`);
     
+    // Get the UserData model
+    let UserData;
+    try {
+      UserData = mongoose.model('UserData');
+      console.log('[API] Successfully retrieved UserData model');
+    } catch (error) {
+      console.error('[API] Error getting UserData model:', error);
+      // Define a minimal schema if the model doesn't exist
+      const UserDataSchema = new mongoose.Schema({
+        userId: { type: String, required: true, unique: true, index: true },
+        name: String,
+        email: String
+      });
+      UserData = mongoose.model('UserData', UserDataSchema);
+    }
+    
     // Format the response to match the Express server
     const response = {
-      routes: routes.map(route => {
+      routes: await Promise.all(routes.map(async route => {
         // Convert to JSON to apply the schema transformations
         const routeData = route.toJSON();
-        return {
+        
+        // Log metadata for debugging
+        console.log(`[API] Route ${routeData.name} metadata:`, routeData.metadata);
+        
+        // Look up the user information
+        let createdBy = null;
+        if (routeData.userId) {
+          try {
+            // First try to get user from MongoDB
+            const userData = await UserData.findOne({ userId: routeData.userId });
+            
+            // Log the route and user information for debugging
+            console.log(`[API][DEBUG] Route: ${routeData.name}, userId: ${routeData.userId}`);
+            
+            if (userData) {
+              createdBy = {
+                id: userData.userId,
+                name: userData.name || 'Anonymous'
+              };
+              console.log(`[API] Found user in MongoDB: ${userData.name} for route: ${routeData.name}`);
+            } else {
+              // If not found in MongoDB, try Auth0
+              console.log(`[API] User not found in MongoDB, trying Auth0: ${routeData.userId} for route: ${routeData.name}`);
+              const auth0User = await getUserInfo(routeData.userId);
+              
+              if (auth0User) {
+                createdBy = {
+                  id: auth0User.id,
+                  name: auth0User.name || 'Anonymous'
+                };
+                console.log(`[API] Found user in Auth0: ${auth0User.name} for route: ${routeData.name}`);
+              } else {
+                console.log(`[API] User not found in Auth0 either for route: ${routeData.name}`);
+                
+                // Create a user display name based on the userId
+                const parts = routeData.userId ? routeData.userId.split('|') : [];
+                if (parts.length === 2) {
+                  const [provider, id] = parts;
+                  if (provider === 'google-oauth2') {
+                    createdBy = {
+                      id: routeData.userId,
+                      name: `Google User (${id.substring(0, 8)})`
+                    };
+                  } else if (provider === 'auth0') {
+                    createdBy = {
+                      id: routeData.userId,
+                      name: `User ${id.substring(0, 8)}`
+                    };
+                  } else {
+                    createdBy = {
+                      id: routeData.userId,
+                      name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User (${id.substring(0, 8)})`
+                    };
+                  }
+                  console.log(`[API] Created display name from userId: ${createdBy.name} for route: ${routeData.name}`);
+                } else {
+                  createdBy = { 
+                    id: routeData.userId,
+                    name: `User ${routeData.userId ? routeData.userId.substring(0, 8) : 'Anonymous'}`
+                  };
+                  console.log(`[API] Created generic display name: ${createdBy.name} for route: ${routeData.name}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`[API] Error looking up user: ${error.message} for route: ${routeData.name}`);
+            // Default to Anonymous if there's an error
+            createdBy = { name: 'Anonymous' };
+          }
+        }
+        
+        // If we still don't have user info, default to Anonymous
+        if (!createdBy) {
+          createdBy = { name: 'Anonymous' };
+          console.log(`[API] Using default Anonymous for route: ${routeData.name}`);
+        }
+        
+        const responseRoute = {
           id: routeData.id,
           persistentId: routeData.persistentId,
           name: routeData.name,
@@ -369,9 +565,16 @@ async function handleGetPublicRoutes(req, res) {
           mapState: routeData.mapState || { center: [-42.8821, 147.3272], zoom: 8 }, // Default to Tasmania
           routes: routeData.routes || [],
           pois: routeData.pois || { draggable: [], places: [] },
-          photos: routeData.photos || []
+          photos: routeData.photos || [],
+          metadata: routeData.metadata || {}, // Include metadata for filtering
+          createdBy: createdBy // Add the user information
         };
-      })
+        
+        // Log the final route object to verify metadata is included
+        console.log(`[API] Route ${responseRoute.name} final metadata:`, responseRoute.metadata);
+        
+        return responseRoute;
+      }))
     };
     
     // Cache the result - setCache function already handles Redis errors internally

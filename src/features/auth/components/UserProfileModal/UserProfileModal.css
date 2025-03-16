@@ -1,0 +1,62 @@
+.user-profile-modal .MuiDialog-paper {
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+.user-profile-modal .MuiDialogTitle-root {
+  background-color: #2a2a2a;
+  padding: 16px 24px;
+}
+
+.user-profile-modal .MuiDialogContent-root {
+  padding: 24px;
+}
+
+.user-profile-modal .MuiDialogActions-root {
+  background-color: #2a2a2a;
+  padding: 16px 24px;
+}
+
+.user-profile-modal .MuiTextField-root {
+  margin-bottom: 16px;
+}
+
+.user-profile-modal .MuiInputBase-root {
+  color: #ffffff;
+}
+
+.user-profile-modal .MuiInputLabel-root {
+  color: #aaaaaa;
+}
+
+.user-profile-modal .MuiOutlinedInput-root {
+  border-color: #444444;
+}
+
+.user-profile-modal .MuiOutlinedInput-notchedOutline {
+  border-color: #444444;
+}
+
+.user-profile-modal .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #666666;
+}
+
+.user-profile-modal .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #ff4d4f;
+}
+
+.user-profile-modal .MuiFormHelperText-root {
+  color: #888888;
+}
+
+.user-profile-modal .MuiButton-contained {
+  background-color: #ff4d4f;
+}
+
+.user-profile-modal .MuiButton-contained:hover {
+  background-color: #ff6b6c;
+}
+
+.user-profile-modal .MuiTypography-colorTextSecondary {
+  color: #888888;
+}

@@ -33,7 +33,11 @@ export const Sidebar = (props) => {
                 return null;
         }
     }, [activeDrawer, handleUploadComplete, handleAddPOI, props.onDeleteRoute]);
-    return (_jsxs(_Fragment, { children: [_jsx(StyledDrawer, { variant: "permanent", children: _jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', height: '100%' }, children: [_jsx(SidebarListItems, { ...props, onUploadGpx: () => handleUploadGpx(), onAddPOI: () => handleAddPOI(), onAddPhotos: () => handleAddPhotos() }), _jsx(Auth0Login, {})] }) }), _jsxs(_Fragment, { children: [_jsx(NestedDrawer, { variant: "persistent", anchor: "left", open: isDrawerOpen, onClose: () => {
+    return (_jsxs(_Fragment, { children: [_jsx(StyledDrawer, { variant: "permanent", children: _jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', height: '100%' }, children: [_jsx(SidebarListItems, { ...props, onUploadGpx: () => handleUploadGpx(), onAddPOI: () => handleAddPOI(), onAddPhotos: () => handleAddPhotos() }), _jsx(Auth0Login, {})] }) }), _jsxs(_Fragment, { children: [_jsx(NestedDrawer, { 
+                        variant: "persistent", 
+                        anchor: "left", 
+                        open: isDrawerOpen, 
+                        onClose: () => {
                             switch (activeDrawer) {
                                 case 'gpx':
                                     handleUploadGpx();
@@ -45,5 +49,37 @@ export const Sidebar = (props) => {
                                     handleAddPhotos();
                                     break;
                             }
-                        }, children: activeDrawer === 'poi' ? (_jsx(POIDrawer, { isOpen: isDrawerOpen, onClose: () => handleAddPOI() })) : (activeDrawerContent) }), props.poiDetailsDrawer?.isOpen && (_jsx(NestedDrawer, { variant: "persistent", anchor: "left", open: props.poiDetailsDrawer.isOpen, onClose: props.poiDetailsDrawer.onClose, sx: { zIndex: 1300 }, children: _jsx(POIDetailsDrawer, { isOpen: props.poiDetailsDrawer.isOpen, onClose: props.poiDetailsDrawer.onClose, iconName: props.poiDetailsDrawer.iconName, category: props.poiDetailsDrawer.category, onSave: props.poiDetailsDrawer.onSave }) }))] })] }));
+                        },
+                        sx: {
+                            '& .MuiDrawer-paper': {
+                                top: '64px', // Position below the header
+                                height: 'calc(100% - 64px)', // Adjust height to account for header
+                                marginLeft: '56px', // Account for the sidebar width
+                                paddingTop: '0px' // Remove any top padding
+                            }
+                        },
+                        children: activeDrawer === 'poi' ? (_jsx(POIDrawer, { isOpen: isDrawerOpen, onClose: () => handleAddPOI() })) : (activeDrawerContent) }), 
+                        
+                        props.poiDetailsDrawer?.isOpen && (_jsx(NestedDrawer, { 
+                            variant: "persistent", 
+                            anchor: "left", 
+                            open: props.poiDetailsDrawer.isOpen, 
+                            onClose: props.poiDetailsDrawer.onClose, 
+                            sx: { 
+                                zIndex: 1300,
+                                '& .MuiDrawer-paper': {
+                                    top: '64px', // Position below the header
+                                    height: 'calc(100% - 64px)', // Adjust height to account for header
+                                    marginLeft: '320px', // Account for the sidebar width + POIDrawer width
+                                    paddingTop: '0px' // Remove any top padding
+                                }
+                            }, 
+                            children: _jsx(POIDetailsDrawer, { 
+                                isOpen: props.poiDetailsDrawer.isOpen, 
+                                onClose: props.poiDetailsDrawer.onClose, 
+                                iconName: props.poiDetailsDrawer.iconName, 
+                                category: props.poiDetailsDrawer.category, 
+                                onSave: props.poiDetailsDrawer.onSave 
+                            }) 
+                        }))] })] }));
 };

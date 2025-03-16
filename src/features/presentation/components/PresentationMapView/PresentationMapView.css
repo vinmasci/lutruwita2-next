@@ -27,27 +27,18 @@
 
 .map-container {
   width: 100%;
-  height: 100%;
-}
-
-.route-filename {
+  height: calc(100vh - 64px); /* Use viewport height instead */
   position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Fraunces', serif;
-  font-weight: 700;
-  font-size: 24px;
-  color: white;
-  text-shadow: 2px 2px 8px rgba(0, 0, 0, 1);
-  z-index: 1000;
+  top: 64px; /* Height of the AppBar */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1; /* Ensure it's below the header */
 }
 
-/* Position the title on mobile devices */
-@media only screen and (max-width: 650px) {
-  .route-filename {
-    left: 60%;
-  }
+/* Route filename heading - hidden since we now use the header */
+.route-filename {
+  display: none;
 }
 
 .elevation-container {

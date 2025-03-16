@@ -1,5 +1,6 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import React, { createContext, useContext, useEffect, useReducer, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useState, useMemo, useCallback } from 'react';
+import { useRouteContext } from '../../map/context/RouteContext';
 import { v4 as uuidv4 } from 'uuid';
 // Reducer
 const poiReducer = (state, action) => {
@@ -89,6 +90,22 @@ export const POIProvider = ({ children }) => {
     const [error, setError] = useState(null);
     const [poiMode, setPoiMode] = useState('none');
     const [visibleCategories, setVisibleCategories] = useState(Object.keys({}));
+    
+    // Get access to the RouteContext to notify it of POI changes
+    let routeContext;
+    try {
+        routeContext = useRouteContext();
+    } catch (error) {
+        // This is expected when the POIProvider is used outside of a RouteProvider
+        routeContext = null;
+    }
+    
+    // Function to notify RouteContext of POI changes
+    const notifyPOIChange = useCallback(() => {
+        if (routeContext) {
+            routeContext.setChangedSections(prev => ({...prev, pois: true}));
+        }
+    }, [routeContext]);
     const addPOI = async (poi) => {
         try {
             console.log('[POIContext] Adding POI with coordinates:', {
@@ -100,6 +117,9 @@ export const POIProvider = ({ children }) => {
             // Add POI to local state only
             dispatch({ type: 'ADD_POI', payload: { poi } });
             
+            // Notify RouteContext of POI changes
+            notifyPOIChange();
+            
             console.log('[POIContext] POI added to state with ID:', `temp-${uuidv4()}`);
         }
         catch (error) {
@@ -110,6 +130,9 @@ export const POIProvider = ({ children }) => {
     const removePOI = (id) => {
         try {
             dispatch({ type: 'REMOVE_POI', payload: id });
+            
+            // Notify RouteContext of POI changes
+            notifyPOIChange();
         }
         catch (error) {
             console.error('[POIContext] Error removing POI:', error);
@@ -119,6 +142,9 @@ export const POIProvider = ({ children }) => {
     const updatePOI = (id, updates) => {
         try {
             dispatch({ type: 'UPDATE_POI', payload: { id, updates } });
+            
+            // Notify RouteContext of POI changes
+            notifyPOIChange();
         }
         catch (error) {
             console.error('[POIContext] Error updating POI:', error);
@@ -128,6 +154,9 @@ export const POIProvider = ({ children }) => {
     const updatePOIPosition = (id, coordinates) => {
         try {
             dispatch({ type: 'UPDATE_POSITION', payload: { id, coordinates } });
+            
+            // Notify RouteContext of POI changes
+            notifyPOIChange();
         }
         catch (error) {
             console.error('[POIContext] Error updating POI position:', error);
@@ -174,6 +203,9 @@ export const POIProvider = ({ children }) => {
             ];
             // Replace existing POIs entirely
             dispatch({ type: 'LOAD_POIS', payload: newPOIs });
+            
+            // Don't notify RouteContext when loading POIs from route
+            // as this is not a user-initiated change
         }
         catch (error) {
             console.error('[POIContext] Error loading POIs:', error);
@@ -185,6 +217,10 @@ export const POIProvider = ({ children }) => {
         try {
             // Clear all POIs by loading an empty array
             dispatch({ type: 'LOAD_POIS', payload: [] });
+            
+            // Notify RouteContext of POI changes
+            notifyPOIChange();
+            
             console.log('[POIContext] All POIs cleared');
         }
         catch (error) {

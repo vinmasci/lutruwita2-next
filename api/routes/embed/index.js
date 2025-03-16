@@ -266,11 +266,13 @@ async function handleGetRouteForEmbed(req, res) {
       photos: route.photos || [],
       elevation: route.routes.map(r => r.surface?.elevationProfile || []),
       description: route.description, // Include the top-level description field
+      headerSettings: route.headerSettings, // Include the header settings
       _type: 'loaded',
       _loadedState: {
         name: route.name,
         pois: route.pois || { draggable: [], places: [] },
-        photos: route.photos || []
+        photos: route.photos || [],
+        headerSettings: route.headerSettings // Include header settings in _loadedState too
       }
     };
     

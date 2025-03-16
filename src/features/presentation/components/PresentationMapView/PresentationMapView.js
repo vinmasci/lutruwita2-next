@@ -7,8 +7,10 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import StyleControl, { MAP_STYLES } from '../StyleControl';
 import PitchControl from '../../../map/components/PitchControl/PitchControl';
 import { useRouteContext } from '../../../map/context/RouteContext';
+import MapHeader from '../../../map/components/MapHeader/MapHeader';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { RouteLayer } from '../../../map/components/RouteLayer';
+import { ClimbMarkers } from '../../../map/components/ClimbMarkers/ClimbMarkers';
 import { PresentationSidebar } from '../PresentationSidebar';
 import { PresentationElevationProfilePanel } from '../ElevationProfile/PresentationElevationProfilePanel';
 import { PresentationPOILayer } from '../POILayer/PresentationPOILayer';
@@ -23,7 +25,7 @@ export default function PresentationMapView() {
     const mapInstance = useRef(null);
     const containerRef = useRef(null);
     const [isMapReady, setIsMapReady] = useState(false);
-    const { currentRoute, routes, currentLoadedState } = useRouteContext();
+    const { currentRoute, routes, currentLoadedState, headerSettings } = useRouteContext();
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
     const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
@@ -346,7 +348,7 @@ export default function PresentationMapView() {
             
             
             // Define a threshold distance - only show marker when close to the route
-            const distanceThreshold = 0.0009; // Approximately 100m at the equator
+            const distanceThreshold = 0.0045; // Approximately 500m at the equator
             
             // If we found a closest point on the active route and it's within the threshold
             if (closestPoint && minDistance < distanceThreshold) {
@@ -435,6 +437,12 @@ export default function PresentationMapView() {
         setPoiPlacementMode: () => { }
     }), [isMapReady, hoverCoordinates]);
     return (_jsx(MapProvider, { value: mapContextValue, children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
+                _jsx(MapHeader, { 
+                    title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
+                    color: headerSettings?.color || '#333333',
+                    logoUrl: headerSettings?.logoUrl,
+                    username: headerSettings?.username
+                }),
                 _jsx(PresentationSidebar, { 
                     isOpen: true,
                     isDistanceMarkersVisible: isDistanceMarkersVisible,
@@ -474,7 +482,7 @@ export default function PresentationMapView() {
                 _jsx(PresentationPhotoLayer, {}),
                 currentRoute && (_jsxs(_Fragment, { children: [
                     isDistanceMarkersVisible && _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),
-                    _jsx("div", { className: "route-filename", children: currentRoute._loadedState?.name || currentRoute.name || "Unnamed Route" })
+                    _jsx(ClimbMarkers, { map: mapInstance.current, route: currentRoute })
                 ] })),
                 currentRoute && (_jsx("div", { className: "elevation-container", children: _jsx(PresentationElevationProfilePanel, { route: currentRoute }) }))
             ] }))

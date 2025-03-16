@@ -9,10 +9,119 @@ import { usePhotoContext } from "../../photo/context/PhotoContext";
 import { usePhotoService } from "../../photo/services/photoService";
 import { usePlaceContext } from "../../place/context/PlaceContext";
 import { normalizeRoute } from "../utils/routeUtils";
+import { getRouteLocationData } from "../../../utils/geocoding";
+import { getRouteDistance, getUnpavedPercentage, getElevationGain } from "../../gpx/utils/routeUtils";
 import { AuthAlert } from "@/features/auth/components/AuthAlert/AuthAlert";
 // Type guard to check if a route is a LoadedRoute
 const isLoadedRoute = (route) => {
     return route._type === 'loaded';
+};
+
+// Function to calculate route summary data
+const calculateRouteSummary = (routes) => {
+    if (!routes || routes.length === 0) return null;
+
+    // Initialize summary data
+    let totalDistance = 0;
+    let totalAscent = 0;
+    let totalUnpavedDistance = 0;
+    let totalRouteDistance = 0;
+    let isLoop = true;
+    const countries = new Set(['Australia']); // Default country
+    const states = new Set();
+    const lgas = new Set();
+
+    // Variables to store first and last points for overall loop check
+    let firstRouteStart = null;
+    let lastRouteEnd = null;
+
+    // Calculate totals from all routes
+    routes.forEach((route, index) => {
+        // Distance
+        const distance = getRouteDistance(route);
+        totalDistance += distance;
+        totalRouteDistance += distance;
+
+        // Elevation
+        const ascent = getElevationGain(route);
+        totalAscent += ascent;
+
+        // Unpaved sections
+        const unpavedPercentage = getUnpavedPercentage(route);
+        totalUnpavedDistance += (distance * unpavedPercentage / 100);
+
+        // Get coordinates for loop check
+        if (route.geojson?.features?.[0]?.geometry?.coordinates) {
+            const coordinates = route.geojson.features[0].geometry.coordinates;
+            if (coordinates.length > 1) {
+                // Store first route's start point
+                if (index === 0) {
+                    firstRouteStart = coordinates[0];
+                }
+                
+                // Store last route's end point
+                if (index === routes.length - 1) {
+                    lastRouteEnd = coordinates[coordinates.length - 1];
+                }
+                
+                // Individual route loop check
+                const start = coordinates[0];
+                const end = coordinates[coordinates.length - 1];
+                
+                // Calculate distance between start and end points
+                const dx = (end[0] - start[0]) * Math.cos((start[1] + end[1]) / 2 * Math.PI / 180);
+                const dy = end[1] - start[1];
+                const distance = Math.sqrt(dx * dx + dy * dy) * 111.32 * 1000; // approx meters
+                
+                // Check if this individual route is a loop (using 5km threshold)
+                const isRouteLoop = distance < 5000;
+                
+                // For a single route, set isLoop based on this route's loop status
+                if (routes.length === 1) {
+                    isLoop = isRouteLoop;
+                } 
+                // For multiple routes, only set isLoop to false if this route isn't a loop
+                // (we'll check multi-route loops later)
+                else if (!isRouteLoop) {
+                    isLoop = false;
+                }
+            }
+        }
+
+        // Location data
+        if (route.metadata) {
+            if (route.metadata.country) countries.add(route.metadata.country);
+            if (route.metadata.state) states.add(route.metadata.state);
+            if (route.metadata.lga) lgas.add(route.metadata.lga);
+        }
+    });
+
+    // Check if the entire collection forms a loop (first route start connects to last route end)
+    if (!isLoop && firstRouteStart && lastRouteEnd && routes.length > 1) {
+        const dx = (lastRouteEnd[0] - firstRouteStart[0]) * Math.cos((firstRouteStart[1] + lastRouteEnd[1]) / 2 * Math.PI / 180);
+        const dy = lastRouteEnd[1] - firstRouteStart[1];
+        const distance = Math.sqrt(dx * dx + dy * dy) * 111.32 * 1000; // approx meters
+        
+        // If the distance between first route start and last route end is small enough (within 5km), it's a loop
+        if (distance < 5000) {
+            isLoop = true;
+        }
+    }
+
+    // Calculate unpaved percentage
+    const unpavedPercentage = totalRouteDistance > 0 
+        ? Math.round((totalUnpavedDistance / totalRouteDistance) * 100) 
+        : 0;
+
+    return {
+        totalDistance: Math.round(totalDistance / 1000 * 10) / 10, // Convert to km with 1 decimal
+        totalAscent: Math.round(totalAscent),
+        unpavedPercentage,
+        isLoop,
+        countries: Array.from(countries),
+        states: Array.from(states),
+        lgas: Array.from(lgas)
+    };
 };
 const RouteContext = createContext(null);
 export const RouteProvider = ({ children, }) => {
@@ -46,7 +155,16 @@ export const RouteProvider = ({ children, }) => {
     const [currentLoadedState, setCurrentLoadedState] = useState(null);
     const [currentLoadedPersistentId, setCurrentLoadedPersistentId] = useState(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [changedSections, setChangedSections] = useState({});
     const [pendingRouteBounds, setPendingRouteBounds] = useState(null);
+    const [headerSettings, setHeaderSettings] = useState({
+        color: '#000000',
+        logoUrl: null,
+        username: '',
+        logoFile: null,
+        logoData: null,
+        logoBlob: null
+    });
 
     const reorderRoutes = useCallback((oldIndex, newIndex) => {
         setRoutes(prev => {
@@ -61,6 +179,7 @@ export const RouteProvider = ({ children, }) => {
             }));
         });
         setHasUnsavedChanges(true);
+        setChangedSections(prev => ({...prev, routes: true}));
     }, []);
 
     // Update route properties
@@ -75,6 +194,19 @@ export const RouteProvider = ({ children, }) => {
             return route;
         }));
         setHasUnsavedChanges(true);
+        
+        // Track specific changes
+        const changedSectionUpdates = {};
+        
+        // Check if description was updated
+        if (updates.description) {
+            changedSectionUpdates.description = true;
+        } else {
+            // Only mark routes as changed if it's not just a description update
+            changedSectionUpdates.routes = true;
+        }
+        
+        setChangedSections(prev => ({...prev, ...changedSectionUpdates}));
     }, []);
     // Context hooks
     const routeService = useRouteService();
@@ -124,6 +256,86 @@ export const RouteProvider = ({ children, }) => {
       
       return updatedPhotos;
     };
+    
+    // Helper function to upload logo to Cloudinary
+    const uploadLogoToCloudinary = async () => {
+      // Check if we have a logo file to upload
+      if (!headerSettings.logoFile && !headerSettings.logoData) {
+        return headerSettings.logoUrl;
+      }
+      
+      try {
+        console.log('[RouteContext] Uploading logo to Cloudinary');
+        
+        // Use axios to upload directly to Cloudinary
+        const formData = new FormData();
+        
+        // Use the file from logoData if available, otherwise use logoFile
+        const fileToUpload = headerSettings.logoData?._blobs?.original || 
+                            headerSettings.logoData?.file || 
+                            headerSettings.logoFile;
+        
+        if (!fileToUpload) {
+          console.warn('[RouteContext] No logo file found to upload');
+          return headerSettings.logoUrl;
+        }
+        
+        // Prepare the form data
+        formData.append('file', fileToUpload);
+        formData.append('upload_preset', 'map_logos'); // Make sure this preset exists in Cloudinary
+        
+        // Upload directly to Cloudinary
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+          {
+            method: 'POST',
+            body: formData
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Upload failed with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const logoUrl = data.secure_url;
+        
+        console.log('[RouteContext] Logo uploaded successfully:', logoUrl);
+        return logoUrl;
+      } catch (error) {
+        console.error('[RouteContext] Error uploading logo to Cloudinary:', error);
+        // Return the existing URL if upload fails
+        return headerSettings.logoUrl;
+      }
+    };
+    // Function to update route metadata
+    const updateRouteMetadata = useCallback(async (route) => {
+        if (!route) return route;
+        
+        try {
+            // Use the Nominatim API to get location data
+            const locationData = await getRouteLocationData(route);
+            
+            // Create metadata object if it doesn't exist
+            if (!route.metadata) route.metadata = {};
+            
+            // Update metadata with location information
+            route.metadata.country = locationData.country || route.metadata.country || 'Australia';
+            route.metadata.state = locationData.state || route.metadata.state || '';
+            route.metadata.lga = locationData.lga || route.metadata.lga || '';
+            
+            console.log('[RouteContext] Updated route metadata:', route.metadata);
+            
+            // Update the route in the context
+            updateRoute(route.routeId || route.id, { metadata: route.metadata });
+            
+            return route;
+        } catch (error) {
+            console.error('[RouteContext] Error updating route with location data:', error);
+            return route;
+        }
+    }, []);
+
     const addRoute = useCallback((route) => {
         setRoutes((prev) => {
             // Process the new route
@@ -139,10 +351,17 @@ export const RouteProvider = ({ children, }) => {
             const existingRoutes = prev.filter(r => r.routeId !== route.routeId);
             // Add the new route
             const updatedRoutes = [...existingRoutes, processedRoute];
+            
+            // Update route metadata in the background
+            updateRouteMetadata(processedRoute).catch(error => {
+                console.error('[RouteContext] Error in route metadata update:', error);
+            });
+            
             return updatedRoutes;
         });
         setHasUnsavedChanges(true);
-    }, [currentLoadedState]);
+        setChangedSections(prev => ({...prev, routes: true}));
+    }, [currentLoadedState, updateRouteMetadata]);
     const deleteRoute = useCallback((routeId) => {
         // Clean up map layers first if we have access to the map
         if (map) {
@@ -182,6 +401,7 @@ export const RouteProvider = ({ children, }) => {
         setRoutes((prev) => prev.filter((route) => route.routeId !== routeId));
         setCurrentRoute((prev) => prev?.routeId === routeId ? null : prev);
         setHasUnsavedChanges(true);
+        setChangedSections(prev => ({...prev, routes: true}));
     }, [map]);
     // Clear current work
     const clearCurrentWork = useCallback(() => {
@@ -277,6 +497,14 @@ export const RouteProvider = ({ children, }) => {
         setCurrentLoadedPersistentId(null);
         setHasUnsavedChanges(false);
         setIsLoadedMap(false);
+        setHeaderSettings({
+            color: '#000000',
+            logoUrl: null,
+            username: '',
+            logoFile: null,
+            logoData: null,
+            logoBlob: null
+        });
     }, [map, routes]);
     // Save current state to backend
     const roundCoordinate = (value) => {
@@ -304,6 +532,8 @@ export const RouteProvider = ({ children, }) => {
             // Upload any local photos to Cloudinary before saving
             console.log('[RouteContext] Checking for local photos to upload...');
             let updatedPhotos = photos;
+            let hasPhotoChanges = changedSections.photos || false;
+            
             try {
                 // Check if there are any local photos that need to be uploaded
                 const localPhotos = photos.filter(p => p.isLocal === true);
@@ -311,6 +541,7 @@ export const RouteProvider = ({ children, }) => {
                     console.log(`[RouteContext] Found ${localPhotos.length} local photos to upload`);
                     // Upload local photos to Cloudinary
                     updatedPhotos = await uploadPhotosToCloudinary();
+                    hasPhotoChanges = true;
                 } else {
                     console.log('[RouteContext] No local photos to upload');
                 }
@@ -318,13 +549,49 @@ export const RouteProvider = ({ children, }) => {
                 console.error('[RouteContext] Error uploading photos:', photoError);
                 // Continue with save even if photo upload fails
             }
-            const routeState = {
+            
+            // Upload logo to Cloudinary if present
+            let updatedHeaderSettings = { ...headerSettings };
+            let hasHeaderChanges = changedSections.headerSettings || false;
+            
+            try {
+                if (headerSettings.logoFile || headerSettings.logoData) {
+                    console.log('[RouteContext] Uploading logo to Cloudinary');
+                    const logoUrl = await uploadLogoToCloudinary();
+                    updatedHeaderSettings = {
+                        ...headerSettings,
+                        logoUrl: logoUrl,
+                        logoFile: null, // Remove the file object after upload
+                        logoData: null  // Remove the logo data object after upload
+                    };
+                    console.log('[RouteContext] Logo uploaded successfully:', logoUrl);
+                    hasHeaderChanges = true;
+                }
+            } catch (logoError) {
+                console.error('[RouteContext] Error uploading logo:', logoError);
+                // Continue with save even if logo upload fails
+            }
+            
+            // Prepare the base route state with required fields
+            const baseRouteState = {
                 id: "", // Will be set by backend
                 persistentId: currentLoadedPersistentId || "", // Will be set by backend for new routes
                 name,
                 type,
-                isPublic,
-                mapState: map ? {
+                isPublic
+            };
+            
+            // Create a partial update with only changed sections
+            const partialUpdate = { ...baseRouteState };
+            
+            // Calculate route summary for metadata
+            const routeSummary = calculateRouteSummary(routes);
+            console.log('[RouteContext] Calculated route summary for save:', routeSummary);
+            partialUpdate.routeSummary = routeSummary;
+            
+            // Add map state if it's changed or this is a new route
+            if (changedSections.mapState || !currentLoadedPersistentId) {
+                partialUpdate.mapState = map ? {
                     zoom: map.getZoom(),
                     center: [map.getCenter().lng, map.getCenter().lat],
                     bearing: map.getBearing(),
@@ -340,32 +607,87 @@ export const RouteProvider = ({ children, }) => {
                     padding: { top: 0, bottom: 0, left: 0, right: 0 },
                     bbox: [-180, -90, 180, 90],
                     style: 'default'
-                },
-                routes: routes.map(roundRouteCoordinates),
-                photos: updatedPhotos,
-                pois,
-            };
+                };
+            }
+            
+            // Add routes if they've changed or this is a new route
+            if (changedSections.routes || !currentLoadedPersistentId) {
+                partialUpdate.routes = routes.map(roundRouteCoordinates);
+            }
+            
+            // Add description if it's changed specifically
+            if (changedSections.description && currentLoadedPersistentId) {
+                // Find the current route with description
+                const routeWithDescription = routes.find(r => r.description);
+                if (routeWithDescription) {
+                    partialUpdate.description = routeWithDescription.description;
+                    console.log('[RouteContext] Adding description to partial update');
+                }
+            }
+            
+            // Add photos if they've changed or this is a new route
+            if (hasPhotoChanges || !currentLoadedPersistentId) {
+                partialUpdate.photos = updatedPhotos;
+            }
+            
+            // Add POIs if they've changed or this is a new route
+            if (changedSections.pois || !currentLoadedPersistentId) {
+                partialUpdate.pois = pois;
+            }
+            
+            // Add header settings if they've changed or this is a new route
+            if (hasHeaderChanges || !currentLoadedPersistentId) {
+                partialUpdate.headerSettings = updatedHeaderSettings;
+            }
+            
+            // For a new route, we need to include everything
+            if (!currentLoadedPersistentId) {
+                console.log('[RouteContext] New route - sending complete data');
+                // This is a new route, so we need to send everything
+                partialUpdate.routes = routes.map(roundRouteCoordinates);
+                partialUpdate.photos = updatedPhotos;
+                partialUpdate.pois = pois;
+                partialUpdate.headerSettings = updatedHeaderSettings;
+            } else {
+                console.log('[RouteContext] Existing route - sending only changed sections:', 
+                    Object.keys(partialUpdate).filter(k => k !== 'id' && k !== 'persistentId' && k !== 'name' && k !== 'type' && k !== 'isPublic'));
+            }
+            
             let result;
             if (currentLoadedPersistentId) {
                 // This is an update to an existing route
-                result = await routeService.saveRoute(routeState);
-                setCurrentLoadedState(routeState);
+                result = await routeService.saveRoute(partialUpdate);
+                
+                // Update the current loaded state with the changes
+                const updatedState = { ...currentLoadedState, ...partialUpdate };
+                setCurrentLoadedState(updatedState);
             }
             else {
                 // This is a new route
-                result = await routeService.saveRoute(routeState);
+                result = await routeService.saveRoute(partialUpdate);
                 setCurrentLoadedPersistentId(result.persistentId);
+                
+                // For a new route, the complete state is what we just saved
+                setCurrentLoadedState(partialUpdate);
             }
             // Update the existing routes array in place if this was an update
             if (currentLoadedPersistentId) {
                 setRoutes(prevRoutes => prevRoutes.map(route => {
                     if (isLoadedRoute(route) && route._loadedState?.persistentId === currentLoadedPersistentId) {
+                        const updatedLoadedState = { ...route._loadedState };
+                        
+                        // Update only the changed parts of _loadedState
+                        if (partialUpdate.mapState) updatedLoadedState.mapState = partialUpdate.mapState;
+                        if (partialUpdate.routes) updatedLoadedState.routes = partialUpdate.routes;
+                        if (partialUpdate.photos) updatedLoadedState.photos = partialUpdate.photos;
+                        if (partialUpdate.pois) updatedLoadedState.pois = partialUpdate.pois;
+                        if (partialUpdate.headerSettings) updatedLoadedState.headerSettings = partialUpdate.headerSettings;
+                        
                         return {
                             ...route,
                             _type: 'loaded',
                             _loadedState: {
-                                ...currentLoadedState,
-                                ...routeState,
+                                ...updatedLoadedState,
                                 persistentId: currentLoadedPersistentId
                             }
                         };
@@ -373,6 +695,14 @@ export const RouteProvider = ({ children, }) => {
                     return route;
                 }));
             }
+            
+            // Update header settings state with the Cloudinary URL
+            if (headerSettings.logoFile || headerSettings.logoData) {
+                setHeaderSettings(updatedHeaderSettings);
+            }
+            
+            // Reset changed sections tracking
+            setChangedSections({});
             setHasUnsavedChanges(false);
             await listRoutes();
         }
@@ -429,6 +759,13 @@ export const RouteProvider = ({ children, }) => {
             else {
                 setCurrentRouteWithDebug(null);
             }
+            
+            // Update route metadata for all loaded routes
+            loadedRoutes.forEach(loadedRoute => {
+                updateRouteMetadata(loadedRoute).catch(error => {
+                    console.error('[RouteContext] Error in route metadata update:', error);
+                });
+            });
                         // Instead of immediately trying to position the map, store the route bounds for later use
             console.log('[RouteContext] Preparing route bounds for deferred positioning');
             
@@ -512,6 +849,11 @@ export const RouteProvider = ({ children, }) => {
                     await updatePlace(place.id, place);
                 }
             }
+            
+            // Load header settings if available
+            if (route.headerSettings) {
+                setHeaderSettings(route.headerSettings);
+            }
         }
         catch (error) {
             console.error("Failed to load route:", error);
@@ -525,9 +867,10 @@ export const RouteProvider = ({ children, }) => {
         }
     }, [routeService, map, addPhoto, loadPOIsFromRoute, updatePlace, setCurrentRouteWithDebug, handleAuthError]);
     // List saved routes
-    const listRoutes = useCallback(async (filters) => {
+    const listRoutes = useCallback(async (filters, metadataOnly = true) => {
         try {
-            const { routes } = await routeService.listRoutes(filters);
+            console.log(`[RouteContext] Listing routes with metadataOnly=${metadataOnly}`);
+            const { routes } = await routeService.listRoutes(filters, metadataOnly);
             setSavedRoutes(routes);
         }
         catch (error) {
@@ -633,6 +976,8 @@ export const RouteProvider = ({ children, }) => {
                     currentLoadedState,
                     currentLoadedPersistentId,
                     hasUnsavedChanges,
+                    // Change tracking
+                    setChangedSections,
                     // Save/Load operations
                     saveCurrentState,
                     loadRoute,
@@ -640,6 +985,26 @@ export const RouteProvider = ({ children, }) => {
                     deleteSavedRoute,
                     clearCurrentWork,
                     pendingRouteBounds,
+                    // Header settings
+                    headerSettings,
+                    updateHeaderSettings: (settings) => {
+                        console.log('Updating header settings in RouteContext:', settings);
+                        
+                        // Create a new blob URL if we have a blob but no URL
+                        let newSettings = { ...headerSettings, ...settings };
+                        
+                        if (newSettings.logoBlob && !newSettings.logoUrl) {
+                            // Create a new URL from the blob
+                            const blobUrl = URL.createObjectURL(newSettings.logoBlob);
+                            console.log('Created new blob URL for logo:', blobUrl);
+                            newSettings.logoUrl = blobUrl;
+                        }
+                        
+                        console.log('New header settings:', newSettings);
+                        setHeaderSettings(newSettings);
+                        setHasUnsavedChanges(true);
+                        setChangedSections(prev => ({...prev, headerSettings: true}));
+                    },
                 }, children: children })] }));
 };
 export const useRouteContext = () => {

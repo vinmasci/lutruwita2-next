@@ -17,9 +17,13 @@ const TURN_ANGLE_THRESHOLD = 45; // Increased for sharper turns
 const MIN_SEGMENT_LENGTH = 3; // Reduced for shorter segments
 const DEFAULT_QUERY_BOX = 10; // Reduced default query box
 const JUNCTION_QUERY_BOX = 5; // Reduced junction query box
-const RETRY_DELAY = 50; // Reduced delay between retries for faster processing
+const RETRY_DELAY = 5; // Reduced delay between retries for faster processing
 const MAX_RETRIES = 10; // Reduced retries - will use previous point's surface if failed
 const BATCH_SIZE = 10; // Process points in batches
+
+// Constants for surface smoothing
+const SMOOTHING_WINDOW_SIZE = 5; // Number of points to consider (current point + points on each side)
+const SMOOTHING_THRESHOLD = 0.6; // Percentage of points in window that must be unpaved to keep a point as unpaved
 // Helper to convert [lon, lat] array to LngLatLike object with validation
 const toLngLat = (coord) => {
     if (!coord || coord.length !== 2 || !isFinite(coord[0]) || !isFinite(coord[1])) {
@@ -201,6 +205,128 @@ const findNearestRoad = (map, point) => {
     }
     return null;
 };
+// Helper function to normalize surface types to just "paved" or "unpaved"
+const normalizeSurfaceType = (surface) => {
+    if (!surface) return null;
+    
+    const surfaceLower = surface.toLowerCase();
+    
+    if (PAVED_SURFACES.includes(surfaceLower)) {
+        return 'paved';
+    } else if (UNPAVED_SURFACES.includes(surfaceLower) || 
+               ['track', 'trail'].includes(surfaceLower)) {
+        return 'unpaved';
+    }
+    
+    return surface; // Keep original if not recognized
+};
+
+// Helper function to smooth surface detection by looking at surrounding points
+const smoothSurfaceDetection = (processedPoints) => {
+    if (!processedPoints || processedPoints.length < SMOOTHING_WINDOW_SIZE) {
+        return processedPoints;
+    }
+    
+    const result = [...processedPoints]; // Create a copy to avoid modifying the original
+    const halfWindow = Math.floor(SMOOTHING_WINDOW_SIZE / 2);
+    
+    // For each point
+    for (let i = 0; i < result.length; i++) {
+        // Skip if the point is not unpaved
+        if (result[i].surface !== 'unpaved' && 
+            !UNPAVED_SURFACES.includes(result[i].surface?.toLowerCase()) &&
+            !['track', 'trail'].includes(result[i].surface?.toLowerCase())) {
+            continue;
+        }
+        
+        // Count unpaved points in the window
+        let unpavedCount = 0;
+        let windowSize = 0;
+        
+        // Look at points in the window
+        for (let j = Math.max(0, i - halfWindow); j <= Math.min(result.length - 1, i + halfWindow); j++) {
+            windowSize++;
+            
+            if (result[j].surface === 'unpaved' || 
+                UNPAVED_SURFACES.includes(result[j].surface?.toLowerCase()) ||
+                ['track', 'trail'].includes(result[j].surface?.toLowerCase())) {
+                unpavedCount++;
+            }
+        }
+        
+        // If the percentage of unpaved points is below the threshold, convert to paved
+        if (unpavedCount / windowSize < SMOOTHING_THRESHOLD) {
+            console.log(`[Surface Smoothing] Converting point at index ${i} from unpaved to paved (${unpavedCount}/${windowSize} unpaved points in window)`);
+            result[i].surface = 'paved';
+        }
+    }
+    
+    return result;
+};
+
+// Helper function to fill in gaps in surface detection
+const fillSurfaceGaps = (processedPoints) => {
+    if (!processedPoints || processedPoints.length < 3) return processedPoints;
+    
+    const result = [...processedPoints]; // Create a copy to avoid modifying the original
+    
+    let startIndex = 0;
+    let knownCategory = null; // 'paved' or 'unpaved'
+    
+    // First pass: normalize all surface types to 'paved' or 'unpaved'
+    for (let i = 0; i < result.length; i++) {
+        const currentSurface = result[i].surface;
+        if (currentSurface) {
+            const normalizedType = normalizeSurfaceType(currentSurface);
+            // Only update if it's one of our two main categories
+            if (normalizedType === 'paved' || normalizedType === 'unpaved') {
+                result[i].normalizedSurface = normalizedType;
+            }
+        }
+    }
+    
+    // Second pass: fill in gaps between sections with the same category
+    for (let i = 0; i < result.length; i++) {
+        const currentCategory = result[i].normalizedSurface;
+        
+        if (currentCategory === 'paved' || currentCategory === 'unpaved') {
+            if (knownCategory === null) {
+                // Start of a new section
+                knownCategory = currentCategory;
+                startIndex = i;
+            } else if (knownCategory === currentCategory) {
+                // End of a section with the same category
+                // Fill in any unknown surfaces in between
+                if (i - startIndex > 1) {
+                    console.log(`[Surface Detection] Filling gap from index ${startIndex} to ${i} with surface category: ${knownCategory}`);
+                    
+                    for (let j = startIndex + 1; j < i; j++) {
+                        // Only fill in unknown surfaces
+                        if (!result[j].surface) {
+                            result[j].surface = knownCategory;
+                            result[j].normalizedSurface = knownCategory;
+                        }
+                    }
+                }
+                
+                // Update start for next potential section
+                startIndex = i;
+            } else {
+                // Different category - start a new section
+                knownCategory = currentCategory;
+                startIndex = i;
+            }
+        }
+    }
+    
+    // Clean up temporary property
+    for (let i = 0; i < result.length; i++) {
+        delete result[i].normalizedSurface;
+    }
+    
+    return result;
+};
+
 // Core surface detection function that processes points one at a time
 export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
     console.log('[assignSurfacesViaNearest] Starting surface detection...');
@@ -267,7 +393,7 @@ export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
         const road = findNearestRoad(map, [pt.lon, pt.lat]);
         cachedRoads = road ? [road] : null;
         // Process the point
-        let bestSurface = 'unpaved';
+        let bestSurface = 'paved'; // Default to paved
         let minDist = Infinity;
         if (i % 100 === 0) {
             console.log(`[assignSurfacesViaNearest] Processing point #${i}, coords=(${pt.lat}, ${pt.lon})`);
@@ -277,7 +403,7 @@ export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
             const previousPoint = results[results.length - 1];
             results.push({
                 ...pt,
-                surface: previousPoint ? previousPoint.surface : 'unpaved'
+                surface: previousPoint ? previousPoint.surface : 'paved' // Default to paved when no roads found
             });
         }
         else {
@@ -321,8 +447,13 @@ export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
                     else if (UNPAVED_SURFACES.includes(surfaceRaw)) {
                         bestSurface = 'unpaved';
                     }
+                    else if (['track', 'trail'].includes(road.properties?.highway)) {
+                        // Tracks and trails are almost always unpaved
+                        bestSurface = 'unpaved';
+                        console.log(`[Surface Detection] Using highway type '${road.properties?.highway}' to determine surface as unpaved`);
+                    }
                     else {
-                        bestSurface = 'unpaved'; // fallback for unknown surfaces
+                        bestSurface = 'paved'; // fallback for unknown surfaces
                     }
                 }
             }
@@ -331,8 +462,18 @@ export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
         // Clear roads cache after each point
         cachedRoads = null;
     }
+    console.log('[assignSurfacesViaNearest] => Finished initial processing. Filling gaps...');
+    
+    // Apply gap filling to improve surface detection
+    const gapFilledResults = fillSurfaceGaps(results);
+    
+    console.log('[assignSurfacesViaNearest] => Gap filling complete. Applying smoothing...');
+    
+    // Apply smoothing to eliminate false positives at intersections
+    const smoothedResults = smoothSurfaceDetection(gapFilledResults);
+    
     console.log('[assignSurfacesViaNearest] => Finished processing. Returning coords...');
-    return results;
+    return smoothedResults;
 };
 // Add surface detection overlay
 export const addSurfaceOverlay = async (map, routeFeature) => {
@@ -345,14 +486,17 @@ export const addSurfaceOverlay = async (map, routeFeature) => {
             lon: coord[0],
             lat: coord[1]
         }));
-        // Process points with surface detection
-        const processedPoints = await assignSurfacesViaNearest(map, points);
+        // Process points with surface detection and gap filling
+        let processedPoints = await assignSurfacesViaNearest(map, points);
         // Create sections based on surface changes
         const sections = [];
         let currentSection = null;
         for (let i = 0; i < processedPoints.length; i++) {
             const point = processedPoints[i];
-            if (point.surface === 'unpaved') {
+            // Check if the point has an unpaved surface (including specific types like dirt)
+            if (point.surface === 'unpaved' || 
+                UNPAVED_SURFACES.includes(point.surface?.toLowerCase()) ||
+                ['track', 'trail'].includes(point.surface?.toLowerCase())) {
                 if (!currentSection) {
                     currentSection = {
                         startIndex: i,

@@ -2,6 +2,8 @@ import { createApiHandler } from '../lib/middleware.js';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '../lib/db.js';
 import { deleteFile, uploadJsonData } from '../lib/cloudinary.js';
+import { getCache, setCache, deleteCache } from '../lib/redis.js';
+import { decompressData, isCompressedData } from '../lib/compression.js';
 
 // Define Route schema to match the original structure
 const RouteSchema = new mongoose.Schema({
@@ -15,6 +17,13 @@ const RouteSchema = new mongoose.Schema({
   lastViewed: { type: Date },
   publicId: { type: String, index: true, sparse: true },
   embedUrl: { type: String }, // URL to the pre-processed embed data in Cloudinary
+  
+  // Header settings
+  headerSettings: {
+    color: { type: String },
+    logoUrl: { type: String },
+    username: { type: String }
+  },
   
   // Map state
   mapState: {
@@ -122,6 +131,13 @@ const RouteSchema = new mongoose.Schema({
     tags: { type: [String], default: [] },
     difficulty: String,
     season: String,
+    country: { type: String, default: 'Australia' },
+    state: { type: String },
+    lga: { type: String },
+    isLoop: { type: Boolean },
+    unpavedPercentage: { type: Number, default: 0 },
+    totalDistance: { type: Number },
+    totalAscent: { type: Number },
     custom: mongoose.Schema.Types.Mixed
   },
   
@@ -173,6 +189,13 @@ async function handleCreateRoute(req, res) {
       // Optional fields with defaults
       description,
       lastViewed: new Date(),
+      
+      // Header settings
+      headerSettings: req.body.headerSettings || {
+        color: '#000000',
+        logoUrl: null,
+        username: ''
+      },
       
       // Complex structures
       mapState: mapState || {
@@ -236,11 +259,13 @@ async function handleCreateRoute(req, res) {
         photos: route.photos || [],
         elevation: route.routes.map(r => r.surface?.elevationProfile || []),
         description: route.description, // Include the top-level description field
+        headerSettings: route.headerSettings, // Include the header settings
         _type: 'loaded',
         _loadedState: {
           name: route.name,
           pois: route.pois || { draggable: [], places: [] },
-          photos: route.photos || []
+          photos: route.photos || [],
+          headerSettings: route.headerSettings // Include header settings in _loadedState too
         }
       };
       
@@ -312,12 +337,21 @@ async function handleUpdateRoute(req, res) {
     // Update all fields that are provided in the request
     const { 
       name, description, isPublic, type, data, metadata, 
-      mapState, routes: routeSegments, pois, photos, viewCount, lastViewed 
+      mapState, routes: routeSegments, pois, photos, viewCount, lastViewed,
+      headerSettings
     } = req.body;
     
     // Update basic fields
     if (name) route.name = name;
-    if (description !== undefined) route.description = description;
+    if (description !== undefined) {
+      route.description = description;
+      
+      // If description is provided separately, also update it in the first route
+      if (route.routes && route.routes.length > 0 && !routeSegments) {
+        console.log(`[API] Updating description in first route`);
+        route.routes[0].description = description;
+      }
+    }
     if (type) route.type = type;
     if (viewCount !== undefined) route.viewCount = viewCount;
     
@@ -329,6 +363,15 @@ async function handleUpdateRoute(req, res) {
       if (isPublic && !route.publicId) {
         route.publicId = `route_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       }
+    }
+    
+    // Update header settings if provided
+    if (headerSettings) {
+      route.headerSettings = {
+        ...route.headerSettings || {},
+        ...headerSettings
+      };
+      console.log(`[API] Updated header settings:`, route.headerSettings);
     }
     
     // Update complex structures
@@ -412,11 +455,13 @@ async function handleUpdateRoute(req, res) {
         photos: route.photos || [],
         elevation: route.routes.map(r => r.surface?.elevationProfile || []),
         description: route.description, // Include the top-level description field
+        headerSettings: route.headerSettings, // Include the header settings
         _type: 'loaded',
         _loadedState: {
           name: route.name,
           pois: route.pois || { draggable: [], places: [] },
-          photos: route.photos || []
+          photos: route.photos || [],
+          headerSettings: route.headerSettings // Include header settings in _loadedState too
         }
       };
       
@@ -570,7 +615,7 @@ async function handleDeleteRoute(req, res) {
 // Handler for getting routes
 async function handleGetRoutes(req, res) {
   try {
-    const { userId, limit = 50, skip = 0, isPublic, persistentId } = req.query;
+    const { userId, limit = 50, skip = 0, isPublic, persistentId, metadataOnly = 'true' } = req.query;
     
     // Build query
     const query = {};
@@ -590,8 +635,22 @@ async function handleGetRoutes(req, res) {
       query.persistentId = persistentId;
     }
     
-    // Get routes
-    const routes = await Route.find(query)
+    // Define projection to only include essential fields when metadataOnly=true
+    const projection = metadataOnly === 'true' ? {
+      persistentId: 1,
+      name: 1,
+      type: 1,
+      isPublic: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      userId: 1,
+      _id: 1
+    } : {};
+    
+    console.log(`[API] Getting routes with metadataOnly=${metadataOnly}`);
+    
+    // Get routes with projection
+    const routes = await Route.find(query, projection)
       .sort({ createdAt: -1 })
       .skip(parseInt(skip))
       .limit(parseInt(limit));
@@ -689,11 +748,7 @@ async function handleGetRoute(req, res) {
   }
 }
 
-import { getCache, setCache, deleteCache, CACHE_DURATIONS } from '../lib/redis.js';
-import { getRedisClient } from '../lib/redis.js';
-
-// Initialize Redis client
-global.redisClient = getRedisClient();
+// Redis is not available locally, so we'll use in-memory storage only
 
 // Define ChunkedUploadSession schema for MongoDB fallback
 const ChunkedUploadSessionSchema = new mongoose.Schema({
@@ -703,6 +758,7 @@ const ChunkedUploadSessionSchema = new mongoose.Schema({
   totalSize: { type: Number, required: true },
   receivedChunks: { type: Number, default: 0 },
   isUpdate: { type: Boolean, default: false },
+  isCompressed: { type: Boolean, default: false }, // Add compression flag
   chunks: { type: Map, of: Boolean, default: new Map() },
   createdAt: { type: Date, default: Date.now, expires: 3600 } // Auto-expire after 1 hour
 });
@@ -911,7 +967,7 @@ async function cleanupSessionData(sessionId, totalChunks) {
 // Start a chunked upload session
 async function handleStartChunkedUpload(req, res) {
   try {
-    const { persistentId, totalChunks, totalSize, isUpdate } = req.body;
+    const { persistentId, totalChunks, totalSize, isUpdate, isCompressed } = req.body;
     
     // Generate a session ID
     const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
@@ -923,6 +979,7 @@ async function handleStartChunkedUpload(req, res) {
       totalSize,
       receivedChunks: 0,
       isUpdate,
+      isCompressed: !!isCompressed, // Store compression flag
       chunks: {},
       createdAt: Date.now()
     };
@@ -1066,11 +1123,26 @@ async function handleCompleteChunkedUpload(req, res) {
     
     console.log(`[API] All chunks retrieved successfully`);
     
+    // Decompress if needed
+    let jsonData = completeData;
+    if (sessionInfo.isCompressed) {
+      try {
+        jsonData = await decompressData(completeData);
+        console.log(`[API] Successfully decompressed data for session ${sessionId}`);
+      } catch (decompressError) {
+        console.error(`[API] Error decompressing data:`, decompressError);
+        return res.status(400).json({ 
+          error: 'Failed to decompress data',
+          details: decompressError.message
+        });
+      }
+    }
+    
     // Parse the reassembled data
     let routeData;
     try {
-      routeData = JSON.parse(completeData);
-      console.log(`[API] Successfully reassembled data for session ${sessionId}, size: ${completeData.length} bytes`);
+      routeData = JSON.parse(jsonData);
+      console.log(`[API] Successfully parsed data for session ${sessionId}, size: ${jsonData.length} bytes`);
     } catch (parseError) {
       console.error(`[API] Error parsing reassembled data:`, parseError);
       return res.status(400).json({ 
@@ -1132,6 +1204,31 @@ async function handleCompleteChunkedUpload(req, res) {
 const handler = async (req, res) => {
   // Ensure database connection
   await connectToDatabase();
+  
+  // Check if the request contains compressed data
+  if (req.headers['x-content-encoding'] === 'gzip') {
+    try {
+      // Get the request body as string
+      let bodyData = req.body;
+      
+      // If the content type is text/plain, the body is already a string
+      // If not, convert it to string if it's an object
+      if (typeof bodyData !== 'string') {
+        bodyData = JSON.stringify(bodyData);
+      }
+      
+      // Decompress the request body
+      const decompressedBody = await decompressData(bodyData);
+      
+      // Parse the JSON
+      req.body = JSON.parse(decompressedBody);
+      
+      console.log('[API] Successfully decompressed request body');
+    } catch (error) {
+      console.error('[API] Error decompressing request body:', error);
+      // Continue with the original body if decompression fails
+    }
+  }
   
   // Parse the URL to extract path parameters
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);

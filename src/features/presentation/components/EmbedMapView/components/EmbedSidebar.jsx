@@ -345,6 +345,14 @@ const EmbedSidebar = ({
         variant="persistent"
         anchor="left"
         open={isNestedOpen}
+        sx={{
+          '& .MuiDrawer-paper': {
+            top: '64px', // Position below the header
+            height: 'calc(100% - 64px)', // Adjust height to account for header
+            marginLeft: '56px', // Account for the sidebar width
+            paddingTop: '0px' // Remove any top padding
+          }
+        }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box sx={{ p: 3, pb: 0 }}>

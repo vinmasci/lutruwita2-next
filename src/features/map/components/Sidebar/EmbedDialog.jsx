@@ -62,7 +62,7 @@ export const EmbedDialog = ({ open, onClose }) => {
   src="${window.location.origin}/embed/${stateId}" 
   width="${embedSize.width}${embedSize.widthUnit}" 
   height="${embedSize.height}${embedSize.heightUnit}" 
-  style="border:0;" 
+  style="border:0; border-radius:12px; overflow:hidden;" 
   allowfullscreen="" 
   loading="lazy">
 </iframe>`;

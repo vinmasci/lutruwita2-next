@@ -14,7 +14,8 @@ export const MapPreview = ({ center, zoom, routes = [], className = '' }) => {
             center: center,
             zoom: zoom,
             interactive: false, // Disable map interactions for preview
-            attributionControl: false
+            attributionControl: false,
+            animate: false // Disable all map animations
         });
         // Clean up on unmount
         return () => {
@@ -109,11 +110,12 @@ export const MapPreview = ({ center, zoom, routes = [], className = '' }) => {
                     });
                 }
             });
-            // Fit bounds to include all routes
+            // Fit bounds to include all routes without animation
             if (!bounds.isEmpty()) {
                 map.current?.fitBounds(bounds, {
                     padding: 20,
-                    maxZoom: 10 // Prevent zooming in too far
+                    maxZoom: 10, // Prevent zooming in too far
+                    animate: false // Disable animation
                 });
             }
         });

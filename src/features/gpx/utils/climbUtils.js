@@ -7,6 +7,7 @@ const CLIMB_CONFIG = {
     VALLEY_MERGE_DIST: 20000, // Maximum distance between valleys to merge climbs (meters)
     MIN_DOWNHILL_GRADIENT: -1, // Minimum gradient to consider as significant downhill (percent)
     MIN_DOWNHILL_LENGTH: 600, // Minimum length for a downhill section to reset climb (meters)
+    LOOK_AHEAD_DISTANCE: 10000, // 10km in meters - how far to look ahead for higher elevation points
 };
 // Category configuration
 const CATEGORY_CONFIG = {
@@ -67,6 +68,55 @@ const calculateGradient = (point1, point2) => {
     const distance = point2.distance - point1.distance;
     return (elevationChange / distance) * 100;
 };
+
+/**
+ * Checks if two climbs have any overlap
+ */
+const checkClimbOverlap = (climb1, climb2) => {
+    // Get start and end distances for both climbs
+    const climb1Start = climb1.startPoint.distance;
+    const climb1End = climb1.endPoint.distance;
+    const climb2Start = climb2.startPoint.distance;
+    const climb2End = climb2.endPoint.distance;
+    
+    // Check for any overlap
+    // Two segments overlap if one starts before the other ends
+    return (climb1Start < climb2End && climb2Start < climb1End);
+};
+
+/**
+ * Removes overlapping climbs, ensuring no overlap between any climbs
+ */
+const removeOverlappingClimbs = (climbs) => {
+    if (climbs.length <= 1) return climbs;
+    
+    // First sort by FIETS score (highest first) to prioritize more significant climbs
+    // If FIETS scores are equal, prioritize by length
+    const sortedClimbs = [...climbs].sort((a, b) => {
+        if (Math.abs(b.fietsScore - a.fietsScore) > 0.1) {
+            return b.fietsScore - a.fietsScore;
+        }
+        return b.totalDistance - a.totalDistance;
+    });
+    
+    const result = [];
+    
+    // Process each climb
+    for (const climb of sortedClimbs) {
+        // Check if this climb overlaps with any climb we've already decided to keep
+        const hasOverlap = result.some(existingClimb => 
+            checkClimbOverlap(climb, existingClimb)
+        );
+        
+        // If no overlap at all, keep this climb
+        if (!hasOverlap) {
+            result.push(climb);
+        }
+    }
+    
+    return result;
+};
+
 /**
  * Detects climbs by identifying sections with consistent steep gradients
  */
@@ -192,8 +242,6 @@ export const detectClimbs = (data) => {
         const startPoint = section.points[0];
         let endPoint = section.points[section.points.length - 1];
         
-        // Look ahead for higher elevation points within 5km of the end point
-        const lookAheadDistance = 5000; // 5km in meters
         const endPointDistance = endPoint.distance;
         const endPointElevation = endPoint.elevation;
         
@@ -201,21 +249,54 @@ export const detectClimbs = (data) => {
         const endPointIdx = smoothedData.findIndex(p => p.distance >= endPointDistance);
         
         if (endPointIdx !== -1 && endPointIdx < smoothedData.length - 1) {
-            // Look ahead up to 5km
+            // Look ahead up to the configured distance
             let highestPoint = endPoint;
             let currentIdx = endPointIdx + 1;
+            let significantDownhillFound = false;
+            let downhillLength = 0;
+            let lastElevation = endPoint.elevation;
             
             while (currentIdx < smoothedData.length && 
-                   smoothedData[currentIdx].distance <= endPointDistance + lookAheadDistance) {
-                // If we find a higher point, update the highest point
-                if (smoothedData[currentIdx].elevation > highestPoint.elevation) {
-                    highestPoint = smoothedData[currentIdx];
+                   smoothedData[currentIdx].distance <= endPointDistance + CLIMB_CONFIG.LOOK_AHEAD_DISTANCE) {
+                const currentPoint = smoothedData[currentIdx];
+                
+                // Check if we're going downhill
+                if (currentPoint.elevation < lastElevation) {
+                    // Calculate gradient of this downhill section
+                    const downhillGradient = calculateGradient(
+                        { distance: smoothedData[currentIdx-1].distance, elevation: lastElevation },
+                        { distance: currentPoint.distance, elevation: currentPoint.elevation }
+                    );
+                    
+                    // If it's a significant downhill
+                    if (downhillGradient <= CLIMB_CONFIG.MIN_DOWNHILL_GRADIENT) {
+                        downhillLength += currentPoint.distance - smoothedData[currentIdx-1].distance;
+                        
+                        // If the downhill is long enough, we've found the end of the climb
+                        if (downhillLength >= CLIMB_CONFIG.MIN_DOWNHILL_LENGTH) {
+                            significantDownhillFound = true;
+                            break;
+                        }
+                    } else {
+                        // Reset downhill length if gradient isn't steep enough
+                        downhillLength = 0;
+                    }
+                } else {
+                    // Reset downhill length when we start going up again
+                    downhillLength = 0;
                 }
+                
+                // If we find a higher point, update the highest point
+                if (currentPoint.elevation > highestPoint.elevation) {
+                    highestPoint = currentPoint;
+                }
+                
+                lastElevation = currentPoint.elevation;
                 currentIdx++;
             }
             
-            // If we found a higher point, use it as the end point
-            if (highestPoint.elevation > endPointElevation) {
+            // If we found a higher point and didn't hit a significant downhill, use it as the end point
+            if (highestPoint.elevation > endPointElevation && !significantDownhillFound) {
                 endPoint = highestPoint;
             }
         }
@@ -260,5 +341,8 @@ export const detectClimbs = (data) => {
     // Filter out climbs with average gradient less than 1.5%
     const filteredClimbs = climbs.filter(climb => climb.averageGradient >= 1.5);
     
-    return filteredClimbs;
+    // Remove overlapping climbs
+    const nonOverlappingClimbs = removeOverlappingClimbs(filteredClimbs);
+    
+    return nonOverlappingClimbs;
 };

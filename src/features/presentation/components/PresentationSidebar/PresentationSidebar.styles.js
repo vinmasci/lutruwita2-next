@@ -4,6 +4,7 @@ export const StyledDrawer = styled(Drawer)({
     width: '56px',
     flexShrink: 0,
     whiteSpace: 'nowrap',
+    marginTop: '64px', // Add margin top to account for header
     '& .MuiDrawer-paper': {
         width: '56px',
         backgroundColor: '#1a1a1a',
@@ -11,6 +12,8 @@ export const StyledDrawer = styled(Drawer)({
         color: '#ffffff',
         overflowX: 'hidden',
         zIndex: 91, // Higher than NestedDrawer (90) but lower than elevation profile (102)
+        top: '64px', // Position below the header
+        height: 'calc(100% - 64px)', // Adjust height to account for header
         '& .MuiListItemIcon-root': {
             color: 'rgba(255, 255, 255, 0.7)',
             minWidth: '40px',
@@ -27,6 +30,8 @@ export const NestedDrawer = styled(Drawer)(({ theme }) => {
         flexShrink: 0,
         whiteSpace: 'nowrap',
         position: 'absolute',
+        top: '64px', // Position below the header
+        height: 'calc(100% - 64px)', // Adjust height to account for header
         '& .MuiDrawer-paper': {
             width: theme.breakpoints.values.sm ? '264px' : '100%',
             backgroundColor: '#1a1a1a',
@@ -37,6 +42,7 @@ export const NestedDrawer = styled(Drawer)(({ theme }) => {
             transition: 'transform 0.3s ease-in-out',
             zIndex: 90, // Lower than elevation profile (102) and sidebar (101)
             transform: 'translateX(0)', // Visible when open
+            height: '100%', // Full height of the adjusted container
             '&.MuiDrawer-paperAnchorLeft.MuiDrawer-paperHidden': {
                 transform: 'translateX(-100%)', // Hidden when closed
                 visibility: 'hidden'
