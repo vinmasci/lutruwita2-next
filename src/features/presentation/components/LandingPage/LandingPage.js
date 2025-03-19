@@ -8,8 +8,7 @@ import {
   CircularProgress, Alert, Stack
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { RouteFilters } from './RouteFilters.jsx';
-import { RouteCardGrid } from './RouteCard.jsx';
+import { CombinedRouteCardGrid } from './RouteCard.jsx';
 import { useRouteFilters } from './useRouteFilters.jsx';
 
 export const LandingPage = () => {
@@ -178,21 +177,6 @@ export const LandingPage = () => {
                                 textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8)'
                             }, children: "Find a route..." }), 
                             
-                            // Use the RouteFilters component
-                            _jsx(RouteFilters, {
-                                searchTerm, setSearchTerm,
-                                selectedState, setSelectedState,
-                                selectedRegion, setSelectedRegion,
-                                selectedMapTypes, setSelectedMapTypes,
-                                surfaceType, setSurfaceType,
-                                distanceFilter, setDistanceFilter,
-                                routeTypeFilter, setRouteTypeFilter,
-                                availableStates,
-                                availableRegions,
-                                availableMapTypes,
-                                handleMapTypeToggle
-                            }),
-                            
                             loading ? (_jsx(Box, { display: "flex", justifyContent: "center", p: 4, children: _jsx(CircularProgress, {}) })) : error ? (_jsx(Alert, { severity: "error", sx: { maxWidth: 'sm', mx: 'auto' }, children: error })) : (_jsxs(_Fragment, { children: [
                                 _jsx(Box, { sx: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }, children:
                                     _jsxs(Typography, { variant: "subtitle1", color: "text.secondary", children: [
@@ -200,8 +184,21 @@ export const LandingPage = () => {
                                     ]})
                                 }),
                                 
-                                // Use the RouteCardGrid component
-                                _jsx(RouteCardGrid, { routes: displayedRoutes }),
+                                // Use the CombinedRouteCardGrid component that includes the filter card
+                                _jsx(CombinedRouteCardGrid, { 
+                                    routes: displayedRoutes,
+                                    searchTerm, setSearchTerm,
+                                    selectedState, setSelectedState,
+                                    selectedRegion, setSelectedRegion,
+                                    selectedMapTypes, setSelectedMapTypes,
+                                    surfaceType, setSurfaceType,
+                                    distanceFilter, setDistanceFilter,
+                                    routeTypeFilter, setRouteTypeFilter,
+                                    availableStates,
+                                    availableRegions,
+                                    availableMapTypes,
+                                    handleMapTypeToggle
+                                }),
                                 
                                 hasMore && !loading && !error && (_jsx(Box, { display: "flex", justifyContent: "center", mt: 4, children: _jsx(Button, { variant: "contained", color: "primary", onClick: loadMoreRoutes, sx: {
                                     px: 4,

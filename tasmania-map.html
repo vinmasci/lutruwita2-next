@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasmania Map Outline</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: white;
+        }
+        .map-container {
+            width: 800px;
+            height: 800px;
+            position: relative;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        path {
+            fill: white;
+            stroke: black;
+            stroke-width: 3;
+        }
+    </style>
+</head>
+<body>
+    <div class="map-container">
+        <svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+            <!-- Tasmania mainland outline -->
+            <path d="M400,150 C450,140 500,145 550,170 C600,195 630,230 650,280 
+                     C670,330 675,380 670,430 C665,480 650,520 625,560 
+                     C600,600 570,630 530,650 C490,670 450,680 410,680 
+                     C370,680 335,675 300,660 C265,645 235,625 210,595 
+                     C185,565 170,530 160,490 C150,450 145,410 150,370 
+                     C155,330 170,290 190,255 C210,220 240,190 275,170 
+                     C310,150 350,140 400,150 Z" />
+            
+            <!-- Bruny Island -->
+            <path d="M530,650 C535,660 540,670 545,680 C550,690 555,700 560,710 
+                     C565,720 570,730 575,740 C580,750 575,760 565,765 
+                     C555,770 545,765 535,760 C525,755 520,745 515,735 
+                     C510,725 505,715 500,705 C495,695 490,685 485,675 
+                     C480,665 485,655 495,650 C505,645 515,650 525,655 Z" />
+            
+            <!-- King Island -->
+            <path d="M150,250 C155,245 160,240 170,240 C180,240 190,245 195,255 
+                     C200,265 200,275 195,285 C190,295 180,300 170,300 
+                     C160,300 150,295 145,285 C140,275 140,265 145,255 Z" />
+            
+            <!-- Flinders Island -->
+            <path d="M650,200 C660,195 670,195 680,200 C690,205 695,215 695,225 
+                     C695,235 690,245 680,250 C670,255 660,255 650,250 
+                     C640,245 635,235 635,225 C635,215 640,205 650,200 Z" />
+        </svg>
+    </div>
+</body>
+</html>

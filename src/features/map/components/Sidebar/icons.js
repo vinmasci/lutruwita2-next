@@ -1,4 +1,4 @@
-import { Route, Upload, Save, FolderOpen, Camera, MapPin, Eraser, RefreshCw, Code } from 'lucide-react';
+import { Route, Upload, Save, FolderOpen, Camera, MapPin, Eraser, RefreshCw, Code, MessageSquare } from 'lucide-react';
 export const SidebarIcons = {
     actions: {
         gpx: Route,
@@ -8,7 +8,8 @@ export const SidebarIcons = {
         photos: Camera,
         poi: MapPin,
         clear: Eraser,
-        embed: Code
+        embed: Code,
+        textboxTabs: MessageSquare
     }
 };
 

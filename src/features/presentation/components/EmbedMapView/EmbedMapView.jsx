@@ -2,13 +2,15 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { MAP_STYLES } from '../../../map/components/StyleControl/StyleControl';
 import { PresentationElevationProfilePanel } from '../ElevationProfile/PresentationElevationProfilePanel';
 import { PresentationPOIViewer } from '../POIViewer';
 import { setupScaleListener } from '../../utils/scaleUtils';
 import { SimpleLightbox } from '../../../photo/components/PhotoPreview/SimpleLightbox';
-import { clusterPhotosPresentation, isCluster, getClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
+import { clusterPhotosPresentation, isCluster as isPhotoCluster, getClusterExpansionZoom as getPhotoClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
+import { clusterPOIs, isCluster as isPOICluster, getClusterExpansionZoom as getPOIClusterExpansionZoom } from '../../../poi/utils/clustering';
 import { MapProvider } from '../../../map/context/MapContext';
 import { PhotoProvider } from '../../../photo/context/PhotoContext';
 import { useRouteDataLoader, filterPhotosByRoute } from './hooks/useRouteDataLoader';
@@ -18,6 +20,7 @@ import { ClimbMarkers } from '../../../map/components/ClimbMarkers/ClimbMarkers'
 // Import extracted components
 import SimplifiedRouteLayer from './components/SimplifiedRouteLayer';
 import POIMarker from './components/POIMarker';
+import POICluster from './components/POICluster';
 import PhotoMarker from './components/PhotoMarker';
 import PhotoCluster from './components/PhotoCluster';
 import EmbedSidebar from './components/EmbedSidebar';
@@ -41,6 +44,7 @@ export default function EmbedMapView() {
     const [zoom, setZoom] = useState(null);
     const [scale, setScale] = useState(1);
     const [clusteredPhotos, setClusteredPhotos] = useState([]);
+    const [clusteredPOIs, setClusteredPOIs] = useState([]);
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
     const [visiblePOICategories, setVisiblePOICategories] = useState([
@@ -120,14 +124,35 @@ export default function EmbedMapView() {
         setIsPhotosVisible(prev => !prev);
     };
     
-    // Function to handle cluster click
-    const handleClusterClick = (cluster) => {
+    // Function to handle photo cluster click
+    const handlePhotoClusterClick = (cluster) => {
         if (mapInstance.current) {
             // Get the expansion zoom level for this cluster
             // Supercluster adds 'id' property to cluster features
             const clusterId = cluster.id || cluster.properties.cluster_id;
             
-            const expansionZoom = getClusterExpansionZoom(clusterId, clusteredPhotos);
+            const expansionZoom = getPhotoClusterExpansionZoom(clusterId, clusteredPhotos);
+            const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
+            
+            // Get the cluster's coordinates
+            const [lng, lat] = cluster.geometry.coordinates;
+            
+            // Zoom to the cluster's location with more aggressive zoom
+            mapInstance.current.easeTo({
+                center: [lng, lat],
+                zoom: targetZoom,
+                duration: 500
+            });
+        }
+    };
+    
+    // Function to handle POI cluster click
+    const handlePOIClusterClick = (cluster) => {
+        if (mapInstance.current) {
+            // Get the expansion zoom level for this cluster
+            const clusterId = cluster.properties.cluster_id;
+            
+            const expansionZoom = getPOIClusterExpansionZoom(clusterId, clusteredPOIs);
             const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
             
             // Get the cluster's coordinates
@@ -427,6 +452,17 @@ export default function EmbedMapView() {
             currentRouteIdRef.current = currentRoute.id || currentRoute.routeId;
         }
     }, [currentRoute]);
+    
+    // Initialize routes using the unified approach - at component top level
+    const { initialized: routesInitialized } = useUnifiedRouteProcessing(
+        routeData?.allRoutesEnhanced || [], 
+        {
+            batchProcess: true,
+            onInitialized: () => {
+                console.log('[EmbedMapView] Routes initialized with unified approach');
+            }
+        }
+    );
 
     // Initialize map
     useEffect(() => {
@@ -471,20 +507,44 @@ export default function EmbedMapView() {
         });
         
         map.on('load', () => {
-            // Add terrain
-            map.addSource('mapbox-dem', {
-                type: 'raster-dem',
-                url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                tileSize: 512,
-                maxzoom: 14
-            });
+            // Check if style is fully loaded
+            const waitForStyleLoaded = () => {
+                if (map.isStyleLoaded()) {
+                    console.log('[EmbedMapView] Map style fully loaded, proceeding with initialization');
+                    initializeMapAfterStyleLoad();
+                } else {
+                    console.log('[EmbedMapView] Style not fully loaded yet, waiting...');
+                    // Wait a bit and check again
+                    setTimeout(waitForStyleLoaded, 100);
+                }
+            };
             
-            map.setTerrain({
-                source: 'mapbox-dem',
-                exaggeration: 1.5
-            });
+            // Function to initialize map components after style is loaded
+            const initializeMapAfterStyleLoad = () => {
+                try {
+                    // Add terrain
+                    map.addSource('mapbox-dem', {
+                        type: 'raster-dem',
+                        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        tileSize: 512,
+                        maxzoom: 14
+                    });
+                    
+                    map.setTerrain({
+                        source: 'mapbox-dem',
+                        exaggeration: 1.5
+                    });
+                    
+                    setIsMapReady(true);
+                } catch (error) {
+                    console.error('[EmbedMapView] Error initializing map after style load:', error);
+                    // Retry after a delay if there was an error
+                    setTimeout(initializeMapAfterStyleLoad, 500);
+                }
+            };
             
-            setIsMapReady(true);
+            // Start the style loading check
+            waitForStyleLoaded();
         });
         
         // Update zoom state when map zooms
@@ -617,6 +677,12 @@ export default function EmbedMapView() {
         
         map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
         
+        // Import and set map instance in the mapOperationsQueue
+        import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
+            setMapInstance(map);
+            console.log('[EmbedMapView] Map instance set in mapOperationsQueue');
+        });
+        
         mapInstance.current = map;
         
         return () => {
@@ -649,31 +715,47 @@ export default function EmbedMapView() {
         }
     }, [isMapReady]);
     
-    // Cluster photos when zoom or photos change
+    // Cluster photos and POIs when zoom or data changes
     useEffect(() => {
-        if (isMapReady && mapInstance.current && routeData?.photos && routeData.photos.length > 0) {
+        if (isMapReady && mapInstance.current) {
             // Get the current zoom level
             const currentZoom = mapInstance.current.getZoom();
             
-            // Filter photos to only include those with valid coordinates
-            const validPhotos = routeData.photos.filter(p => {
-                if (!p.coordinates) {
-                    console.warn('Photo missing coordinates:', p.id);
-                    return false;
-                }
-                if (typeof p.coordinates.lat !== 'number' || typeof p.coordinates.lng !== 'number') {
-                    console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
-                    return false;
-                }
-                return true;
-            });
+            // Cluster photos if available
+            if (routeData?.photos && routeData.photos.length > 0) {
+                // Filter photos to only include those with valid coordinates
+                const validPhotos = routeData.photos.filter(p => {
+                    if (!p.coordinates) {
+                        console.warn('Photo missing coordinates:', p.id);
+                        return false;
+                    }
+                    if (typeof p.coordinates.lat !== 'number' || typeof p.coordinates.lng !== 'number') {
+                        console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
+                        return false;
+                    }
+                    return true;
+                });
+                
+                // Cluster the photos
+                const clusteredPhotoData = clusterPhotosPresentation(validPhotos, currentZoom);
+                setClusteredPhotos(clusteredPhotoData);
+            }
             
-            // Cluster the photos
-            const clustered = clusterPhotosPresentation(validPhotos, currentZoom);
-            // Remove console log to reduce noise
-            setClusteredPhotos(clustered);
+            // Cluster POIs if available
+            if (routeData?.pois?.draggable && routeData.pois.draggable.length > 0) {
+                // Filter POIs by visible categories
+                const filteredPOIs = routeData.pois.draggable.filter(poi => 
+                    visiblePOICategories.includes(poi.category)
+                );
+                
+                // Cluster the POIs
+                const clusteredPOIData = clusterPOIs(filteredPOIs, currentZoom);
+                setClusteredPOIs(clusteredPOIData);
+            } else {
+                setClusteredPOIs([]);
+            }
         }
-    }, [isMapReady, routeData?.photos, zoom]);
+    }, [isMapReady, routeData?.photos, routeData?.pois?.draggable, zoom, visiblePOICategories]);
     
     // Fit map to route bounds when map and route are ready
     useEffect(() => {
@@ -816,7 +898,7 @@ export default function EmbedMapView() {
                 {/* Render route and POIs when map is ready and data is loaded */}
                 {isMapReady && mapInstance.current && !isLoading && !error && (
                     <>
-                        {/* Render all routes */}
+                        {/* Initialize routes using the unified approach - moved to component top level */}
                         {routeData?.allRoutesEnhanced && routeData.allRoutesEnhanced.map(route => (
                             <SimplifiedRouteLayer
                                 map={mapInstance.current}
@@ -835,41 +917,55 @@ export default function EmbedMapView() {
                             />
                         )}
                         
-                        {/* Render POIs directly without context */}
-                        {routeData?.pois?.draggable && routeData.pois.draggable.map(poi => (
-                            <POIMarker
-                                key={poi.id}
-                                map={mapInstance.current}
-                                poi={poi}
-                                onClick={setSelectedPOI}
-                                visiblePOICategories={visiblePOICategories}
-                                scale={scale}
-                            />
-                        ))}
-                        
-                        {routeData?.pois?.places && routeData.pois.places.map(poi => (
-                            <POIMarker
-                                key={poi.id}
-                                map={mapInstance.current}
-                                poi={poi}
-                                onClick={setSelectedPOI}
-                                visiblePOICategories={visiblePOICategories}
-                                scale={scale}
-                            />
-                        ))}
+                        {/* Render POIs with clustering */}
+                        {clusteredPOIs.length > 0 ? (
+                            clusteredPOIs.map(item => 
+                                isPOICluster(item) ? (
+                                    <POICluster
+                                        key={`poi-cluster-${item.properties.cluster_id}`}
+                                        map={mapInstance.current}
+                                        cluster={item}
+                                        onClick={() => handlePOIClusterClick(item)}
+                                    />
+                                ) : (
+                                    <POIMarker
+                                        key={`poi-${item.properties.id}`}
+                                        map={mapInstance.current}
+                                        poi={item.properties.poi}
+                                        onClick={setSelectedPOI}
+                                        visiblePOICategories={visiblePOICategories}
+                                        scale={scale}
+                                    />
+                                )
+                            )
+                        ) : (
+                            // Fallback to direct rendering if clustering fails
+                            routeData?.pois?.draggable && routeData.pois.draggable
+                                .filter(poi => visiblePOICategories.includes(poi.category))
+                                .map(poi => (
+                                    <POIMarker
+                                        key={poi.id}
+                                        map={mapInstance.current}
+                                        poi={poi}
+                                        onClick={setSelectedPOI}
+                                        visiblePOICategories={visiblePOICategories}
+                                        scale={scale}
+                                    />
+                                ))
+                        )}
                         
                         {/* Render photo markers with clustering */}
                         {isPhotosVisible && clusteredPhotos.length > 0 && (
                             // Use clustered photos if available
                             clusteredPhotos.map(item => {
-                                if (isCluster(item)) {
+                                if (isPhotoCluster(item)) {
                                     // Render a cluster
                                     return (
                                         <PhotoCluster
                                             key={`cluster-${item.id || Math.random().toString(36).substr(2, 9)}`}
                                             map={mapInstance.current}
                                             cluster={item}
-                                            onClick={() => handleClusterClick(item)}
+                                            onClick={() => handlePhotoClusterClick(item)}
                                         />
                                     );
                                 } else {

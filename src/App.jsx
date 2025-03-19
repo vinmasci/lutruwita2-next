@@ -6,6 +6,7 @@ import MapView from './features/map/components/MapView/MapView';
 import { PhotoProvider } from './features/photo/context/PhotoContext';
 import { PlaceProvider } from './features/place/context/PlaceContext';
 import { POIProvider } from './features/poi/context/POIContext';
+import { TextboxTabsProvider } from './features/presentation/context/TextboxTabsContext';
 import { ProcessingProvider } from './features/map/context';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import Auth0Callback from './features/auth/components/Auth0Callback/Auth0Callback';
@@ -37,7 +38,8 @@ export default function App() {
             <PhotoProvider>
               <PlaceProvider>
                 <POIProvider>
-                  <Routes>
+                  <TextboxTabsProvider>
+                    <Routes>
                     <Route path="/callback" element={<Auth0Callback />} />
                     <Route path="/" element={<LandingPage />} />
                     <Route
@@ -74,7 +76,8 @@ export default function App() {
                         </React.Suspense>
                       </Box>
                     } />
-                  </Routes>
+                    </Routes>
+                  </TextboxTabsProvider>
                 </POIProvider>
               </PlaceProvider>
             </PhotoProvider>

@@ -76,10 +76,15 @@ export async function uploadFile(fileBuffer, options = {}) {
 /**
  * Delete a file from Cloudinary
  * @param {string} publicId - The public ID of the file to delete
+ * @param {Object} options - Additional options for deletion
+ * @param {string} options.resource_type - The resource type ('image', 'raw', etc.)
  * @returns {Promise<Object>} - The result of the delete operation
  */
-export async function deleteFile(publicId) {
-  return cloudinary.uploader.destroy(publicId);
+export async function deleteFile(publicId, options = {}) {
+  return cloudinary.uploader.destroy(publicId, {
+    resource_type: options.resource_type || 'image',
+    ...options
+  });
 }
 
 /**

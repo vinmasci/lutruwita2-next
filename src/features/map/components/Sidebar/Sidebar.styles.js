@@ -16,8 +16,10 @@ export const NestedDrawer = styled(MuiDrawer)(({ theme }) => ({
         marginLeft: 56,
         boxSizing: 'border-box',
         height: '100%', // Full height of the adjusted container
-        paddingBottom: '320px', // Add padding to allow scrolling past elevation panel
         overflowY: 'auto', // Ensure content is scrollable
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100%'
     },
 }));
 export const StyledDrawer = styled(MuiDrawer)(({ theme }) => ({

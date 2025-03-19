@@ -225,6 +225,8 @@ export const useRouteService = () => {
                     ...routeDataWithUserId.metadata || {},
                     ...routeMetadata
                 },
+                // Include POIs in the transformed data
+                pois: routeData.pois || { draggable: [], places: [] },
                 data: {
                     // Store all routes in the data structure
                     allRoutes: routeData.routes || [],
@@ -686,7 +688,17 @@ export const useRouteService = () => {
                         routes: [routeObject]
                     };
                 }
-                
+            }
+            
+            // Ensure POIs are included in the transformed data
+            if (data.pois && !transformedData.pois) {
+                console.log('[routeService] Adding POIs to transformed data:', 
+                    data.pois.draggable?.length || 0, 'draggable POIs,', 
+                    data.pois.places?.length || 0, 'place POIs');
+                transformedData.pois = data.pois;
+            } else if (!transformedData.pois) {
+                console.log('[routeService] No POIs found in route data, initializing empty POIs');
+                transformedData.pois = { draggable: [], places: [] };
             }
             
             // Handle both formats: data.route (old format) or data directly (new format)

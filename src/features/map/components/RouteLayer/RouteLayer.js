@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
 import { useRouteContext } from "../../context/RouteContext";
+import { queueRouteOperation, cleanupRouteLayers, safeRemoveLayer, safeRemoveSource } from '../../utils/mapOperationsUtils';
 
 // Material UI colors
 const DEFAULT_COLORS = {
@@ -26,6 +27,9 @@ export const RouteLayer = ({ map, route }) => {
         mainWidth: 3,
         borderWidth: 5
     });
+    
+    // Track if this route has already been rendered
+    const renderedRef = useRef(false);
 
     // Function to find and update layer visibility
     const updateLayerVisibility = useCallback(() => {
@@ -36,15 +40,12 @@ export const RouteLayer = ({ map, route }) => {
         
         // Get all layers in the map
         const allLayers = map.getStyle().layers.map(layer => layer.id);
-        console.log('[RouteLayer] All map layers:', allLayers);
         
         // Find all layers that might be related to this route
         const routeLayers = allLayers.filter(layerId => 
             layerId.includes(routeId) || 
             (route.routeId && layerId.includes(route.routeId))
         );
-        
-        console.log(`[RouteLayer] Found ${routeLayers.length} layers for route ${routeId}:`, routeLayers);
         
         // Find main line and border layers
         const mainLineLayers = routeLayers.filter(layerId => layerId.includes('-main-line'));
@@ -54,16 +55,8 @@ export const RouteLayer = ({ map, route }) => {
         // Get visibility state
         const visibility = routeVisibility[routeId] || { mainRoute: true, unpavedSections: true };
         
-        console.log(`[RouteLayer] Updating visibility for route ${routeId}:`, {
-            visibility,
-            mainLineLayers,
-            borderLayers,
-            surfaceLayers
-        });
-        
         // Update main line layers
         mainLineLayers.forEach(layerId => {
-            console.log(`[RouteLayer] Setting ${layerId} visibility to ${visibility.mainRoute ? 'visible' : 'none'}`);
             map.setLayoutProperty(
                 layerId,
                 'visibility',
@@ -73,7 +66,6 @@ export const RouteLayer = ({ map, route }) => {
         
         // Update border layers
         borderLayers.forEach(layerId => {
-            console.log(`[RouteLayer] Setting ${layerId} visibility to ${visibility.mainRoute ? 'visible' : 'none'}`);
             map.setLayoutProperty(
                 layerId,
                 'visibility',
@@ -83,7 +75,6 @@ export const RouteLayer = ({ map, route }) => {
         
         // Update surface layers
         surfaceLayers.forEach(layerId => {
-            console.log(`[RouteLayer] Setting ${layerId} visibility to ${visibility.unpavedSections ? 'visible' : 'none'}`);
             map.setLayoutProperty(
                 layerId,
                 'visibility',
@@ -92,50 +83,88 @@ export const RouteLayer = ({ map, route }) => {
         });
     }, [map, route, isStyleLoaded, routeVisibility]);
     
-    // Function to move route layers to front - SIMPLE VERSION
+    // Function to move route layers to front - ENHANCED VERSION
     const moveRouteToFront = useCallback(() => {
         if (!map || !route || !isStyleLoaded) return;
         
         // Get the stable route ID
         const routeId = route.id || route.routeId;
         
-        // Check if this is the current route - using comprehensive check
-        const isCurrentRoute = currentRoute && (
-            currentRoute.id === route.id || 
-            currentRoute.routeId === route.routeId ||
-            // Additional checks for different ID formats
-            (currentRoute.id && route.routeId && currentRoute.id.toString() === route.routeId.toString()) ||
-            (currentRoute.routeId && route.id && currentRoute.routeId.toString() === route.id.toString())
+        // Extract IDs for comparison, handling different formats
+        const routeIds = [
+            routeId,
+            route.id,
+            route.routeId,
+            // Handle 'route-' prefix variations
+            routeId?.startsWith('route-') ? routeId.substring(6) : `route-${routeId}`
+        ].filter(Boolean); // Remove any undefined/null values
+        
+        const currentRouteIds = [
+            currentRoute?.id,
+            currentRoute?.routeId,
+            // Handle 'route-' prefix variations
+            currentRoute?.id?.startsWith('route-') ? currentRoute.id.substring(6) : currentRoute?.id ? `route-${currentRoute.id}` : null,
+            currentRoute?.routeId?.startsWith('route-') ? currentRoute.routeId.substring(6) : currentRoute?.routeId ? `route-${currentRoute.routeId}` : null
+        ].filter(Boolean); // Remove any undefined/null values
+        
+        // Check if any of the route IDs match any of the current route IDs
+        const isCurrentRoute = currentRoute && routeIds.some(id => 
+            currentRouteIds.some(currentId => 
+                id === currentId || id.toString() === currentId.toString()
+            )
         );
+        
+        // Debug ID comparison for loaded routes
+        if (route._type === 'loaded') {
+            console.log('[RouteLayer] ID comparison for loaded route:', {
+                routeIds,
+                currentRouteIds,
+                isCurrentRoute,
+                routeType: route._type,
+                loadedState: route._loadedState ? true : false
+            });
+        }
         
         // Only move to front if this is the current route
         if (isCurrentRoute) {
-            console.log(`[RouteLayer] Moving route ${routeId} to front - SIMPLE VERSION`);
+            console.log('[RouteLayer] Moving route to front:', routeId);
             
             // Find all layers for this route
             const mainLayerId = `${routeId}-main-line`;
             const borderLayerId = `${routeId}-main-border`;
             const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
             
-            // Simply move the current route layers to the front
-            // The order matters: border first, then main line, then surface
+            // Get all layers in the map
+            const style = map.getStyle();
+            if (!style || !style.layers) {
+                console.error('[RouteLayer] Map style not available');
+                return;
+            }
+            
+            // Find the topmost layer to move our layers above
+            const lastLayerId = style.layers[style.layers.length - 1].id;
+            
+            // Move the layers to the front in the correct order
             try {
+                // First move the border layer to the top
                 if (map.getLayer(borderLayerId)) {
-                    console.log(`[RouteLayer] Moving border layer ${borderLayerId} to front`);
-                    map.moveLayer(borderLayerId); // Move to the very top
+                    console.log('[RouteLayer] Moving border layer to front:', borderLayerId);
+                    map.moveLayer(borderLayerId, lastLayerId);
                 }
                 
+                // Then move the main line layer above the border
                 if (map.getLayer(mainLayerId)) {
-                    console.log(`[RouteLayer] Moving main layer ${mainLayerId} to front`);
-                    map.moveLayer(mainLayerId); // Move to the very top (will be above border)
+                    console.log('[RouteLayer] Moving main layer to front:', mainLayerId);
+                    map.moveLayer(mainLayerId); // This will place it at the very top
                 }
                 
+                // Finally move the surface layer above everything
                 if (map.getLayer(surfaceLayerId)) {
-                    console.log(`[RouteLayer] Moving surface layer ${surfaceLayerId} to front`);
-                    map.moveLayer(surfaceLayerId); // Move to the very top (will be above main)
+                    console.log('[RouteLayer] Moving surface layer to front:', surfaceLayerId);
+                    map.moveLayer(surfaceLayerId); // This will place it at the very top
                 }
                 
-                console.log(`[RouteLayer] Successfully moved route ${routeId} layers to front`);
+                console.log('[RouteLayer] Successfully moved route layers to front');
             } catch (error) {
                 console.error(`[RouteLayer] Error moving current route layers to front:`, error);
             }
@@ -157,7 +186,6 @@ export const RouteLayer = ({ map, route }) => {
         if (!map) return;
         
         const styleChangeHandler = () => {
-            console.log('[RouteLayer] Map style changed, updating layer visibility');
             // Wait for the style to load before updating visibility
             setTimeout(updateLayerVisibility, 500);
         };
@@ -169,242 +197,218 @@ export const RouteLayer = ({ map, route }) => {
         };
     }, [map, updateLayerVisibility]);
 
+    // Main effect for rendering the route
     useEffect(() => {
         try {
             // Skip rendering if the route has an error flag or is missing geojson data
             if (!map || !route || !isStyleLoaded || !route.geojson || route.error) {
-                console.log(`[RouteLayer] Skipping route rendering:`, {
-                    routeId: route?.id || route?.routeId,
-                    hasMap: !!map,
-                    hasRoute: !!route,
-                    isStyleLoaded,
-                    hasGeojson: !!route?.geojson,
-                    hasError: !!route?.error
-                });
                 return;
             }
 
+            // Get the stable route ID - ensure consistent ID usage
             const routeId = route.id || route.routeId;
             const mainLayerId = `${routeId}-main-line`;
             const borderLayerId = `${routeId}-main-border`;
-            const hoverLayerId = `${routeId}-hover`;
+            const hoverLayerId = `${routeId}-hover-line`;
             const mainSourceId = `${routeId}-main`;
             const visibility = routeVisibility[routeId] || { mainRoute: true, unpavedSections: true };
-
-            // Initial validation of GeoJSON data
-            if (!route.geojson.features || !route.geojson.features.length) {
-                console.error('[RouteLayer] Invalid GeoJSON data:', {
-                    routeId: route.routeId,
-                    geojsonType: route.geojson.type,
-                    featureCount: route.geojson.features?.length
-                });
+            
+            // If the route is already rendered, skip rendering
+            if (map.getLayer(mainLayerId) && renderedRef.current) {
                 return;
             }
 
-            // Extract and validate geometry
-            const geometry = route.geojson.features[0].geometry;
-            if (!geometry || geometry.type !== 'LineString') {
-                console.error('[RouteLayer] Invalid GeoJSON structure:', {
-                    featureType: geometry?.type,
-                    expected: 'LineString'
-                });
-                return;
-            }
-
-            // Ensure map style is loaded and source doesn't exist
-            const sourceExists = map.getSource(mainSourceId);
-            const style = map.getStyle();
-            if (!style || !style.layers) {
-                console.error('[RouteLayer] Map style not fully loaded');
-                return;
-            }
-
-
-            // Clean up existing layers and source if they exist
-            if (sourceExists) {
-                const layersToRemove = [borderLayerId, mainLayerId, hoverLayerId, `unpaved-sections-layer-${routeId}`];
-                layersToRemove.forEach(layerId => {
-                    if (map.getLayer(layerId)) {
-                        map.removeLayer(layerId);
+            // Queue the route rendering operation to ensure proper timing
+            queueRouteOperation(map, route, (mapInstance, currentRoute) => {
+                try {
+                    // Initial validation of GeoJSON data
+                    if (!currentRoute.geojson.features || !currentRoute.geojson.features.length) {
+                        console.error('[RouteLayer] Invalid GeoJSON data:', {
+                            routeId: currentRoute.routeId || currentRoute.id,
+                            geojsonType: currentRoute.geojson.type,
+                            featureCount: currentRoute.geojson.features?.length
+                        });
+                        return;
                     }
-                });
 
-                const sourcesToRemove = [mainSourceId, `unpaved-sections-${routeId}`];
-                sourcesToRemove.forEach(sourceId => {
-                    if (map.getSource(sourceId)) {
-                        map.removeSource(sourceId);
+                    // Extract and validate geometry
+                    const geometry = currentRoute.geojson.features[0].geometry;
+                    if (!geometry || geometry.type !== 'LineString') {
+                        console.error('[RouteLayer] Invalid GeoJSON structure:', {
+                            featureType: geometry?.type,
+                            expected: 'LineString'
+                        });
+                        return;
                     }
-                });
-            }
 
-            // Add new source and layers
-            try {
-                // Add main route source
-                map.addSource(mainSourceId, {
-                    type: 'geojson',
-                    data: route.geojson,
-                    tolerance: 0.5
-                });
-            }
-            catch (error) {
-                console.error('[RouteLayer] Error adding source:', error);
-                return;
-            }
+                    // Clean up existing layers and sources for this route
+                    cleanupRouteLayers(mapInstance, routeId);
 
-            // Add border layer
-            map.addLayer({
-                id: borderLayerId,
-                type: 'line',
-                source: mainSourceId,
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round',
-                    visibility: visibility.mainRoute ? 'visible' : 'none'
-                },
-                paint: {
-                    'line-color': '#ffffff',
-                    'line-width': 5,
-                    'line-opacity': 1
+                    // Add main route source
+                    mapInstance.addSource(mainSourceId, {
+                        type: 'geojson',
+                        data: currentRoute.geojson,
+                        tolerance: 0.5
+                    });
+
+                    // Add border layer
+                    mapInstance.addLayer({
+                        id: borderLayerId,
+                        type: 'line',
+                        source: mainSourceId,
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round',
+                            visibility: visibility.mainRoute ? 'visible' : 'none'
+                        },
+                        paint: {
+                            'line-color': '#ffffff',
+                            'line-width': 5,
+                            'line-opacity': 1
+                        }
+                    });
+
+                    // Add main route layer
+                    mapInstance.addLayer({
+                        id: mainLayerId,
+                        type: 'line',
+                        source: mainSourceId,
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round',
+                            visibility: visibility.mainRoute ? 'visible' : 'none'
+                        },
+                        paint: {
+                            'line-color': currentRoute.color || DEFAULT_COLORS.main,
+                            'line-width': 3,
+                            'line-opacity': 1
+                        }
+                    });
+
+                    // Add hover layer (initially hidden) only for focused routes
+                    if (currentRoute.isFocused) {
+                        mapInstance.addLayer({
+                            id: hoverLayerId,
+                            type: 'line',
+                            source: mainSourceId,
+                            layout: {
+                                'line-join': 'round',
+                                'line-cap': 'round',
+                                visibility: 'none'
+                            },
+                            paint: {
+                                'line-color': currentRoute.color ? `${currentRoute.color}99` : DEFAULT_COLORS.hover,
+                                'line-width': 5,
+                                'line-opacity': 1
+                            }
+                        });
+                    }
+
+                    // Add combined surface layer for all routes
+                    if (currentRoute.unpavedSections && currentRoute.unpavedSections.length > 0) {
+                        const surfaceSourceId = `unpaved-sections-${routeId}`;
+                        const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
+
+                        // Combine all unpaved sections into a single feature collection
+                        const features = currentRoute.unpavedSections.map(section => ({
+                            type: 'Feature',
+                            properties: {
+                                surface: section.surfaceType
+                            },
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: section.coordinates
+                            }
+                        }));
+
+                        mapInstance.addSource(surfaceSourceId, {
+                            type: 'geojson',
+                            data: {
+                                type: 'FeatureCollection',
+                                features
+                            },
+                            tolerance: 1, // Increase simplification tolerance
+                            maxzoom: 14 // Limit detail at high zoom levels
+                        });
+
+                        mapInstance.addLayer({
+                            id: surfaceLayerId,
+                            type: 'line',
+                            source: surfaceSourceId,
+                            layout: {
+                                'line-join': 'round',
+                                'line-cap': 'round',
+                                visibility: visibility.unpavedSections ? 'visible' : 'none'
+                            },
+                            paint: {
+                                'line-color': '#ffffff',
+                                'line-width': 2,
+                                'line-dasharray': [1, 3]
+                            }
+                        });
+                    }
+
+                    // Add hover handlers only for focused routes
+                    if (currentRoute.isFocused) {
+                        const mouseHandler = () => {
+                            mapInstance.getCanvas().style.cursor = 'pointer';
+                            if (visibility.mainRoute) {
+                                mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
+                            }
+                        };
+
+                        const mouseleaveHandler = () => {
+                            mapInstance.getCanvas().style.cursor = '';
+                            mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'none');
+                        };
+
+                        // Add click handler for toggling visibility
+                        const clickHandler = () => {
+                            // Just toggle hover layer visibility, no re-rendering
+                            if (visibility.mainRoute) {
+                                mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
+                            }
+                        };
+
+                        mapInstance.on('click', mainLayerId, clickHandler);
+                        mapInstance.on('mouseenter', mainLayerId, mouseHandler);
+                        mapInstance.on('mousemove', mainLayerId, mouseHandler);
+                        mapInstance.on('mouseleave', mainLayerId, mouseleaveHandler);
+                    }
+                    
+                    // Mark this route as rendered
+                    renderedRef.current = true;
+                } catch (error) {
+                    console.error('[RouteLayer] Error in route rendering operation:', error);
                 }
-            });
+            }, `render-route-${routeId}`);
 
-            // Add main route layer
-            map.addLayer({
-                id: mainLayerId,
-                type: 'line',
-                source: mainSourceId,
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round',
-                    visibility: visibility.mainRoute ? 'visible' : 'none'
-                },
-                paint: {
-                    'line-color': route.color || DEFAULT_COLORS.main,
-                    'line-width': 3,
-                    'line-opacity': 1
+            // Return cleanup function
+            return () => {
+                // Clean up event listeners when component unmounts
+                if (map) {
+                    map.off('click', mainLayerId);
+                    map.off('mouseenter', mainLayerId);
+                    map.off('mousemove', mainLayerId);
+                    map.off('mouseleave', mainLayerId);
                 }
-            });
-
-            // Log the layer ID for debugging
-            console.log(`[RouteLayer] Added layer with ID: ${mainLayerId}`);
-
-            // Add hover layer (initially hidden) only for focused routes
-            if (route.isFocused) {
-                map.addLayer({
-                    id: hoverLayerId,
-                    type: 'line',
-                    source: mainSourceId,
-                    layout: {
-                        'line-join': 'round',
-                        'line-cap': 'round',
-                        visibility: 'none'
-                    },
-                    paint: {
-                        'line-color': route.color ? `${route.color}99` : DEFAULT_COLORS.hover,
-                        'line-width': 5,
-                        'line-opacity': 1
-                    }
-                });
-            }
-
-            // Add combined surface layer for all routes
-            if (route.unpavedSections && route.unpavedSections.length > 0) {
-                const surfaceSourceId = `unpaved-sections-${routeId}`;
-                const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
-
-                // Combine all unpaved sections into a single feature collection
-                const features = route.unpavedSections.map(section => ({
-                    type: 'Feature',
-                    properties: {
-                        surface: section.surfaceType
-                    },
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: section.coordinates
-                    }
-                }));
-
-                map.addSource(surfaceSourceId, {
-                    type: 'geojson',
-                    data: {
-                        type: 'FeatureCollection',
-                        features
-                    },
-                    tolerance: 1, // Increase simplification tolerance
-                    maxzoom: 14 // Limit detail at high zoom levels
-                });
-
-                map.addLayer({
-                    id: surfaceLayerId,
-                    type: 'line',
-                    source: surfaceSourceId,
-                    layout: {
-                        'line-join': 'round',
-                        'line-cap': 'round',
-                        visibility: visibility.unpavedSections ? 'visible' : 'none'
-                    },
-                    paint: {
-                        'line-color': '#ffffff',
-                        'line-width': 2,
-                        'line-dasharray': [1, 3]
-                    }
-                });
-                
-                // Log that unpaved sections were added
-                console.log(`[RouteLayer] Added unpaved sections layer for route ${routeId} with ${features.length} sections`);
-            }
-
-            // Add hover handlers only for focused routes
-            if (route.isFocused) {
-                const mouseHandler = () => {
-                    map.getCanvas().style.cursor = 'pointer';
-                    if (visibility.mainRoute) {
-                        map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
-                    }
-                };
-
-                const mouseleaveHandler = () => {
-                    map.getCanvas().style.cursor = '';
-                    map.setLayoutProperty(hoverLayerId, 'visibility', 'none');
-                };
-
-                // Add click handler for toggling visibility
-                const clickHandler = () => {
-                    // Just toggle hover layer visibility, no re-rendering
-                    if (visibility.mainRoute) {
-                        map.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
-                    }
-                };
-
-                map.on('click', mainLayerId, clickHandler);
-                map.on('mouseenter', mainLayerId, mouseHandler);
-                map.on('mousemove', mainLayerId, mouseHandler);
-                map.on('mouseleave', mainLayerId, mouseleaveHandler);
-
-                return () => {
-                    // Just remove event listeners, don't cleanup layers
-                    map.off('click', mainLayerId, clickHandler);
-                    map.off('mouseenter', mainLayerId, mouseHandler);
-                    map.off('mousemove', mainLayerId, mouseHandler);
-                    map.off('mouseleave', mainLayerId, mouseleaveHandler);
-                };
-            }
+            };
         }
         catch (error) {
             console.error('[RouteLayer] Error rendering route:', error);
         }
-    }, [map, route, isStyleLoaded, routeVisibility, toggleRouteVisibility]);
+    }, [map, route, isStyleLoaded, routeVisibility]);
 
     // Effect to update the line color when the route color changes
     useEffect(() => {
         if (!map || !route || !isStyleLoaded) return;
         
-            const currentColor = route.color;
-            const prevColor = prevColorRef.current;
-            
-            // Only update if the color has changed
-            if (currentColor !== prevColor) {
-                const routeId = route.id || route.routeId;
+        const currentColor = route.color;
+        const prevColor = prevColorRef.current;
+        
+        // Only update if the color has changed
+        if (currentColor !== prevColor) {
+            const routeId = route.id || route.routeId;
             const mainLayerId = `${routeId}-main-line`;
             const hoverLayerId = `${routeId}-hover`;
             
@@ -415,8 +419,6 @@ export const RouteLayer = ({ map, route }) => {
                     'line-color',
                     currentColor || DEFAULT_COLORS.main
                 );
-            } else {
-                console.warn(`[RouteLayer] Main layer (${mainLayerId}) not found`);
             }
             
             // Update hover layer color if it exists
@@ -446,23 +448,43 @@ export const RouteLayer = ({ map, route }) => {
             return;
         }
         
-        // Check if this is the current route
-        const isCurrentRoute = currentRoute && (
-            currentRoute.id === route.id || 
-            currentRoute.routeId === route.routeId ||
-            // Additional checks for different ID formats
-            (currentRoute.id && route.routeId && currentRoute.id.toString() === route.routeId.toString()) ||
-            (currentRoute.routeId && route.id && currentRoute.routeId.toString() === route.id.toString())
+        // Get the stable route ID
+        const routeId = route.id || route.routeId;
+        
+        // Extract IDs for comparison, handling different formats
+        const routeIds = [
+            routeId,
+            route.id,
+            route.routeId,
+            // Handle 'route-' prefix variations
+            routeId?.startsWith('route-') ? routeId.substring(6) : `route-${routeId}`
+        ].filter(Boolean); // Remove any undefined/null values
+        
+        const currentRouteIds = [
+            currentRoute?.id,
+            currentRoute?.routeId,
+            // Handle 'route-' prefix variations
+            currentRoute?.id?.startsWith('route-') ? currentRoute.id.substring(6) : currentRoute?.id ? `route-${currentRoute.id}` : null,
+            currentRoute?.routeId?.startsWith('route-') ? currentRoute.routeId.substring(6) : currentRoute?.routeId ? `route-${currentRoute.routeId}` : null
+        ].filter(Boolean); // Remove any undefined/null values
+        
+        // Check if any of the route IDs match any of the current route IDs
+        const isCurrentRoute = currentRoute && routeIds.some(id => 
+            currentRouteIds.some(currentId => 
+                id === currentId || id.toString() === currentId.toString()
+            )
         );
         
-        // Log for debugging
-        console.log(`[RouteLayer] Animation check for route ${route.id || route.routeId}:`, {
-            isCurrentRoute,
-            currentRouteId: currentRoute?.id,
-            currentRouteRouteId: currentRoute?.routeId,
-            routeId: route.id,
-            routeRouteId: route.routeId
-        });
+        // Debug ID comparison for loaded routes in animation effect
+        if (route._type === 'loaded') {
+            console.log('[RouteLayer] Animation ID comparison for loaded route:', {
+                routeIds,
+                currentRouteIds,
+                isCurrentRoute,
+                routeType: route._type,
+                loadedState: route._loadedState ? true : false
+            });
+        }
         
         if (!isCurrentRoute) {
             return;
@@ -471,7 +493,6 @@ export const RouteLayer = ({ map, route }) => {
         // Move this route to front when it becomes the current route
         moveRouteToFront();
         
-        const routeId = route.id || route.routeId;
         const mainLayerId = `${routeId}-main-line`;
         const borderLayerId = `${routeId}-main-border`;
         

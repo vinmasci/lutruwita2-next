@@ -8,6 +8,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import { Route, Mountain, MoreHorizontal } from 'lucide-react';
 import { ImageSlider } from '../ImageSlider/ImageSlider';
+import { FilterCard } from './FilterCard';
 
 // Map state abbreviations
 const STATE_ABBREVIATIONS = {
@@ -254,6 +255,55 @@ export const RouteCard = ({ route }) => {
 export const RouteCardGrid = ({ routes }) => {
   return (
     <Grid container spacing={4}>
+      {routes.map((route) => (
+        <RouteCard key={route.id} route={route} />
+      ))}
+    </Grid>
+  );
+};
+
+// Combined grid that includes the filter card as the first item
+export const CombinedRouteCardGrid = ({ 
+  routes,
+  searchTerm, setSearchTerm,
+  selectedState, setSelectedState,
+  selectedRegion, setSelectedRegion,
+  selectedMapTypes, setSelectedMapTypes,
+  surfaceType, setSurfaceType,
+  distanceFilter, setDistanceFilter,
+  routeTypeFilter, setRouteTypeFilter,
+  availableStates,
+  availableRegions,
+  availableMapTypes,
+  handleMapTypeToggle
+}) => {
+  return (
+    <Grid container spacing={4}>
+      {/* Filter card as the first item */}
+      <Grid item xs={12} sm={6} md={3}>
+        <FilterCard
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedState={selectedState}
+          setSelectedState={setSelectedState}
+          selectedRegion={selectedRegion}
+          setSelectedRegion={setSelectedRegion}
+          selectedMapTypes={selectedMapTypes}
+          setSelectedMapTypes={setSelectedMapTypes}
+          surfaceType={surfaceType}
+          setSurfaceType={setSurfaceType}
+          distanceFilter={distanceFilter}
+          setDistanceFilter={setDistanceFilter}
+          routeTypeFilter={routeTypeFilter}
+          setRouteTypeFilter={setRouteTypeFilter}
+          availableStates={availableStates}
+          availableRegions={availableRegions}
+          availableMapTypes={availableMapTypes}
+          handleMapTypeToggle={handleMapTypeToggle}
+        />
+      </Grid>
+      
+      {/* Route cards */}
       {routes.map((route) => (
         <RouteCard key={route.id} route={route} />
       ))}

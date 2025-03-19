@@ -8,9 +8,10 @@ import { StyledDrawer } from './POIDrawer.styles';
 import { POI_ICONS, getIconDefinition } from '../../constants/poi-icons';
 import POIModeSelection from './POIModeSelection';
 import POIIconSelection from './POIIconSelection';
-import PlacePOIIconSelection from '../PlacePOIIconSelection';
-import PlacePOIInstructions from './PlacePOIInstructions';
-import { getPlaceLabelAtPoint } from '../../utils/placeDetection';
+// Place POI functionality is commented out
+// import PlacePOIIconSelection from '../PlacePOIIconSelection';
+// import PlacePOIInstructions from './PlacePOIInstructions';
+// import { getPlaceLabelAtPoint } from '../../utils/placeDetection';
 import POIDetailsDrawer from '../POIDetailsDrawer/POIDetailsDrawer';
 const POIDrawer = ({ isOpen, onClose }) => {
     const { addPOI, poiMode, setPoiMode, pois } = usePOIContext();
@@ -29,7 +30,7 @@ const POIDrawer = ({ isOpen, onClose }) => {
     // State to store draggable POI data that will be displayed and saved to MongoDB
     const [draggablePoiData, setDraggablePoiData] = React.useState([]);
     const [selectedPoi, setSelectedPoi] = React.useState(null);
-    // Reset state when drawer closes
+    // Reset state when drawer closes or initialize to icon-select when opened
     React.useEffect(() => {
         if (!isOpen) {
             setState({
@@ -43,9 +44,18 @@ const POIDrawer = ({ isOpen, onClose }) => {
                 error: null,
             });
             setPoiMode('none');
+        } else {
+            // Skip mode selection and go directly to icon selection with 'regular' mode
+            setState(prev => ({
+                ...prev,
+                step: 'icon-select'
+            }));
+            setPoiMode('regular');
         }
     }, [isOpen]);
     const { map } = useMapContext();
+    // Place POI functionality is commented out
+    /*
     // Handle map click events for place selection
     useEffect(() => {
         if (!map || poiMode !== 'place') {
@@ -91,6 +101,7 @@ const POIDrawer = ({ isOpen, onClose }) => {
             map.off('click', handleClick);
         };
     }, [map, poiMode, pois]);
+    */
     // Reset state when drawer closes
     useEffect(() => {
         if (!isOpen) {
@@ -105,6 +116,8 @@ const POIDrawer = ({ isOpen, onClose }) => {
         // Update POI mode in context
         setPoiMode(newMode);
     };
+    // Place POI functionality is commented out
+    /*
     const handlePlaceSelect = (placeId) => {
         // In place mode, check if place has icons
         if (poiMode === 'place') {
@@ -120,11 +133,14 @@ const POIDrawer = ({ isOpen, onClose }) => {
             step: 'icon-select'
         }));
     };
+    */
     const handleIconSelect = (icon) => {
         const category = POI_ICONS.find((icon_def) => icon_def.name === icon)?.category;
         if (!icon || !category)
             return;
         console.log('[POIDrawer] Handling icon select:', { icon, category });
+        // Place POI functionality is commented out
+        /*
         if (poiMode === 'place' && selectedPlace) {
             // If place has icons, don't handle icon selection here
             if (selectedPlace.icons && selectedPlace.icons.length > 0) {
@@ -134,12 +150,15 @@ const POIDrawer = ({ isOpen, onClose }) => {
             return;
         }
         else {
+        */
             console.log('[POIDrawer] Setting drag preview for map POI:', { icon, category });
             // Set drag preview for map POI
             setDragPreview({ icon, category });
             
             console.log('[POIDrawer] Drag preview set, waiting for user to drag and drop');
+        /*
         }
+        */
     };
     const { setDragPreview } = useMapContext();
     const handleStartDrag = (icon, category) => {
@@ -220,34 +239,37 @@ const POIDrawer = ({ isOpen, onClose }) => {
             case 'mode-select':
                 return _jsx(POIModeSelection, { onModeSelect: handleModeSelect });
             case 'icon-select':
+                // Place POI functionality is commented out
+                /*
                 if (poiMode === 'place') {
                     return selectedPlace ? (_jsx(PlacePOIIconSelection, { place: selectedPlace, onBack: handleIconBack })) : (_jsx(PlacePOIInstructions, {}));
                 }
+                */
                 return (_jsx(POIIconSelection, { mode: poiMode, selectedIcon: state.selectedIcon, onIconSelect: handleIconSelect, onBack: handleIconBack, startDrag: handleStartDrag }));
-            case 'details':
-                if (selectedPoi) {
-                    return (_jsx(POIDetailsDrawer, { isOpen: true, onClose: () => {
-                            setState(prev => ({
-                                ...prev,
-                                step: 'mode-select'
-                            }));
-                            setSelectedPoi(null);
-                        }, iconName: selectedPoi.icon, category: selectedPoi.category, onSave: (details) => {
-                            addPOI({
-                                ...selectedPoi,
-                                ...details
-                            });
-                            setState(prev => ({
-                                ...prev,
-                                step: 'mode-select',
-                                selectedCategory: null,
-                                selectedIcon: null
-                            }));
-                            setPoiMode('none');
-                            setSelectedPoi(null);
-                        } }));
-                }
-                return null;
+      case 'details':
+        if (selectedPoi) {
+          return (_jsx(POIDetailsDrawer, { isOpen: true, onClose: () => {
+            setState(prev => ({
+              ...prev,
+              step: 'mode-select'
+            }));
+            setSelectedPoi(null);
+          }, iconName: selectedPoi.icon, category: selectedPoi.category, onSave: (details) => {
+            addPOI({
+              ...selectedPoi,
+              ...details
+            });
+            setState(prev => ({
+              ...prev,
+              step: 'mode-select',
+              selectedCategory: null,
+              selectedIcon: null
+            }));
+            setPoiMode('none');
+            setSelectedPoi(null);
+          } }));
+        }
+        return null;
             default:
                 return _jsx(POIModeSelection, { onModeSelect: handleModeSelect });
         }
@@ -257,10 +279,8 @@ const POIDrawer = ({ isOpen, onClose }) => {
                 width: '264px',
                 border: 'none',
                 backgroundColor: 'transparent',
-                overflow: 'hidden',
-                top: '64px', // Position below the header
-                height: 'calc(100% - 64px)', // Adjust height to account for header
-                marginTop: '56px' // Account for the sidebar width
+                overflowY: 'auto',
+                height: '100%'
             }
         }, children: _jsxs(StyledDrawer, { children: [renderContent(), _jsx("div", { id: "poi-data-for-mongo", style: {
                         display: 'none' // Hide the metadata display

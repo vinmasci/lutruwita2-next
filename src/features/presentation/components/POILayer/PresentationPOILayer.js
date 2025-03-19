@@ -7,7 +7,10 @@ import { POI_CATEGORIES } from '../../../poi/types/poi.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import { ICON_PATHS } from '../../../poi/constants/icon-paths';
 import { calculatePOIPositions } from '../../../poi/utils/placeDetection';
+import { clusterPOIs, isCluster, getClusterExpansionZoom } from '../../../poi/utils/clustering';
 import { PresentationPOIViewer } from '../POIViewer';
+import POICluster from '../../../poi/components/POICluster/POICluster';
+import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker/MapboxPOIMarker';
 import './PresentationPOILayer.css';
 export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     const { currentRoute } = useRouteContext();
@@ -15,12 +18,16 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     const markersRef = useRef([]);
     const placeMarkersRef = useRef([]);
     const [selectedPOI, setSelectedPOI] = useState(null);
-    // Effect to handle place POIs visibility based on zoom
+    const [zoom, setZoom] = useState(null);
+    const [clusteredItems, setClusteredItems] = useState([]);
+    // Effect to handle POIs visibility and clustering based on zoom
     useEffect(() => {
         if (!map)
             return;
         const handleZoom = () => {
-            const currentZoom = Math.floor(map.getZoom());
+            const currentZoom = map.getZoom();
+            setZoom(currentZoom);
+            
             // Use requestAnimationFrame to batch DOM updates
             requestAnimationFrame(() => {
                 // Update zoom level for regular POIs
@@ -28,9 +35,12 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                     const markerElement = marker.getElement();
                     const container = markerElement.querySelector('.marker-container');
                     if (container) {
-                        container.setAttribute('data-zoom', currentZoom.toString());
+                        container.setAttribute('data-zoom', Math.floor(currentZoom).toString());
                     }
                 });
+                
+                // Place POI functionality is commented out
+                /*
                 // Show/hide place markers based on zoom level
                 placeMarkersRef.current.forEach(({ marker }) => {
                     if (currentZoom > 8.071) {
@@ -40,6 +50,7 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                         marker.remove();
                     }
                 });
+                */
             });
         };
         map.on('zoom', handleZoom);
@@ -55,15 +66,46 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         }
         loadPOIsFromRoute(currentRoute._loadedState.pois);
     }, [currentRoute]); // Remove loadPOIsFromRoute from deps since it's a stable context function
+    // Update clustering when POIs or zoom changes
+    useEffect(() => {
+        if (!map || zoom === null) return;
+
+        // Get all draggable POIs filtered by visible categories
+        const allPOIs = getPOIsForRoute();
+        const filteredPOIs = allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category));
+        
+        // Cluster POIs
+        const clusters = clusterPOIs(filteredPOIs, zoom);
+        setClusteredItems(clusters);
+    }, [map, zoom, visibleCategories, getPOIsForRoute]);
+
+    // Handle cluster click
+    const handleClusterClick = (cluster) => {
+        if (!map) return;
+        
+        // Get the zoom level to expand this cluster
+        const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id, clusteredItems);
+        const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
+        
+        // Get the cluster's coordinates
+        const [lng, lat] = cluster.geometry.coordinates;
+        
+        // Zoom to the cluster's location
+        map.easeTo({
+            center: [lng, lat],
+            zoom: targetZoom
+        });
+    };
+
     // Memoize POI data to prevent unnecessary recalculations
     // Memoize POI data based on the actual POIs from context and filter by visible categories
     const poiData = useMemo(() => {
         const allPOIs = getPOIsForRoute();
         return {
             draggable: allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category)),
-            places: allPOIs.places.filter(poi => visibleCategories.includes(poi.category))
+            places: [] // Place POI functionality is commented out
         };
-    }, [getPOIsForRoute, visibleCategories]); // Will update when POIs or visible categories change
+    }, [visibleCategories, getPOIsForRoute]); // Only update when visible categories change, not on every getPOIsForRoute call
     // Memoize marker creation function
     const createMarker = useCallback((poi) => {
         const el = document.createElement('div');
@@ -125,18 +167,22 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         });
         return { marker, poiId: poi.id };
     }, [map, setSelectedPOI, onSelectPOI]);
-    // Effect to update markers when POI data changes
+    // Effect to update markers when POI data changes - only used when not clustering
     useEffect(() => {
-        if (!map)
+        if (!map || clusteredItems.length > 0)
             return;
+            
         // Clear existing markers
         markersRef.current.forEach(({ marker }) => marker.remove());
         markersRef.current = [];
+        
         // Handle regular POIs
         poiData.draggable.forEach((poi) => {
             const markerRef = createMarker(poi);
             markersRef.current.push(markerRef);
         });
+        // Place POI functionality is commented out
+        /*
         // Group place POIs by coordinates
         const poiGroups = poiData.places.reduce((acc, poi) => {
             const key = `${poi.coordinates[0]},${poi.coordinates[1]}`;
@@ -232,6 +278,7 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                 }
             }
         });
+        */
         return () => {
             markersRef.current.forEach(({ marker }) => marker.remove());
             markersRef.current = [];
@@ -239,6 +286,56 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
             placeMarkersRef.current = [];
         };
     }, [map, poiData, createMarker]); // Use memoized poiData instead of getPOIsForRoute
-    // Only render the POI viewer if we're not using an external onSelectPOI handler
-    return onSelectPOI ? null : (_jsx(PresentationPOIViewer, { poi: selectedPOI, onClose: () => setSelectedPOI(null) }));
+    // Prepare rendered items based on clustered items
+    const renderedItems = [];
+    
+    if (clusteredItems.length > 0) {
+        // Render clusters and individual POIs
+        for (let i = 0; i < clusteredItems.length; i++) {
+            const item = clusteredItems[i];
+            if (isCluster(item)) {
+                renderedItems.push(
+                    _jsx(POICluster, {
+                        cluster: item,
+                        onClick: () => handleClusterClick(item),
+                        key: `cluster-${item.properties.cluster_id}`
+                    })
+                );
+            } else {
+                renderedItems.push(
+                    _jsx(MapboxPOIMarker, {
+                        poi: item.properties.poi,
+                        onClick: (poi) => {
+                            console.log('[PresentationPOILayer] POI clicked:', poi);
+                            // Ensure we're using the original POI object, not the transformed GeoJSON feature
+                            const originalPoi = item.properties.poi;
+                            if (onSelectPOI) {
+                                console.log('[PresentationPOILayer] Using onSelectPOI');
+                                onSelectPOI(originalPoi);
+                            } else {
+                                console.log('[PresentationPOILayer] Using setSelectedPOI');
+                                setSelectedPOI(originalPoi);
+                            }
+                        },
+                        key: `poi-${item.properties.id}`
+                    })
+                );
+            }
+        }
+    }
+    
+    // Always render the POI viewer if needed, regardless of clustering
+    if (!onSelectPOI && selectedPOI) {
+        console.log('[PresentationPOILayer] Rendering PresentationPOIViewer with POI:', selectedPOI);
+        return [
+            ...renderedItems,
+            _jsx(PresentationPOIViewer, {
+                poi: selectedPOI,
+                onClose: () => setSelectedPOI(null),
+                key: 'poi-viewer'
+            })
+        ];
+    }
+    
+    return renderedItems.length > 0 ? renderedItems : null;
 };

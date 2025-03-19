@@ -1,3 +1,5 @@
+// This file is commented out to disable Place POIs functionality while keeping draggable POIs
+/*
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
 import { Typography, IconButton, Box, Button, TextField, ButtonBase, CircularProgress } from '@mui/material';
@@ -14,7 +16,7 @@ import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoP
 
 const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, description: initialDescription = '', photos: initialPhotos = [] }) => {
     const { pois } = usePOIContext();
-    const { updatePlace } = usePlaceContext();
+    const { places, updatePlace } = usePlaceContext();
     const [hoveredIcon, setHoveredIcon] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [description, setDescription] = useState('');
@@ -36,9 +38,56 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
         }
     }, [isOpen, initialDescription, initialPhotos]);
 
-    const placePOIs = React.useMemo(() => pois.filter((poi) => poi.type === 'place' &&
-        placeId !== null &&
-        poi.placeId === placeId), [pois, placeId]);
+    const placePOIs = React.useMemo(() => {
+        // Log for debugging
+        console.log('[PlacePOIDetailsDrawer] Finding POIs for place:', {
+            placeId,
+            hasPlace: places && placeId ? !!places[placeId] : false,
+            placeCoordinates: places && placeId && places[placeId] ? places[placeId].coordinates : null
+        });
+        
+        return pois.filter((poi) => {
+            // Basic type and placeId check
+            if (poi.type !== 'place' || placeId === null) return false;
+            
+            // Match by placeId
+            if (poi.placeId === placeId) return true;
+            
+            // Match by coordinates if the place has coordinates
+            if (poi.coordinates && places && placeId && places[placeId]?.coordinates) {
+                const placeCoords = places[placeId].coordinates;
+                const poiCoords = poi.coordinates;
+                
+                // Check if coordinates match
+                if (poiCoords[0] === placeCoords[0] && poiCoords[1] === placeCoords[1]) {
+                    console.log('[PlacePOIDetailsDrawer] Found POI by coordinates match:', {
+                        poiId: poi.id,
+                        poiCoords,
+                        placeCoords
+                    });
+                    return true;
+                }
+            }
+            
+            // Check all places for coordinate matches
+            if (poi.coordinates && places) {
+                for (const [id, place] of Object.entries(places)) {
+                    if (place.coordinates && 
+                        poi.coordinates[0] === place.coordinates[0] && 
+                        poi.coordinates[1] === place.coordinates[1]) {
+                        console.log('[PlacePOIDetailsDrawer] Found POI by coordinates in different place:', {
+                            poiId: poi.id,
+                            poiPlaceId: poi.placeId,
+                            matchedPlaceId: id
+                        });
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        });
+    }, [pois, placeId, places]);
 
     const poiGroups = React.useMemo(() => placePOIs.reduce((acc, poi) => {
         if (!acc[poi.category]) {
@@ -493,3 +542,4 @@ const PlacePOIDetailsDrawer = ({ isOpen, onClose, placeId, placeName, descriptio
 };
 
 export default PlacePOIDetailsDrawer;
+*/

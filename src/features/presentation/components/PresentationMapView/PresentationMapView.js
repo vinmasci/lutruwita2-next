@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { usePresentationRouteInit } from '../../hooks/usePresentationRouteInit';
+import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from 'mapbox-gl';
 import SearchControl from '../SearchControl/SearchControl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -37,11 +37,11 @@ export default function PresentationMapView() {
             return cleanup;
         }
     }, []);
-    // Initialize routes using our presentation-specific hook
-    const { initialized: routesInitialized } = usePresentationRouteInit({
-        routes,
+    // Initialize routes using the unified route processing hook
+    const { initialized: routesInitialized } = useUnifiedRouteProcessing(routes, {
+        batchProcess: true,
         onInitialized: () => {
-            // Routes initialized
+            console.log('[PresentationMapView] Routes initialized with unified approach');
         }
     });
     // Update hover marker when coordinates change
@@ -184,6 +184,12 @@ export default function PresentationMapView() {
             maxPitch: 85,
             width: '100%',
             height: '100%'
+        });
+        
+        // Import and set map instance in the mapOperationsQueue
+        import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
+            setMapInstance(map);
+            console.log('[PresentationMapView] Map instance set in mapOperationsQueue');
         });
         // Log map initialization events
         map.on('load', () => {
@@ -465,13 +471,7 @@ export default function PresentationMapView() {
                     }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })),
             isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [
                 routes.map(route => {
-                    // Debug route IDs
-                    console.log('[PresentationMapView] Route:', {
-                        id: route.id,
-                        routeId: route.routeId,
-                        name: route.name,
-                        layerId: `${route.id || route.routeId}-main-line`
-                    });
+                    // Removed debug logging to prevent unnecessary re-renders
                     return _jsx(RouteLayer, { 
                         map: mapInstance.current, 
                         route: route,

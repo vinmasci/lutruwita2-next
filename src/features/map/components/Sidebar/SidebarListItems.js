@@ -10,6 +10,7 @@ import { SidebarIcons, RefreshIcon } from './icons';
 import { SaveDialog } from './SaveDialog.jsx';
 import { LoadDialog } from './LoadDialog';
 import { EmbedDialog } from './EmbedDialog.jsx';
+import { TextboxTabsDrawer, useTextboxTabs } from '../../../presentation/components/TextboxTabs';
 
 export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemClick }) => {
     const { routes, savedRoutes, saveCurrentState, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
@@ -17,6 +18,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
     const { clearPOIs, setPoiMode } = usePOIContext();
     const { clearPhotos } = usePhotoContext();
     const { clearPlaces } = usePlaceContext();
+    const { openDrawer: openTextboxTabsDrawer, toggleDrawer: toggleTextboxTabsDrawer } = useTextboxTabs();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
     const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
@@ -243,6 +245,18 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
             icon: SidebarIcons.actions.poi,
             text: 'Add POI',
             onClick: onAddPOI
+        },
+        {
+            id: 'textboxTabs',
+            icon: SidebarIcons.actions.textboxTabs,
+            text: 'Textbox Tabs',
+            onClick: () => {
+                if (onItemClick) {
+                    onItemClick('textboxTabs');
+                }
+                // Use toggleDrawer instead of just openDrawer to allow closing when clicked again
+                toggleTextboxTabsDrawer();
+            }
         }
     ];
 
@@ -252,13 +266,6 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
             icon: SidebarIcons.actions.clear,
             text: 'Clear Map',
             onClick: handleClearClick,
-            disabled: routes.length === 0
-        },
-        {
-            id: 'refresh',
-            icon: RefreshIcon,
-            text: 'Refresh Map',
-            onClick: handleRefreshClick,
             disabled: routes.length === 0
         },
         {

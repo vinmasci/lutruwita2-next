@@ -585,12 +585,63 @@ async function handleDeleteRoute(req, res) {
     // Delete the embed data from Cloudinary if it exists
     if (route.embedUrl) {
       try {
-        const publicId = `embeds/embed-${route.persistentId}`;
-        console.log(`[API] Deleting embed data from Cloudinary: ${publicId}`);
-        await deleteFile(publicId);
-        console.log(`[API] Deleted embed data: ${publicId}`);
+        // Extract the actual public ID from the embedUrl
+        console.log(`[API] Embed URL: ${route.embedUrl}`);
+        
+        // Parse the URL to extract the path
+        const embedUrlObj = new URL(route.embedUrl);
+        const pathParts = embedUrlObj.pathname.split('/');
+        console.log(`[API] URL path parts:`, pathParts);
+        
+        // Try different approaches to delete the file
+        
+        // Approach 1: Use the same format as when creating the file
+        const publicId1 = `embed-${route.persistentId}`;
+        console.log(`[API] Attempting to delete embed data (Approach 1) - publicId: ${publicId1}, resource_type: raw, folder: embeds`);
+        try {
+          const result1 = await deleteFile(publicId1, { 
+            resource_type: 'raw',
+            type: 'upload',
+            folder: 'embeds'
+          });
+          console.log(`[API] Approach 1 result:`, result1);
+        } catch (error1) {
+          console.error(`[API] Approach 1 failed:`, error1);
+        }
+        
+        // Approach 2: Include folder in the publicId
+        const publicId2 = `embeds/embed-${route.persistentId}`;
+        console.log(`[API] Attempting to delete embed data (Approach 2) - publicId: ${publicId2}, resource_type: raw`);
+        try {
+          const result2 = await deleteFile(publicId2, { 
+            resource_type: 'raw'
+          });
+          console.log(`[API] Approach 2 result:`, result2);
+        } catch (error2) {
+          console.error(`[API] Approach 2 failed:`, error2);
+        }
+        
+        // Approach 3: Extract public ID from URL
+        // Find the part after /raw/upload/ in the URL
+        const uploadIndex = pathParts.findIndex(part => part === 'upload');
+        if (uploadIndex !== -1 && uploadIndex + 1 < pathParts.length) {
+          const extractedPublicId = pathParts.slice(uploadIndex + 1).join('/').replace(/\.\w+$/, ''); // Remove file extension
+          console.log(`[API] Attempting to delete embed data (Approach 3) - extracted publicId: ${extractedPublicId}, resource_type: raw`);
+          try {
+            const result3 = await deleteFile(extractedPublicId, { 
+              resource_type: 'raw'
+            });
+            console.log(`[API] Approach 3 result:`, result3);
+          } catch (error3) {
+            console.error(`[API] Approach 3 failed:`, error3);
+          }
+        } else {
+          console.log(`[API] Could not extract public ID from URL for Approach 3`);
+        }
+        
+        console.log(`[API] Attempted to delete embed data using multiple approaches`);
       } catch (embedError) {
-        console.error(`[API] Error deleting embed data: ${embedError.message}`);
+        console.error(`[API] Error in overall embed deletion process:`, embedError);
         // Continue with route deletion even if embed data deletion fails
       }
     }

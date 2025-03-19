@@ -21,6 +21,7 @@ export interface SidebarProps {
   onToggleSurface: () => void;
   onPlacePOI: () => void;
   onDeleteRoute: (routeId: string) => void;
+  mode?: 'edit' | 'presentation' | 'embed';
 }
 
 export interface SidebarHookReturn {

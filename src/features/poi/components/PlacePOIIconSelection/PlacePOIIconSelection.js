@@ -1,3 +1,5 @@
+// This file is commented out to disable Place POIs functionality while keeping draggable POIs
+/*
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
 import { Typography, Button, Box } from '@mui/material';
@@ -11,26 +13,45 @@ const PlacePOIIconSelection = ({ place, onBack }) => {
     const [hoveredIcon, setHoveredIcon] = useState(null);
     // Initialize selectedIcons with existing icons for this place
     const [selectedIcons, setSelectedIcons] = useState(() => {
+        // Find POIs by placeId or by coordinates
         const existingIcons = pois
-            .filter(poi => poi.type === 'place' &&
-            poi.placeId === place.id)
+            .filter(poi => 
+                (poi.type === 'place' && poi.placeId === place.id) || // Match by placeId
+                (poi.type === 'place' && 
+                 poi.coordinates[0] === place.coordinates[0] && 
+                 poi.coordinates[1] === place.coordinates[1]) // Match by coordinates as fallback
+            )
             .map(poi => poi.icon);
         return new Set(existingIcons);
     });
-    // Update selectedIcons when place changes
+    
+    // Update selectedIcons when place or pois change
     useEffect(() => {
+        // Find POIs by placeId or by coordinates
         const existingIcons = pois
-            .filter(poi => poi.type === 'place' &&
-            poi.placeId === place.id)
+            .filter(poi => 
+                (poi.type === 'place' && poi.placeId === place.id) || // Match by placeId
+                (poi.type === 'place' && 
+                 poi.coordinates[0] === place.coordinates[0] && 
+                 poi.coordinates[1] === place.coordinates[1]) // Match by coordinates as fallback
+            )
             .map(poi => poi.icon);
         setSelectedIcons(new Set(existingIcons));
-    }, [place.id, pois]);
+    }, [place.id, place.coordinates, pois]);
     const handleIconClick = (iconName, category) => {
-        // Find existing POI with this icon
-        const existingPOI = pois.find(poi => poi.type === 'place' &&
-            poi.placeId === place.id &&
-            poi.icon === iconName);
+        // Find existing POI with this icon by placeId or coordinates
+        const existingPOI = pois.find(poi => 
+            poi.type === 'place' && 
+            poi.icon === iconName && 
+            (
+                poi.placeId === place.id || // Match by placeId
+                (poi.coordinates[0] === place.coordinates[0] && 
+                 poi.coordinates[1] === place.coordinates[1]) // Match by coordinates
+            )
+        );
+        
         const newSelectedIcons = new Set(selectedIcons);
+        
         if (existingPOI) {
             // If POI exists, remove it
             removePOI(existingPOI.id);
@@ -112,3 +133,4 @@ const PlacePOIIconSelection = ({ place, onBack }) => {
                             }, sx: { flex: 2 }, children: "Done" })] }) })] }));
 };
 export default PlacePOIIconSelection;
+*/

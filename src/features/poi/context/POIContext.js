@@ -7,8 +7,8 @@ const poiReducer = (state, action) => {
     switch (action.type) {
         case 'ADD_POI': {
             const now = new Date().toISOString();
-            // Generate a temporary ID for frontend state management
-            const tempId = `temp-${uuidv4()}`;
+            // Use provided tempId if available, otherwise generate a new one
+            const tempId = action.payload.tempId || `temp-${uuidv4()}`;
             
             console.log('[poiReducer] Adding POI to state:', {
                 tempId,
@@ -22,6 +22,8 @@ const poiReducer = (state, action) => {
             };
             
             let result;
+            // Place POI functionality is commented out
+            /*
             if (action.payload.poi.type === 'place') {
                 result = [...state, {
                     ...base,
@@ -30,11 +32,14 @@ const poiReducer = (state, action) => {
                 }];
             }
             else {
+            */
                 result = [...state, {
                     ...base,
                     type: 'draggable',
                 }];
+            /*
             }
+            */
             
             console.log('[poiReducer] New state after adding POI:', {
                 newPoiCount: result.length,
@@ -53,6 +58,8 @@ const poiReducer = (state, action) => {
                 if (updates.type && updates.type !== poi.type) {
                     throw new Error('Cannot change POI type');
                 }
+                // Place POI functionality is commented out
+                /*
                 if (poi.type === 'place') {
                     const placeUpdates = updates;
                     return {
@@ -63,13 +70,16 @@ const poiReducer = (state, action) => {
                     };
                 }
                 else {
+                */
                     const draggableUpdates = updates;
                     return {
                         ...poi,
                         ...draggableUpdates,
                         type: 'draggable',
                     };
+                /*
                 }
+                */
             });
         case 'UPDATE_POSITION':
             return state.map((poi) => poi.id === action.payload.id
@@ -114,13 +124,17 @@ export const POIProvider = ({ children }) => {
                 poi
             });
             
+            // Generate a temporary ID for logging consistency
+            const tempId = `temp-${uuidv4()}`;
+            
             // Add POI to local state only
-            dispatch({ type: 'ADD_POI', payload: { poi } });
+            dispatch({ type: 'ADD_POI', payload: { poi, tempId } });
             
             // Notify RouteContext of POI changes
+            console.log('[POIContext] Notifying RouteContext of POI changes (add)');
             notifyPOIChange();
             
-            console.log('[POIContext] POI added to state with ID:', `temp-${uuidv4()}`);
+            console.log('[POIContext] POI added to state with ID:', tempId);
         }
         catch (error) {
             console.error('[POIContext] Error:', error);
@@ -129,10 +143,15 @@ export const POIProvider = ({ children }) => {
     };
     const removePOI = (id) => {
         try {
+            console.log('[POIContext] Removing POI with ID:', id);
+            
             dispatch({ type: 'REMOVE_POI', payload: id });
             
             // Notify RouteContext of POI changes
+            console.log('[POIContext] Notifying RouteContext of POI changes (remove)');
             notifyPOIChange();
+            
+            console.log('[POIContext] POI removed successfully');
         }
         catch (error) {
             console.error('[POIContext] Error removing POI:', error);
@@ -165,44 +184,85 @@ export const POIProvider = ({ children }) => {
     };
     // Get POIs in route format - memoized to prevent unnecessary recalculations
     const getPOIsForRoute = React.useCallback((_routeId) => {
+        // Removed console logs to prevent excessive output
+        
         // Split POIs by type and validate
         const draggablePois = pois.filter((poi) => {
             if (poi.type !== 'draggable')
                 return false;
             // Validate required fields
             if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon) {
-                console.warn('[POIContext] Invalid draggable POI:', poi.id);
+                // console.warn('[POIContext] Invalid draggable POI:', poi.id);
                 return false;
             }
             return true;
         });
+        
+        // Place POI functionality is commented out
+        /*
         const placePois = pois.filter((poi) => {
             if (poi.type !== 'place')
                 return false;
             // Validate required fields
             if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon || !poi.placeId) {
-                console.warn('[POIContext] Invalid place POI:', poi.id);
+                // console.warn('[POIContext] Invalid place POI:', poi.id);
                 return false;
             }
             return true;
         });
-        return {
+        */
+        
+        const result = {
             draggable: draggablePois,
-            places: placePois
+            places: [] // Empty array since place POIs are disabled
         };
+        
+        return result;
     }, [pois]); // Only recompute when POIs change
     // Load POIs from route
     const loadPOIsFromRoute = (routePOIs) => {
         try {
-            if (!routePOIs)
+            if (!routePOIs) {
+                console.log('[POIContext] No POIs to load from route');
                 return;
+            }
+            
+            console.log('[POIContext] Loading POIs from route:', {
+                draggableCount: routePOIs.draggable?.length || 0,
+                placesCount: routePOIs.places?.length || 0
+            });
+            
             // Process new POIs - they should all be full POI objects now
+            // Place POI functionality is commented out
             const newPOIs = [
-                ...routePOIs.draggable,
-                ...routePOIs.places
+                ...(routePOIs.draggable || [])
+                // ...(routePOIs.places || []) // Place POIs are disabled
             ];
+            
+            console.log('[POIContext] Total POIs to load:', newPOIs.length);
+            
+            // Ensure all place POIs have proper placeId set
+            // Place POI functionality is commented out
+            /*
+            const processedPOIs = newPOIs.map(poi => {
+                // If it's a place POI but doesn't have a placeId, try to generate one
+                if (poi.type === 'place' && !poi.placeId && poi.coordinates) {
+                    // Use coordinates as a fallback placeId
+                    const placeId = `${poi.coordinates[0]},${poi.coordinates[1]}`;
+                    console.log(`[POIContext] Adding missing placeId to place POI: ${placeId}`);
+                    return {
+                        ...poi,
+                        placeId
+                    };
+                }
+                return poi;
+            });
+            */
+            
             // Replace existing POIs entirely
             dispatch({ type: 'LOAD_POIS', payload: newPOIs });
+            
+            console.log('[POIContext] POIs loaded successfully');
             
             // Don't notify RouteContext when loading POIs from route
             // as this is not a user-initiated change

@@ -6,9 +6,8 @@ export const StyledDrawer = styled(Box)(({ theme }) => ({
     backgroundColor: 'rgb(35, 35, 35)',
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',
-    padding: '16px',
-    boxSizing: 'border-box',
+    overflowY: 'auto',
+    boxSizing: 'border-box'
 }));
 export const DrawerHeader = styled(Box)(({ theme }) => ({
     padding: '16px',

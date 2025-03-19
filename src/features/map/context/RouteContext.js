@@ -160,6 +160,7 @@ export const RouteProvider = ({ children, }) => {
     const [headerSettings, setHeaderSettings] = useState({
         color: '#000000',
         logoUrl: null,
+        logoPublicId: null, // Track the public ID for deletion
         username: '',
         logoFile: null,
         logoData: null,
@@ -201,8 +202,13 @@ export const RouteProvider = ({ children, }) => {
         // Check if description was updated
         if (updates.description) {
             changedSectionUpdates.description = true;
-        } else {
-            // Only mark routes as changed if it's not just a description update
+        } 
+        // Check if only metadata was updated
+        else if (updates.metadata && Object.keys(updates).length === 1) {
+            changedSectionUpdates.metadata = true;
+        } 
+        else {
+            // Only mark routes as changed if it's not just a description or metadata update
             changedSectionUpdates.routes = true;
         }
         
@@ -257,57 +263,82 @@ export const RouteProvider = ({ children, }) => {
       return updatedPhotos;
     };
     
-    // Helper function to upload logo to Cloudinary
-    const uploadLogoToCloudinary = async () => {
-      // Check if we have a logo file to upload
-      if (!headerSettings.logoFile && !headerSettings.logoData) {
-        return headerSettings.logoUrl;
+  // Helper function to upload logo to Cloudinary
+  const uploadLogoToCloudinary = async () => {
+    // Import the cloudinary utility functions
+    const { uploadToCloudinary, getPublicIdFromUrl } = await import('../../../utils/cloudinary');
+    
+    // Check if we have a logo file to upload
+    if (!headerSettings.logoFile && !headerSettings.logoData && !headerSettings.logoBlob) {
+      // Check if the current URL is a blob URL
+      if (headerSettings.logoUrl && headerSettings.logoUrl.startsWith('blob:')) {
+        console.warn('[RouteContext] Logo URL is a blob URL but no file is available for upload');
+        return { url: null, publicId: null }; // Return null to indicate we should not use this URL
+      }
+      // Return the existing URL and try to extract the public ID if it's a Cloudinary URL
+      return { 
+        url: headerSettings.logoUrl, 
+        publicId: headerSettings.logoPublicId || getPublicIdFromUrl(headerSettings.logoUrl)
+      };
+    }
+    
+    try {
+      console.log('[RouteContext] Uploading logo to Cloudinary');
+      
+      // Try all possible sources for the file, in order of preference
+      let fileToUpload = null;
+      
+      // First try the blob directly
+      if (headerSettings.logoBlob) {
+        console.log('[RouteContext] Using logoBlob for upload');
+        fileToUpload = headerSettings.logoBlob;
+      } 
+      // Then try the blob from logoData
+      else if (headerSettings.logoData?._blobs?.original) {
+        console.log('[RouteContext] Using logoData._blobs.original for upload');
+        fileToUpload = headerSettings.logoData._blobs.original;
+      }
+      // Then try the file from logoData
+      else if (headerSettings.logoData?.file) {
+        console.log('[RouteContext] Using logoData.file for upload');
+        fileToUpload = headerSettings.logoData.file;
+      }
+      // Finally try the logoFile
+      else if (headerSettings.logoFile) {
+        console.log('[RouteContext] Using logoFile for upload');
+        fileToUpload = headerSettings.logoFile;
       }
       
-      try {
-        console.log('[RouteContext] Uploading logo to Cloudinary');
-        
-        // Use axios to upload directly to Cloudinary
-        const formData = new FormData();
-        
-        // Use the file from logoData if available, otherwise use logoFile
-        const fileToUpload = headerSettings.logoData?._blobs?.original || 
-                            headerSettings.logoData?.file || 
-                            headerSettings.logoFile;
-        
-        if (!fileToUpload) {
-          console.warn('[RouteContext] No logo file found to upload');
-          return headerSettings.logoUrl;
+      if (!fileToUpload) {
+        console.warn('[RouteContext] No logo file found to upload');
+        // If the current URL is a blob URL, return null to avoid using it
+        if (headerSettings.logoUrl && headerSettings.logoUrl.startsWith('blob:')) {
+          return { url: null, publicId: null };
         }
-        
-        // Prepare the form data
-        formData.append('file', fileToUpload);
-        formData.append('upload_preset', 'map_logos'); // Make sure this preset exists in Cloudinary
-        
-        // Upload directly to Cloudinary
-        const response = await fetch(
-          `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-          {
-            method: 'POST',
-            body: formData
-          }
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Upload failed with status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const logoUrl = data.secure_url;
-        
-        console.log('[RouteContext] Logo uploaded successfully:', logoUrl);
-        return logoUrl;
-      } catch (error) {
-        console.error('[RouteContext] Error uploading logo to Cloudinary:', error);
-        // Return the existing URL if upload fails
-        return headerSettings.logoUrl;
+        return { 
+          url: headerSettings.logoUrl, 
+          publicId: headerSettings.logoPublicId || getPublicIdFromUrl(headerSettings.logoUrl)
+        };
       }
-    };
+      
+      // Use the uploadToCloudinary utility function
+      const result = await uploadToCloudinary(fileToUpload);
+      
+      console.log('[RouteContext] Logo uploaded successfully:', result);
+      return { url: result.url, publicId: result.publicId };
+    } catch (error) {
+      console.error('[RouteContext] Error uploading logo to Cloudinary:', error);
+      // Return null if upload fails and current URL is a blob URL
+      if (headerSettings.logoUrl && headerSettings.logoUrl.startsWith('blob:')) {
+        return { url: null, publicId: null };
+      }
+      // Return the existing URL if upload fails and it's not a blob URL
+      return { 
+        url: headerSettings.logoUrl, 
+        publicId: headerSettings.logoPublicId || getPublicIdFromUrl(headerSettings.logoUrl)
+      };
+    }
+  };
     // Function to update route metadata
     const updateRouteMetadata = useCallback(async (route) => {
         if (!route) return route;
@@ -352,10 +383,20 @@ export const RouteProvider = ({ children, }) => {
             // Add the new route
             const updatedRoutes = [...existingRoutes, processedRoute];
             
-            // Update route metadata in the background
-            updateRouteMetadata(processedRoute).catch(error => {
-                console.error('[RouteContext] Error in route metadata update:', error);
-            });
+    // Check if we're in any presentation or preview mode
+    const isPresentationMode = window.location.pathname.includes('/presentation/') || 
+                              window.location.pathname.includes('/preview/route/');
+    
+    // Only update route metadata for fresh routes (not loaded from DB) and when not in presentation mode
+    if (processedRoute._type === 'fresh' && !isPresentationMode) {
+        console.log('[RouteContext] Updating metadata for new route');
+        updateRouteMetadata(processedRoute).catch(error => {
+            console.error('[RouteContext] Error in route metadata update:', error);
+        });
+    } else {
+        console.log('[RouteContext] Skipping metadata update for', 
+            processedRoute._type === 'loaded' ? 'loaded route' : 'route in presentation mode');
+    }
             
             return updatedRoutes;
         });
@@ -550,25 +591,50 @@ export const RouteProvider = ({ children, }) => {
                 // Continue with save even if photo upload fails
             }
             
-            // Upload logo to Cloudinary if present
+            // Upload logo to Cloudinary if present or if current URL is a blob URL
             let updatedHeaderSettings = { ...headerSettings };
             let hasHeaderChanges = changedSections.headerSettings || false;
             
             try {
-                if (headerSettings.logoFile || headerSettings.logoData) {
+                // Check if we need to upload the logo (either we have a file/data or the current URL is a blob URL)
+                if (headerSettings.logoFile || headerSettings.logoData || 
+                    (headerSettings.logoUrl && headerSettings.logoUrl.startsWith('blob:'))) {
+                    
                     console.log('[RouteContext] Uploading logo to Cloudinary');
-                    const logoUrl = await uploadLogoToCloudinary();
+                    const { url: logoUrl, publicId: logoPublicId } = await uploadLogoToCloudinary();
+                    
+                    // If logoUrl is null, it means we should not use the current URL (it's a blob URL)
                     updatedHeaderSettings = {
                         ...headerSettings,
-                        logoUrl: logoUrl,
+                        logoUrl: logoUrl, // This will be null if the upload failed or if we should not use the blob URL
+                        logoPublicId: logoPublicId, // Store the public ID for later deletion
                         logoFile: null, // Remove the file object after upload
-                        logoData: null  // Remove the logo data object after upload
+                        logoData: null, // Remove the logo data object after upload
+                        logoBlob: null // Remove the blob after upload
                     };
-                    console.log('[RouteContext] Logo uploaded successfully:', logoUrl);
+                    
+                    // If the logo URL is null and we had a blob URL, clear it completely
+                    if (logoUrl === null && headerSettings.logoUrl && headerSettings.logoUrl.startsWith('blob:')) {
+                        console.log('[RouteContext] Clearing blob URL since upload failed or no file was available');
+                        updatedHeaderSettings.logoUrl = null;
+                        updatedHeaderSettings.logoPublicId = null;
+                    } else if (logoUrl) {
+                        console.log('[RouteContext] Logo uploaded successfully:', logoUrl);
+                        console.log('[RouteContext] Logo public ID:', logoPublicId);
+                    }
+                    
                     hasHeaderChanges = true;
                 }
             } catch (logoError) {
                 console.error('[RouteContext] Error uploading logo:', logoError);
+                
+                // If there was an error and we have a blob URL, clear it to avoid saving an invalid URL
+                if (headerSettings.logoUrl && headerSettings.logoUrl.startsWith('blob:')) {
+                    console.log('[RouteContext] Clearing blob URL due to upload error');
+                    updatedHeaderSettings.logoUrl = null;
+                    hasHeaderChanges = true;
+                }
+                
                 // Continue with save even if logo upload fails
             }
             
@@ -625,15 +691,24 @@ export const RouteProvider = ({ children, }) => {
                 }
             }
             
+            // Add metadata if it's changed specifically
+            if (changedSections.metadata && currentLoadedPersistentId) {
+                // We don't need to do anything special here as metadata is already included in the routeSummary
+                console.log('[RouteContext] Metadata changed, but no need to include routes in partial update');
+            }
+            
             // Add photos if they've changed or this is a new route
             if (hasPhotoChanges || !currentLoadedPersistentId) {
                 partialUpdate.photos = updatedPhotos;
             }
             
-            // Add POIs if they've changed or this is a new route
-            if (changedSections.pois || !currentLoadedPersistentId) {
-                partialUpdate.pois = pois;
-            }
+            // Always include POIs in the save data since they're small
+            console.log('[RouteContext] Always including POIs in save data:', {
+                draggableCount: pois.draggable?.length || 0,
+                placesCount: pois.places?.length || 0,
+                totalCount: (pois.draggable?.length || 0) + (pois.places?.length || 0)
+            });
+            partialUpdate.pois = pois;
             
             // Add header settings if they've changed or this is a new route
             if (hasHeaderChanges || !currentLoadedPersistentId) {
@@ -760,12 +835,8 @@ export const RouteProvider = ({ children, }) => {
                 setCurrentRouteWithDebug(null);
             }
             
-            // Update route metadata for all loaded routes
-            loadedRoutes.forEach(loadedRoute => {
-                updateRouteMetadata(loadedRoute).catch(error => {
-                    console.error('[RouteContext] Error in route metadata update:', error);
-                });
-            });
+            // No need to update metadata for loaded routes as they should already have it
+            console.log('[RouteContext] Skipping metadata update for loaded routes');
                         // Instead of immediately trying to position the map, store the route bounds for later use
             console.log('[RouteContext] Preparing route bounds for deferred positioning');
             
@@ -852,7 +923,24 @@ export const RouteProvider = ({ children, }) => {
             
             // Load header settings if available
             if (route.headerSettings) {
-                setHeaderSettings(route.headerSettings);
+                // Check if the logo URL is a blob URL, which would be invalid after reload
+                if (route.headerSettings.logoUrl && route.headerSettings.logoUrl.startsWith('blob:')) {
+                    console.warn('[RouteContext] Detected blob URL in loaded route, clearing it:', route.headerSettings.logoUrl);
+                    // Create a new headerSettings object with the logoUrl set to null
+                    const sanitizedHeaderSettings = {
+                        ...route.headerSettings,
+                        logoUrl: null
+                    };
+                    setHeaderSettings(sanitizedHeaderSettings);
+                    
+                    // Also update the route object to avoid using the blob URL in the future
+                    if (route._loadedState) {
+                        route._loadedState.headerSettings = sanitizedHeaderSettings;
+                    }
+                } else {
+                    // Logo URL is not a blob URL, so it's safe to use
+                    setHeaderSettings(route.headerSettings);
+                }
             }
         }
         catch (error) {

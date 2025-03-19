@@ -1,3 +1,5 @@
+// This file is commented out to disable Place POIs functionality while keeping draggable POIs
+/*
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from '../../context/POIContext';
@@ -10,6 +12,9 @@ import { PlaceNamePOI, POI_CATEGORIES, POICategory } from '../../types/poi.types
 import { PlaceLabel } from '../../utils/placeDetection';
 import { PlacePOIDetailsDrawer } from '../POIDetailsDrawer';
 import { Place } from '../../../place/types/place.types';
+import MapboxPOIMarker from '../MapboxPOIMarker/MapboxPOIMarker';
+import POICluster from '../POICluster/POICluster';
+import { clusterPOIs, isCluster, getClusterExpansionZoom } from '../../utils/clustering';
 
 const HIGHLIGHT_SOURCE = 'place-highlight-source';
 const HIGHLIGHT_LAYER = 'place-highlight-layer';
@@ -29,6 +34,7 @@ export const PlacePOILayer: React.FC<Props> = () => {
   const [hoveredPlace, setHoveredPlace] = useState<PlaceLabel | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [clusteredItems, setClusteredItems] = useState<any[]>([]);
 
   const isDrawerOpen = selectedPlace !== null;
   // Custom hook to track map style loading
@@ -87,6 +93,42 @@ export const PlacePOILayer: React.FC<Props> = () => {
       map.off('zoom', handleZoom);
     };
   }, [map]);
+
+  // Update clustering when POIs or zoom changes
+  useEffect(() => {
+    if (!map || zoom === null || !isLayerReady) return;
+
+    // Only cluster when zoomed out enough
+    if (zoom <= 8.071) {
+      setClusteredItems([]);
+      return;
+    }
+
+    // Get all place POIs
+    const placePois = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
+    
+    // Cluster POIs
+    const clusters = clusterPOIs(placePois, zoom);
+    setClusteredItems(clusters);
+  }, [pois, map, zoom, isLayerReady]);
+
+  // Handle cluster click
+  const handleClusterClick = (cluster: any) => {
+    if (!map) return;
+    
+    // Get the zoom level to expand this cluster
+    const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id, clusteredItems);
+    const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
+    
+    // Get the cluster's coordinates
+    const [lng, lat] = cluster.geometry.coordinates;
+    
+    // Zoom to the cluster's location
+    map.easeTo({
+      center: [lng, lat],
+      zoom: targetZoom
+    });
+  };
 
   // Clear selected place when POI mode changes
   useEffect(() => {
@@ -179,30 +221,38 @@ export const PlacePOILayer: React.FC<Props> = () => {
       const place = getPlaceLabelAtPoint(map, e.point);
       if (!place) return;
 
-      // Check if place already has POIs
+      // Check if place already has POIs - improved to check by placeId as well
       const hasPOIs = pois.some(poi => 
-        poi.coordinates[0] === place.coordinates[0] && 
-        poi.coordinates[1] === place.coordinates[1]
+        (poi.type === 'place' && poi.placeId === place.id) || // Check by placeId first
+        (poi.coordinates[0] === place.coordinates[0] && poi.coordinates[1] === place.coordinates[1]) // Then by coordinates
       );
 
-      // Only show details drawer if we're not in place mode or if the place has POIs
-      if (poiMode !== 'place' || hasPOIs) {
-        // Get existing place data or create new if it doesn't exist
-        const existingPlace = places[place.id];
-        const placeData: Place = existingPlace || {
-          id: place.id,
-          name: place.name,
-          coordinates: place.coordinates,
-          description: '',
-          photos: []
-        };
+      console.log('[PlacePOILayer] Place clicked:', {
+        place,
+        hasPOIs,
+        matchingPOIs: pois.filter(poi => 
+          (poi.type === 'place' && poi.placeId === place.id) || 
+          (poi.coordinates[0] === place.coordinates[0] && poi.coordinates[1] === place.coordinates[1])
+        )
+      });
 
-        // Only save if it's a new place
-        if (!existingPlace) {
-          await updatePlace(place.id, placeData);
-        }
-        setSelectedPlace(placeData);
+      // Always show details drawer when clicking on a place, regardless of mode
+      // This allows editing existing POIs even after loading a saved map
+      // Get existing place data or create new if it doesn't exist
+      const existingPlace = places[place.id];
+      const placeData: Place = existingPlace || {
+        id: place.id,
+        name: place.name,
+        coordinates: place.coordinates,
+        description: '',
+        photos: []
+      };
+
+      // Only save if it's a new place
+      if (!existingPlace) {
+        await updatePlace(place.id, placeData);
       }
+      setSelectedPlace(placeData);
     };
 
       // Add event listeners
@@ -229,18 +279,100 @@ export const PlacePOILayer: React.FC<Props> = () => {
     }
   }, [map, isStyleLoaded, poiMode, places, pois]);
 
-  // Handle POI markers - now dependent on isLayerReady
+  // Handle POI markers - now dependent on isLayerReady and clusteredItems
   useEffect(() => {
     const setupMarkers = async () => {
+      if (!map || !isLayerReady) {
+        return;
+      }
 
-    if (!map || !isLayerReady) {
-      return;
-    }
+      // If we have clustered items, don't create individual markers
+      // as they will be handled by the rendering of clusteredItems
+      if (clusteredItems.length > 0) {
+        // Clear existing markers
+        markersRef.current.forEach(({ marker }) => marker.remove());
+        markersRef.current = [];
+        return;
+      }
+
+      // Clear existing markers
+      markersRef.current.forEach(({ marker }) => marker.remove());
+      markersRef.current = [];
+
+      // Helper function to get place ID from coordinates
+      const getPlaceId = (coordinates: [number, number]): string => {
+        // First check if there are any POIs at these coordinates
+        const existingPOI = pois.find(
+          poi => poi.type === 'place' && 
+          poi.coordinates[0] === coordinates[0] && 
+          poi.coordinates[1] === coordinates[1]
+        ) as PlaceNamePOI | undefined;
+
+        if (existingPOI) {
+          return existingPOI.placeId;
+        }
+
+        // If no POI found, try to get the place label from the map
+        const point = map.project(coordinates);
+        const placeLabel = getPlaceLabelAtPoint(map, point);
+        
+        if (placeLabel) {
+          return placeLabel.id;
+        }
+
+        // If no place label found, look for existing place by coordinates
+        const existingPlace = Object.values(places).find(
+          place => place.coordinates[0] === coordinates[0] && place.coordinates[1] === coordinates[1]
+        );
+        if (existingPlace) {
+          return existingPlace.id;
+        }
+
+        // If no existing place found, use coordinate format as fallback
+        const coordinateId = `${coordinates[0]},${coordinates[1]}`;
+        return coordinateId;
+      };
+
+      // Get all place POIs and create missing places
+      const placePois = pois.filter((poi): poi is PlaceNamePOI => poi.type === 'place');
+      for (const poi of placePois) {
+        const placeId = getPlaceId(poi.coordinates);
+        const existingPlace = places[placeId];
+        if (!existingPlace) {
+          await updatePlace(placeId, {
+            id: placeId,
+            name: poi.name,
+            coordinates: poi.coordinates,
+            description: '',
+            photos: []
+          });
+        }
+      }
 
 
-    // Clear existing markers
-    markersRef.current.forEach(({ marker }) => marker.remove());
-    markersRef.current = [];
+    // Group POIs by location to show them together
+    const poiGroups = placePois
+      .reduce<Record<string, PlaceNamePOI[]>>((acc
+
+  // Handle POI markers - now dependent on isLayerReady and clusteredItems
+  useEffect(() => {
+    const setupMarkers = async () => {
+      if (!map || !isLayerReady) {
+        return;
+      }
+
+      // If we have clustered items, don't create individual markers
+      // as they will be handled by the rendering of clusteredItems
+      if (clusteredItems.length > 0) {
+        // Clear existing markers
+        markersRef.current.forEach(({ marker }) => marker.remove());
+        markersRef.current = [];
+        return;
+      }
+
+      // Clear existing markers
+      markersRef.current.forEach(({ marker }) => marker.remove());
+      markersRef.current = [];
 
       // Helper function to get place ID from coordinates
       const getPlaceId = (coordinates: [number, number]): string => {
@@ -440,15 +572,44 @@ export const PlacePOILayer: React.FC<Props> = () => {
   }, [map, isStyleLoaded, pois, zoom, places]);
 
   return (
-    <PlacePOIDetailsDrawer
-      isOpen={isDrawerOpen}
-      onClose={() => setSelectedPlace(null)}
-      placeId={selectedPlace?.id || null}
-      placeName={selectedPlace?.name || ''}
-      description={selectedPlace?.description || ''}
-      photos={selectedPlace?.photos || []}
-    />
+    <>
+      {clusteredItems.length > 0 ? (
+        // Render clusters and individual POIs
+        clusteredItems.map(item => 
+          isCluster(item) ? (
+            <POICluster 
+              key={`cluster-${item.properties.cluster_id}`}
+              cluster={item}
+              onClick={() => handleClusterClick(item)}
+            />
+          ) : (
+            <MapboxPOIMarker
+              key={item.properties.id}
+              poi={item.properties.poi}
+              onClick={() => {
+                // Handle POI click
+                if (map) {
+                  const place = getPlaceLabelAtPoint(map, map.project(item.geometry.coordinates));
+                  if (place && places[place.id]) {
+                    setSelectedPlace(places[place.id]);
+                  }
+                }
+              }}
+            />
+          )
+        )
+      ) : null}
+      <PlacePOIDetailsDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setSelectedPlace(null)}
+        placeId={selectedPlace?.id || null}
+        placeName={selectedPlace?.name || ''}
+        description={selectedPlace?.description || ''}
+        photos={selectedPlace?.photos || []}
+      />
+    </>
   );
 };
 
 export default PlacePOILayer;
+*/

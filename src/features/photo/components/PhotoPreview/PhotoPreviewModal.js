@@ -145,6 +145,9 @@ export const PhotoPreviewModal = ({ photo, onClose, additionalPhotos }) => {
         fullScreen: false, 
         maxWidth: false, 
         fullWidth: false, 
+        disableScrollLock: true,
+        disableAutoFocus: true,
+        keepMounted: true,
         sx: {
             '& .MuiDialog-container': {
                 alignItems: 'center',
@@ -153,8 +156,12 @@ export const PhotoPreviewModal = ({ photo, onClose, additionalPhotos }) => {
                     width: '800px',
                     maxWidth: '80%',
                     m: 2,
-                    borderRadius: 1
+                    borderRadius: 1,
+                    backgroundColor: 'rgba(35, 35, 35, 0.95)'
                 }
+            },
+            '& .MuiBackdrop-root': {
+                position: 'absolute'
             }
         }, 
         children: [

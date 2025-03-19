@@ -85,7 +85,10 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
         }
         // Handle clicking
         if (onClick) {
-            el.addEventListener('click', () => onClick(poi));
+            el.addEventListener('click', () => {
+                console.log('[MapboxPOIMarker] Click detected on POI:', poi);
+                onClick(poi);
+            });
         }
         // Handle dragging
         if (isDraggable && markerRef.current) {

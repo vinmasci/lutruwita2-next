@@ -1,0 +1,87 @@
+.poi-cluster {
+  position: relative;
+  cursor: pointer;
+}
+
+.poi-cluster-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.poi-cluster-bubble {
+  background-color: rgba(0, 123, 255, 0.8);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  width: 36px;
+  height: 36px;
+  transition: transform 0.2s ease;
+}
+
+.poi-cluster-bubble:hover {
+  transform: scale(1.1);
+}
+
+.poi-cluster-point {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(0, 123, 255, 0.8);
+  margin-top: -4px;
+}
+
+/* Count chip styling */
+.poi-cluster-count-chip {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #ff0000;
+  color: white;
+  border: 1px solid white;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+/* Zoom-based scaling */
+.poi-cluster[data-zoom="8"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="9"] .poi-cluster-bubble {
+  transform: scale(0.8);
+}
+
+.poi-cluster[data-zoom="10"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="11"] .poi-cluster-bubble {
+  transform: scale(0.9);
+}
+
+.poi-cluster[data-zoom="12"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="13"] .poi-cluster-bubble {
+  transform: scale(1);
+}
+
+.poi-cluster[data-zoom="14"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="15"] .poi-cluster-bubble {
+  transform: scale(1.1);
+}
+
+.poi-cluster[data-zoom="16"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="17"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="18"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="19"] .poi-cluster-bubble,
+.poi-cluster[data-zoom="20"] .poi-cluster-bubble {
+  transform: scale(1.2);
+}

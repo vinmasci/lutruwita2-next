@@ -7,14 +7,17 @@ import { useSidebar } from './useSidebar';
 import { Box, CircularProgress } from '@mui/material';
 import { Auth0Login } from '../../../auth/components/Auth0Login/Auth0Login';
 import { POIDrawer } from '../../../poi/components/POIDrawer';
-import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
+import { POIDetailsModal } from '../../../poi/components/POIDetailsModal';
 import { normalizeRoute } from '../../utils/routeUtils';
+import { TextboxTabsDrawer } from '../../../presentation/components/TextboxTabs';
+import { useTextboxTabs } from '../../../presentation/context/TextboxTabsContext';
 // Lazy load components
 const LazyUploader = lazy(() => import('../../../gpx/components/Uploader/Uploader'));
 const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
 export const Sidebar = (props) => {
-    const { isDrawerOpen, activeDrawer, handleUploadGpx, handleAddPOI, handleAddPhotos } = useSidebar(props);
+    const { isDrawerOpen, activeDrawer, handleUploadGpx, handleAddPOI, handleAddPhotos, handleTextboxTabs } = useSidebar(props);
     const { addPhoto, deletePhoto } = usePhotoContext();
+    const { isDrawerOpen: isTextboxTabsDrawerOpen } = useTextboxTabs();
     const handleUploadComplete = async (result) => {
         // Normalize the route before passing it to MapView
         const normalizedRoute = normalizeRoute(result);
@@ -60,26 +63,21 @@ export const Sidebar = (props) => {
                         },
                         children: activeDrawer === 'poi' ? (_jsx(POIDrawer, { isOpen: isDrawerOpen, onClose: () => handleAddPOI() })) : (activeDrawerContent) }), 
                         
-                        props.poiDetailsDrawer?.isOpen && (_jsx(NestedDrawer, { 
-                            variant: "persistent", 
-                            anchor: "left", 
-                            open: props.poiDetailsDrawer.isOpen, 
-                            onClose: props.poiDetailsDrawer.onClose, 
-                            sx: { 
-                                zIndex: 1300,
-                                '& .MuiDrawer-paper': {
-                                    top: '64px', // Position below the header
-                                    height: 'calc(100% - 64px)', // Adjust height to account for header
-                                    marginLeft: '320px', // Account for the sidebar width + POIDrawer width
-                                    paddingTop: '0px' // Remove any top padding
-                                }
-                            }, 
-                            children: _jsx(POIDetailsDrawer, { 
+                        props.poiDetailsDrawer?.isOpen && (
+                            _jsx(POIDetailsModal, { 
                                 isOpen: props.poiDetailsDrawer.isOpen, 
                                 onClose: props.poiDetailsDrawer.onClose, 
                                 iconName: props.poiDetailsDrawer.iconName, 
                                 category: props.poiDetailsDrawer.category, 
-                                onSave: props.poiDetailsDrawer.onSave 
-                            }) 
-                        }))] })] }));
+                                onSave: props.poiDetailsDrawer.onSave,
+                                readOnly: props.mode === 'presentation' || props.mode === 'embed'
+                            })
+                        ),
+                        
+                        // Add TextboxTabsDrawer with proper props
+                        _jsx(TextboxTabsDrawer, { 
+                            isOpen: isTextboxTabsDrawerOpen, 
+                            onClose: handleTextboxTabs 
+                        })
+                        ] })] }));
 };
