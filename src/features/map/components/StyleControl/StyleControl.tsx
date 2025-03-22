@@ -62,7 +62,7 @@ class StyleControl {
     }
 
     // Wait for style to load
-    this.map.once('style.load', () => {
+    this.map?.once('style.load', () => {
       // Re-add terrain source
       if (!this.map?.getSource('mapbox-dem')) {
         this.map?.addSource('mapbox-dem', {
@@ -100,17 +100,31 @@ class StyleControl {
           minzoom: 12,
           maxzoom: 14,
           paint: {
-            'line-opacity': 1,
+            'line-opacity': [
+              'match',
+              ['get', 'surface'],
+              ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
+              0, // Make asphalt roads transparent
+              ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
+              0.5, // 50% opacity for gravel roads
+              1
+            ],
             'line-color': [
               'match',
               ['get', 'surface'],
               ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-              '#4A90E2',
+              '#888888', // Fallback color for asphalt roads (won't be visible due to opacity 0)
               ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-              '#D35400',
+              '#D35400', // Keep orange color for gravel roads
               '#888888'
             ],
-            'line-width': 2
+            'line-width': [
+              'match',
+              ['get', 'surface'],
+              ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
+              4, // Wider line for gravel roads
+              2  // Default width for other roads
+            ]
           }
         });
       }
@@ -147,7 +161,7 @@ class StyleControl {
     console.debug('[StyleControl] Switching to style:', {
       style,
       url: MAP_STYLES[style].url,
-      currentLayers: this.map.getStyle()?.layers?.map(l => ({
+      currentLayers: this.map?.getStyle()?.layers?.map(l => ({
         id: l.id,
         type: l.type,
         source: l.source
@@ -155,13 +169,13 @@ class StyleControl {
     });
 
     // Switch map style
-    this.map.setStyle(MAP_STYLES[style].url);
+    this.map?.setStyle(MAP_STYLES[style].url);
 
     // Log layers after style load
-    this.map.once('style.load', () => {
+    this.map?.once('style.load', () => {
       console.debug('[StyleControl] New style loaded:', {
         style,
-        layers: this.map.getStyle()?.layers?.map(l => ({
+        layers: this.map?.getStyle()?.layers?.map(l => ({
           id: l.id,
           type: l.type,
           source: l.source

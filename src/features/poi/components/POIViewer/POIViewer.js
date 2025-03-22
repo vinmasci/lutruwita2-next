@@ -1,15 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
 import { Box, IconButton, Typography, Dialog, DialogContent, TextField, Button, Modal } from '@mui/material';
-import { ChevronLeft, Close, Edit, Save, Cancel, Delete } from '@mui/icons-material';
-import { DrawerHeader, DrawerContent } from '../POIDrawer/POIDrawer.styles';
-import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
+import { Close, Edit, Save, Cancel, Delete } from '@mui/icons-material';
 import { POI_CATEGORIES } from '../../types/poi.types';
 import { getIconDefinition } from '../../constants/poi-icons';
 import { createPOIPhotos } from '../../utils/photo';
 import { usePOIContext } from '../../context/POIContext';
 
-export const POIViewer = ({ poi: initialPoi, onClose, onUpdate, displayMode = "drawer" }) => {
+export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
     const { pois, removePOI } = usePOIContext();
     const [poi, setPoi] = useState(initialPoi);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
@@ -87,68 +85,77 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate, displayMode = "d
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
     const categoryColor = POI_CATEGORIES[poi.category]?.color || '#777777'; // Default gray color if category not found
 
-    // Render drawer content
-    const renderDrawerContent = () => {
-        return (
-            _jsxs(Box, {
+    return _jsxs(_Fragment, { children: [
+        _jsx(Modal, {
+            open: Boolean(poi),
+            onClose: onClose,
+            "aria-labelledby": "poi-viewer-modal",
+            children: _jsxs(Box, {
                 sx: {
-                    height: '100%',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '90%',
+                    maxWidth: '500px',
+                    maxHeight: '90vh',
+                    bgcolor: 'rgba(0, 0, 0, 0.7)',
+                    border: '1px solid rgba(30, 136, 229, 0.5)',
+                    borderRadius: 2,
+                    boxShadow: 24,
+                    p: 4,
+                    overflowY: 'auto',
                     display: 'flex',
                     flexDirection: 'column'
                 },
                 children: [
-                    _jsxs(DrawerHeader, {
+                    _jsxs(Box, {
+                        sx: { 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            mb: 3
+                        },
                         children: [
+                            _jsxs(Box, {
+                                sx: { display: 'flex', alignItems: 'center', gap: 1 },
+                                children: [
+                                    _jsx("i", {
+                                        className: `lucide-${iconDef?.name}`,
+                                        style: {
+                                            color: categoryColor,
+                                            fontSize: '24px'
+                                        }
+                                    }),
+                                    isEditing ? (
+                                        _jsx(TextField, {
+                                            value: editedName,
+                                            onChange: (e) => setEditedName(e.target.value),
+                                            variant: "standard",
+                                            sx: {
+                                                input: { color: 'white', fontSize: '1.25rem' },
+                                                '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255, 255, 255, 0.42)' },
+                                                '& .MuiInput-underline:hover:before': { borderBottomColor: 'rgba(255, 255, 255, 0.87)' },
+                                            }
+                                        })
+                                    ) : (
+                                        _jsx(Typography, { variant: "h6", color: "white", children: poi.name })
+                                    )
+                                ]
+                            }),
                             _jsx(IconButton, {
                                 onClick: onClose,
                                 sx: {
-                                    mr: 1,
                                     color: 'white',
                                     '&:hover': {
                                         backgroundColor: 'rgba(255, 255, 255, 0.1)'
                                     }
                                 },
-                                children: _jsx(ChevronLeft, {})
-                            }),
-                            _jsxs(Box, {
-                                sx: { 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    flexGrow: 1, 
-                                    gap: 1
-                                },
-                                children: [
-                                    _jsxs(Box, {
-                                        sx: { display: 'flex', alignItems: 'center', gap: 1 },
-                                        children: [
-                                            _jsx("i", {
-                                                className: `lucide-${iconDef?.name}`,
-                                                style: {
-                                                    color: categoryColor,
-                                                    fontSize: '24px'
-                                                }
-                                            }),
-                                            isEditing ? (
-                                                _jsx(TextField, {
-                                                    value: editedName,
-                                                    onChange: (e) => setEditedName(e.target.value),
-                                                    variant: "standard",
-                                                    sx: {
-                                                        input: { color: 'white', fontSize: '1.25rem' },
-                                                        '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255, 255, 255, 0.42)' },
-                                                        '& .MuiInput-underline:hover:before': { borderBottomColor: 'rgba(255, 255, 255, 0.87)' },
-                                                    }
-                                                })
-                                            ) : (
-                                                _jsx(Typography, { variant: "h6", color: "white", children: poi.name })
-                                            )
-                                        ]
-                                    })
-                                ]
+                                children: _jsx(Close, {})
                             })
                         ]
                     }),
-                    _jsxs(DrawerContent, {
+                    _jsxs(Box, {
                         children: [
                             _jsx(Box, {
                                 sx: {
@@ -401,413 +408,52 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate, displayMode = "d
                     })
                 ]
             })
-        );
-    };
-
-    // Render modal content - styled more like PresentationPOIViewer
-    const renderModalContent = () => {
-        return (
-            _jsxs(Box, {
+        }),
+        _jsx(Modal, {
+            open: Boolean(selectedPhoto),
+            onClose: () => setSelectedPhoto(null),
+            sx: {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10000, // Higher than the POI viewer modal
+                '& .MuiBackdrop-root': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)'
+                }
+            },
+            children: _jsxs(Box, {
                 sx: {
-                    display: 'flex',
-                    flexDirection: 'column',
-                    width: '100%'
+                    position: 'relative',
+                    maxWidth: '90vw',
+                    maxHeight: '90vh',
+                    outline: 'none'
                 },
                 children: [
-                    // Header with title and close button
-                    _jsxs(Box, {
-                        sx: { 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'space-between',
-                            mb: 3
-                        },
-                        children: [
-                            _jsxs(Box, { 
-                                sx: { display: 'flex', alignItems: 'center', gap: 1 }, 
-                                children: [
-                                    _jsx("i", { 
-                                        className: `lucide-${iconDef?.name}`, 
-                                        style: {
-                                            color: categoryColor,
-                                            fontSize: '24px'
-                                        } 
-                                    }),
-                                    isEditing ? (
-                                        _jsx(TextField, {
-                                            value: editedName,
-                                            onChange: (e) => setEditedName(e.target.value),
-                                            variant: "standard",
-                                            sx: {
-                                                input: { color: 'white', fontSize: '1.25rem' },
-                                                '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255, 255, 255, 0.42)' },
-                                                '& .MuiInput-underline:hover:before': { borderBottomColor: 'rgba(255, 255, 255, 0.87)' },
-                                            }
-                                        })
-                                    ) : (
-                                        _jsx(Typography, { variant: "h6", color: "white", children: poi.name })
-                                    )
-                                ]
-                            }),
-                            _jsx(IconButton, {
-                                onClick: onClose,
-                                sx: {
-                                    color: 'white',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                    }
-                                },
-                                children: _jsx(Close, {})
-                            })
-                        ]
+                    selectedPhoto && _jsx("img", {
+                        src: selectedPhoto,
+                        alt: "Full size photo",
+                        style: {
+                            maxWidth: '100%',
+                            maxHeight: '90vh',
+                            objectFit: 'contain'
+                        }
                     }),
-
-                    // Description section
-                    _jsx(Box, { 
+                    _jsx(IconButton, {
+                        onClick: () => setSelectedPhoto(null),
                         sx: {
-                            mb: 3,
-                            p: 2,
-                            borderRadius: '4px',
-                            backgroundColor: 'rgba(45, 45, 45, 0.9)',
-                            width: '100%'
-                        }, 
-                        children: isEditing ? (
-                            _jsx(TextField, {
-                                fullWidth: true,
-                                multiline: true,
-                                minRows: 3,
-                                value: editedDescription,
-                                onChange: (e) => setEditedDescription(e.target.value),
-                                variant: "outlined",
-                                sx: {
-                                    '& .MuiOutlinedInput-root': {
-                                        color: 'white',
-                                        bgcolor: 'rgba(0, 0, 0, 0.2)',
-                                        '& fieldset': {
-                                            borderColor: 'rgba(255, 255, 255, 0.23)',
-                                        },
-                                        '&:hover fieldset': {
-                                            borderColor: 'rgba(255, 255, 255, 0.5)',
-                                        },
-                                    },
-                                }
-                            })
-                        ) : (
-                            _jsx(Typography, { 
-                                variant: "body1", 
-                                color: "white",
-                                sx: { whiteSpace: 'pre-wrap' }, 
-                                children: poi.description || 'No description' 
-                            })
-                        )
-                    }),
-
-                    // Photos section
-                    _jsxs(Box, { 
-                        children: [
-                            _jsxs(Box, {
-                                sx: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 },
-                                children: [
-                                    _jsxs(Typography, { 
-                                        variant: "subtitle2", 
-                                        color: "white", 
-                                        children: ["Photos (", (poi.photos?.length || 0) + newPhotos.length, ")"] 
-                                    }),
-                                    isEditing && (
-                                        _jsxs(Button, {
-                                            component: "label",
-                                            variant: "outlined",
-                                            size: "small",
-                                            sx: { color: 'white', borderColor: 'rgba(255, 255, 255, 0.23)' },
-                                            children: [
-                                                "Add Photos",
-                                                _jsx("input", {
-                                                    type: "file",
-                                                    hidden: true,
-                                                    multiple: true,
-                                                    accept: "image/*",
-                                                    onChange: (e) => {
-                                                        const files = Array.from(e.target.files || []);
-                                                        handleAddPhotos(files);
-                                                    }
-                                                })
-                                            ]
-                                        })
-                                    )
-                                ]
-                            }),
-                            _jsx(Box, { 
-                                sx: {
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(2, 1fr)',
-                                    gap: 1
-                                }, 
-                                children: [
-                                    ...(poi.photos || []).map((photo, index) => (
-                                        _jsxs(Box, { 
-                                            onClick: () => setSelectedPhoto(photo.url), 
-                                            sx: {
-                                                aspectRatio: '1',
-                                                backgroundColor: 'rgba(35, 35, 35, 0.9)',
-                                                borderRadius: 1,
-                                                overflow: 'hidden',
-                                                cursor: 'pointer',
-                                                transition: 'transform 0.2s',
-                                                position: 'relative',
-                                                '&:hover': {
-                                                    transform: 'scale(1.02)'
-                                                }
-                                            }, 
-                                            children: [
-                                                _jsx("img", { 
-                                                    src: photo.url, 
-                                                    alt: photo.caption || `Photo ${index + 1}`, 
-                                                    style: {
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        objectFit: 'cover'
-                                                    } 
-                                                }),
-                                                isEditing && (
-                                                    _jsx(IconButton, {
-                                                        size: "small",
-                                                        onClick: (e) => {
-                                                            e.stopPropagation();
-                                                            if (poi.photos) {
-                                                                const updatedPhotos = [...poi.photos];
-                                                                updatedPhotos.splice(index, 1);
-                                                                // Update both local state and trigger save
-                                                                setPoi({ ...poi, photos: updatedPhotos });
-                                                                if (onUpdate) {
-                                                                    onUpdate(poi.id, { photos: updatedPhotos });
-                                                                }
-                                                            }
-                                                        },
-                                                        sx: {
-                                                            position: 'absolute',
-                                                            top: 4,
-                                                            right: 4,
-                                                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                                                            color: 'white',
-                                                            '&:hover': {
-                                                                backgroundColor: 'rgba(0, 0, 0, 0.7)'
-                                                            }
-                                                        },
-                                                        children: _jsx(Close, { fontSize: "small" })
-                                                    })
-                                                )
-                                            ]
-                                        }, index)
-                                    )),
-                                    ...newPhotos.map((photo, index) => (
-                                        _jsxs(Box, {
-                                            sx: {
-                                                aspectRatio: '1',
-                                                backgroundColor: 'rgba(35, 35, 35, 0.9)',
-                                                borderRadius: 1,
-                                                overflow: 'hidden',
-                                                position: 'relative',
-                                            },
-                                            children: [
-                                                _jsx("img", {
-                                                    src: photo.url,
-                                                    alt: photo.caption || `New photo ${index + 1}`,
-                                                    style: {
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        objectFit: 'cover'
-                                                    }
-                                                }),
-                                                isEditing && (
-                                                    _jsx(IconButton, {
-                                                        size: "small",
-                                                        onClick: () => handleRemoveNewPhoto(index),
-                                                        sx: {
-                                                            position: 'absolute',
-                                                            top: 4,
-                                                            right: 4,
-                                                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                                                            color: 'white',
-                                                            '&:hover': {
-                                                                backgroundColor: 'rgba(0, 0, 0, 0.7)'
-                                                            }
-                                                        },
-                                                        children: _jsx(Close, { fontSize: "small" })
-                                                    })
-                                                )
-                                            ]
-                                        }, `new-${index}`)
-                                    ))
-                                ]
-                            })
-                        ] 
-                    }),
-
-                    // Action buttons
-                    _jsx(Box, {
-                        sx: {
-                            mt: 3,
-                            display: 'flex',
-                            gap: 1,
-                            justifyContent: 'flex-end',
-                            borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-                            pt: 2
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            color: 'white',
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                            }
                         },
-                        children: !isEditing ? (
-                            _jsxs(_Fragment, {
-                                children: [
-                                    _jsx(Button, {
-                                        variant: "outlined",
-                                        startIcon: _jsx(Delete, {}),
-                                        onClick: () => {
-                                            removePOI(poi.id);
-                                            onClose();
-                                        },
-                                        sx: {
-                                            color: 'white',
-                                            borderColor: 'white',
-                                            '&:hover': {
-                                                borderColor: 'white',
-                                                backgroundColor: 'rgba(255, 255, 255, 0.08)'
-                                            }
-                                        },
-                                        children: "Delete"
-                                    }),
-                                    _jsx(Button, {
-                                        variant: "contained",
-                                        startIcon: _jsx(Edit, {}),
-                                        onClick: handleStartEditing,
-                                        sx: {
-                                            backgroundColor: 'white',
-                                            color: 'black',
-                                            '&:hover': {
-                                                backgroundColor: 'rgba(255, 255, 255, 0.9)'
-                                            }
-                                        },
-                                        children: "Edit"
-                                    })
-                                ]
-                            })
-                        ) : (
-                            _jsxs(_Fragment, {
-                                children: [
-                                    _jsx(Button, {
-                                        variant: "outlined",
-                                        startIcon: _jsx(Cancel, {}),
-                                        onClick: handleCancelEditing,
-                                        sx: {
-                                            color: 'white',
-                                            borderColor: 'rgba(255, 255, 255, 0.23)',
-                                            '&:hover': {
-                                                borderColor: 'rgba(255, 255, 255, 0.5)'
-                                            }
-                                        },
-                                        children: "Cancel"
-                                    }),
-                                    _jsx(Button, {
-                                        variant: "contained",
-                                        startIcon: _jsx(Save, {}),
-                                        onClick: handleSave,
-                                        color: "primary",
-                                        children: "Save"
-                                    })
-                                ]
-                            })
-                        )
+                        children: _jsx(Close, {})
                     })
                 ]
             })
-        );
-    };
-
-    // Render either drawer or modal based on displayMode
-    return _jsxs(_Fragment, { children: [
-        displayMode === "drawer" ? (
-            _jsx(NestedDrawer, {
-                anchor: "left",
-                open: Boolean(poi),
-                onClose: onClose,
-                variant: "temporary",
-                sx: {
-                    '& .MuiDrawer-paper': {
-                        backgroundColor: 'rgba(0, 0, 0, 1)',
-                        borderLeft: '1px solid #333',
-                    }
-                },
-                children: renderDrawerContent()
-            })
-        ) : (
-            _jsx(Modal, { 
-                open: Boolean(poi), 
-                onClose: onClose,
-                disableScrollLock: true,
-                disableAutoFocus: true,
-                keepMounted: true,
-                sx: { 
-                    zIndex: 9999,
-                    // Ensure modal doesn't affect other fixed elements
-                    '& .MuiBackdrop-root': {
-                        position: 'absolute'
-                    }
-                },
-                children: _jsx(Box, { 
-                    sx: {
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '90%',
-                        maxWidth: '500px',
-                        maxHeight: '90vh',
-                        bgcolor: 'rgba(35, 35, 35, 0.95)',
-                        border: '1px solid rgba(30, 136, 229, 0.5)',
-                        borderRadius: 2,
-                        boxShadow: 24,
-                        p: 4,
-                        overflowY: 'auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        zIndex: 9999
-                    },
-                    children: renderModalContent()
-                })
-            })
-        ),
-        _jsxs(Dialog, {
-            open: Boolean(selectedPhoto),
-            onClose: () => setSelectedPhoto(null),
-            maxWidth: "xl",
-            fullWidth: true,
-            children: [
-                _jsx(IconButton, {
-                    onClick: () => setSelectedPhoto(null),
-                    sx: {
-                        position: 'absolute',
-                        right: 8,
-                        top: 8,
-                        color: 'white',
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        '&:hover': {
-                            backgroundColor: 'rgba(0, 0, 0, 0.7)'
-                        }
-                    },
-                    children: _jsx(Close, {})
-                }),
-                _jsx(DialogContent, {
-                    sx: { p: 0 },
-                    children: selectedPhoto && (
-                        _jsx("img", {
-                            src: selectedPhoto,
-                            alt: "Full size",
-                            style: {
-                                width: '100%',
-                                height: 'auto',
-                                display: 'block'
-                            }
-                        })
-                    )
-                })
-            ]
         })
     ]});
 };

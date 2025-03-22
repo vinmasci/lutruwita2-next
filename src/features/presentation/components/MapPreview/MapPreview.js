@@ -2,7 +2,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-export const MapPreview = ({ center, zoom, routes = [], className = '' }) => {
+export const MapPreview = ({ center, zoom, routes = [], className = '', disableFitBounds = false }) => {
     const mapContainer = useRef(null);
     const map = useRef(null);
     useEffect(() => {
@@ -82,7 +82,7 @@ export const MapPreview = ({ center, zoom, routes = [], className = '' }) => {
                         'line-cap': 'round'
                     },
                     paint: {
-                        'line-color': '#ee5253',
+                        'line-color': route.customMapOptions?.color || '#ee5253',
                         'line-width': 3
                     }
                 });
@@ -110,15 +110,28 @@ export const MapPreview = ({ center, zoom, routes = [], className = '' }) => {
                     });
                 }
             });
-            // Fit bounds to include all routes without animation
-            if (!bounds.isEmpty()) {
+            
+            // Check if we should skip fitting bounds
+            const shouldFitBounds = !disableFitBounds && 
+                                   !routes.some(route => route.customMapOptions?.disableFitBounds);
+            
+            // Fit bounds to include all routes without animation if not disabled
+            if (!bounds.isEmpty() && shouldFitBounds) {
+                // Get the maximum zoom level from route options or use default
+                const maxZoom = Math.max(
+                    ...routes
+                        .filter(route => route.customMapOptions?.maxZoom)
+                        .map(route => route.customMapOptions.maxZoom),
+                    15 // Default max zoom is higher than before
+                );
+                
                 map.current?.fitBounds(bounds, {
                     padding: 20,
-                    maxZoom: 10, // Prevent zooming in too far
+                    maxZoom: maxZoom,
                     animate: false // Disable animation
                 });
             }
         });
-    }, [routes]);
+    }, [routes, disableFitBounds]);
     return (_jsx("div", { ref: mapContainer, className: `w-full h-full ${className}` }));
 };

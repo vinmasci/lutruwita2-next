@@ -1,5 +1,5 @@
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMapInitializer } from './hooks/useMapInitializer';
 import { useMapEvents } from './hooks/useMapEvents';
@@ -17,19 +17,18 @@ import { usePOIContext } from '../../../poi/context/POIContext';
 import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
 import { POIViewer } from '../../../poi/components/POIViewer/POIViewer';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
-import { createPOIPhotos } from '../../../poi/utils/photo';
 import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
-// import PlacePOILayer from '../../../poi/components/PlacePOILayer/PlacePOILayer';
 import DraggablePOILayer from '../../../poi/components/DraggablePOILayer/DraggablePOILayer.jsx';
 import { ClimbMarkers } from '../ClimbMarkers/ClimbMarkers';
-import { DraggableTextboxTabsLayer, TextboxTabsProvider } from '../../../presentation/components/TextboxTabs';
-// import '../../../poi/components/PlacePOILayer/PlacePOILayer.css';
+import LineLayer from '../../../lineMarkers/components/LineLayer/LineLayer.jsx';
+import DirectLineLayer from '../../../lineMarkers/components/LineLayer/DirectLineLayer.jsx';
+import { LineProvider, useLineContext } from '../../../lineMarkers/context/LineContext.jsx';
 import './MapView.css';
 import './photo-fix.css'; // Nuclear option to force photos behind UI components
 import { Sidebar } from '../Sidebar';
-import { CircularProgress, Box, Typography } from '@mui/material';
+import { CircularProgress, Box, Typography, Button } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { RouteLayer } from '../RouteLayer';
 import { normalizeRoute } from '../../utils/routeUtils';
@@ -39,6 +38,7 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 function MapViewContent() {
     const containerRef = useRef(null); // Add a ref for the container
     const { pois, updatePOIPosition, addPOI, updatePOI, poiMode, setPoiMode } = usePOIContext();
+    const { isDrawing } = useLineContext();
     const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
     const currentRouteId = useRef(null);
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
@@ -52,7 +52,8 @@ function MapViewContent() {
         routes,
         headerSettings,
         updateHeaderSettings,
-        setChangedSections
+        setChangedSections,
+        loadedLineData
     } = useRouteContext();
     
     // Function to notify RouteContext of map state changes
@@ -187,10 +188,10 @@ function MapViewContent() {
         const canvas = map.getCanvas();
         if (!canvas)
             return;
-        // Set cursor style based on POI mode
-        canvas.style.cursor = poiMode === 'regular' ? 'crosshair' : '';
+        // Set cursor style based on POI or line drawing mode
+        canvas.style.cursor = (poiMode === 'regular' || isDrawing) ? 'crosshair' : '';
         // Handle clicks only in regular POI mode
-        if (poiMode === 'regular') {
+        if (poiMode === 'regular' && !isDrawing) {
             const clickHandler = (e) => {
                 if (onPoiPlacementClick) {
                     const coords = [e.lngLat.lng, e.lngLat.lat];
@@ -203,7 +204,7 @@ function MapViewContent() {
                 canvas.style.cursor = '';
             };
         }
-    }, [poiMode, onPoiPlacementClick, isMapReady, dragPreview]);
+    }, [poiMode, onPoiPlacementClick, isMapReady, dragPreview, isDrawing]);
 
     const handleAddPOI = () => {
         const newIsOpen = !isPOIDrawerOpen;
@@ -279,14 +280,7 @@ function MapViewContent() {
                 coordinatesString: `${selectedPOIDetails.coordinates[0].toFixed(6)}, ${selectedPOIDetails.coordinates[1].toFixed(6)}`
             });
             
-            // Process photos if they exist
-            let processedPhotos = [];
-            if (details.photos && details.photos.length > 0) {
-                console.log(`Processing ${details.photos.length} photos for POI`);
-                processedPhotos = await createPOIPhotos(details.photos);
-            }
-            
-            // Create POI with all details including photos
+            // Create POI with all details
             const poiDetails = {
                 type: 'draggable',
                 coordinates: selectedPOIDetails.coordinates,
@@ -294,7 +288,6 @@ function MapViewContent() {
                 description: details.description,
                 category: selectedPOIDetails.category,
                 icon: selectedPOIDetails.iconName,
-                photos: processedPhotos
             };
             
             console.log('[POI_DETAILS_FOR_MONGODB]', JSON.stringify(poiDetails, null, 2));
@@ -302,8 +295,7 @@ function MapViewContent() {
             // Add POI to context
             console.log('Adding POI to context with coordinates:', {
                 coordinates: poiDetails.coordinates,
-                coordinatesString: `${poiDetails.coordinates[0].toFixed(6)}, ${poiDetails.coordinates[1].toFixed(6)}`,
-                photoCount: processedPhotos.length
+                coordinatesString: `${poiDetails.coordinates[0].toFixed(6)}, ${poiDetails.coordinates[1].toFixed(6)}`
             });
             
             addPOI(poiDetails);
@@ -421,7 +413,9 @@ function MapViewContent() {
         updatePOIPosition(poi.id, newCoordinates);
     }, [updatePOIPosition]);
 
-    return (_jsx(MapProvider, { value: {
+    // Create the MapProvider component
+    const mapProviderProps = {
+        value: {
             map: mapInstance.current,
             isMapReady,
             isInitializing,
@@ -433,150 +427,258 @@ function MapViewContent() {
             setDragPreview,
             poiPlacementMode: poiMode === 'regular',
             setPoiPlacementMode: (mode) => setPoiMode(mode ? 'regular' : 'none')
-        }, children: _jsxs("div", { ref: containerRef, className: "w-full h-full relative", children: [
-                    _jsx(MapHeader, { 
-                        title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
-                        color: headerSettings.color,
-                        logoUrl: headerSettings.logoUrl,
-                        username: headerSettings.username
-                    }),
-                    _jsx("div", { className: "map-container", ref: mapRef }), 
-                    
-                    !isMapReady && (_jsxs(Box, { sx: {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000
-                    }, children: [
-                        _jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), 
-                        _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })
-                    ] })), 
-                    
-                    _jsx(Sidebar, { 
-                        onUploadGpx: handleUploadGpx, 
-                        onAddPhotos: () => { }, 
-                        onAddPOI: handleAddPOI, 
-                        mapReady: mapReady, 
-                        onItemClick: () => { }, 
-                        onToggleRoute: () => { }, 
-                        onToggleGradient: () => { }, 
-                        onToggleSurface: () => { }, 
-                        onPlacePOI: () => { }, 
-                        onDeleteRoute: handleDeleteRoute 
-                    }), 
-                    
-                    isMapReady && (_jsxs("div", { className: "map-layers", children: [
-                        /* Place POI Layer commented out */
-                        /* _jsx(PlacePOILayer, {}, "place-poi-layer") */
-                        _jsx(DraggablePOILayer, {
-                            onPOIClick: handlePOIClick,
-                            onPOIDragEnd: handlePOIDragEnd
-                        }, "draggable-pois"),
-                        _jsx(DraggableTextboxTabsLayer, {}, "draggable-textbox-tabs"),
-                        _jsx(PhotoLayer, {}, "photo-layer"),
-                        currentRoute && (_jsx(ClimbMarkers, { 
-                            map: mapInstance.current, 
-                            route: currentRoute 
-                        }, "climb-markers"))
-                    ] })), 
-                    
-                    isMapReady && (_jsx("div", { 
-                        className: "header-customization-container", 
-                        style: { 
-                            position: 'absolute', 
-                            top: '75px', 
-                            right: '70px', 
-                            zIndex: 1000 
-                        }, 
-                        children: _jsx(HeaderCustomization, {
-                            color: headerSettings.color,
-                            logoUrl: headerSettings.logoUrl,
-                            username: headerSettings.username,
-                            onSave: updateHeaderSettings
+        }
+    };
+
+    // Create the main container div
+    const containerProps = {
+        ref: containerRef,
+        className: "w-full h-full relative"
+    };
+
+    // Create the MapHeader component
+    const mapHeaderProps = {
+        title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
+        color: headerSettings.color,
+        logoUrl: headerSettings.logoUrl,
+        username: headerSettings.username
+    };
+
+    // Create the map container div
+    const mapContainerProps = {
+        className: "map-container",
+        ref: mapRef
+    };
+
+    // Create the loading overlay
+    const loadingOverlayProps = {
+        sx: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+        }
+    };
+
+    // Create the CircularProgress component
+    const circularProgressProps = {
+        size: 60,
+        sx: { mb: 2 }
+    };
+
+    // Create the Typography component
+    const typographyProps = {
+        variant: "h6",
+        color: "white"
+    };
+
+    // Create the Sidebar component
+    const sidebarProps = {
+        onUploadGpx: handleUploadGpx,
+        onAddPhotos: () => { },
+        onAddPOI: handleAddPOI,
+        mapReady: mapReady,
+        onItemClick: () => { },
+        onToggleRoute: () => { },
+        onToggleGradient: () => { },
+        onToggleSurface: () => { },
+        onPlacePOI: () => { },
+        onDeleteRoute: handleDeleteRoute
+    };
+
+    // Create the map layers div
+    const mapLayersProps = {
+        className: "map-layers"
+    };
+
+    // Create the DraggablePOILayer component
+    const draggablePOILayerProps = {
+        onPOIClick: handlePOIClick,
+        onPOIDragEnd: handlePOIDragEnd,
+        key: "draggable-pois"
+    };
+
+    // Create the PhotoLayer component
+    const photoLayerProps = {
+        key: "photo-layer"
+    };
+
+    // Create the LineLayer component
+    const lineLayerProps = {
+        key: "line-layer"
+    };
+
+    // Create the ClimbMarkers component
+    const climbMarkersProps = {
+        map: mapInstance.current,
+        route: currentRoute,
+        key: "climb-markers"
+    };
+
+    // Create the header customization container div
+    const headerCustomizationContainerProps = {
+        className: "header-customization-container",
+        style: {
+            position: 'absolute',
+            top: '75px',
+            right: '70px',
+            zIndex: 1000
+        }
+    };
+
+    // Create the HeaderCustomization component
+    const headerCustomizationProps = {
+        color: headerSettings.color,
+        logoUrl: headerSettings.logoUrl,
+        username: headerSettings.username,
+        onSave: updateHeaderSettings
+    };
+
+    // Create the POIDragPreview component props if dragPreview exists
+    const poiDragPreviewProps = dragPreview ? {
+        icon: dragPreview.icon,
+        category: dragPreview.category,
+        onPlace: (coordinates) => {
+            handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
+            setDragPreview(null);
+        }
+    } : null;
+
+    // Create the MapboxPOIMarker component props if selectedPOIDetails exists
+    const mapboxPOIMarkerProps = selectedPOIDetails ? {
+        poi: {
+            id: 'temp-poi',
+            type: 'draggable',
+            coordinates: selectedPOIDetails.coordinates,
+            name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
+            category: selectedPOIDetails.category,
+            icon: selectedPOIDetails.iconName
+        }
+    } : null;
+
+    // Create the route filename div
+    const routeFilenameProps = {
+        className: "route-filename"
+    };
+
+    // Create the ElevationProfilePanel component
+    const elevationProfilePanelProps = {
+        route: currentRoute
+    };
+
+    // Create the DistanceMarkers component
+    const distanceMarkersProps = {
+        map: mapInstance.current
+    };
+
+    // Create the POIDetailsDrawer component props if selectedPOIDetails exists
+    const poiDetailsDrawerProps = selectedPOIDetails ? {
+        isOpen: detailsDrawerOpen,
+        onClose: () => {
+            setDetailsDrawerOpen(false);
+            setSelectedPOIDetails(null);
+            setPoiMode('none');
+            setIsPOIDrawerOpen(false);
+        },
+        iconName: selectedPOIDetails.iconName,
+        category: selectedPOIDetails.category,
+        onSave: handlePOIDetailsSave
+    } : null;
+
+    // Create the POIViewer component props if selectedPOI exists
+    const poiViewerProps = selectedPOI ? {
+        poi: selectedPOI,
+        onClose: () => setSelectedPOI(null),
+        onUpdate: updatePOI
+    } : null;
+
+    return React.createElement(MapProvider, mapProviderProps, 
+        React.createElement('div', containerProps, [
+            // MapHeader
+            React.createElement(MapHeader, mapHeaderProps),
+            
+            // Map container
+            React.createElement('div', mapContainerProps),
+            
+            // Loading overlay
+            !isMapReady && React.createElement(Box, loadingOverlayProps, [
+                React.createElement(CircularProgress, circularProgressProps),
+                React.createElement(Typography, typographyProps, "Loading map...")
+            ]),
+            
+            // Sidebar
+            React.createElement(Sidebar, sidebarProps),
+            
+            // Map layers
+            isMapReady && React.createElement('div', mapLayersProps, [
+                React.createElement(DraggablePOILayer, draggablePOILayerProps),
+                React.createElement(PhotoLayer, photoLayerProps),
+                React.createElement(LineLayer, lineLayerProps),
+                // Add DirectLineLayer for loaded line data
+                loadedLineData && loadedLineData.length > 0 && React.createElement(DirectLineLayer, {
+                    map: mapInstance.current,
+                    lines: loadedLineData,
+                    key: "direct-line-layer"
+                }),
+                currentRoute && React.createElement(ClimbMarkers, climbMarkersProps)
+            ]),
+            
+            // Header customization
+            isMapReady && React.createElement('div', headerCustomizationContainerProps,
+                React.createElement(HeaderCustomization, headerCustomizationProps)
+            ),
+            
+            // POI drag preview
+            dragPreview && React.createElement(POIDragPreview, poiDragPreviewProps),
+            
+            // Selected POI details marker
+            selectedPOIDetails && React.createElement(MapboxPOIMarker, mapboxPOIMarkerProps),
+            
+            // Unified route processing
+            isMapReady && mapInstance.current && React.createElement(React.Fragment, null, [
+                // Render routes using RouteLayer component
+                React.createElement(React.Fragment, null,
+                    routes.map(route => 
+                        React.createElement(RouteLayer, {
+                            map: mapInstance.current,
+                            route: route,
+                            key: route.id || route.routeId
                         })
-                    })),
-                    
-                    dragPreview && (_jsx(POIDragPreview, { 
-                        icon: dragPreview.icon, 
-                        category: dragPreview.category, 
-                        onPlace: (coordinates) => {
-                            handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
-                            setDragPreview(null);
-                        } 
-                    })), 
-                    
-                    selectedPOIDetails && (_jsx(MapboxPOIMarker, { 
-                        poi: {
-                            id: 'temp-poi',
-                            type: 'draggable',
-                            coordinates: selectedPOIDetails.coordinates,
-                            name: getIconDefinition(selectedPOIDetails.iconName)?.label || '',
-                            category: selectedPOIDetails.category,
-                            icon: selectedPOIDetails.iconName
-                        } 
-                    })), 
-                    
-                    // Unified route processing
-                    isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [
-                        // Render routes using RouteLayer component
-                        _jsx(_Fragment, {
-                            children: routes.map(route => (
-                                _jsx(RouteLayer, {
-                                    map: mapInstance.current,
-                                    route: route
-                                }, route.id || route.routeId)
-                            ))
-                        }),
-                        
-                        // Route information and components
-                        currentRoute && (_jsxs(_Fragment, { children: [
-                            _jsx("div", { 
-                                className: "route-filename", 
-                                children: currentRoute._type === 'loaded' && currentRoute._loadedState 
-                                    ? currentRoute._loadedState.name 
-                                    : currentRoute.name || 'Untitled Route' 
-                            }),
-                            _jsx(ElevationProfilePanel, { route: currentRoute }),
-                            _jsx(DistanceMarkers, { map: mapInstance.current })
-                        ] }))
-                    ] })),
-                    
-                    selectedPOIDetails && (_jsx(POIDetailsDrawer, { 
-                        isOpen: detailsDrawerOpen, 
-                        onClose: () => {
-                            setDetailsDrawerOpen(false);
-                            setSelectedPOIDetails(null);
-                            setPoiMode('none');
-                            setIsPOIDrawerOpen(false);
-                        }, 
-                        iconName: selectedPOIDetails.iconName, 
-                        category: selectedPOIDetails.category, 
-                        onSave: handlePOIDetailsSave
-                    })), 
-                    
-                    selectedPOI && (_jsx(POIViewer, { 
-                        poi: selectedPOI, 
-                        onClose: () => setSelectedPOI(null), 
-                        onUpdate: updatePOI,
-                        displayMode: "modal"
-                    }))
-                ] }) 
-            })
+                    )
+                ),
+                
+                // Route information and components
+                currentRoute && React.createElement(React.Fragment, null, [
+                    React.createElement('div', routeFilenameProps, 
+                        currentRoute._type === 'loaded' && currentRoute._loadedState 
+                            ? currentRoute._loadedState.name 
+                            : currentRoute.name || 'Untitled Route'
+                    ),
+                    React.createElement(ElevationProfilePanel, elevationProfilePanelProps),
+                    React.createElement(DistanceMarkers, distanceMarkersProps)
+                ])
+            ]),
+            
+            // POI details drawer
+            selectedPOIDetails && React.createElement(POIDetailsDrawer, poiDetailsDrawerProps),
+            
+            // Selected POI viewer
+            selectedPOI && React.createElement(POIViewer, poiViewerProps)
+        ])
     );
 }
 
 export default function MapView() {
-    return (
-        _jsx(RouteProvider, { 
-            children: _jsx(TextboxTabsProvider, {
-                children: _jsx(MapViewContent, {})
-            }) 
+    console.log('[MapView] Creating MapView component with provider structure: RouteProvider → LineProvider → MapViewContent');
+    return React.createElement(RouteProvider, { 
+        children: React.createElement(LineProvider, {
+            children: React.createElement(MapViewContent, {})
         })
-    );
+    });
 }

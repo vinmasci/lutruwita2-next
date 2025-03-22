@@ -9,8 +9,8 @@ import { calculateElevationGained, calculateElevationLost } from '../utils/eleva
 
 import { 
   ListOrdered, Camera, CameraOff, Ruler, AlertTriangle, 
-  Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp,
-  Eye, EyeOff
+  Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight,
+  Settings2, Eye, EyeOff, PowerOff, CirclePower
 } from 'lucide-react';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
@@ -26,6 +26,10 @@ const EmbedSidebar = ({
   setCurrentRoute,
   isPhotosVisible,
   togglePhotosVisibility,
+  isClimbFlagsVisible,
+  toggleClimbFlagsVisibility,
+  isLineMarkersVisible,
+  toggleLineMarkersVisibility,
   visiblePOICategories,
   togglePOICategoryVisibility,
   routeVisibility,
@@ -33,6 +37,8 @@ const EmbedSidebar = ({
   map
 }) => {
   const [isNestedOpen, setIsNestedOpen] = useState(true);
+  const [allComponentsDisabled, setAllComponentsDisabled] = useState(false);
+  const [previouslyVisiblePOICategories, setPreviouslyVisiblePOICategories] = useState([]);
   
   // Get all routes from routeData
   const routes = routeData?.routes || [];
@@ -131,22 +137,60 @@ const EmbedSidebar = ({
       }
     }
   };
+
+  // Toggle all components on/off
+  const toggleAllComponents = () => {
+    setAllComponentsDisabled(prev => !prev);
+    
+    // If we're enabling components, restore previous state
+    // If we're disabling components, hide everything
+    if (allComponentsDisabled) {
+      // Re-enable components
+      if (!isPhotosVisible) togglePhotosVisibility();
+      if (!isDistanceMarkersVisible) toggleDistanceMarkersVisibility();
+      if (!isClimbFlagsVisible) toggleClimbFlagsVisibility();
+      if (!isLineMarkersVisible) toggleLineMarkersVisibility();
+      
+      // Directly restore previously visible POI categories
+      // This prevents duplication by setting the exact state rather than toggling
+      setVisiblePOICategories(previouslyVisiblePOICategories);
+    } else {
+      // Store currently visible categories before disabling
+      setPreviouslyVisiblePOICategories([...visiblePOICategories]);
+      
+      // Disable all components
+      if (isPhotosVisible) togglePhotosVisibility();
+      if (isDistanceMarkersVisible) toggleDistanceMarkersVisibility();
+      if (isClimbFlagsVisible) toggleClimbFlagsVisibility();
+      if (isLineMarkersVisible) toggleLineMarkersVisibility();
+      
+      // Clear all POI categories
+      setVisiblePOICategories([]);
+    }
+  };
+  
+  // Common style for all list item buttons to ensure consistent spacing
+  const listItemButtonStyle = {
+    marginTop: '8px',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+    },
+    '&:hover .MuiListItemIcon-root svg': {
+      color: '#ff4d4f'
+    }
+  };
   
   return (
     <>
       <StyledDrawer variant="permanent" anchor="left">
         <List>
+          {/* Routes icon at the very top */}
           <Tooltip title="Routes" placement="right">
             <ListItemButton
               onClick={() => setIsNestedOpen(!isNestedOpen)}
               data-active={isNestedOpen}
               sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:hover .MuiListItemIcon-root svg': {
-                  color: '#ff4d4f'
-                },
+                ...listItemButtonStyle,
                 '&[data-active="true"] .MuiListItemIcon-root svg': {
                   color: '#4caf50'
                 }
@@ -160,18 +204,26 @@ const EmbedSidebar = ({
           
           <Divider sx={{ my: 1, backgroundColor: 'rgba(255, 255, 255, 0.2)' }} />
           
+          {/* Power toggle moved below Routes */}
+          <Tooltip title={allComponentsDisabled ? "Enable All Components" : "Disable All Components"} placement="right">
+            <ListItemButton
+              onClick={toggleAllComponents}
+              sx={listItemButtonStyle}
+            >
+              <ListItemIcon>
+                {allComponentsDisabled ? 
+                  <CirclePower color="#4caf50" /> : 
+                  <PowerOff color="#ff4d4f" />}
+              </ListItemIcon>
+            </ListItemButton>
+          </Tooltip>
+          
+          <Divider sx={{ my: 1, backgroundColor: 'rgba(255, 255, 255, 0.2)' }} />
+          
           <Tooltip title={isPhotosVisible ? "Hide Photos" : "Show Photos"} placement="right">
             <ListItemButton
               onClick={togglePhotosVisibility}
-              sx={{
-                marginTop: '8px',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:hover .MuiListItemIcon-root svg': {
-                  color: '#ff4d4f'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 {isPhotosVisible ? 
@@ -184,15 +236,7 @@ const EmbedSidebar = ({
           <Tooltip title={isDistanceMarkersVisible ? "Hide Distance Markers" : "Show Distance Markers"} placement="right">
             <ListItemButton
               onClick={toggleDistanceMarkersVisibility}
-              sx={{
-                marginTop: '8px',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:hover .MuiListItemIcon-root svg': {
-                  color: '#ff4d4f'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <Ruler color={isDistanceMarkersVisible ? '#4caf50' : '#ff4d4f'} />
@@ -200,16 +244,28 @@ const EmbedSidebar = ({
             </ListItemButton>
           </Tooltip>
           
+          {/* Line markers moved to be underneath distance markers */}
+          <Tooltip title="Line Markers" placement="right">
+            <ListItemButton
+              onClick={toggleLineMarkersVisibility}
+              sx={listItemButtonStyle}
+            >
+              <ListItemIcon>
+                <Settings2
+                  color={isLineMarkersVisible ? '#4caf50' : '#ff4d4f'}
+                />
+              </ListItemIcon>
+            </ListItemButton>
+          </Tooltip>
+          
+          {/* Divider after line markers */}
+          <Divider sx={{ my: 1, backgroundColor: 'rgba(255, 255, 255, 0.2)' }} />
+          
           {/* POI Category Toggles */}
           <Tooltip title="Road Information" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('road-information')}
-              sx={{
-                marginTop: '8px',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <AlertTriangle
@@ -222,11 +278,7 @@ const EmbedSidebar = ({
           <Tooltip title="Accommodation" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('accommodation')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <Tent
@@ -239,11 +291,7 @@ const EmbedSidebar = ({
           <Tooltip title="Food & Drink" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('food-drink')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <Coffee
@@ -256,11 +304,7 @@ const EmbedSidebar = ({
           <Tooltip title="Natural Features" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('natural-features')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <Mountain
@@ -273,11 +317,7 @@ const EmbedSidebar = ({
           <Tooltip title="Town Services" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('town-services')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <Building
@@ -290,11 +330,7 @@ const EmbedSidebar = ({
           <Tooltip title="Transportation" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('transportation')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
                 <Bus
@@ -307,32 +343,24 @@ const EmbedSidebar = ({
           <Tooltip title="Event Information" placement="right">
             <ListItemButton
               onClick={() => togglePOICategoryVisibility('event-information')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
-                <Flag
+                <MapPinCheck
                   color={visiblePOICategories.includes('event-information') ? '#4caf50' : '#ff4d4f'}
                 />
               </ListItemIcon>
             </ListItemButton>
           </Tooltip>
           
-          <Tooltip title="Climb Categories" placement="right">
+          <Tooltip title="Climb Flags" placement="right">
             <ListItemButton
-              onClick={() => togglePOICategoryVisibility('climb-category')}
-              sx={{
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                }
-              }}
+              onClick={toggleClimbFlagsVisibility}
+              sx={listItemButtonStyle}
             >
               <ListItemIcon>
-                <TrendingUp
-                  color={visiblePOICategories.includes('climb-category') ? '#4caf50' : '#ff4d4f'}
+                <FlagTriangleRight
+                  color={isClimbFlagsVisible ? '#4caf50' : '#ff4d4f'}
                 />
               </ListItemIcon>
             </ListItemButton>

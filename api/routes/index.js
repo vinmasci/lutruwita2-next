@@ -106,6 +106,20 @@ const RouteSchema = new mongoose.Schema({
     }]
   },
   
+  // Lines array
+  lines: [{
+    id: { type: String, required: true },
+    type: { type: String, default: 'line' },
+    coordinates: {
+      start: { type: [Number], required: true },
+      end: { type: [Number], required: true }
+    },
+    name: { type: String },
+    description: { type: String },
+    icons: [{ type: String }],
+    photos: [{ type: mongoose.Schema.Types.Mixed }]
+  }],
+  
   // Data object
   data: {
     points: { type: [mongoose.Schema.Types.Mixed], default: [] },
@@ -214,6 +228,9 @@ async function handleCreateRoute(req, res) {
         places: []
       },
       
+      // Include lines if provided
+      lines: req.body.lines || [],
+      
       data: data || {
         points: [],
         surfaces: []
@@ -256,6 +273,7 @@ async function handleCreateRoute(req, res) {
         })),
         mapState: route.mapState,
         pois: route.pois || { draggable: [], places: [] },
+        lines: route.lines || [], // Include the lines array
         photos: route.photos || [],
         elevation: route.routes.map(r => r.surface?.elevationProfile || []),
         description: route.description, // Include the top-level description field
@@ -264,6 +282,7 @@ async function handleCreateRoute(req, res) {
         _loadedState: {
           name: route.name,
           pois: route.pois || { draggable: [], places: [] },
+          lines: route.lines || [], // Include lines in _loadedState too
           photos: route.photos || [],
           headerSettings: route.headerSettings // Include header settings in _loadedState too
         }
@@ -398,6 +417,12 @@ async function handleUpdateRoute(req, res) {
       if (pois.places) route.pois.places = pois.places;
     }
     
+    // Update lines if provided
+    if (req.body.lines) {
+      route.lines = req.body.lines;
+      console.log(`[API] Updated lines array with ${req.body.lines.length} lines`);
+    }
+    
     if (photos) {
       route.photos = photos;
     }
@@ -452,6 +477,7 @@ async function handleUpdateRoute(req, res) {
         })),
         mapState: route.mapState,
         pois: route.pois || { draggable: [], places: [] },
+        lines: route.lines || [], // Include the lines array
         photos: route.photos || [],
         elevation: route.routes.map(r => r.surface?.elevationProfile || []),
         description: route.description, // Include the top-level description field
@@ -460,6 +486,7 @@ async function handleUpdateRoute(req, res) {
         _loadedState: {
           name: route.name,
           pois: route.pois || { draggable: [], places: [] },
+          lines: route.lines || [], // Include lines in _loadedState too
           photos: route.photos || [],
           headerSettings: route.headerSettings // Include header settings in _loadedState too
         }

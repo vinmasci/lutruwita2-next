@@ -9,15 +9,12 @@ import { Auth0Login } from '../../../auth/components/Auth0Login/Auth0Login';
 import { POIDrawer } from '../../../poi/components/POIDrawer';
 import { POIDetailsModal } from '../../../poi/components/POIDetailsModal';
 import { normalizeRoute } from '../../utils/routeUtils';
-import { TextboxTabsDrawer } from '../../../presentation/components/TextboxTabs';
-import { useTextboxTabs } from '../../../presentation/context/TextboxTabsContext';
 // Lazy load components
 const LazyUploader = lazy(() => import('../../../gpx/components/Uploader/Uploader'));
 const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
 export const Sidebar = (props) => {
-    const { isDrawerOpen, activeDrawer, handleUploadGpx, handleAddPOI, handleAddPhotos, handleTextboxTabs } = useSidebar(props);
+    const { isDrawerOpen, activeDrawer, handleUploadGpx, handleAddPOI, handleAddPhotos, handleAddLine } = useSidebar(props);
     const { addPhoto, deletePhoto } = usePhotoContext();
-    const { isDrawerOpen: isTextboxTabsDrawerOpen } = useTextboxTabs();
     const handleUploadComplete = async (result) => {
         // Normalize the route before passing it to MapView
         const normalizedRoute = normalizeRoute(result);
@@ -36,7 +33,13 @@ export const Sidebar = (props) => {
                 return null;
         }
     }, [activeDrawer, handleUploadComplete, handleAddPOI, props.onDeleteRoute]);
-    return (_jsxs(_Fragment, { children: [_jsx(StyledDrawer, { variant: "permanent", children: _jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', height: '100%' }, children: [_jsx(SidebarListItems, { ...props, onUploadGpx: () => handleUploadGpx(), onAddPOI: () => handleAddPOI(), onAddPhotos: () => handleAddPhotos() }), _jsx(Auth0Login, {})] }) }), _jsxs(_Fragment, { children: [_jsx(NestedDrawer, { 
+    return (_jsxs(_Fragment, { children: [_jsx(StyledDrawer, { variant: "permanent", children: _jsxs(Box, { sx: { display: 'flex', flexDirection: 'column', height: '100%' }, children: [_jsx(SidebarListItems, { 
+        ...props, 
+        onUploadGpx: () => handleUploadGpx(), 
+        onAddPOI: () => handleAddPOI(), 
+        onAddPhotos: () => handleAddPhotos(),
+        onAddLine: () => handleAddLine()
+    }), _jsx(Auth0Login, {})] }) }), _jsxs(_Fragment, { children: [_jsx(NestedDrawer, { 
                         variant: "persistent", 
                         anchor: "left", 
                         open: isDrawerOpen, 
@@ -50,6 +53,9 @@ export const Sidebar = (props) => {
                                     break;
                                 case 'photos':
                                     handleAddPhotos();
+                                    break;
+                                case 'line':
+                                    handleAddLine();
                                     break;
                             }
                         },
@@ -72,12 +78,5 @@ export const Sidebar = (props) => {
                                 onSave: props.poiDetailsDrawer.onSave,
                                 readOnly: props.mode === 'presentation' || props.mode === 'embed'
                             })
-                        ),
-                        
-                        // Add TextboxTabsDrawer with proper props
-                        _jsx(TextboxTabsDrawer, { 
-                            isOpen: isTextboxTabsDrawerOpen, 
-                            onClose: handleTextboxTabs 
-                        })
-                        ] })] }));
+                        )] })] }));
 };

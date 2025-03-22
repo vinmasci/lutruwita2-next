@@ -1,0 +1,47 @@
+/* DirectEmbedLineLayer.css */
+
+/* Line marker styling */
+.line-text-container {
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.line-text-label {
+  color: white;
+  font-weight: 500;
+  font-family: "Roboto", "Arial", sans-serif;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  display: inline-block;
+}
+
+.line-icons-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+
+/* Icon bubble styling */
+.line-icons-container > div {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 2px;
+  cursor: pointer;
+}
+
+/* Icon styling */
+.line-icons-container i {
+  color: black;
+}

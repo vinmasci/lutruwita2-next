@@ -10,16 +10,18 @@ import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, Flag, TrendingUp, Ruler, Eye, EyeOff } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight, Ruler, Settings2, Eye, EyeOff, PowerOff, CirclePower } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
 
-export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDistanceMarkersVisibility }) => {
+export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDistanceMarkersVisibility, isClimbFlagsVisible, toggleClimbFlagsVisibility, isLineMarkersVisible, toggleLineMarkersVisibility }) => {
     const { routes, currentRoute, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
     const { loadPOIsFromRoute, visibleCategories, toggleCategoryVisibility } = usePOIContext();
     const { addPhoto, isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
     const [isNestedOpen, setIsNestedOpen] = useState(true);
+    const [allComponentsDisabled, setAllComponentsDisabled] = useState(false);
+    const [previouslyVisibleCategories, setPreviouslyVisibleCategories] = useState([]);
     const currentIndex = routes.findIndex(route => route.id === currentRoute?.id);
 
     const updateRouteAndMap = (route) => {
@@ -48,12 +50,55 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
         }
     };
 
+    // Toggle all components on/off
+    const toggleAllComponents = () => {
+        setAllComponentsDisabled(prev => !prev);
+        
+        // If we're enabling components, restore previous state
+        // If we're disabling components, hide everything
+        if (allComponentsDisabled) {
+            // Re-enable components
+            if (!isPhotosVisible) togglePhotosVisibility();
+            if (!isDistanceMarkersVisible) toggleDistanceMarkersVisibility();
+            if (!isClimbFlagsVisible) toggleClimbFlagsVisibility();
+            if (!isLineMarkersVisible) toggleLineMarkersVisibility();
+            
+            // Directly restore previously visible POI categories
+            // This prevents duplication by setting the exact state rather than toggling
+            setVisibleCategories(previouslyVisibleCategories);
+        } else {
+            // Store currently visible categories before disabling
+            setPreviouslyVisibleCategories([...visibleCategories]);
+            
+            // Disable all components
+            if (isPhotosVisible) togglePhotosVisibility();
+            if (isDistanceMarkersVisible) toggleDistanceMarkersVisibility();
+            if (isClimbFlagsVisible) toggleClimbFlagsVisibility();
+            if (isLineMarkersVisible) toggleLineMarkersVisibility();
+            
+            // Clear all POI categories
+            setVisibleCategories([]);
+        }
+    };
+
+    // Common style for all list item buttons to ensure consistent spacing
+    const listItemButtonStyle = {
+        marginTop: '8px',
+        '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        },
+        '&:hover .MuiListItemIcon-root svg': {
+            color: '#ff4d4f'
+        }
+    };
+
     return (_jsxs(ErrorBoundary, { children: [
         _jsx(StyledDrawer, { 
             variant: "permanent", 
             anchor: "left", 
             children: _jsxs(List, { 
                 children: [
+                    // Routes icon at the very top
                     _jsx(Tooltip, { 
                         title: "Routes", 
                         placement: "right", 
@@ -63,12 +108,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                             },
                             'data-active': isNestedOpen,
                             sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                },
-                                '&:hover .MuiListItemIcon-root svg': {
-                                    color: '#ff4d4f'
-                                },
+                                ...listItemButtonStyle,
                                 '&[data-active="true"] .MuiListItemIcon-root svg': {
                                     color: '#4caf50'
                                 }
@@ -78,26 +118,42 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                             }) 
                         }) 
                     }),
+                    
                     _jsx(Divider, { 
                         sx: { 
                             my: 1, 
                             backgroundColor: 'rgba(255, 255, 255, 0.2)' 
                         } 
                     }),
+                    
+                    // Power toggle moved below Routes
+                    _jsx(Tooltip, { 
+                        title: allComponentsDisabled ? "Enable All Components" : "Disable All Components", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: toggleAllComponents,
+                            sx: listItemButtonStyle, 
+                            children: _jsx(ListItemIcon, { 
+                                children: allComponentsDisabled ? 
+                                    _jsx(CirclePower, { color: "#4caf50" }) : 
+                                    _jsx(PowerOff, { color: "#ff4d4f" }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Divider, { 
+                        sx: { 
+                            my: 1, 
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)' 
+                        } 
+                    }),
+                    
                     _jsx(Tooltip, { 
                         title: isPhotosVisible ? "Hide Photos" : "Show Photos", 
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: togglePhotosVisibility,
-                            sx: {
-                                marginTop: '8px',
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                },
-                                '&:hover .MuiListItemIcon-root svg': {
-                                    color: '#ff4d4f'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: isPhotosVisible ? 
                                     _jsx(Camera, { color: '#4caf50' }) : 
@@ -111,15 +167,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: toggleDistanceMarkersVisibility,
-                            sx: {
-                                marginTop: '8px',
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                },
-                                '&:hover .MuiListItemIcon-root svg': {
-                                    color: '#ff4d4f'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(Ruler, { 
                                     color: isDistanceMarkersVisible ? '#4caf50' : '#ff4d4f' 
@@ -128,18 +176,36 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         }) 
                     }),
                     
+                    // Line markers moved to be underneath distance markers
+                    _jsx(Tooltip, { 
+                        title: "Line Markers", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: toggleLineMarkersVisibility,
+                            sx: listItemButtonStyle, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Settings2, { 
+                                    color: isLineMarkersVisible ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    // Divider after line markers
+                    _jsx(Divider, { 
+                        sx: { 
+                            my: 1, 
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)' 
+                        } 
+                    }),
+                    
                     // POI Category Toggles
                     _jsx(Tooltip, { 
                         title: "Road Information", 
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('road-information'),
-                            sx: {
-                                marginTop: '8px',
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(AlertTriangle, { 
                                     color: visibleCategories.includes('road-information') ? '#4caf50' : '#ff4d4f' 
@@ -153,11 +219,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('accommodation'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(Tent, { 
                                     color: visibleCategories.includes('accommodation') ? '#4caf50' : '#ff4d4f' 
@@ -171,11 +233,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('food-drink'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(Coffee, { 
                                     color: visibleCategories.includes('food-drink') ? '#4caf50' : '#ff4d4f' 
@@ -189,11 +247,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('natural-features'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(Mountain, { 
                                     color: visibleCategories.includes('natural-features') ? '#4caf50' : '#ff4d4f' 
@@ -207,11 +261,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('town-services'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(Building, { 
                                     color: visibleCategories.includes('town-services') ? '#4caf50' : '#ff4d4f' 
@@ -225,11 +275,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('transportation'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(Bus, { 
                                     color: visibleCategories.includes('transportation') ? '#4caf50' : '#ff4d4f' 
@@ -243,13 +289,9 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => toggleCategoryVisibility('event-information'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
-                                children: _jsx(Flag, { 
+                                children: _jsx(MapPinCheck, { 
                                     color: visibleCategories.includes('event-information') ? '#4caf50' : '#ff4d4f' 
                                 }) 
                             }) 
@@ -257,18 +299,14 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                     }),
                     
                     _jsx(Tooltip, { 
-                        title: "Climb Categories", 
+                        title: "Climb Flags", 
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
-                            onClick: () => toggleCategoryVisibility('climb-category'),
-                            sx: {
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }, 
+                            onClick: toggleClimbFlagsVisibility,
+                            sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
-                                children: _jsx(TrendingUp, { 
-                                    color: visibleCategories.includes('climb-category') ? '#4caf50' : '#ff4d4f' 
+                                children: _jsx(FlagTriangleRight, { 
+                                    color: isClimbFlagsVisible ? '#4caf50' : '#ff4d4f' 
                                 }) 
                             }) 
                         }) 

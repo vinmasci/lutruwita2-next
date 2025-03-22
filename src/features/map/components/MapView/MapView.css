@@ -3,8 +3,18 @@
 
 /* Map layers container */
 .map-layers {
-  position: relative;
+  position: absolute;
   z-index: 1; /* Lower than sidebar (100) and elevation profile (102) */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none; /* Allow clicks to pass through to the map */
+}
+
+/* Ensure the actual interactive elements have pointer events */
+.map-layers > * {
+  pointer-events: auto;
 }
 
 /* Ensure UI elements are above map layers */
@@ -37,7 +47,7 @@
 .map-container {
   width: 100% !important;
   height: calc(100vh - 64px) !important; /* Use viewport height instead */
-  position: absolute !important;
+  position: fixed !important; /* Changed from absolute to fixed for more stable positioning */
   top: 64px !important; /* Height of the AppBar */
   left: 0 !important;
   right: 0 !important;

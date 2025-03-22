@@ -6,19 +6,19 @@ import { useMapContext } from '../../context/MapContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePlaceContext } from '../../../place/context/PlaceContext';
+import { useLineContext } from '../../../lineMarkers/context/LineContext';
 import { SidebarIcons, RefreshIcon } from './icons';
 import { SaveDialog } from './SaveDialog.jsx';
 import { LoadDialog } from './LoadDialog';
 import { EmbedDialog } from './EmbedDialog.jsx';
-import { TextboxTabsDrawer, useTextboxTabs } from '../../../presentation/components/TextboxTabs';
 
-export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemClick }) => {
-    const { routes, savedRoutes, saveCurrentState, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
+export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine, onItemClick }) => {
+    const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
     const { map } = useMapContext();
     const { clearPOIs, setPoiMode } = usePOIContext();
     const { clearPhotos } = usePhotoContext();
     const { clearPlaces } = usePlaceContext();
-    const { openDrawer: openTextboxTabsDrawer, toggleDrawer: toggleTextboxTabsDrawer } = useTextboxTabs();
+    const { setIsDrawing, saveRoute } = useLineContext();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
     const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
@@ -133,6 +133,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
         clearPhotos(); // Clear photos
         clearPlaces(); // Clear places
         setPoiMode('none'); // Reset POI mode
+        setIsDrawing(false); // Reset line drawing mode
         
         // Force a refresh of the map by triggering a style reload
         refreshMapStyle();
@@ -247,15 +248,12 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
             onClick: onAddPOI
         },
         {
-            id: 'textboxTabs',
-            icon: SidebarIcons.actions.textboxTabs,
-            text: 'Textbox Tabs',
+            id: 'line',
+            icon: SidebarIcons.actions.line,
+            text: 'Add Line',
             onClick: () => {
-                if (onItemClick) {
-                    onItemClick('textboxTabs');
-                }
-                // Use toggleDrawer instead of just openDrawer to allow closing when clicked again
-                toggleTextboxTabsDrawer();
+                onItemClick('line');
+                onAddLine();
             }
         }
     ];
@@ -366,7 +364,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onItemCli
                 onSave: (formData) => {
                     // Don't close the dialog immediately, let it stay open while saving
                     // The isSaving prop will show the spinner
-                    saveCurrentState(formData.name, formData.type, formData.isPublic)
+                    saveRoute(formData.name, formData.type, formData.isPublic)
                         .then(() => {
                             setSaveDialogOpen(false);
                         })

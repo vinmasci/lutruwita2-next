@@ -5,14 +5,18 @@ import { publicRouteService } from '../../services/publicRoute.service.js';
 import { PresentationMapView } from '../PresentationMapView';
 import { Box, CircularProgress, Alert } from '@mui/material';
 import { RouteProvider, useRouteContext } from '../../../map/context/RouteContext';
+import { LineProvider, useLineContext } from '../../../lineMarkers/context/LineContext.jsx';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { deserializePhoto } from '../../../photo/utils/photoUtils';
+
 export const RoutePresentation = () => {
     const { id } = useParams();
     const [route, setRoute] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [lineData, setLineData] = useState([]);
+
     useEffect(() => {
         const fetchRoute = async () => {
             if (!id)
@@ -47,6 +51,7 @@ export const RoutePresentation = () => {
         };
         fetchRoute();
     }, [id]);
+
     // Just add required fields to server routes
     const routes = useMemo(() => {
         if (!route)
@@ -62,7 +67,6 @@ export const RoutePresentation = () => {
                 console.error('[RoutePresentation] Route data missing routeId:', routeData);
                 return null;
             }
-            
             
             // Ensure the route object has the persistentId property
             return {
@@ -84,31 +88,65 @@ export const RoutePresentation = () => {
             };
         }).filter((route) => route !== null);
     }, [route]);
+
     // Create a memoized component for route content
     const RouteContent = React.memo(({ route }) => {
         const { addRoute, setCurrentRoute, updateHeaderSettings } = useRouteContext();
         const { addPhoto } = usePhotoContext();
         const { loadPOIsFromRoute } = usePOIContext();
+        const { loadLinesFromRoute } = useLineContext();
         const [initialized, setInitialized] = useState(false);
+
         // Initialize routes once when processed data is available
         useEffect(() => {
             if (initialized || !routes.length)
                 return;
             // Batch route initialization
             const initializeRoutes = () => {
+                console.log('[RoutePresentation] Starting route initialization');
+                
                 // Add all routes in a single batch
                 routes.forEach((route) => {
                     addRoute(route);
                 });
+                console.log('[RoutePresentation] Added all routes to RouteContext');
+                
                 // Set initial route once all routes are added
-                // Set initial route
                 setCurrentRoute(routes[0]);
+                console.log('[RoutePresentation] Set current route:', routes[0].routeId);
+                
                 // Load photos and POIs
                 if (route.photos) {
+                    console.log('[RoutePresentation] Loading photos:', route.photos.length);
                     addPhoto(route.photos.map(deserializePhoto));
+                } else {
+                    console.log('[RoutePresentation] No photos to load');
                 }
+                
                 if (route.pois) {
+                    console.log('[RoutePresentation] Loading POIs:', 
+                        route.pois.draggable?.length || 0, 'draggable POIs,',
+                        route.pois.places?.length || 0, 'place POIs');
                     loadPOIsFromRoute(route.pois);
+                } else {
+                    console.log('[RoutePresentation] No POIs to load');
+                }
+                
+                // Check for line data and load it directly
+                if (route.lines) {
+                    console.log('[RoutePresentation] Found line data in route:', route.lines.length, 'lines');
+                    console.log('[RoutePresentation] Line data details:', JSON.stringify(route.lines));
+                    console.log('[RoutePresentation] Provider structure: LineProvider → RouteProvider → RouteContent');
+                    console.log('[RoutePresentation] Loading lines directly into LineContext');
+                    loadLinesFromRoute(route.lines);
+                    
+                    // Store the line data in the parent component's state for direct rendering
+                    setLineData(route.lines);
+                    console.log('[RoutePresentation] Stored line data for direct rendering:', route.lines.length, 'lines');
+                    
+                    console.log('[RoutePresentation] Lines loaded directly into LineContext');
+                } else {
+                    console.log('[RoutePresentation] No line data found in route');
                 }
                 
                 // Set header settings if available
@@ -120,20 +158,32 @@ export const RoutePresentation = () => {
                 }
                 
                 setInitialized(true);
+                console.log('[RoutePresentation] Route initialization completed');
             };
             initializeRoutes();
-        }, [routes, initialized, addRoute, setCurrentRoute, updateHeaderSettings]);
-        return routes.length > 0 ? _jsx(PresentationMapView, {}) : null;
+        }, [routes, initialized, addRoute, setCurrentRoute, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute]);
+
+        // Add additional logging for lineData
+        console.log('[RoutePresentation] Passing lineData to PresentationMapView:', {
+            lineDataLength: lineData?.length || 0,
+            firstLine: lineData?.length > 0 ? JSON.stringify(lineData[0]) : 'No lines'
+        });
+        
+        return routes.length > 0 ? _jsx(PresentationMapView, { lineData: lineData }) : null;
     });
+
     // Set display name for debugging
     RouteContent.displayName = 'RouteContent';
+
     // Loading state
     if (loading) {
         return (_jsx(Box, { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", children: _jsx(CircularProgress, {}) }));
     }
+
     // Error state
     if (error || !route) {
         return (_jsx(Box, { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", children: _jsx(Alert, { severity: "error", sx: { maxWidth: 'sm' }, children: error || 'Route not found' }) }));
     }
-    return (_jsx(RouteProvider, { children: _jsx(RouteContent, { route: route }) }));
+
+    return (_jsx(LineProvider, { children: _jsx(RouteProvider, { children: _jsx(RouteContent, { route: route }) }) }));
 };

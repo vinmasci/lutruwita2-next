@@ -1,13 +1,15 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useMapContext } from '../../context/MapContext';
 import { detectClimbs } from '../../../gpx/utils/climbUtils';
 import mapboxgl from 'mapbox-gl';
+import { PresentationClimbViewer } from '../../../../features/presentation/components/ClimbViewer/PresentationClimbViewer';
 import './ClimbMarkers.css';
 
 export const ClimbMarkers = ({ map, route }) => {
     const [markers, setMarkers] = useState([]);
     const { hoverCoordinates } = useMapContext();
     const popupRef = useRef(null);
+    const [selectedClimb, setSelectedClimb] = useState(null);
 
     useEffect(() => {
         // Clean up markers when component unmounts or route changes
@@ -266,42 +268,15 @@ export const ClimbMarkers = ({ map, route }) => {
                 .setLngLat(endCoord)
                 .addTo(map);
 
-                // Add mouseover/mouseout events for tooltips
-                const handleMouseEnter = (e, marker) => {
+                // Add click event to show the climb viewer modal
+                const handleClimbClick = (e) => {
                     e.stopPropagation();
-                    
-                    // Remove existing popup
-                    if (popupRef.current) {
-                        popupRef.current.remove();
-                    }
-                    
-                    // Create new popup - positioned above the flag
-                    popupRef.current = new mapboxgl.Popup({
-                        closeButton: false, // No close button
-                        closeOnClick: true, // Close when clicking elsewhere
-                        maxWidth: 'none',
-                        className: 'climb-popup', // Add a class for custom styling
-                        offset: [0, -40] // Move the popup up by 40 pixels
-                    })
-                    .setLngLat(marker.getLngLat())
-                    .setHTML(tooltipContent)
-                    .addTo(map);
-                };
-                
-                const handleMouseLeave = (e) => {
-                    // Close the popup when mouse leaves
-                    if (popupRef.current) {
-                        popupRef.current.remove();
-                        popupRef.current = null;
-                    }
+                    setSelectedClimb(climb);
                 };
                 
                 // Add event listeners to both start and end markers
-                startEl.addEventListener('mouseenter', (e) => handleMouseEnter(e, startMarker));
-                startEl.addEventListener('mouseleave', handleMouseLeave);
-                
-                endEl.addEventListener('mouseenter', (e) => handleMouseEnter(e, endMarker));
-                endEl.addEventListener('mouseleave', handleMouseLeave);
+                startEl.addEventListener('click', handleClimbClick);
+                endEl.addEventListener('click', handleClimbClick);
                 
 
                 newMarkers.push(startMarker, endMarker);
@@ -318,7 +293,14 @@ export const ClimbMarkers = ({ map, route }) => {
         }
     }, [map, route]);
 
-    return null;
+    // Use React.createElement instead of JSX since this is a .js file
+    return selectedClimb ? 
+        React.createElement(PresentationClimbViewer, {
+            climb: selectedClimb,
+            route: route,
+            onClose: () => setSelectedClimb(null)
+        }) : 
+        null;
 };
 
 export default ClimbMarkers;

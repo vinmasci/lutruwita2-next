@@ -208,6 +208,19 @@ const RouteSchema = new mongoose.Schema({
     },
     required: false
   },
+  // Lines array
+  lines: [{
+    id: { type: String, required: true },
+    type: { type: String, default: 'line' },
+    coordinates: {
+      start: { type: [Number], required: true },
+      end: { type: [Number], required: true }
+    },
+    name: { type: String },
+    description: { type: String },
+    icons: [{ type: String }],
+    photos: [{ type: mongoose.Schema.Types.Mixed }]
+  }],
 }, {
   timestamps: true,
   toJSON: {
@@ -565,6 +578,7 @@ async function handleGetPublicRoutes(req, res) {
           mapState: routeData.mapState || { center: [-42.8821, 147.3272], zoom: 8 }, // Default to Tasmania
           routes: routeData.routes || [],
           pois: routeData.pois || { draggable: [], places: [] },
+          lines: routeData.lines || [], // Include lines array
           photos: routeData.photos || [],
           metadata: routeData.metadata || {}, // Include metadata for filtering
           createdBy: createdBy // Add the user information

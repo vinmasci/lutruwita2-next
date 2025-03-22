@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useGpxProcessing } from '../../../gpx/hooks/useGpxProcessing';
 import { useMapContext } from '../../context/MapContext';
-import { useTextboxTabs } from '../../../presentation/context/TextboxTabsContext';
-
+import { useLineContext } from '../../../lineMarkers/context/LineContext';
 export const useSidebar = (props) => {
     // All hooks must be called before any other code
     const { setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
+    const { setIsDrawing } = useLineContext();
     const { isProcessing } = useGpxProcessing();
-    const { toggleDrawer: toggleTextboxTabsDrawer, isDrawerOpen: isTextboxTabsDrawerOpen, closeDrawer: closeTextboxTabsDrawer, openDrawer: openTextboxTabsDrawer } = useTextboxTabs();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [activeDrawer, setActiveDrawer] = useState(null);
     const [error, setError] = useState(null);
@@ -17,11 +16,6 @@ export const useSidebar = (props) => {
             setActiveDrawer(null);
         }
         else {
-            // Close TextboxTabs drawer if it's open
-            if (isTextboxTabsDrawerOpen) {
-                closeTextboxTabsDrawer();
-            }
-            
             setIsDrawerOpen(true);
             setActiveDrawer('photos');
             props.onItemClick('photos');
@@ -44,11 +38,6 @@ export const useSidebar = (props) => {
                 setError(null);
             }
             else {
-                // Close TextboxTabs drawer if it's open
-                if (isTextboxTabsDrawerOpen) {
-                    closeTextboxTabsDrawer();
-                }
-                
                 setIsDrawerOpen(true);
                 setActiveDrawer('gpx');
                 props.onItemClick('gpx');
@@ -62,8 +51,21 @@ export const useSidebar = (props) => {
             setPoiPlacementClick(undefined);
         }
     }, [isDrawerOpen, activeDrawer, setPoiPlacementMode, setPoiPlacementClick]);
-    
-    // No bidirectional coordination effect - this was causing the TextboxTabs drawer to close immediately
+    const { startDrawing, stopDrawing } = useLineContext();
+
+    const handleAddLine = () => {
+        if (activeDrawer === 'line') {
+            setIsDrawerOpen(false);
+            setActiveDrawer(null);
+            stopDrawing();
+        } else {
+            setIsDrawerOpen(false);
+            setActiveDrawer('line');
+            startDrawing();
+            props.onItemClick('line');
+        }
+    };
+
     const handleAddPOI = () => {
         if (activeDrawer === 'poi') {
             setIsDrawerOpen(false);
@@ -72,34 +74,10 @@ export const useSidebar = (props) => {
             setPoiPlacementClick(undefined);
         }
         else {
-            // Close TextboxTabs drawer if it's open
-            if (isTextboxTabsDrawerOpen) {
-                closeTextboxTabsDrawer();
-            }
-            
             setIsDrawerOpen(true);
             setActiveDrawer('poi');
             props.onItemClick('poi');
             props.onAddPOI();
-        }
-    };
-
-    const handleTextboxTabs = () => {
-        // Always close other drawers first
-        setIsDrawerOpen(false);
-        setActiveDrawer(null);
-        
-        // If TextboxTabs drawer is already open, close it
-        if (isTextboxTabsDrawerOpen) {
-            closeTextboxTabsDrawer();
-        } else {
-            // Otherwise, open it
-            openTextboxTabsDrawer();
-        }
-        
-        // Notify parent component
-        if (props.onItemClick) {
-            props.onItemClick('textboxTabs');
         }
     };
     return {
@@ -114,6 +92,6 @@ export const useSidebar = (props) => {
         handlePlacePOI: props.onPlacePOI,
         handleAddPOI,
         handleAddPhotos,
-        handleTextboxTabs
+        handleAddLine
     };
 };

@@ -16,11 +16,13 @@ import { PresentationElevationProfilePanel } from '../ElevationProfile/Presentat
 import { PresentationPOILayer } from '../POILayer/PresentationPOILayer';
 import { PresentationPhotoLayer } from '../PhotoLayer/PresentationPhotoLayer';
 import { PresentationDistanceMarkers } from '../DistanceMarkers/PresentationDistanceMarkers';
+import DirectPresentationLineLayer from '../LineLayer/DirectPresentationLineLayer.jsx';
 import { MapProvider } from '../../../map/context/MapContext';
+import { LineProvider } from '../../../lineMarkers/context/LineContext.jsx';
 import { setupScaleListener } from '../../utils/scaleUtils';
 import './PresentationMapView.css';
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-export default function PresentationMapView() {
+export default function PresentationMapView(props) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const containerRef = useRef(null);
@@ -29,6 +31,8 @@ export default function PresentationMapView() {
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
     const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
+    const [isClimbFlagsVisible, setIsClimbFlagsVisible] = useState(true);
+    const [isLineMarkersVisible, setIsLineMarkersVisible] = useState(true);
     
     // Set up scaling
     useEffect(() => {
@@ -442,7 +446,7 @@ export default function PresentationMapView() {
         poiPlacementMode: false,
         setPoiPlacementMode: () => { }
     }), [isMapReady, hoverCoordinates]);
-    return (_jsx(MapProvider, { value: mapContextValue, children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
+    return (_jsx(MapProvider, { value: mapContextValue, children: _jsx(LineProvider, { children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
                 _jsx(MapHeader, { 
                     title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
                     color: headerSettings?.color || '#333333',
@@ -452,7 +456,11 @@ export default function PresentationMapView() {
                 _jsx(PresentationSidebar, { 
                     isOpen: true,
                     isDistanceMarkersVisible: isDistanceMarkersVisible,
-                    toggleDistanceMarkersVisibility: () => setIsDistanceMarkersVisible(!isDistanceMarkersVisible)
+                    toggleDistanceMarkersVisibility: () => setIsDistanceMarkersVisible(!isDistanceMarkersVisible),
+                    isClimbFlagsVisible: isClimbFlagsVisible,
+                    toggleClimbFlagsVisibility: () => setIsClimbFlagsVisible(!isClimbFlagsVisible),
+                    isLineMarkersVisible: isLineMarkersVisible,
+                    toggleLineMarkersVisibility: () => setIsLineMarkersVisible(!isLineMarkersVisible)
                 }),
         _jsxs("div", { className: "presentation-map-area", children: [
             _jsx("div", { ref: mapRef, className: "map-container" }),
@@ -480,12 +488,16 @@ export default function PresentationMapView() {
                 }),
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
                 _jsx(PresentationPhotoLayer, {}),
+                isLineMarkersVisible && _jsx(DirectPresentationLineLayer, { 
+                  map: mapInstance.current, 
+                  lines: props.lineData || [] 
+                }),
                 currentRoute && (_jsxs(_Fragment, { children: [
                     isDistanceMarkersVisible && _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),
-                    _jsx(ClimbMarkers, { map: mapInstance.current, route: currentRoute })
+                    isClimbFlagsVisible && _jsx(ClimbMarkers, { map: mapInstance.current, route: currentRoute })
                 ] })),
                 currentRoute && (_jsx("div", { className: "elevation-container", children: _jsx(PresentationElevationProfilePanel, { route: currentRoute }) }))
             ] }))
         ] })
-    ] }) }));
+    ] }) }) }));
 }

@@ -1,7 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState } from 'react';
-import { Box, IconButton, Typography, Dialog, DialogContent, Modal } from '@mui/material';
+import { Box, IconButton, Typography, Modal } from '@mui/material';
 import { Close } from '@mui/icons-material';
+import { ImageSlider } from '../ImageSlider/ImageSlider';
 import { POI_CATEGORIES } from '../../../poi/types/poi.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 
@@ -15,7 +16,20 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
     const categoryColor = POI_CATEGORIES[poi.category]?.color || '#777777'; // Default gray color if category not found
     
-    return (_jsxs(_Fragment, { children: [
+    // Prepare photos for the image slider
+    const photos = poi.photos || [];
+    
+    // Create mapPreviewProps for the ImageSlider
+    const mapPreviewProps = {
+        center: poi.coordinates, // Use the POI's coordinates as center
+        zoom: 14, // Default zoom level
+        routes: [] // No routes to display
+    };
+    
+    // Always show the map preview, even if there are no photos
+    const showImageSlider = true;
+    
+    return _jsxs(_Fragment, { children: [
         _jsx(Modal, { 
             open: Boolean(poi), 
             onClose: onClose,
@@ -50,6 +64,7 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
                     zIndex: 9999
                 }, 
                 children: [
+                    // Header with name and close button
                     _jsxs(Box, {
                         sx: { 
                             display: 'flex', 
@@ -83,67 +98,44 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
                             })
                         ]
                     }),
-                    _jsxs(Box, { children: [
-                        _jsx(Box, { 
-                            sx: {
-                                mb: 3,
-                                p: 2,
-                                borderRadius: '4px',
-                                backgroundColor: 'rgba(45, 45, 45, 0.9)',
-                            }, 
-                            children: _jsx(Typography, { 
-                                variant: "body1", 
-                                color: "white",
-                                sx: { whiteSpace: 'pre-wrap' }, 
-                                children: poi.description || 'No description' 
-                            })
-                        }), 
-                        poi.photos && poi.photos.length > 0 && (_jsxs(Box, { 
-                            children: [
-                                _jsxs(Typography, { 
-                                    variant: "subtitle2", 
-                                    color: "white", 
-                                    sx: { mb: 1 }, 
-                                    children: ["Photos (", poi.photos.length, ")"] 
-                                }),
-                                _jsx(Box, { 
-                                    sx: {
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(2, 1fr)',
-                                        gap: 1
-                                    }, 
-                                    children: poi.photos.map((photo, index) => (
-                                        _jsx(Box, { 
-                                            onClick: () => setSelectedPhoto(photo.url), 
-                                            sx: {
-                                                aspectRatio: '1',
-                                                backgroundColor: 'rgba(35, 35, 35, 0.9)',
-                                                borderRadius: 1,
-                                                overflow: 'hidden',
-                                                cursor: 'pointer',
-                                                transition: 'transform 0.2s',
-                                                '&:hover': {
-                                                    transform: 'scale(1.02)'
-                                                }
-                                            }, 
-                                            children: _jsx("img", { 
-                                                src: photo.url, 
-                                                alt: photo.caption || `Photo ${index + 1}`, 
-                                                style: {
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover'
-                                                } 
-                                            }) 
-                                        }, index)
-                                    )) 
-                                })
-                            ] 
-                        }))
-                    ] })
+                    
+                    // Image slider - always show regardless of photos
+                    _jsx(Box, { 
+                        sx: { 
+                            height: '250px', 
+                            mb: 3,
+                            position: 'relative',
+                            borderRadius: '8px',
+                            overflow: 'hidden'
+                        },
+                        children: _jsx(ImageSlider, { 
+                            photos: photos, 
+                            maxPhotos: 10,
+                            mapPreviewProps: mapPreviewProps,
+                            alwaysShowMap: true // Always show the map preview
+                        })
+                    }),
+                    
+                    // Description
+                    _jsx(Box, { 
+                        sx: {
+                            mb: 3,
+                            p: 2,
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(45, 45, 45, 0.9)',
+                        }, 
+                        children: _jsx(Typography, { 
+                            variant: "body1", 
+                            color: "white",
+                            sx: { whiteSpace: 'pre-wrap' }, 
+                            children: poi.description || 'No description' 
+                        })
+                    })
                 ] 
             }) 
         }), 
+        
+        // Photo lightbox modal
         _jsx(Modal, {
             open: Boolean(selectedPhoto),
             onClose: () => setSelectedPhoto(null),
@@ -194,5 +186,7 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
                 ]
             })
         })
-    ] }));
+    ] });
 };
+
+export default PresentationPOIViewer;

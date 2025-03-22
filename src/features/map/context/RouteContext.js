@@ -8,6 +8,7 @@ import { usePOIContext } from "../../poi/context/POIContext";
 import { usePhotoContext } from "../../photo/context/PhotoContext";
 import { usePhotoService } from "../../photo/services/photoService";
 import { usePlaceContext } from "../../place/context/PlaceContext";
+import { useLineContext } from "../../lineMarkers/context/LineContext";
 import { normalizeRoute } from "../utils/routeUtils";
 import { getRouteLocationData } from "../../../utils/geocoding";
 import { getRouteDistance, getUnpavedPercentage, getElevationGain } from "../../gpx/utils/routeUtils";
@@ -157,6 +158,7 @@ export const RouteProvider = ({ children, }) => {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [changedSections, setChangedSections] = useState({});
     const [pendingRouteBounds, setPendingRouteBounds] = useState(null);
+    const [loadedLineData, setLoadedLineData] = useState([]);
     const [headerSettings, setHeaderSettings] = useState({
         color: '#000000',
         logoUrl: null,
@@ -222,6 +224,16 @@ export const RouteProvider = ({ children, }) => {
     const { photos, addPhoto } = photoContext;
     const photoService = usePhotoService();
     const { places, updatePlace } = usePlaceContext();
+    
+    // Get LineContext for line marker functionality
+    let lineContext;
+    try {
+        lineContext = useLineContext();
+    } catch (error) {
+        // This is expected when the RouteProvider is used outside of a LineProvider
+        console.log('[RouteContext] LineContext not available:', error.message);
+        lineContext = null;
+    }
     
     // Helper function to upload photos to Cloudinary
     const uploadPhotosToCloudinary = async () => {
@@ -547,6 +559,8 @@ export const RouteProvider = ({ children, }) => {
             logoBlob: null
         });
     }, [map, routes]);
+    // Function to get lines from LineContext will be passed as parameter
+    
     // Save current state to backend
     const roundCoordinate = (value) => {
         return Number(value.toFixed(5));
@@ -561,7 +575,7 @@ export const RouteProvider = ({ children, }) => {
         }
         return roundedRoute;
     };
-    const saveCurrentState = useCallback(async (name, type, isPublic) => {
+    const saveCurrentState = useCallback(async (name, type, isPublic, lineData) => {
         try {
             console.log('[RouteContext] Starting save with:', { name, type, isPublic });
             const pois = getPOIsForRoute();
@@ -709,6 +723,13 @@ export const RouteProvider = ({ children, }) => {
                 totalCount: (pois.draggable?.length || 0) + (pois.places?.length || 0)
             });
             partialUpdate.pois = pois;
+            
+            // Include lines in the save data (passed as parameter)
+            console.log('[RouteContext] Including lines in save data:', lineData ? lineData.length : 0);
+            if (lineData && lineData.length > 0) {
+                console.log('[RouteContext] Line data details:', JSON.stringify(lineData));
+            }
+            partialUpdate.lines = lineData || [];
             
             // Add header settings if they've changed or this is a new route
             if (hasHeaderChanges || !currentLoadedPersistentId) {
@@ -920,6 +941,37 @@ export const RouteProvider = ({ children, }) => {
                     await updatePlace(place.id, place);
                 }
             }
+            // Check for lines data and load it if available
+            if (route.lines) {
+                console.log('[RouteContext] Found lines data in loaded route:', 
+                    route.lines ? route.lines.length : 0, 'lines');
+                console.log('[RouteContext] Line data details:', JSON.stringify(route.lines));
+                
+                // Store the line data in state for direct access
+                setLoadedLineData(route.lines);
+                
+                // Also try to use LineContext if available (for backward compatibility)
+                if (lineContext) {
+                    console.log('[RouteContext] LineContext is available');
+                    
+                    if (typeof lineContext.loadLinesFromRoute === 'function') {
+                        console.log('[RouteContext] loadLinesFromRoute function is available');
+                        console.log('[RouteContext] Calling loadLinesFromRoute function from LineContext');
+                        lineContext.loadLinesFromRoute(route.lines);
+                        console.log('[RouteContext] loadLinesFromRoute function called successfully');
+                    } else {
+                        console.error('[RouteContext] loadLinesFromRoute function not available in LineContext');
+                        console.error('[RouteContext] Available functions in LineContext:', 
+                            Object.keys(lineContext).filter(key => typeof lineContext[key] === 'function'));
+                    }
+                } else {
+                    console.log('[RouteContext] LineContext not available, using direct line data approach instead');
+                }
+            } else {
+                console.log('[RouteContext] No lines data found in loaded route');
+                // Clear any previously loaded line data
+                setLoadedLineData([]);
+            }
             
             // Load header settings if available
             if (route.headerSettings) {
@@ -1075,6 +1127,8 @@ export const RouteProvider = ({ children, }) => {
                     pendingRouteBounds,
                     // Header settings
                     headerSettings,
+                    // Line data
+                    loadedLineData,
                     updateHeaderSettings: (settings) => {
                         console.log('Updating header settings in RouteContext:', settings);
                         

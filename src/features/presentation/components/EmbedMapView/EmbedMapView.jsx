@@ -12,6 +12,8 @@ import { SimpleLightbox } from '../../../photo/components/PhotoPreview/SimpleLig
 import { clusterPhotosPresentation, isCluster as isPhotoCluster, getClusterExpansionZoom as getPhotoClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
 import { clusterPOIs, isCluster as isPOICluster, getClusterExpansionZoom as getPOIClusterExpansionZoom } from '../../../poi/utils/clustering';
 import { MapProvider } from '../../../map/context/MapContext';
+import { LineProvider } from '../../../lineMarkers/context/LineContext.jsx';
+import DirectEmbedLineLayer from './components/DirectEmbedLineLayer.jsx';
 import { PhotoProvider } from '../../../photo/context/PhotoContext';
 import { useRouteDataLoader, filterPhotosByRoute } from './hooks/useRouteDataLoader';
 import MapHeader from '../../../map/components/MapHeader/MapHeader';
@@ -38,6 +40,8 @@ export default function EmbedMapView() {
     const mapInstance = useRef(null);
     const [isMapReady, setIsMapReady] = useState(false);
     const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
+    const [isClimbFlagsVisible, setIsClimbFlagsVisible] = useState(true);
+    const [isLineMarkersVisible, setIsLineMarkersVisible] = useState(true);
     const [selectedPOI, setSelectedPOI] = useState(null);
     const [isPhotosVisible, setIsPhotosVisible] = useState(true);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
@@ -117,6 +121,16 @@ export default function EmbedMapView() {
                 });
             }
         }
+    };
+    
+    // Function to toggle climb flags visibility
+    const toggleClimbFlagsVisibility = () => {
+        setIsClimbFlagsVisible(prev => !prev);
+    };
+    
+    // Function to toggle line markers visibility
+    const toggleLineMarkersVisibility = () => {
+        setIsLineMarkersVisible(prev => !prev);
     };
     
     // Function to toggle photos visibility
@@ -822,7 +836,8 @@ export default function EmbedMapView() {
 
     return (
         <MapProvider value={mapContextValue}>
-            <div ref={containerRef} className="embed-container">
+            <LineProvider>
+                <div ref={containerRef} className="embed-container">
             {/* Add the header */}
             <MapHeader 
                 title={currentRoute?.name || 'Untitled Route'}
@@ -841,6 +856,10 @@ export default function EmbedMapView() {
                 setCurrentRoute={setCurrentRoute}
                 isPhotosVisible={isPhotosVisible}
                 togglePhotosVisibility={togglePhotosVisibility}
+                isClimbFlagsVisible={isClimbFlagsVisible}
+                toggleClimbFlagsVisibility={toggleClimbFlagsVisibility}
+                isLineMarkersVisible={isLineMarkersVisible}
+                toggleLineMarkersVisibility={toggleLineMarkersVisibility}
                 visiblePOICategories={visiblePOICategories}
                 togglePOICategoryVisibility={togglePOICategoryVisibility}
                 routeVisibility={routeVisibility}
@@ -909,8 +928,16 @@ export default function EmbedMapView() {
                             />
                         ))}
                         
+                        {/* Add DirectEmbedLineLayer for line markers */}
+                        {isLineMarkersVisible && (
+                            <DirectEmbedLineLayer 
+                                map={mapInstance.current}
+                                lines={routeData?.lines || []}
+                            />
+                        )}
+                        
                         {/* Render climb markers for current route */}
-                        {currentRoute && (
+                        {currentRoute && isClimbFlagsVisible && (
                             <ClimbMarkers 
                                 map={mapInstance.current} 
                                 route={currentRoute} 
@@ -1038,7 +1065,8 @@ export default function EmbedMapView() {
                     </>
                 )}
             </div>
-            </div>
+                </div>
+            </LineProvider>
         </MapProvider>
     );
 }

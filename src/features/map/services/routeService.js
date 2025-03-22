@@ -225,8 +225,9 @@ export const useRouteService = () => {
                     ...routeDataWithUserId.metadata || {},
                     ...routeMetadata
                 },
-                // Include POIs in the transformed data
+                // Include POIs and lines in the transformed data
                 pois: routeData.pois || { draggable: [], places: [] },
+                lines: routeData.lines || [],
                 data: {
                     // Store all routes in the data structure
                     allRoutes: routeData.routes || [],
@@ -642,6 +643,14 @@ export const useRouteService = () => {
             });
             const data = await handleResponse(response);
             
+            console.log('[routeService] Raw route data received from API:', {
+                persistentId: data.persistentId,
+                name: data.name,
+                hasLines: !!data.lines,
+                lineCount: data.lines ? data.lines.length : 0,
+                lines: data.lines
+            });
+            
             // Transform the API response to match what the client expects
             let transformedData = data;
             
@@ -699,6 +708,16 @@ export const useRouteService = () => {
             } else if (!transformedData.pois) {
                 console.log('[routeService] No POIs found in route data, initializing empty POIs');
                 transformedData.pois = { draggable: [], places: [] };
+            }
+            
+            // Ensure lines are included in the transformed data
+            if (data.lines && !transformedData.lines) {
+                console.log('[routeService] Adding lines to transformed data:', 
+                    data.lines.length || 0, 'lines');
+                transformedData.lines = data.lines;
+            } else if (!transformedData.lines) {
+                console.log('[routeService] No lines found in route data, initializing empty lines array');
+                transformedData.lines = [];
             }
             
             // Handle both formats: data.route (old format) or data directly (new format)
