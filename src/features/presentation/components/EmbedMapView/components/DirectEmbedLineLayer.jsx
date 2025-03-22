@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import LineMarker from '../../../../lineMarkers/components/LineMarker/LineMarker.jsx';
-import { PresentationLineViewer } from '../../../LineViewer/PresentationLineViewer';
+import { PresentationLineViewer } from '../../LineViewer/PresentationLineViewer';
 import './DirectEmbedLineLayer.css';
 
 /**
