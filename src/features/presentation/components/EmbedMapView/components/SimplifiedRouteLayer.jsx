@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { along, lineString, length } from '@turf/turf';
 import mapboxgl from 'mapbox-gl';
-import { RouteLayer } from '../../../../../map/components/RouteLayer/RouteLayer';
-import { normalizeRoute } from '../../../../../map/hooks/useUnifiedRouteProcessing';
+import { RouteLayer } from '../../../../map/components/RouteLayer/RouteLayer';
+import { normalizeRoute } from '../../../../map/hooks/useUnifiedRouteProcessing';
 
 // Import the CSS for distance markers
 import './SimplifiedRouteLayer.css';
