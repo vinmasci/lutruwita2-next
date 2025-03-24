@@ -58,8 +58,15 @@ const DirectEmbedLineLayer = ({ map, lines = [] }) => {
       ...line,
       // Ensure id is present
       id: line.id || `line-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      // Ensure coordinates are properly structured
-      coordinates: line.coordinates || { start: [0, 0], end: [0, 0] },
+      // Ensure coordinates are properly structured with support for midpoint
+      coordinates: line.coordinates 
+        ? {
+            start: line.coordinates.start || [0, 0],
+            end: line.coordinates.end || [0, 0],
+            // Preserve midpoint if it exists
+            ...(line.coordinates.mid ? { mid: line.coordinates.mid } : {})
+          }
+        : { start: [0, 0], end: [0, 0] },
       // Ensure name is a string
       name: line.name || '',
       // Ensure icons is an array

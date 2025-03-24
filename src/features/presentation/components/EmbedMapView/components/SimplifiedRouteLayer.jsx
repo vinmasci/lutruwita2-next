@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { along, lineString, length } from '@turf/turf';
 import mapboxgl from 'mapbox-gl';
-import { RouteLayer } from '../../../../map/components/RouteLayer/RouteLayer';
+import EmbedRouteLayer from './EmbedRouteLayer';
 import { normalizeRoute } from '../../../../map/hooks/useUnifiedRouteProcessing';
 
 // Import the CSS for distance markers
@@ -144,11 +144,15 @@ const SimplifiedRouteLayer = ({ map, route, showDistanceMarkers = false, isActiv
 
   // Animation is now handled by the RouteLayer component
 
-  // Render the unified RouteLayer component
+  // Render the EmbedRouteLayer component
   return (
     <>
-      {/* Use the enhanced RouteLayer component for route rendering */}
-      <RouteLayer map={map} route={normalizedRoute} />
+      {/* Use the EmbedRouteLayer component for route rendering */}
+      <EmbedRouteLayer 
+        map={map} 
+        route={normalizedRoute} 
+        currentRoute={normalizedRoute} // Pass the current route as a prop
+      />
       
       {/* Handle distance markers separately */}
       {showDistanceMarkers && (

@@ -10,8 +10,12 @@ import { ProcessingProvider } from './features/map/context';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import Auth0Callback from './features/auth/components/Auth0Callback/Auth0Callback';
 import { Auth0Provider } from '@auth0/auth0-react';
+import { AuthProvider } from './features/auth/context/AuthContext';
 import { LandingPage } from './features/presentation/components/LandingPage/LandingPage';
 import { RoutePresentation } from './features/presentation/components/RoutePresentation/RoutePresentation';
+
+// Make React available globally for components that use React.createElement
+window.React = React;
 
 export default function App() {
   return (
@@ -31,7 +35,9 @@ export default function App() {
         window.history.replaceState({}, document.title, '/editor');
       }}
     >
-      <BrowserRouter>
+      {/* Add our custom AuthProvider to synchronize authentication state */}
+      <AuthProvider>
+        <BrowserRouter>
         <ThemeProvider theme={theme}>
           <ProcessingProvider>
             <PhotoProvider>
@@ -80,7 +86,8 @@ export default function App() {
             </PhotoProvider>
           </ProcessingProvider>
         </ThemeProvider>
-      </BrowserRouter>
+        </BrowserRouter>
+      </AuthProvider>
     </Auth0Provider>
   );
 }

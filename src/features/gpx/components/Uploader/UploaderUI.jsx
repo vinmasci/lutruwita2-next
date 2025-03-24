@@ -553,6 +553,9 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
                     </Box>
                 </Paper>
             )}
+            
+            {/* Add spacer for bottom padding */}
+            <Box sx={{ height: '360px' }} />
 
             <Popover
                 open={Boolean(colorPickerAnchor)}

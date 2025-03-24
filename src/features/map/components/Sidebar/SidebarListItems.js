@@ -7,10 +7,12 @@ import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePlaceContext } from '../../../place/context/PlaceContext';
 import { useLineContext } from '../../../lineMarkers/context/LineContext';
+import { useSidebar } from './useSidebar';
 import { SidebarIcons, RefreshIcon } from './icons';
 import { SaveDialog } from './SaveDialog.jsx';
 import { LoadDialog } from './LoadDialog';
 import { EmbedDialog } from './EmbedDialog.jsx';
+import { removeAllMapboxMarkers } from '../../utils/mapCleanup';
 
 export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine, onItemClick }) => {
     const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
@@ -18,7 +20,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
     const { clearPOIs, setPoiMode } = usePOIContext();
     const { clearPhotos } = usePhotoContext();
     const { clearPlaces } = usePlaceContext();
-    const { setIsDrawing, saveRoute } = useLineContext();
+    const { setIsDrawing, saveRoute, stopDrawing, lines, setLines } = useLineContext();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
     const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
@@ -80,7 +82,68 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
         
-        // Force cleanup of each route individually first
+        // Clean up line-related map layers first
+        if (map) {
+            try {
+                // First, remove all mapboxgl markers (including text and icon markers)
+                removeAllMapboxMarkers(map);
+                
+                const style = map.getStyle();
+                if (style && style.layers) {
+                    console.log('[SidebarListItems] Cleaning up line-related map layers');
+                    
+                    // Find all line-related layers
+                    const lineLayers = style.layers
+                        .map(layer => layer.id)
+                        .filter(id => 
+                            id.startsWith('line-') || 
+                            id.includes('circle-') || 
+                            id.includes('inner-circle-')
+                        );
+                    
+                    console.log('[SidebarListItems] Found line layers to remove:', lineLayers);
+                    
+                    // Remove each line layer
+                    lineLayers.forEach(layerId => {
+                        if (map.getLayer(layerId)) {
+                            try {
+                                console.log('[SidebarListItems] Removing line layer:', layerId);
+                                map.removeLayer(layerId);
+                            } catch (error) {
+                                console.error('[SidebarListItems] Error removing line layer:', layerId, error);
+                            }
+                        }
+                    });
+                    
+                    // Find all line-related sources
+                    const lineSources = Object.keys(style.sources || {})
+                        .filter(id => 
+                            id.startsWith('line-') || 
+                            id.includes('circle-source-')
+                        );
+                    
+                    console.log('[SidebarListItems] Found line sources to remove:', lineSources);
+                    
+                    // Remove each line source
+                    setTimeout(() => {
+                        lineSources.forEach(sourceId => {
+                            if (map.getSource(sourceId)) {
+                                try {
+                                    console.log('[SidebarListItems] Removing line source:', sourceId);
+                                    map.removeSource(sourceId);
+                                } catch (error) {
+                                    console.error('[SidebarListItems] Error removing line source:', sourceId, error);
+                                }
+                            }
+                        });
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('[SidebarListItems] Error cleaning up line layers:', error);
+            }
+        }
+        
+        // Force cleanup of each route individually
         routes.forEach(route => {
             const routeId = route.routeId || `route-${route.id}`;
             console.log('[SidebarListItems] Explicitly cleaning up route:', routeId);
@@ -127,13 +190,29 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             }
         });
         
+        // Reset line drawing mode and stop drawing BEFORE clearing contexts
+        // This ensures the line tool is properly reset
+        setIsDrawing(false);
+        
+        if (typeof stopDrawing === 'function') {
+            console.log('[SidebarListItems] Calling stopDrawing to reset line drawing state');
+            stopDrawing();
+        }
+        
+        // Clear lines array directly
+        try {
+            console.log('[SidebarListItems] Clearing lines array');
+            setLines([]);
+        } catch (error) {
+            console.error('[SidebarListItems] Error clearing lines array:', error);
+        }
+        
         // Clear all data from contexts
-        clearCurrentWork(); // Clear routes
+        clearCurrentWork(); // Clear routes and loadedLineData
         clearPOIs(); // Clear POIs
         clearPhotos(); // Clear photos
         clearPlaces(); // Clear places
         setPoiMode('none'); // Reset POI mode
-        setIsDrawing(false); // Reset line drawing mode
         
         // Force a refresh of the map by triggering a style reload
         refreshMapStyle();
@@ -179,6 +258,9 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
     const refreshMapStyle = () => {
         if (map) {
             try {
+                // First, remove all mapboxgl markers to ensure they don't persist
+                removeAllMapboxMarkers(map);
+                
                 // Get the current style
                 const currentStyle = map.getStyle();
                 if (currentStyle) {

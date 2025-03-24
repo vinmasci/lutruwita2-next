@@ -46,13 +46,44 @@ const DirectLineLayer = ({ map, lines = [] }) => {
         // Check if this line is already in the context
         const exists = result.some(contextLine => contextLine.id === propLine.id);
         if (!exists) {
+          // Add the line to the result array for display
           result.push(propLine);
+          
+          // Also add the line to the context state to ensure it's saved
+          // This is important to prevent lines from being lost when saving to MongoDB
+          if (!contextLines.some(line => line.id === propLine.id)) {
+            console.log(`[DirectLineLayer] Adding line ${propLine.id} from props to context state`);
+            
+            // Ensure the line has all required properties, especially preserving the midpoint
+            const enhancedLine = {
+              ...propLine,
+              id: propLine.id || `line-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              coordinates: propLine.coordinates 
+                ? {
+                    start: propLine.coordinates.start || [0, 0],
+                    end: propLine.coordinates.end || [0, 0],
+                    // Preserve midpoint if it exists
+                    ...(propLine.coordinates.mid ? { mid: propLine.coordinates.mid } : {})
+                  }
+                : { start: [0, 0], end: [0, 0] },
+              name: propLine.name || '',
+              icons: Array.isArray(propLine.icons) ? propLine.icons : [],
+              type: propLine.type || 'line'
+            };
+            
+            // Log if the line has a midpoint
+            if (propLine.coordinates?.mid) {
+              console.log(`[DirectLineLayer] Line ${propLine.id} has midpoint:`, propLine.coordinates.mid);
+            }
+            
+            addLine(enhancedLine);
+          }
         }
       });
     }
     
     return result;
-  }, [contextLines, lines]);
+  }, [contextLines, lines, addLine]);
 
   // Handle line click
   const handleLineClick = useCallback((line) => {
@@ -65,7 +96,13 @@ const DirectLineLayer = ({ map, lines = [] }) => {
       description: line.description || '',
       icons: line.icons || [],
       // Ensure photos is an array, even if empty
-      photos: Array.isArray(line.photos) ? line.photos : []
+      photos: Array.isArray(line.photos) ? line.photos : [],
+      // Ensure coordinates structure is preserved, especially the midpoint
+      coordinates: {
+        start: line.coordinates?.start || [0, 0],
+        end: line.coordinates?.end || [0, 0],
+        ...(line.coordinates?.mid ? { mid: line.coordinates.mid } : {})
+      }
     };
     
     console.log('[DirectLineLayer] Normalized line data for drawer:', normalizedLine);
@@ -81,8 +118,22 @@ const DirectLineLayer = ({ map, lines = [] }) => {
       ...updatedLine,
       id: updatedLine.id || `line-${Date.now()}`,
       type: 'line',
-      coordinates: updatedLine.coordinates || selectedLine?.coordinates
+      coordinates: updatedLine.coordinates 
+        ? {
+            start: updatedLine.coordinates.start || [0, 0],
+            end: updatedLine.coordinates.end || [0, 0],
+            // Preserve midpoint if it exists in the updated line
+            ...(updatedLine.coordinates.mid ? { mid: updatedLine.coordinates.mid } : 
+              // Otherwise check if it exists in the selected line
+              (selectedLine?.coordinates?.mid ? { mid: selectedLine.coordinates.mid } : {}))
+          }
+        : (selectedLine?.coordinates || { start: [0, 0], end: [0, 0] })
     };
+    
+    // Log if the line has a midpoint
+    if (finalLine.coordinates.mid) {
+      console.log(`[DirectLineLayer] Saving line ${finalLine.id} with midpoint:`, finalLine.coordinates.mid);
+    }
 
     console.log('[DirectLineLayer] Saving line:', finalLine);
 

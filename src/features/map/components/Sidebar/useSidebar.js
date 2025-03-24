@@ -5,7 +5,7 @@ import { useLineContext } from '../../../lineMarkers/context/LineContext';
 export const useSidebar = (props) => {
     // All hooks must be called before any other code
     const { setPoiPlacementMode, setPoiPlacementClick } = useMapContext();
-    const { setIsDrawing } = useLineContext();
+    const { setIsDrawing, startDrawing, stopDrawing } = useLineContext();
     const { isProcessing } = useGpxProcessing();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [activeDrawer, setActiveDrawer] = useState(null);
@@ -51,7 +51,6 @@ export const useSidebar = (props) => {
             setPoiPlacementClick(undefined);
         }
     }, [isDrawerOpen, activeDrawer, setPoiPlacementMode, setPoiPlacementClick]);
-    const { startDrawing, stopDrawing } = useLineContext();
 
     const handleAddLine = () => {
         if (activeDrawer === 'line') {
@@ -92,6 +91,7 @@ export const useSidebar = (props) => {
         handlePlacePOI: props.onPlacePOI,
         handleAddPOI,
         handleAddPhotos,
-        handleAddLine
+        handleAddLine,
+        stopDrawing
     };
 };

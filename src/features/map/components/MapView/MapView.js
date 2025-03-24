@@ -25,6 +25,7 @@ import { ClimbMarkers } from '../ClimbMarkers/ClimbMarkers';
 import LineLayer from '../../../lineMarkers/components/LineLayer/LineLayer.jsx';
 import DirectLineLayer from '../../../lineMarkers/components/LineLayer/DirectLineLayer.jsx';
 import { LineProvider, useLineContext } from '../../../lineMarkers/context/LineContext.jsx';
+import { MapOverviewProvider } from '../../../presentation/context/MapOverviewContext.jsx';
 import './MapView.css';
 import './photo-fix.css'; // Nuclear option to force photos behind UI components
 import { Sidebar } from '../Sidebar';
@@ -675,10 +676,12 @@ function MapViewContent() {
 }
 
 export default function MapView() {
-    console.log('[MapView] Creating MapView component with provider structure: RouteProvider → LineProvider → MapViewContent');
-    return React.createElement(RouteProvider, { 
-        children: React.createElement(LineProvider, {
-            children: React.createElement(MapViewContent, {})
+    console.log('[MapView] Creating MapView component with provider structure: MapOverviewProvider → RouteProvider → LineProvider → MapViewContent');
+    return React.createElement(MapOverviewProvider, { 
+        children: React.createElement(RouteProvider, {
+            children: React.createElement(LineProvider, {
+                children: React.createElement(MapViewContent, {})
+            })
         })
     });
 }

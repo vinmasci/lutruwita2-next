@@ -33,52 +33,66 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, dis
   const [selectedIndex, setSelectedIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [imageError, setImageError] = useState(false);
   
+  // Local state to track photos after deletion
+  const [localPhotos, setLocalPhotos] = useState(photos);
+  
+  // Update local photos when props change
+  useEffect(() => {
+    setLocalPhotos(photos);
+  }, [photos]);
+  
   // Get the currently selected photo
-  const selectedPhoto = photos[selectedIndex];
+  const selectedPhoto = localPhotos[selectedIndex];
   
   // Get the photo context for potential delete operations
   const { deletePhoto } = usePhotoContext();
   
   // Navigation handlers
   const handleNext = useCallback(() => {
-    setSelectedIndex((prev) => (prev + 1) % photos.length);
+    setSelectedIndex((prev) => (prev + 1) % localPhotos.length);
     setImageError(false); // Reset error state when changing photos
-  }, [photos.length]);
+  }, [localPhotos.length]);
   
   const handlePrev = useCallback(() => {
-    setSelectedIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    setSelectedIndex((prev) => (prev - 1 + localPhotos.length) % localPhotos.length);
     setImageError(false); // Reset error state when changing photos
-  }, [photos.length]);
+  }, [localPhotos.length]);
   
   // Delete handler
   const handleDelete = useCallback(() => {
     if (selectedPhoto) {
-      // Call the context delete function
-      deletePhoto(selectedPhoto.id);
+      console.log('[SimpleLightbox] Deleting photo:', selectedPhoto.name);
+      console.log('[SimpleLightbox] Selected photo URL:', selectedPhoto.url);
+      console.log('[SimpleLightbox] Local photos before deletion:', localPhotos.length);
+      
+      // Call the context delete function with URL instead of ID
+      deletePhoto(selectedPhoto.url);
       
       // Call the provided onDelete if available
       if (onDelete) {
-        onDelete(selectedPhoto.id);
+        // If onDelete expects an ID, pass the URL as a fallback
+        onDelete(selectedPhoto.id || selectedPhoto.url);
       }
       
+      // Update local photos state to reflect the deletion
+      // Use URL for comparison since IDs might be undefined
+      const newPhotos = localPhotos.filter(p => p.url !== selectedPhoto.url);
+      console.log('[SimpleLightbox] Local photos after deletion:', newPhotos.length);
+      setLocalPhotos(newPhotos);
+      
       // If there are more photos, navigate to the next one, otherwise close
-      if (photos.length > 1) {
+      if (newPhotos.length > 0) {
         // If we're at the last photo, go to the previous one
-        if (selectedIndex === photos.length - 1) {
-          handlePrev();
-        } else {
-          // Otherwise, stay at the same index (which will now show the next photo)
-          const newPhotos = photos.filter(p => p.id !== selectedPhoto.id);
-          if (newPhotos.length === 0) {
-            onClose();
-          }
+        if (selectedIndex >= newPhotos.length) {
+          setSelectedIndex(newPhotos.length - 1);
         }
+        // Otherwise, stay at the same index (which will now show the next photo)
       } else {
         // If this was the only photo, close the lightbox
         onClose();
       }
     }
-  }, [selectedPhoto, deletePhoto, onDelete, photos, selectedIndex, handlePrev, onClose]);
+  }, [selectedPhoto, deletePhoto, onDelete, localPhotos, selectedIndex, onClose]);
   
   // Keyboard navigation
   useEffect(() => {
@@ -203,7 +217,7 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, dis
         )}
         
         {/* Navigation buttons */}
-        {photos.length > 1 && (
+        {localPhotos.length > 1 && (
           <>
             <IconButton
               onClick={handlePrev}
@@ -267,7 +281,7 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, dis
         </Stack>
         
         {/* Thumbnails for navigation */}
-        {photos.length > 1 && (
+        {localPhotos.length > 1 && (
           <Stack 
             direction="row" 
             spacing={1} 
@@ -284,7 +298,7 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, dis
               }
             }}
           >
-            {photos.map((p, index) => (
+            {localPhotos.map((p, index) => (
               <Box
                 key={p.id}
                 onClick={() => {

@@ -15,7 +15,10 @@ import DownloadIcon from '@mui/icons-material/Download'; // Download icon for GP
 import { downloadRouteAsGpx } from '../../../../utils/gpx/export'; // Import GPX export utility
 import { PresentationRouteDescriptionPanel } from '../RouteDescription';
 import { PresentationWeatherProfilePanel } from '../WeatherProfile';
+import { PresentationMapOverviewPanel } from '../MapOverview';
 import mapboxgl from 'mapbox-gl'; // Import mapboxgl
+import MapOverviewContextAdapter from '../EmbedMapView/components/MapOverviewContextAdapter';
+import MapOverviewLoader from '../MapOverview/MapOverviewLoader';
 
 const ElevationPanel = styled(Box)(({ theme }) => ({
     position: 'fixed',
@@ -311,6 +314,14 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                         setIsCollapsed: setIsCollapsed
                     }),
                     _jsx(TabButton, {
+                        tab: 'mapOverview',
+                        label: 'Map Overview',
+                        activeTab: activeTab,
+                        onClick: () => setActiveTab('mapOverview'),
+                        isCollapsed: isCollapsed,
+                        setIsCollapsed: setIsCollapsed
+                    }),
+                    _jsx(TabButton, {
                         tab: 'description',
                         label: 'Description',
                         activeTab: activeTab,
@@ -429,10 +440,17 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                     }
                 },
                 children: activeTab === 'elevation' 
-                    ? route && _jsx(PresentationElevationProfile, { route: route })
+                    ? route && _jsx(PresentationElevationProfile, { route: route, key: "elevation" })
                     : activeTab === 'description'
-                    ? route && _jsx(PresentationRouteDescriptionPanel, { route: route })
-                    : route && _jsx(PresentationWeatherProfilePanel, { route: route })
+                    ? route && _jsx(PresentationRouteDescriptionPanel, { route: route, key: "description" })
+                    : activeTab === 'weather'
+                    ? route && _jsx(PresentationWeatherProfilePanel, { route: route, key: "weather" })
+                    : _jsxs(MapOverviewContextAdapter, { 
+                        children: [
+                          _jsx(MapOverviewLoader, {}),
+                          _jsx(PresentationMapOverviewPanel, { key: "mapOverview" })
+                        ]
+                      })
             })
         ] 
     });

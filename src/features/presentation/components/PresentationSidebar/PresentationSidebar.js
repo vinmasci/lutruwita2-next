@@ -389,7 +389,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                             }) 
                         }), 
                         _jsx(List, { 
-                            sx: { flex: 1, overflowY: 'auto', px: 3, py: 2, pb: 40 }, 
+                            sx: { flex: 1, overflowY: 'auto', px: 3, py: 2, pb: 120 }, 
                             children: routes.map((route) => (
                                 _jsxs(ListItem, { 
                                     sx: {

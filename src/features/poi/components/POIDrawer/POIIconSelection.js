@@ -26,8 +26,8 @@ const POIIconSelection = ({ mode, selectedIcon, onIconSelect, onBack, startDrag 
             onMouseLeave: () => setHoveredIcon(null), 
             sx: {
                 position: 'relative',
-                width: '20px',
-                height: '20px',
+                width: '28px',
+                height: '28px',
                 backgroundColor: iconColor,
                 borderRadius: '4px',
                 display: 'flex',
@@ -38,9 +38,7 @@ const POIIconSelection = ({ mode, selectedIcon, onIconSelect, onBack, startDrag 
                 }
             }, 
             children: [
-                icon.name === 'ClimbHC' 
-                    ? _jsx("span", { style: { fontSize: '11px', color: 'white' }, children: "HC" })
-                    : _jsx("i", { className: ICON_PATHS[icon.name], style: { fontSize: '12px', color: 'white' } }),
+                _jsx("i", { className: ICON_PATHS[icon.name], style: { fontSize: '16px', color: 'white' } }),
                 hoveredIcon === icon.name && _jsx(StyledTooltip, { children: icon.label })
             ] 
         }, icon.name);
@@ -83,7 +81,13 @@ const POIIconSelection = ({ mode, selectedIcon, onIconSelect, onBack, startDrag 
             category: 'road-information',
             label: 'Road Information',
             iconGroups: [
-                ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ArrowUpRight', 'Construction', 'HeavyTraffic'],
+                ['TrafficCone', 'Octagon', 'AlertOctagon', 'Lock', 'Unlock', 'ArrowUpRight', 'Construction', 'HeavyTraffic']
+            ]
+        },
+        {
+            category: 'trail-information',
+            label: 'Trail Information',
+            iconGroups: [
                 ['AudioWaveform', 'Route', 'RailTrail', 'ChevronsRightLeft', 'HikeABike', 'WaterCrossing', 'RemoteArea']
             ]
         },
@@ -120,11 +124,6 @@ const POIIconSelection = ({ mode, selectedIcon, onIconSelect, onBack, startDrag 
             label: 'Event Information', 
             iconGroups: [['PlayCircle', 'StopCircle', 'Stethoscope', 'BatteryCharging', 'X', 'Wrench', 'Flag']] 
         },
-        { 
-            category: 'climb-category', 
-            label: 'Climb Categories', 
-            iconGroups: [['ClimbHC', 'ClimbCat1', 'ClimbCat2', 'ClimbCat3', 'ClimbCat4']] 
-        }
     ];
     
     return _jsx(Box, { 

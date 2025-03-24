@@ -19,6 +19,22 @@ const createIndex = () => {
         }
     });
 };
+// Helper function to get a unique identifier from a photo URL
+export const getPhotoIdentifier = (url) => {
+    if (!url) {
+        console.warn('[Clustering] No URL provided for photo identifier');
+        return null;
+    }
+    
+    const match = url.match(/\/v(\d+)\//);
+    if (match && match[1]) {
+        return match[1]; // Return the version number
+    }
+    
+    // Fallback to using the full URL if we can't extract the version
+    return url;
+};
+
 const getClusteredPhotos = (photos, zoom) => {
     // Convert photos to GeoJSON features
     const features = photos
@@ -26,7 +42,7 @@ const getClusteredPhotos = (photos, zoom) => {
         .map(photo => ({
         type: 'Feature',
         properties: {
-            id: photo.id,
+            id: getPhotoIdentifier(photo.url) || `photo-${Math.random().toString(36).substr(2, 9)}`,
             photo
         },
         geometry: {

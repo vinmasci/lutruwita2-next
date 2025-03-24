@@ -195,7 +195,7 @@ export const RouteList = () => {
     }, [routes]);
 
     return (_jsxs(_Fragment, { children: [
-        _jsxs(List, { sx: { width: '100%', padding: 2 }, children: [
+        _jsxs(List, { sx: { width: '100%', padding: 2, paddingBottom: 120 }, children: [
             _jsx(Button, { 
                 variant: "contained", 
                 startIcon: _jsx(SaveIcon, {}), 

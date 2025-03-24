@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { Typography } from '@mui/material';
-import { MapPin, MapPinned } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { ModeSelectionCard } from './POIDrawer.styles';
 const POIModeSelection = ({ onModeSelect }) => {
     return (_jsxs(_Fragment, { children: [

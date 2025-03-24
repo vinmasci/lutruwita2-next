@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
+import useEmbedRouteProcessing from './hooks/useEmbedRouteProcessing';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { MAP_STYLES } from '../../../map/components/StyleControl/StyleControl';
 import { PresentationElevationProfilePanel } from '../ElevationProfile/PresentationElevationProfilePanel';
@@ -13,11 +13,16 @@ import { clusterPhotosPresentation, isCluster as isPhotoCluster, getClusterExpan
 import { clusterPOIs, isCluster as isPOICluster, getClusterExpansionZoom as getPOIClusterExpansionZoom } from '../../../poi/utils/clustering';
 import { MapProvider } from '../../../map/context/MapContext';
 import { LineProvider } from '../../../lineMarkers/context/LineContext.jsx';
+import { EmbedRouteProvider } from './context/EmbedRouteContext.jsx';
+import { MapOverviewProvider } from '../../../presentation/context/MapOverviewContext.jsx';
+import MapOverviewInitializer from './components/MapOverviewInitializer';
 import DirectEmbedLineLayer from './components/DirectEmbedLineLayer.jsx';
+import RouteInitializer from './components/RouteInitializer';
+import RouteContextAdapter from './components/RouteContextAdapter';
 import { PhotoProvider } from '../../../photo/context/PhotoContext';
 import { useRouteDataLoader, filterPhotosByRoute } from './hooks/useRouteDataLoader';
 import MapHeader from '../../../map/components/MapHeader/MapHeader';
-import { ClimbMarkers } from '../../../map/components/ClimbMarkers/ClimbMarkers';
+import { EmbedClimbMarkers } from './components/EmbedClimbMarkers';
 
 // Import extracted components
 import SimplifiedRouteLayer from './components/SimplifiedRouteLayer';
@@ -467,16 +472,8 @@ export default function EmbedMapView() {
         }
     }, [currentRoute]);
     
-    // Initialize routes using the unified approach - at component top level
-    const { initialized: routesInitialized } = useUnifiedRouteProcessing(
-        routeData?.allRoutesEnhanced || [], 
-        {
-            batchProcess: true,
-            onInitialized: () => {
-                console.log('[EmbedMapView] Routes initialized with unified approach');
-            }
-        }
-    );
+    // We'll initialize routes inside the EmbedRouteProvider
+    const routesInitializedRef = useRef(false);
 
     // Initialize map
     useEffect(() => {
@@ -834,17 +831,76 @@ export default function EmbedMapView() {
         setPoiPlacementMode: () => { }
     }), [isMapReady, hoverCoordinates]);
 
+    // Create a simplified RouteProvider value with just the properties needed by RouteLayer
+    const routeContextValue = useMemo(() => ({
+        // The main property needed by RouteLayer
+        currentRoute,
+        
+        // Other properties that might be used by components in the embed view
+        routes: routeData?.allRoutesEnhanced || [],
+        addRoute: () => {},
+        deleteRoute: () => {},
+        setCurrentRoute,
+        focusRoute: () => {},
+        unfocusRoute: () => {},
+        updateRoute: () => {},
+        reorderRoutes: () => {},
+        
+        // Saved routes state - empty values since not needed in embed view
+        savedRoutes: [],
+        isSaving: false,
+        isLoading: false,
+        isLoadedMap: false,
+        currentLoadedState: null,
+        currentLoadedPersistentId: null,
+        hasUnsavedChanges: false,
+        
+        // Change tracking - empty function since not needed in embed view
+        setChangedSections: () => {},
+        
+        // Save/Load operations - empty functions since not needed in embed view
+        saveCurrentState: () => {},
+        loadRoute: () => {},
+        listRoutes: () => {},
+        deleteSavedRoute: () => {},
+        clearCurrentWork: () => {},
+        pendingRouteBounds: null,
+        
+        // Header settings - use from routeData
+        headerSettings: routeData?.headerSettings || {},
+        
+        // Line data - use from routeData
+        loadedLineData: routeData?.lines || [],
+        updateHeaderSettings: () => {}
+    }), [currentRoute, routeData, setCurrentRoute]);
+
     return (
-        <MapProvider value={mapContextValue}>
-            <LineProvider>
-                <div ref={containerRef} className="embed-container">
+        <EmbedRouteProvider initialRoutes={routeData?.allRoutesEnhanced || []} initialCurrentRoute={currentRoute}>
+            {/* Initialize routes using the embed-specific approach - inside the provider */}
+            {routeData?.allRoutesEnhanced && (
+                <RouteInitializer 
+                    routes={routeData.allRoutesEnhanced} 
+                    onInitialized={() => {
+                        routesInitializedRef.current = true;
+                        console.log('[EmbedMapView] Routes initialized with embed-specific approach');
+                    }}
+                />
+            )}
+            <MapOverviewProvider>
+                {/* Initialize map overview data from routeData */}
+                <MapOverviewInitializer routeData={routeData} />
+                <MapProvider value={mapContextValue}>
+                    <LineProvider>
+                    <div ref={containerRef} className="embed-container">
             {/* Add the header */}
-            <MapHeader 
-                title={currentRoute?.name || 'Untitled Route'}
-                color={routeData?.headerSettings?.color || '#000000'}
-                logoUrl={routeData?.headerSettings?.logoUrl}
-                username={routeData?.headerSettings?.username}
-            />
+            <RouteContextAdapter>
+                <MapHeader 
+                    title={currentRoute?.name || 'Untitled Route'}
+                    color={routeData?.headerSettings?.color || '#000000'}
+                    logoUrl={routeData?.headerSettings?.logoUrl}
+                    username={routeData?.headerSettings?.username}
+                />
+            </RouteContextAdapter>
             
             {/* Add the EmbedSidebar */}
             <EmbedSidebar 
@@ -919,13 +975,14 @@ export default function EmbedMapView() {
                     <>
                         {/* Initialize routes using the unified approach - moved to component top level */}
                         {routeData?.allRoutesEnhanced && routeData.allRoutesEnhanced.map(route => (
-                            <SimplifiedRouteLayer
-                                map={mapInstance.current}
-                                route={route}
-                                key={route.id || route.routeId}
-                                showDistanceMarkers={isDistanceMarkersVisible && route.id === currentRoute?.id}
-                                isActive={route.id === currentRoute?.id || route.routeId === currentRoute?.routeId}
-                            />
+                            <RouteContextAdapter key={route.id || route.routeId}>
+                                <SimplifiedRouteLayer
+                                    map={mapInstance.current}
+                                    route={route}
+                                    showDistanceMarkers={isDistanceMarkersVisible && route.id === currentRoute?.id}
+                                    isActive={route.id === currentRoute?.id || route.routeId === currentRoute?.routeId}
+                                />
+                            </RouteContextAdapter>
                         ))}
                         
                         {/* Add DirectEmbedLineLayer for line markers */}
@@ -938,10 +995,12 @@ export default function EmbedMapView() {
                         
                         {/* Render climb markers for current route */}
                         {currentRoute && isClimbFlagsVisible && (
-                            <ClimbMarkers 
-                                map={mapInstance.current} 
-                                route={currentRoute} 
-                            />
+                            <RouteContextAdapter>
+                                <EmbedClimbMarkers 
+                                    map={mapInstance.current} 
+                                    route={currentRoute} 
+                                />
+                            </RouteContextAdapter>
                         )}
                         
                         {/* Render POIs with clustering */}
@@ -1012,10 +1071,12 @@ export default function EmbedMapView() {
                         
                         {/* POI Viewer */}
                         {selectedPOI && (
-                            <PresentationPOIViewer 
-                                poi={selectedPOI} 
-                                onClose={() => setSelectedPOI(null)} 
-                            />
+                            <RouteContextAdapter>
+                                <PresentationPOIViewer 
+                                    poi={selectedPOI} 
+                                    onClose={() => setSelectedPOI(null)} 
+                                />
+                            </RouteContextAdapter>
                         )}
                         
                         {/* Photo Lightbox */}
@@ -1034,39 +1095,44 @@ export default function EmbedMapView() {
                             <div className="elevation-container">
                                 {/* Use the PhotoProvider with photos directly in the value prop */}
                                 <PhotoProvider>
-                                    <PresentationElevationProfilePanel 
-                                        route={{
-                                            ...currentRoute,
-                                            // Add the photos to the route object directly
-                                            // This ensures they're available to the PresentationRouteDescriptionPanel
-                                            _allPhotos: routeData?.photos || [],
-                                            // Ensure description has the correct structure with photos
-                                            description: {
-                                                ...currentRoute.description,
-                                                // If description.photos is missing or empty, use filtered photos
-                                                photos: currentRoute.description?.photos?.length > 0 
-                                                    ? currentRoute.description.photos 
-                                                    : filterPhotosByRoute(routeData?.photos?.map(photo => ({
-                                                        ...photo,
-                                                        // Ensure each photo has the required properties
-                                                        id: photo.id || photo._id,
-                                                        url: photo.url,
-                                                        thumbnailUrl: photo.thumbnailUrl || photo.url,
-                                                        coordinates: photo.coordinates
-                                                    })) || [], currentRoute)
-                                            }
-                                        }}
-                                        isFlyByActive={isFlyByActive}
-                                        handleFlyByClick={handleFlyBy}
-                                    />
+                                    {/* Wrap with RouteContextAdapter to provide RouteContext */}
+                                    <RouteContextAdapter>
+                                        <PresentationElevationProfilePanel 
+                                            route={{
+                                                ...currentRoute,
+                                                // Add the photos to the route object directly
+                                                // This ensures they're available to the PresentationRouteDescriptionPanel
+                                                _allPhotos: routeData?.photos || [],
+                                                // Ensure description has the correct structure with photos
+                                                description: {
+                                                    ...currentRoute.description,
+                                                    // If description.photos is missing or empty, use filtered photos
+                                                    photos: currentRoute.description?.photos?.length > 0 
+                                                        ? currentRoute.description.photos 
+                                                        : filterPhotosByRoute(routeData?.photos?.map(photo => ({
+                                                            ...photo,
+                                                            // Ensure each photo has the required properties
+                                                            id: photo.id || photo._id,
+                                                            url: photo.url,
+                                                            thumbnailUrl: photo.thumbnailUrl || photo.url,
+                                                            coordinates: photo.coordinates
+                                                        })) || [], currentRoute)
+                                                }
+                                            }}
+                                            isFlyByActive={isFlyByActive}
+                                            handleFlyByClick={handleFlyBy}
+                                        />
+                                    </RouteContextAdapter>
                                 </PhotoProvider>
                             </div>
                         )}
                     </>
                 )}
             </div>
-                </div>
-            </LineProvider>
-        </MapProvider>
+                    </div>
+                    </LineProvider>
+                </MapProvider>
+            </MapOverviewProvider>
+        </EmbedRouteProvider>
     );
 }

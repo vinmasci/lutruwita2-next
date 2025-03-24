@@ -34,8 +34,9 @@ const LineMarker = ({
   // Memoize coordinates to prevent unnecessary updates
   const coordinates = useMemo(() => ({
     start: line.coordinates?.start,
+    mid: line.coordinates?.mid,
     end: line.coordinates?.end
-  }), [line.coordinates?.start, line.coordinates?.end]);
+  }), [line.coordinates?.start, line.coordinates?.mid, line.coordinates?.end]);
 
   // Initial setup of layers and cleanup
   useEffect(() => {
@@ -54,6 +55,11 @@ const LineMarker = ({
     if (!sourceRef.current) {
       console.log('[LineMarker] Creating new source and layers');
       try {
+        // Determine the line coordinates based on whether we have a midpoint
+        const lineCoordinates = coordinates.mid 
+          ? [coordinates.start, coordinates.mid, coordinates.end] // Two-segment line with midpoint
+          : [coordinates.start, coordinates.end]; // Single segment line
+        
         map.addSource(lineLayerId.current, {
           type: 'geojson',
           data: {
@@ -61,7 +67,7 @@ const LineMarker = ({
             properties: {},
             geometry: {
               type: 'LineString',
-              coordinates: [coordinates.start, coordinates.end]
+              coordinates: lineCoordinates
             }
           }
         });
@@ -259,12 +265,17 @@ const LineMarker = ({
       // Update line source
       const source = map.getSource(sourceRef.current);
       if (source) {
+        // Determine the line coordinates based on whether we have a midpoint
+        const lineCoordinates = coordinates.mid 
+          ? [coordinates.start, coordinates.mid, coordinates.end] // Two-segment line with midpoint
+          : [coordinates.start, coordinates.end]; // Single segment line
+        
         source.setData({
           type: 'Feature',
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: [coordinates.start, coordinates.end]
+            coordinates: lineCoordinates
           }
         });
       }

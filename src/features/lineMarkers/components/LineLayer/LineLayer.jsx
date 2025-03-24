@@ -44,7 +44,8 @@ const LineLayer = () => {
         id: `line-${Date.now()}`,
         coordinates: {
           start: startPoint,
-          end: startPoint // Initially same as start
+          end: startPoint, // Initially same as start
+          mid: null // Add midpoint for the diagonal segment
         },
         type: 'line'
       };
@@ -57,11 +58,24 @@ const LineLayer = () => {
       // Get the start point
       const startPoint = currentLine.coordinates.start;
       
-      // Use the mouse's x-coordinate but keep the y-coordinate the same as the start point
-      // This ensures the line stays on a flat plain
+      // Calculate the vertical distance from start to mouse
+      const verticalDistance = mousePosition[1] - startPoint[1];
+      
+      // Calculate the horizontal distance from start to mouse
+      const horizontalDistance = mousePosition[0] - startPoint[0];
+      
+      // Calculate the midpoint (end of diagonal segment, start of horizontal segment)
+      // The vertical component determines how far up/down the diagonal goes
+      const midPoint = [
+        startPoint[0] + Math.abs(verticalDistance), // Move horizontally by the same amount as vertical
+        startPoint[1] + verticalDistance // Move vertically based on mouse position
+      ];
+      
+      // Calculate the end point (end of horizontal segment)
+      // The horizontal distance determines how far left/right the horizontal line goes
       const endPoint = [
-        mousePosition[0], // Use the mouse's x-coordinate (allows left or right)
-        startPoint[1]     // Keep the same y coordinate for a straight line
+        midPoint[0] + (horizontalDistance - Math.abs(verticalDistance)), // Adjust for the horizontal component of the diagonal
+        midPoint[1] // Keep the same y-coordinate as the midpoint for a horizontal line
       ];
       
       const finalLine = {
@@ -69,9 +83,11 @@ const LineLayer = () => {
         id: currentLine.id || `line-${Date.now()}`,
         coordinates: {
           ...currentLine.coordinates,
-          end: endPoint
+          mid: midPoint, // Add midpoint for the diagonal segment
+          end: endPoint  // Update endpoint for the horizontal segment
         }
       };
+      
       setSelectedLine(finalLine);
       setDrawerOpen(true);
       setCurrentLine(null);
@@ -89,18 +105,33 @@ const LineLayer = () => {
     // Get the start point
     const startPoint = currentLine.coordinates.start;
     
-    // Use the mouse's x-coordinate but keep the y-coordinate the same as the start point
-    // This allows drawing left or right but keeps the line on a flat plain
-    const newEndPoint = [
-      mousePosition[0], // Use the mouse's x-coordinate (allows left or right)
-      startPoint[1]     // Keep the same y coordinate for a straight line
+    // Calculate the vertical distance from start to mouse
+    const verticalDistance = mousePosition[1] - startPoint[1];
+    
+    // Calculate the horizontal distance from start to mouse
+    const horizontalDistance = mousePosition[0] - startPoint[0];
+    
+    // Calculate the midpoint (end of diagonal segment, start of horizontal segment)
+    // The vertical component determines how far up/down the diagonal goes
+    const midPoint = [
+      startPoint[0] + Math.abs(verticalDistance), // Move horizontally by the same amount as vertical
+      startPoint[1] + verticalDistance // Move vertically based on mouse position
     ];
     
+    // Calculate the end point (end of horizontal segment)
+    // The horizontal distance determines how far left/right the horizontal line goes
+    const endPoint = [
+      midPoint[0] + (horizontalDistance - Math.abs(verticalDistance)), // Adjust for the horizontal component of the diagonal
+      midPoint[1] // Keep the same y-coordinate as the midpoint for a horizontal line
+    ];
+    
+    // Update the line with both the midpoint and endpoint
     setCurrentLine(prevLine => ({
       ...prevLine,
       coordinates: {
         ...prevLine.coordinates,
-        end: newEndPoint
+        mid: midPoint, // Add midpoint for the diagonal segment
+        end: endPoint  // Update endpoint for the horizontal segment
       }
     }));
   }, [isDrawing, currentLine, setCurrentLine]);
@@ -160,10 +191,24 @@ const LineLayer = () => {
       ...updatedLine,
       id: updatedLine.id || `line-${Date.now()}`,
       type: 'line',
-      coordinates: updatedLine.coordinates || selectedLine?.coordinates
+      coordinates: updatedLine.coordinates 
+        ? {
+            start: updatedLine.coordinates.start || [0, 0],
+            end: updatedLine.coordinates.end || [0, 0],
+            // Preserve midpoint if it exists in the updated line
+            ...(updatedLine.coordinates.mid ? { mid: updatedLine.coordinates.mid } : 
+              // Otherwise check if it exists in the selected line
+              (selectedLine?.coordinates?.mid ? { mid: selectedLine.coordinates.mid } : {}))
+          }
+        : (selectedLine?.coordinates || { start: [0, 0], end: [0, 0] })
     };
+    
+    // Log if the line has a midpoint
+    if (finalLine.coordinates.mid) {
+      console.log(`[LineLayer] Saving line ${finalLine.id} with midpoint:`, finalLine.coordinates.mid);
+    }
 
-    console.log('Saving line:', finalLine);
+    console.log('[LineLayer] Saving line:', finalLine);
 
     if (finalLine.id && finalLine.coordinates) {
       if (lines.some(line => line.id === finalLine.id)) {

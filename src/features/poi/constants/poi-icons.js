@@ -8,13 +8,13 @@ export const POI_ICONS = [
     { name: 'Construction', category: 'road-information', label: 'Road Construction', description: 'Road works or construction area' },
     { name: 'ArrowUpRight', category: 'road-information', label: 'Steep Gradient', description: 'Steep uphill or downhill section' },
     { name: 'HeavyTraffic', category: 'road-information', label: 'Heavy Traffic', description: 'High traffic area' },
-    { name: 'ChevronsRightLeft', category: 'road-information', label: 'Rough Surface', description: 'Rough or uneven road surface', style: { color: '#ff6348' } },
-    { name: 'AudioWaveform', category: 'road-information', label: 'Single Track', description: 'Narrow single track section', style: { color: '#ff6348' } },
-    { name: 'Route', category: 'road-information', label: 'Trailhead', description: 'Start of a trail or track', style: { color: '#ff6348' } },
-    { name: 'RailTrail', category: 'road-information', label: 'Rail Trail', description: 'Former railway line converted to trail', style: { color: '#ff6348' } },
-    { name: 'HikeABike', category: 'road-information', label: 'Hike-a-bike', description: 'Section where bike must be carried', style: { color: '#ff6348' } },
-    { name: 'WaterCrossing', category: 'road-information', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#ff6348' } },
-    { name: 'RemoteArea', category: 'road-information', label: 'Remote Area', description: 'Remote or isolated area', style: { color: '#ff6348' } },
+    { name: 'ChevronsRightLeft', category: 'trail-information', label: 'Rough Surface', description: 'Rough or uneven road surface', style: { color: '#3498db' } },
+    { name: 'AudioWaveform', category: 'trail-information', label: 'Single Track', description: 'Narrow single track section', style: { color: '#3498db' } },
+    { name: 'Route', category: 'trail-information', label: 'Trailhead', description: 'Start of a trail or track', style: { color: '#3498db' } },
+    { name: 'RailTrail', category: 'trail-information', label: 'Rail Trail', description: 'Former railway line converted to trail', style: { color: '#3498db' } },
+    { name: 'HikeABike', category: 'trail-information', label: 'Hike-a-bike', description: 'Section where bike must be carried', style: { color: '#3498db' } },
+    { name: 'WaterCrossing', category: 'trail-information', label: 'Water Crossing', description: 'River, stream, or water crossing', style: { color: '#3498db' } },
+    { name: 'RemoteArea', category: 'trail-information', label: 'Remote Area', description: 'Remote or isolated area', style: { color: '#3498db' } },
     // Accommodation
     { name: 'Tent', category: 'accommodation', label: 'Campsite', description: 'Camping area or campsite' },
     { name: 'Huts', category: 'accommodation', label: 'Huts', description: 'Mountain huts or shelters' },
@@ -55,12 +55,6 @@ export const POI_ICONS = [
     { name: 'BatteryCharging', category: 'event-information', label: 'Rest Stop', description: 'Rest or recovery point', style: { color: '#ef5777' } },
     { name: 'Wrench', category: 'event-information', label: 'Bike Hub', description: 'Bike maintenance or repair', style: { color: '#ef5777' } },
     { name: 'Flag', category: 'event-information', label: 'Checkpoint', description: 'Event checkpoint', style: { color: '#ef5777' } },
-    // Climb Categories
-    { name: 'ClimbHC', category: 'climb-category', label: 'HC Climb', description: 'Hors Catégorie climb', style: { color: '#8B0000' } },
-    { name: 'ClimbCat1', category: 'climb-category', label: 'Category 1 Climb', description: 'Category 1 climb', style: { color: '#FF0000' } },
-    { name: 'ClimbCat2', category: 'climb-category', label: 'Category 2 Climb', description: 'Category 2 climb', style: { color: '#fa8231' } },
-    { name: 'ClimbCat3', category: 'climb-category', label: 'Category 3 Climb', description: 'Category 3 climb', style: { color: '#f7b731' } },
-    { name: 'ClimbCat4', category: 'climb-category', label: 'Category 4 Climb', description: 'Category 4 climb', style: { color: '#228B22' } }
 ];
 export const getIconsByCategory = (category) => {
     return POI_ICONS.filter(icon => icon.category === category);

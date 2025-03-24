@@ -48,6 +48,18 @@ export const LineProvider = ({ children }) => {
       return true;
     });
     
+    // Log lines with midpoints for debugging
+    const linesWithMidpoints = validLines.filter(line => line.coordinates.mid);
+    console.log('[LineContext] Lines with midpoints:', linesWithMidpoints.length);
+    if (linesWithMidpoints.length > 0) {
+      console.log('[LineContext] Example line with midpoint:', {
+        id: linesWithMidpoints[0].id,
+        start: linesWithMidpoints[0].coordinates.start,
+        mid: linesWithMidpoints[0].coordinates.mid,
+        end: linesWithMidpoints[0].coordinates.end
+      });
+    }
+    
     console.log('[LineContext] Valid lines for saving:', validLines.length);
     
     // Check for photos in lines
@@ -148,6 +160,12 @@ export const LineProvider = ({ children }) => {
         console.warn('[LineContext] Invalid line data structure:', line);
         return false;
       }
+      
+      // Log if the line has a midpoint
+      if (line.coordinates.mid) {
+        console.log(`[LineContext] Line ${line.id} has midpoint:`, line.coordinates.mid);
+      }
+      
       console.log('[LineContext] Valid line found:', line.id);
       return true;
     });
@@ -203,9 +221,21 @@ export const LineProvider = ({ children }) => {
       };
     });
     
-    console.log('[LineContext] Setting lines in state with processed photos');
-    setLines(processedLines);
-    console.log('[LineContext] Lines loaded successfully');
+    // IMPORTANT FIX: Merge loaded lines with existing lines instead of replacing them
+    setLines(prevLines => {
+      // Create a map of existing line IDs for quick lookup
+      const existingLineIds = new Map(prevLines.map(line => [line.id, true]));
+      
+      // Filter out any loaded lines that already exist in the current state
+      const newLines = processedLines.filter(line => !existingLineIds.has(line.id));
+      
+      console.log(`[LineContext] Merging ${newLines.length} new lines with ${prevLines.length} existing lines`);
+      
+      // Return the combined array of existing lines plus new lines
+      return [...prevLines, ...newLines];
+    });
+    
+    console.log('[LineContext] Lines loaded and merged successfully');
   }, []);
 
   return (

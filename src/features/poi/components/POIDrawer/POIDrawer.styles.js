@@ -70,7 +70,7 @@ export const CategoryItem = styled(ListItem)(({ theme, selected }) => ({
 }));
 export const IconGrid = styled(Box)(({ theme }) => ({
     display: 'grid',
-    gridTemplateColumns: 'repeat(9, 1fr)',
+    gridTemplateColumns: 'repeat(7, 1fr)',
     gap: '6px',
     padding: '0px 0px',
     justifyItems: 'center',

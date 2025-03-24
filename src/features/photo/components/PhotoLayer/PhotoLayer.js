@@ -5,7 +5,7 @@ import { usePhotoContext } from '../../context/PhotoContext';
 import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
 import { PhotoCluster } from '../PhotoCluster/PhotoCluster';
 import { SimpleLightbox } from '../PhotoPreview/SimpleLightbox';
-import { clusterPhotos, isCluster, getClusterExpansionZoom } from '../../utils/clustering';
+import { clusterPhotos, isCluster, getClusterExpansionZoom, getPhotoIdentifier } from '../../utils/clustering';
 import './PhotoLayer.css';
 export const PhotoLayer = () => {
     const { map } = useMapContext();
@@ -79,8 +79,69 @@ export const PhotoLayer = () => {
         // No longer opening the modal for clusters
         // Only individual photo markers will open the modal when clicked
     }, [map, clusteredItems]);
-    return (_jsxs("div", { className: "photo-layer", children: [clusteredItems.map(item => isCluster(item) ? (_jsx(PhotoCluster, { cluster: item, onClick: () => handleClusterClick(item) }, `cluster-${item.properties.cluster_id}`)) : (_jsx(PhotoMarker, { photo: item.properties.photo, onClick: () => setSelectedPhoto(item.properties.photo) }, item.properties.id))), selectedPhoto && (_jsx(SimpleLightbox, { photo: selectedPhoto, onClose: () => {
-                    setSelectedPhoto(null);
-                    setSelectedCluster(null);
-                }, additionalPhotos: selectedCluster }, `preview-${selectedPhoto.id}`))] }));
+    // Function to find the cluster that contains a photo using URL
+    const findPhotoCluster = useCallback((photoUrl) => {
+        if (!photoUrl) {
+            console.warn('[PhotoLayer] No URL provided to findPhotoCluster');
+            return null;
+        }
+        
+        const photoIdentifier = getPhotoIdentifier(photoUrl);
+        console.log('[PhotoLayer] Looking for photo with identifier:', photoIdentifier);
+        
+        for (const item of clusteredItems) {
+            if (isCluster(item) && item.properties.photos) {
+                // Check if this cluster contains the photo using URL identifier
+                const photoInCluster = item.properties.photos.find(p => {
+                    const pIdentifier = getPhotoIdentifier(p.url);
+                    return pIdentifier === photoIdentifier;
+                });
+                
+                if (photoInCluster) {
+                    return item.properties.photos;
+                }
+            }
+        }
+        return null;
+    }, [clusteredItems, getPhotoIdentifier]);
+
+    // Handle photo click - set both selectedPhoto and selectedCluster
+    const handlePhotoClick = useCallback((photo) => {
+        console.log('[PhotoLayer] Photo clicked:', photo.name);
+        console.log('[PhotoLayer] Photo URL:', photo.url);
+        console.log('[PhotoLayer] Photo identifier:', getPhotoIdentifier(photo.url));
+        console.log('[PhotoLayer] Photo coordinates:', photo.coordinates);
+        console.log('[PhotoLayer] Current zoom level:', zoom);
+        setSelectedPhoto(photo);
+        
+        // Find if this photo is part of a cluster using URL
+        const clusterPhotos = findPhotoCluster(photo.url);
+        console.log('[PhotoLayer] Found cluster photos:', clusterPhotos ? clusterPhotos.length : 'none');
+        if (clusterPhotos) {
+            console.log('[PhotoLayer] Cluster photo URLs:', clusterPhotos.map(p => getPhotoIdentifier(p.url)));
+        }
+        setSelectedCluster(clusterPhotos);
+    }, [findPhotoCluster, getPhotoIdentifier, zoom]);
+
+    return (_jsxs("div", { className: "photo-layer", children: [
+        clusteredItems.map(item => 
+            isCluster(item) 
+                ? (_jsx(PhotoCluster, { 
+                    cluster: item, 
+                    onClick: () => handleClusterClick(item) 
+                  }, `cluster-${item.properties.cluster_id}`)) 
+                : (_jsx(PhotoMarker, { 
+                    photo: item.properties.photo, 
+                    onClick: () => handlePhotoClick(item.properties.photo) 
+                  }, item.properties.id))
+        ), 
+        selectedPhoto && (_jsx(SimpleLightbox, { 
+            photo: selectedPhoto, 
+            onClose: () => {
+                setSelectedPhoto(null);
+                setSelectedCluster(null);
+            }, 
+            additionalPhotos: selectedCluster 
+        }, `preview-${selectedPhoto.id}`))
+    ] }));
 };

@@ -1,6 +1,8 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { createContext, useContext, useState, useCallback } from 'react';
 import { useRouteContext } from '../../map/context/RouteContext';
+import { getPhotoIdentifier } from '../../photo/utils/clustering';
+
 const PhotoContext = createContext(undefined);
 export const usePhotoContext = () => {
     const context = useContext(PhotoContext);
@@ -23,22 +25,62 @@ export const PhotoProvider = ({ children }) => {
     }
     
     // Function to notify RouteContext of photo changes
-    const notifyPhotoChange = useCallback(() => {
+    const notifyPhotoChange = useCallback((changeType = 'update') => {
         if (routeContext) {
-            routeContext.setChangedSections(prev => ({...prev, photos: true}));
+            routeContext.setChangedSections(prev => ({
+                ...prev, 
+                photos: true,
+                photoChangeType: changeType // 'add', 'delete', or 'update'
+            }));
         }
     }, [routeContext]);
     const addPhoto = (newPhotos) => {
         setPhotos(prev => [...prev, ...newPhotos]);
-        notifyPhotoChange();
+        notifyPhotoChange('add');
     };
-    const deletePhoto = (photoId) => {
-        setPhotos(prev => prev.filter(p => p.id !== photoId));
-        notifyPhotoChange();
+    const deletePhoto = (photoUrl) => {
+        console.log('[PhotoContext] Deleting photo with URL:', photoUrl);
+        console.log('[PhotoContext] Current photos count before deletion:', photos.length);
+        
+        const identifier = getPhotoIdentifier(photoUrl);
+        if (!identifier) {
+            console.error('[PhotoContext] Failed to get identifier for photo, aborting deletion');
+            return; // Abort deletion if we can't get an identifier
+        }
+        
+        console.log('[PhotoContext] Deleting photo with identifier:', identifier);
+        
+        setPhotos(prev => {
+            // Safety check - don't delete if we would remove all photos
+            const newPhotos = prev.filter(p => {
+                const photoId = getPhotoIdentifier(p.url);
+                return photoId !== identifier;
+            });
+            
+            // If we would delete all photos, something is wrong - abort
+            if (newPhotos.length === 0 && prev.length > 1) {
+                console.error('[PhotoContext] Attempted to delete all photos, aborting');
+                return prev; // Return original array unchanged
+            }
+            
+            console.log('[PhotoContext] Deleted photo, remaining count:', newPhotos.length);
+            return newPhotos;
+        });
+        
+        notifyPhotoChange('delete');
     };
-    const updatePhoto = (photoId, updates) => {
-        setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, ...updates } : p));
-        notifyPhotoChange();
+    const updatePhoto = (photoUrl, updates) => {
+        const identifier = getPhotoIdentifier(photoUrl);
+        if (!identifier) {
+            console.error('[PhotoContext] Failed to get identifier for photo update, aborting');
+            return;
+        }
+        
+        setPhotos(prev => prev.map(p => {
+            const photoId = getPhotoIdentifier(p.url);
+            return photoId === identifier ? { ...p, ...updates } : p;
+        }));
+        notifyPhotoChange('update');
     };
     const loadPhotos = (newPhotos) => {
         // Convert SerializedPhoto to ProcessedPhoto
@@ -55,7 +97,7 @@ export const PhotoProvider = ({ children }) => {
     const clearPhotos = () => {
         // Clear all photos by setting to an empty array
         setPhotos([]);
-        notifyPhotoChange();
+        notifyPhotoChange('clear');
         console.log('[PhotoContext] All photos cleared');
     };
     const togglePhotosVisibility = useCallback(() => {

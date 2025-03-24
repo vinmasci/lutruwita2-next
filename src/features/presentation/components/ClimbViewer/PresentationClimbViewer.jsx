@@ -137,13 +137,17 @@ export const PresentationClimbViewer = ({ climb, route, onClose }) => {
           width: '90%',
           maxWidth: '500px',
           height: 'auto',
-          maxHeight: '90vh',
+          maxHeight: {
+            xs: '85vh', // Slightly smaller on mobile to ensure it's not cut off
+            sm: '90vh'
+          },
           bgcolor: 'rgba(35, 35, 35, 0.95)',
           border: '1px solid rgba(30, 136, 229, 0.5)',
           borderRadius: 2,
           boxShadow: 24,
-          p: 4,
+          p: { xs: 2, sm: 4 }, // Less padding on mobile
           overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
           display: 'flex',
           flexDirection: 'column',
           zIndex: 9999

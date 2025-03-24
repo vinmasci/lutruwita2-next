@@ -41,7 +41,7 @@ const highlightColors = {
     'Yellow': '#ffeb3b'
 };
 
-export const RichTextEditor = ({ value, onChange }) => {
+export const RichTextEditor = ({ value, onChange, onEditorReady }) => {
     const [textColorMenuAnchor, setTextColorMenuAnchor] = useState(null);
     const [highlightMenuAnchor, setHighlightMenuAnchor] = useState(null);
     const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -100,6 +100,13 @@ export const RichTextEditor = ({ value, onChange }) => {
             editor.commands.setContent(value || '');
         }
     }, [editor, value]);
+
+    // Call onEditorReady when editor is initialized
+    React.useEffect(() => {
+        if (editor && onEditorReady) {
+            onEditorReady(editor);
+        }
+    }, [editor, onEditorReady]);
 
     if (!editor) {
         return null;

@@ -8,13 +8,14 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { RouteDescriptionPanel } from '../RouteDescription/RouteDescriptionPanel';
+import { EditableMapOverviewPanel } from '../../../presentation/components/MapOverview/EditableMapOverviewPanel';
 
 interface ElevationProfilePanelProps {
   route?: ProcessedRoute;
   header?: ReactNode;
 }
 
-type TabType = 'elevation' | 'description';
+type TabType = 'elevation' | 'description' | 'mapOverview';
 
 export const ElevationProfilePanel = ({
   route,
@@ -70,6 +71,7 @@ export const ElevationProfilePanel = ({
         // No background or border styling
       }}>
         <TabButton tab="elevation" label="Elevation" />
+        <TabButton tab="mapOverview" label="Map Overview" />
         <TabButton tab="description" label="Description" />
       </Box>
       
@@ -124,6 +126,9 @@ export const ElevationProfilePanel = ({
       {header}
       {route && activeTab === 'elevation' && <ElevationProfile route={route} />}
       {route && activeTab === 'description' && <RouteDescriptionPanel route={route} />}
+      {activeTab === 'mapOverview' && (
+        <EditableMapOverviewPanel />
+      )}
     </ElevationPanel>
   );
 };

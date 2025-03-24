@@ -1,14 +1,147 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { compressJSON, decompressJSON } from '../../../utils/compression';
 
+// Create a custom event for authentication state changes
+export const AUTH_EVENTS = {
+    TOKEN_REFRESH_FAILED: 'auth:token_refresh_failed',
+    TOKEN_EXPIRED: 'auth:token_expired',
+    SESSION_TIMEOUT: 'auth:session_timeout'
+};
+
 export const useRouteService = () => {
-    const { getAccessTokenSilently, user } = useAuth0();
+    const { getAccessTokenSilently, user, logout, loginWithRedirect } = useAuth0();
     const userId = user?.sub;
     // Always use relative URL for serverless deployment
     const API_BASE = '/api/routes';
     
+    // Authentication state manager
+    const AuthenticationManager = {
+        // Store the last token refresh time
+        lastTokenRefresh: Date.now(),
+        
+        // Token validity duration in milliseconds (default: 50 minutes)
+        // Auth0 tokens typically expire after 1 hour, so refresh 10 minutes before expiry
+        tokenValidityDuration: 50 * 60 * 1000,
+        
+        // Check if token needs refresh
+        needsRefresh: function() {
+            return Date.now() - this.lastTokenRefresh > this.tokenValidityDuration;
+        },
+        
+        // Handle authentication errors
+        handleAuthError: function(error) {
+            console.error('[AuthManager] Authentication error:', error);
+            
+            // Check error type to determine appropriate action
+            if (error.error === 'login_required' || 
+                error.error === 'consent_required' ||
+                error.message?.includes('Login required') ||
+                error.message?.includes('consent required')) {
+                
+                // Token is invalid or expired, dispatch event
+                const event = new CustomEvent(AUTH_EVENTS.TOKEN_EXPIRED, { 
+                    detail: { error, message: 'Your session has expired. Please log in again.' } 
+                });
+                window.dispatchEvent(event);
+                
+                // Redirect to login after a short delay
+                setTimeout(() => {
+                    console.log('[AuthManager] Redirecting to login page...');
+                    loginWithRedirect({
+                        appState: { returnTo: window.location.pathname }
+                    });
+                }, 2000);
+                
+                return false;
+            }
+            
+            if (error.error === 'timeout' || error.message?.includes('timeout')) {
+                // Session timeout, dispatch event
+                const event = new CustomEvent(AUTH_EVENTS.SESSION_TIMEOUT, { 
+                    detail: { error, message: 'Your session has timed out. Please log in again.' } 
+                });
+                window.dispatchEvent(event);
+                
+                return false;
+            }
+            
+            // Generic token refresh failure
+            const event = new CustomEvent(AUTH_EVENTS.TOKEN_REFRESH_FAILED, { 
+                detail: { error, message: 'Failed to refresh authentication. Please log in again.' } 
+            });
+            window.dispatchEvent(event);
+            
+            return false;
+        },
+        
+        // Reset authentication state
+        resetAuth: function() {
+            console.log('[AuthManager] Resetting authentication state...');
+            // Clear any cached tokens or state
+            localStorage.removeItem('auth0.is.authenticated');
+            
+            // Log out the user
+            logout({ returnTo: window.location.origin });
+        }
+    };
+    
+    // Set up a periodic token validity check
+    if (typeof window !== 'undefined') {
+        // Check token validity every 5 minutes
+        const tokenCheckInterval = setInterval(() => {
+            if (AuthenticationManager.needsRefresh()) {
+                console.log('[routeService] Token may be expiring soon, refreshing...');
+                // Silently refresh the token
+                getAccessTokenSilently({ ignoreCache: true })
+                    .then(() => {
+                        console.log('[routeService] Token refreshed successfully');
+                        AuthenticationManager.lastTokenRefresh = Date.now();
+                    })
+                    .catch(error => {
+                        console.error('[routeService] Failed to refresh token:', error);
+                        AuthenticationManager.handleAuthError(error);
+                    });
+            }
+        }, 5 * 60 * 1000); // Check every 5 minutes
+        
+        // Clean up interval on component unmount
+        window.addEventListener('beforeunload', () => {
+            clearInterval(tokenCheckInterval);
+        });
+        
+        // Set up listeners for authentication events
+        window.addEventListener(AUTH_EVENTS.TOKEN_REFRESH_FAILED, (event) => {
+            console.warn('[routeService] Token refresh failed:', event.detail.message);
+            // Show a notification to the user
+            if (window.confirm(event.detail.message)) {
+                AuthenticationManager.resetAuth();
+            }
+        });
+        
+        window.addEventListener(AUTH_EVENTS.TOKEN_EXPIRED, (event) => {
+            console.warn('[routeService] Token expired:', event.detail.message);
+            // Automatic redirect handled in handleAuthError
+        });
+        
+        window.addEventListener(AUTH_EVENTS.SESSION_TIMEOUT, (event) => {
+            console.warn('[routeService] Session timeout:', event.detail.message);
+            // Show a notification to the user
+            if (window.confirm(event.detail.message)) {
+                AuthenticationManager.resetAuth();
+            }
+        });
+    }
+    
     const getAuthHeaders = async () => {
         try {
+            // Check if token needs refresh
+            if (AuthenticationManager.needsRefresh()) {
+                console.log('[routeService] Token may be expiring soon, refreshing before request...');
+                await getAccessTokenSilently({ ignoreCache: true });
+                AuthenticationManager.lastTokenRefresh = Date.now();
+            }
+            
+            // Get the token
             const token = await getAccessTokenSilently();
             return {
                 'Content-Type': 'application/json',
@@ -16,7 +149,12 @@ export const useRouteService = () => {
             };
         }
         catch (error) {
-            console.error('Failed to get auth token:', error);
+            console.error('[routeService] Failed to get auth token:', error);
+            
+            // Handle authentication errors
+            AuthenticationManager.handleAuthError(error);
+            
+            // Still throw the error to be caught by the calling function
             throw new Error('Authentication required');
         }
     };
@@ -24,6 +162,23 @@ export const useRouteService = () => {
     const handleResponse = async (response) => {
         const contentType = response.headers.get('content-type');
         const isJson = contentType && contentType.includes('application/json');
+        
+        // Check for authentication errors
+        if (response.status === 401 || response.status === 403) {
+            console.error('[routeService] Authentication error:', response.status);
+            
+            // Create a custom error object
+            const authError = {
+                error: 'login_required',
+                message: 'Your session has expired or is invalid. Please log in again.'
+            };
+            
+            // Handle the authentication error
+            AuthenticationManager.handleAuthError(authError);
+            
+            throw new Error('Authentication failed. Please log in again.');
+        }
+        
         if (!response.ok) {
             // Clone the response before reading it
             const responseClone = response.clone();
@@ -44,6 +199,7 @@ export const useRouteService = () => {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
         }
+        
         try {
             if (isJson) {
                 return await response.json();
@@ -128,6 +284,79 @@ export const useRouteService = () => {
             
             const headers = await getAuthHeaders();
             
+            // Check if this is an update to an existing route and if we're only updating specific sections
+            const isUpdate = !!routeDataWithUserId.persistentId;
+            
+            // Enhanced partial update detection
+            // Consider it a partial update if:
+            // 1. It has a persistentId (existing route) AND
+            // 2. Either:
+            //    a. It doesn't include routes, OR
+            //    b. It includes mapOverview and only a few other essential fields, OR
+            //    c. It's a minimal update with just the required fields
+            const hasMapOverview = !!routeData.mapOverview;
+            const essentialFields = ['id', 'persistentId', 'name', 'type', 'isPublic', 'userId', 'routeSummary', 'mapOverview'];
+            const nonEssentialFields = Object.keys(routeData).filter(key => !essentialFields.includes(key) && key !== 'routes');
+            
+            // Check if this is a minimal update (just the required fields)
+            const requiredFields = ['persistentId', 'name', 'type', 'isPublic', 'userId'];
+            const hasOnlyRequiredFields = Object.keys(routeData).every(key => requiredFields.includes(key)) && 
+                                         requiredFields.every(key => key === 'userId' || routeData[key] !== undefined);
+            
+            // Check if this is a partial update based on our enhanced criteria
+            const isPartialUpdate = isUpdate && (
+                !routeData.routes || 
+                (hasMapOverview && nonEssentialFields.length <= 2) || // Allow a few non-essential fields
+                hasOnlyRequiredFields // Minimal update with just required fields
+            );
+            
+            if (hasOnlyRequiredFields) {
+                console.log('[routeService] Detected minimal update with only required fields');
+            }
+            
+            // If this is a partial update (has persistentId and meets our criteria)
+            if (isPartialUpdate) {
+                console.log('[routeService] Detected partial update, using optimized endpoint');
+                console.log('[routeService] Update contains fields:', Object.keys(routeData).join(', '));
+                
+                // Log what fields are being updated
+                console.log('[routeService] Updating fields:', Object.keys(routeData).join(', '));
+                
+                // Create a minimal payload with just the necessary fields
+                const minimalPayload = {
+                    ...routeData,
+                    userId: userId
+                };
+                
+                // Convert to JSON string to measure size
+                const jsonData = JSON.stringify(minimalPayload);
+                const payloadSizeInBytes = new Blob([jsonData]).size;
+                const payloadSizeInMB = payloadSizeInBytes / (1024 * 1024);
+                
+                console.log(`[routeService] Optimized payload size: ${payloadSizeInMB.toFixed(2)}MB`);
+                
+                // Use the partial update endpoint
+                // The API expects the persistentId as a query parameter for PATCH requests
+                const endpoint = `${API_BASE}/${routeDataWithUserId.persistentId}`;
+                const method = 'PATCH';
+                
+                // Set the Content-Type to application/json for the minimal payload
+                headers['Content-Type'] = 'application/json';
+                
+                const response = await fetch(endpoint, {
+                    method,
+                    headers,
+                    body: jsonData,
+                    credentials: 'include'
+                });
+                
+                console.log('[routeService] Save response status:', response.status);
+                const result = await handleResponse(response);
+                console.log('[routeService] Server response:', result);
+                return result;
+            }
+            
+            // For full updates or new routes, continue with the existing logic
             // Use existing metadata from routes if available, otherwise use empty object
             const routeMetadata = {};
             
@@ -499,6 +728,61 @@ export const useRouteService = () => {
         });
     }
     
+    // Helper function to get route distance
+    function getRouteDistance(route) {
+        // Check multiple possible locations for distance data
+        return route.statistics?.totalDistance || // First check statistics.totalDistance
+               route.data?.distance ||           // Then check data.distance
+               (route.geojson?.features?.[0]?.properties?.distance) || // Then check geojson properties
+               0;  // Default to 0 if not found
+    }
+    
+    // Helper function to get unpaved percentage
+    function getUnpavedPercentage(route) {
+        // Check if route has surface data
+        if (route.surface && route.surface.surfaceTypes) {
+            // Calculate unpaved percentage from surface types
+            let totalDistance = 0;
+            let unpavedDistance = 0;
+            
+            route.surface.surfaceTypes.forEach(surface => {
+                if (surface.type && surface.type.toLowerCase().includes('unpaved')) {
+                    unpavedDistance += surface.distance || 0;
+                }
+                totalDistance += surface.distance || 0;
+            });
+            
+            return totalDistance > 0 ? (unpavedDistance / totalDistance) * 100 : 0;
+        } else if (route.unpavedSections && route.unpavedSections.length > 0) {
+            // Calculate unpaved percentage from unpaved sections
+            const routeDistance = getRouteDistance(route);
+            if (routeDistance === 0) return 0;
+            
+            let unpavedDistance = route.unpavedSections.reduce((total, section) => {
+                // Calculate distance of this section if coordinates are available
+                if (section.coordinates && section.coordinates.length > 1) {
+                    let sectionDistance = 0;
+                    for (let i = 1; i < section.coordinates.length; i++) {
+                        const [lon1, lat1] = section.coordinates[i-1];
+                        const [lon2, lat2] = section.coordinates[i];
+                        // Simple distance calculation
+                        const dx = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
+                        const dy = lat2 - lat1;
+                        const distance = Math.sqrt(dx * dx + dy * dy) * 111.32 * 1000; // approx meters
+                        sectionDistance += distance;
+                    }
+                    return total + sectionDistance;
+                }
+                return total;
+            }, 0);
+            
+            return (unpavedDistance / routeDistance) * 100;
+        } else {
+            // Default to 10% if no surface data available
+            return 10;
+        }
+    }
+    
     // Helper function to calculate bounds from route data
     function calculateBounds(routeData) {
         // Default bounds if we can't calculate from coordinates
@@ -654,6 +938,9 @@ export const useRouteService = () => {
             // Transform the API response to match what the client expects
             let transformedData = data;
             
+            // Log metadata for debugging
+            console.log('[routeService] Metadata from API:', data.metadata);
+            
             // Check if this is the new API format (with data field but no routes array)
             if (data.data && !data.routes) {
                 
@@ -665,6 +952,20 @@ export const useRouteService = () => {
                         ...data,
                         routes: data.data.allRoutes
                     };
+                    
+                    // Transfer metadata to each route object
+                    if (data.metadata) {
+                        transformedData.routes = transformedData.routes.map(route => ({
+                            ...route,
+                            metadata: {
+                                ...route.metadata,
+                                country: data.metadata.country,
+                                state: data.metadata.state,
+                                lga: data.metadata.lga,
+                                isLoop: data.metadata.isLoop
+                            }
+                        }));
+                    }
                 } else {
                     // Fallback to creating a single route from the data field
                     
@@ -688,7 +989,9 @@ export const useRouteService = () => {
                         status: {
                             processingState: 'completed',
                             progress: 100
-                        }
+                        },
+                        // Add metadata to the route object
+                        metadata: data.metadata || {}
                     };
                     
                     // Create a transformed data structure with routes array
@@ -710,6 +1013,12 @@ export const useRouteService = () => {
                 transformedData.pois = { draggable: [], places: [] };
             }
             
+            // Ensure metadata is preserved in the transformed data
+            if (data.metadata && !transformedData.metadata) {
+                console.log('[routeService] Adding metadata to transformed data:', data.metadata);
+                transformedData.metadata = data.metadata;
+            }
+            
             // Ensure lines are included in the transformed data
             if (data.lines && !transformedData.lines) {
                 console.log('[routeService] Adding lines to transformed data:', 
@@ -720,12 +1029,37 @@ export const useRouteService = () => {
                 transformedData.lines = [];
             }
             
+            // Ensure metadata is properly transferred to all route objects
+            // This is a critical step to ensure metadata is preserved when loading routes
+            if (transformedData.routes && transformedData.routes.length > 0 && transformedData.metadata) {
+                console.log('[routeService] Ensuring metadata is transferred to all route objects');
+                transformedData.routes = transformedData.routes.map(route => {
+                    // If route doesn't have metadata or has incomplete metadata, add it from the top-level metadata
+                    if (!route.metadata || !route.metadata.state || !route.metadata.lga) {
+                        console.log('[routeService] Adding metadata to route:', route.name || route.routeId);
+                        return {
+                            ...route,
+                            metadata: {
+                                ...route.metadata, // Keep any existing metadata
+                                country: transformedData.metadata.country || 'Australia',
+                                state: transformedData.metadata.state || '',
+                                lga: transformedData.metadata.lga || '',
+                                isLoop: transformedData.metadata.isLoop || false
+                            }
+                        };
+                    }
+                    return route;
+                });
+            }
+
             // Handle both formats: data.route (old format) or data directly (new format)
             // Check if the data has a 'route' property or if it has 'routes' directly
             const routeData = transformedData.route || transformedData;
             
             // Add detailed logging for route data
             if (routeData && routeData.routes && routeData.routes.length > 0) {
+                // Log the first route's metadata to verify it's being transferred correctly
+                console.log('[routeService] First route metadata:', routeData.routes[0].metadata);
                 
                 if (!routeData.routes[0].geojson) {
                     console.error('[routeService] Missing GeoJSON data in route');

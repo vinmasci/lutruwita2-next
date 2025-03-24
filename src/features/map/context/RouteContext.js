@@ -1,11 +1,13 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { getMapOverviewData, setMapOverviewData, setMarkMapOverviewChangedFunction } from "../../presentation/store/mapOverviewStore";
 import { useRouteService } from "../services/routeService";
 import { useMapContext } from "./MapContext";
 import { queueMapOperation } from "../utils/mapOperationsQueue";
 import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from "../../poi/context/POIContext";
 import { usePhotoContext } from "../../photo/context/PhotoContext";
+import { getPhotoIdentifier } from "../../photo/utils/clustering";
 import { usePhotoService } from "../../photo/services/photoService";
 import { usePlaceContext } from "../../place/context/PlaceContext";
 import { useLineContext } from "../../lineMarkers/context/LineContext";
@@ -126,6 +128,19 @@ const calculateRouteSummary = (routes) => {
 };
 const RouteContext = createContext(null);
 export const RouteProvider = ({ children, }) => {
+    // Set up the function to mark map overview as changed
+    useEffect(() => {
+        // Provide the function to mark map overview as changed
+        setMarkMapOverviewChangedFunction(() => {
+            setChangedSections(prev => ({...prev, mapOverview: true}));
+        });
+        
+        // Clean up when unmounted
+        return () => {
+            setMarkMapOverviewChangedFunction(null);
+        };
+    }, []);
+    
     // Local route state
     const [routes, setRoutes] = useState([]);
     const [currentRoute, setCurrentRoute] = useState(null);
@@ -558,6 +573,10 @@ export const RouteProvider = ({ children, }) => {
             logoData: null,
             logoBlob: null
         });
+        
+        // IMPORTANT: Also clear loadedLineData to ensure DirectLineLayer doesn't render any lines
+        console.debug('[RouteContext] Clearing loadedLineData');
+        setLoadedLineData([]);
     }, [map, routes]);
     // Function to get lines from LineContext will be passed as parameter
     
@@ -583,6 +602,34 @@ export const RouteProvider = ({ children, }) => {
                 throw new Error('No route data to save');
             }
             setIsSaving(true);
+            
+            // Check if there are any changes at all
+            const hasAnyChanges = Object.keys(changedSections).length > 0;
+            
+            // If this is an existing route and there are no changes, use a minimal update
+            if (currentLoadedPersistentId && !hasAnyChanges) {
+                console.log('[RouteContext] No changes detected, using minimal update');
+                
+                // Create a minimal payload with just the required fields
+                const minimalPayload = {
+                    persistentId: currentLoadedPersistentId,
+                    name,
+                    type,
+                    isPublic
+                };
+                
+                // Use the partial update endpoint
+                const result = await routeService.saveRoute(minimalPayload);
+                console.log('[RouteContext] Minimal update successful');
+                
+                // Reset changed sections tracking
+                setChangedSections({});
+                setHasUnsavedChanges(false);
+                await listRoutes();
+                
+                setIsSaving(false);
+                return result;
+            }
             
             // Upload any local photos to Cloudinary before saving
             console.log('[RouteContext] Checking for local photos to upload...');
@@ -711,12 +758,41 @@ export const RouteProvider = ({ children, }) => {
                 console.log('[RouteContext] Metadata changed, but no need to include routes in partial update');
             }
             
-            // Add photos if they've changed or this is a new route
+            // Handle photos based on the type of change
             if (hasPhotoChanges || !currentLoadedPersistentId) {
-                partialUpdate.photos = updatedPhotos;
+                console.log('[RouteContext] Photo changes detected, type:', changedSections.photoChangeType);
+                
+                // For a new route or if we don't know the change type, include all photos
+                if (!currentLoadedPersistentId || !changedSections.photoChangeType) {
+                    console.log('[RouteContext] Including all photos in save data');
+                    partialUpdate.photos = updatedPhotos;
+                }
+                // For photo deletion, we can just include the current photos (which already have the deleted photo removed)
+                else if (changedSections.photoChangeType === 'delete') {
+                    console.log('[RouteContext] Photo deletion detected, including current photos state');
+                    partialUpdate.photos = updatedPhotos;
+                }
+                // For photo addition, we could optimize further but for now include all photos
+                else if (changedSections.photoChangeType === 'add') {
+                    console.log('[RouteContext] Photo addition detected, including all photos');
+                    partialUpdate.photos = updatedPhotos;
+                }
+                // For other changes, include all photos
+                else {
+                    console.log('[RouteContext] Other photo change detected, including all photos');
+                    partialUpdate.photos = updatedPhotos;
+                }
+                
+                // Log photo details
+                console.log('[RouteContext] Photos in save payload:', {
+                    count: partialUpdate.photos.length,
+                    photoIds: partialUpdate.photos.map(p => getPhotoIdentifier(p.url)),
+                    totalSizeKB: JSON.stringify(partialUpdate.photos).length / 1024
+                });
             }
             
-            // Always include POIs in the save data since they're small
+            // IMPORTANT FIX: Always include POIs in the save data, not just changed ones
+            // This ensures we don't lose existing POIs when saving
             console.log('[RouteContext] Always including POIs in save data:', {
                 draggableCount: pois.draggable?.length || 0,
                 placesCount: pois.places?.length || 0,
@@ -724,17 +800,33 @@ export const RouteProvider = ({ children, }) => {
             });
             partialUpdate.pois = pois;
             
-            // Include lines in the save data (passed as parameter)
+            // IMPORTANT FIX: Always include all lines in the save data, not just changed ones
+            // This ensures we don't lose existing lines when adding new ones
             console.log('[RouteContext] Including lines in save data:', lineData ? lineData.length : 0);
             if (lineData && lineData.length > 0) {
                 console.log('[RouteContext] Line data details:', JSON.stringify(lineData));
             }
             partialUpdate.lines = lineData || [];
             
+            // Mark lines as changed to ensure they're saved
+            if (lineData && lineData.length > 0) {
+                changedSections.lines = true;
+            }
+            
             // Add header settings if they've changed or this is a new route
             if (hasHeaderChanges || !currentLoadedPersistentId) {
                 partialUpdate.headerSettings = updatedHeaderSettings;
             }
+            
+    // Add map overview if it's changed or this is a new route
+    if (changedSections.mapOverview || !currentLoadedPersistentId) {
+        // Get map overview data from the shared store
+        const mapOverviewData = getMapOverviewData();
+        if (mapOverviewData) {
+            console.log('[RouteContext] Including map overview in save data:', mapOverviewData);
+            partialUpdate.mapOverview = mapOverviewData;
+        }
+    }
             
             // For a new route, we need to include everything
             if (!currentLoadedPersistentId) {
@@ -745,9 +837,40 @@ export const RouteProvider = ({ children, }) => {
                 partialUpdate.pois = pois;
                 partialUpdate.headerSettings = updatedHeaderSettings;
             } else {
-                console.log('[RouteContext] Existing route - sending only changed sections:', 
-                    Object.keys(partialUpdate).filter(k => k !== 'id' && k !== 'persistentId' && k !== 'name' && k !== 'type' && k !== 'isPublic'));
+                // For existing routes, check if we're only updating the map overview
+                const isOnlyMapOverviewUpdate = 
+                    changedSections.mapOverview && 
+                    Object.keys(changedSections).length === 1;
+                
+                if (isOnlyMapOverviewUpdate && partialUpdate.routes) {
+                    console.log('[RouteContext] Detected map overview only update, removing routes from payload');
+                    delete partialUpdate.routes;
+                }
+                
+                // Check if we're only updating a few fields
+                const nonEssentialFields = Object.keys(partialUpdate).filter(
+                    k => k !== 'id' && k !== 'persistentId' && k !== 'name' && k !== 'type' && k !== 'isPublic'
+                );
+                
+                console.log('[RouteContext] Existing route - sending only changed sections:', nonEssentialFields);
+                
+                // If we have routes in the payload but we're only updating a few other fields, remove routes
+                if (partialUpdate.routes && nonEssentialFields.length <= 3 && nonEssentialFields.includes('routes')) {
+                    console.log('[RouteContext] Optimizing payload by removing routes data');
+                    delete partialUpdate.routes;
+                }
             }
+            
+            // Log the entire save payload size and structure
+            console.log('[RouteContext] Full save payload details:', {
+                totalSizeKB: JSON.stringify(partialUpdate).length / 1024,
+                fields: Object.keys(partialUpdate),
+                photoCount: partialUpdate.photos ? partialUpdate.photos.length : 0,
+                routeCount: partialUpdate.routes ? partialUpdate.routes.length : 0,
+                poiCount: partialUpdate.pois ? 
+                    ((partialUpdate.pois.draggable?.length || 0) + (partialUpdate.pois.places?.length || 0)) : 0,
+                lineCount: partialUpdate.lines ? partialUpdate.lines.length : 0
+            });
             
             let result;
             if (currentLoadedPersistentId) {
@@ -993,6 +1116,13 @@ export const RouteProvider = ({ children, }) => {
                     // Logo URL is not a blob URL, so it's safe to use
                     setHeaderSettings(route.headerSettings);
                 }
+            }
+            
+            // Load map overview data if available
+            if (route.mapOverview) {
+                console.log('[RouteContext] Loading map overview data:', route.mapOverview);
+                // Update the shared store
+                setMapOverviewData(route.mapOverview);
             }
         }
         catch (error) {

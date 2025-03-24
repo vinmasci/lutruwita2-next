@@ -25,6 +25,11 @@ const RouteSchema = new mongoose.Schema({
     username: { type: String }
   },
   
+  // Map overview
+  mapOverview: {
+    description: { type: String, default: '' }
+  },
+  
   // Map state
   mapState: {
     zoom: { type: Number, default: 0 },
@@ -112,7 +117,8 @@ const RouteSchema = new mongoose.Schema({
     type: { type: String, default: 'line' },
     coordinates: {
       start: { type: [Number], required: true },
-      end: { type: [Number], required: true }
+      end: { type: [Number], required: true },
+      mid: { type: [Number] } // Add mid property for 45-degree diagonal lines
     },
     name: { type: String },
     description: { type: String },
@@ -211,6 +217,11 @@ async function handleCreateRoute(req, res) {
         username: ''
       },
       
+      // Map overview
+      mapOverview: req.body.mapOverview || {
+        description: ''
+      },
+      
       // Complex structures
       mapState: mapState || {
         zoom: 0,
@@ -278,13 +289,15 @@ async function handleCreateRoute(req, res) {
         elevation: route.routes.map(r => r.surface?.elevationProfile || []),
         description: route.description, // Include the top-level description field
         headerSettings: route.headerSettings, // Include the header settings
+        mapOverview: route.mapOverview || { description: '' }, // Include the map overview
         _type: 'loaded',
         _loadedState: {
           name: route.name,
           pois: route.pois || { draggable: [], places: [] },
           lines: route.lines || [], // Include lines in _loadedState too
           photos: route.photos || [],
-          headerSettings: route.headerSettings // Include header settings in _loadedState too
+          headerSettings: route.headerSettings, // Include header settings in _loadedState too
+          mapOverview: route.mapOverview || { description: '' } // Include map overview in _loadedState too
         }
       };
       
@@ -393,6 +406,15 @@ async function handleUpdateRoute(req, res) {
       console.log(`[API] Updated header settings:`, route.headerSettings);
     }
     
+    // Update map overview if provided
+    if (req.body.mapOverview) {
+      route.mapOverview = {
+        ...route.mapOverview || {},
+        ...req.body.mapOverview
+      };
+      console.log(`[API] Updated map overview:`, route.mapOverview);
+    }
+    
     // Update complex structures
     if (mapState) {
       route.mapState = {
@@ -482,13 +504,15 @@ async function handleUpdateRoute(req, res) {
         elevation: route.routes.map(r => r.surface?.elevationProfile || []),
         description: route.description, // Include the top-level description field
         headerSettings: route.headerSettings, // Include the header settings
+        mapOverview: route.mapOverview || { description: '' }, // Include the map overview
         _type: 'loaded',
         _loadedState: {
           name: route.name,
           pois: route.pois || { draggable: [], places: [] },
           lines: route.lines || [], // Include lines in _loadedState too
           photos: route.photos || [],
-          headerSettings: route.headerSettings // Include header settings in _loadedState too
+          headerSettings: route.headerSettings, // Include header settings in _loadedState too
+          mapOverview: route.mapOverview || { description: '' } // Include map overview in _loadedState too
         }
       };
       
@@ -1278,6 +1302,177 @@ async function handleCompleteChunkedUpload(req, res) {
   }
 }
 
+// Handler to get map overview data
+async function getMapOverview(req, res) {
+  try {
+    const persistentId = req.params.persistentId;
+    
+    if (!persistentId) {
+      return res.status(400).json({ error: 'Missing persistentId' });
+    }
+    
+    // Find the route
+    const route = await Route.findOne({ persistentId });
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    
+    // Return just the map overview data
+    return res.status(200).json(route.mapOverview || { description: '' });
+  } catch (error) {
+    console.error('Get map overview error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to get map overview',
+      details: error.message
+    });
+  }
+}
+
+// Handler for partial updates
+async function handlePartialUpdate(req, res) {
+  try {
+    const persistentId = req.query.id || req.params?.persistentId;
+    
+    if (!persistentId) {
+      return res.status(400).json({ error: 'Missing persistentId' });
+    }
+    
+    console.log(`[API] Processing partial update for route with persistentId: ${persistentId}`);
+    console.log(`[API] Update fields:`, Object.keys(req.body).join(', '));
+    
+    // Find the route
+    const route = await Route.findOne({ persistentId });
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    
+    // Extract only the fields that need updating
+    const updateFields = req.body;
+    
+    // Apply updates to specific fields only
+    Object.keys(updateFields).forEach(field => {
+      if (field !== 'id' && field !== 'persistentId' && field !== 'userId') {
+        if (field === 'mapOverview') {
+          route.mapOverview = {
+            ...route.mapOverview || {},
+            ...updateFields.mapOverview
+          };
+          console.log(`[API] Updated map overview:`, route.mapOverview);
+        } 
+        else if (field === 'headerSettings') {
+          route.headerSettings = {
+            ...route.headerSettings || {},
+            ...updateFields.headerSettings
+          };
+          console.log(`[API] Updated header settings:`, route.headerSettings);
+        }
+        else if (field === 'description') {
+          route.description = updateFields.description;
+          
+          // If description is provided separately, also update it in the first route
+          if (route.routes && route.routes.length > 0) {
+            console.log(`[API] Updating description in first route`);
+            route.routes[0].description = updateFields.description;
+          }
+        }
+        else {
+          route[field] = updateFields[field];
+          console.log(`[API] Updated field ${field}`);
+        }
+      }
+    });
+    
+    // Update timestamp
+    route.updatedAt = new Date();
+    
+    // Save the route with only the changed fields
+    await route.save();
+    console.log(`[API] Saved partial update for route: ${route.name}`);
+    
+    // Update embed data if needed (only for specific fields that affect the embed)
+    const embedAffectingFields = [
+      'name', 'routes', 'mapState', 'pois', 'lines', 
+      'photos', 'description', 'headerSettings', 'mapOverview'
+    ];
+    
+    const needsEmbedUpdate = Object.keys(updateFields)
+      .some(field => embedAffectingFields.includes(field));
+    
+    if (needsEmbedUpdate) {
+      try {
+        console.log(`[API] Generating updated embed data for route: ${route.name}`);
+        
+        // Create the embed data package
+        const embedData = {
+          id: route._id,
+          persistentId: route.persistentId,
+          name: route.name,
+          routes: route.routes.map(r => ({
+            routeId: r.routeId,
+            name: r.name,
+            color: r.color,
+            geojson: r.geojson,
+            surface: r.surface,
+            unpavedSections: r.unpavedSections,
+            description: r.description
+          })),
+          mapState: route.mapState,
+          pois: route.pois || { draggable: [], places: [] },
+          lines: route.lines || [],
+          photos: route.photos || [],
+          elevation: route.routes.map(r => r.surface?.elevationProfile || []),
+          description: route.description,
+          headerSettings: route.headerSettings,
+          mapOverview: route.mapOverview || { description: '' },
+          _type: 'loaded',
+          _loadedState: {
+            name: route.name,
+            pois: route.pois || { draggable: [], places: [] },
+            lines: route.lines || [],
+            photos: route.photos || [],
+            headerSettings: route.headerSettings,
+            mapOverview: route.mapOverview || { description: '' }
+          }
+        };
+        
+        // Upload to Cloudinary with the same public ID to replace the existing file
+        const publicId = `embed-${route.persistentId}`;
+        console.log(`[API] Uploading updated embed data to Cloudinary with public ID: ${publicId}`);
+        
+        // Add a timestamp to force a version update
+        const options = {
+          timestamp: Date.now()
+        };
+        
+        const result = await uploadJsonData(embedData, publicId, options);
+        
+        // Update the route with the embed URL if it changed
+        if (route.embedUrl !== result.url) {
+          route.embedUrl = result.url;
+          await route.save();
+        }
+        
+        console.log(`[API] Updated embed data uploaded successfully: ${result.url}`);
+      } catch (embedError) {
+        console.error(`[API] Error generating updated embed data:`, embedError);
+        // Continue even if embed data generation fails
+      }
+    }
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Route partially updated',
+      updatedFields: Object.keys(updateFields).filter(f => f !== 'id' && f !== 'persistentId' && f !== 'userId')
+    });
+  } catch (error) {
+    console.error('Partial update error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to update route',
+      details: error.message
+    });
+  }
+}
+
 // Route handler
 const handler = async (req, res) => {
   // Ensure database connection
@@ -1342,6 +1537,22 @@ const handler = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
+  // Handle partial update endpoint
+  if (pathParts.includes('partial') && (req.method === 'PATCH' || req.method === 'PUT')) {
+    console.log(`[API] Handling partial update request: ${url.pathname}`);
+    
+    // Find the index of 'partial' in the path
+    const partialIndex = pathParts.indexOf('partial');
+    
+    // Get the persistentId (the part after 'partial')
+    if (partialIndex < pathParts.length - 1) {
+      req.params = { persistentId: pathParts[partialIndex + 1] };
+      return handlePartialUpdate(req, res);
+    }
+    
+    return res.status(400).json({ error: 'Missing persistentId in partial update request' });
+  }
+  
   // Extract persistentId from path if present (e.g., /api/routes/[persistentId])
   let persistentId = null;
   
@@ -1353,7 +1564,7 @@ const handler = async (req, res) => {
     // If the last part is not 'routes', 'save', or contains a query string,
     // it's likely a persistentId
     if (lastPart && 
-        !['routes', 'save', 'public', 'chunked', 'start', 'upload', 'complete'].includes(lastPart) && 
+        !['routes', 'save', 'public', 'chunked', 'start', 'upload', 'complete', 'partial'].includes(lastPart) && 
         lastPart.indexOf('?') === -1) {
       persistentId = decodeURIComponent(lastPart);
       console.log(`[API] Detected persistentId from path: ${persistentId}`);
@@ -1378,6 +1589,12 @@ const handler = async (req, res) => {
       return handleDeleteRoute(req, res);
     
     case 'GET':
+      // Check if it's a map overview request
+      if (req.query.id && req.query.mapoverview === 'true') {
+        req.params = { persistentId: req.query.id };
+        return getMapOverview(req, res);
+      }
+      
       // Check if it's a single route request
       if (req.query.id) {
         return handleGetRoute(req, res);
@@ -1386,10 +1603,52 @@ const handler = async (req, res) => {
       // Otherwise, it's a routes list request
       return handleGetRoutes(req, res);
     
+    case 'PATCH':
+      // Handle partial update if it wasn't caught by the specific endpoint
+      if (req.query.id) {
+        return handlePartialUpdate(req, res);
+      }
+      
+      return res.status(400).json({ error: 'Missing route ID for partial update' });
+    
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }
 };
 
-// Export the handler with middleware - make auth optional for debugging
-export default createApiHandler(handler, { requireDb: true, requireAuth: false });
+// Handler for the map overview endpoint
+const mapOverviewHandler = async (req, res) => {
+  // Ensure database connection
+  await connectToDatabase();
+  
+  // Extract persistentId from path
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathParts = url.pathname.split('/').filter(part => part.length > 0);
+  
+  // Find the index of 'mapoverview' in the path
+  const mapOverviewIndex = pathParts.indexOf('mapoverview');
+  
+  // Get the persistentId (the part before 'mapoverview')
+  if (mapOverviewIndex > 0) {
+    const persistentId = pathParts[mapOverviewIndex - 1];
+    req.params = { persistentId };
+    return getMapOverview(req, res);
+  }
+  
+  return res.status(400).json({ error: 'Missing persistentId in map overview request' });
+};
+
+// Export the handlers with middleware - make auth optional for debugging
+export default (req, res) => {
+  // Parse the URL to extract path parameters
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathParts = url.pathname.split('/').filter(part => part.length > 0);
+  
+  // Check if this is a map overview request
+  if (pathParts.includes('mapoverview')) {
+    return createApiHandler(mapOverviewHandler, { requireDb: true, requireAuth: false })(req, res);
+  }
+  
+  // Otherwise, use the main handler
+  return createApiHandler(handler, { requireDb: true, requireAuth: false })(req, res);
+};
