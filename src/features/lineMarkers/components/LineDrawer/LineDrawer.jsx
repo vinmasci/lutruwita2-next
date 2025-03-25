@@ -7,7 +7,9 @@ import {
   Box,
   Button,
   Divider,
-  ButtonBase
+  ButtonBase,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -15,6 +17,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import { useLineContext } from '../../context/LineContext.jsx';
 import LineIconSelection from './LineIconSelection.jsx';
 import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoPreviewModal';
+import logger from '../../../../utils/logger';
 
 const LineDrawer = ({ 
   isOpen, 
@@ -28,6 +31,8 @@ const LineDrawer = ({
   const [selectedIcons, setSelectedIcons] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  // State for error handling
+  const [error, setError] = useState(null);
 
   // Helper function to convert a File to a base64 data URL
   const fileToBase64 = (file) => {
@@ -124,6 +129,32 @@ const LineDrawer = ({
 
   const handleDeletePhoto = (indexToDelete) => {
     setPhotos(prevPhotos => prevPhotos.filter((_, index) => index !== indexToDelete));
+  };
+
+  // Enhanced delete handler with error handling
+  const handleDelete = () => {
+    if (!line || !line.id) {
+      setError("Cannot delete line: Invalid line data");
+      return;
+    }
+
+    try {
+      console.log('[LineDrawer] Attempting to delete line with ID:', line.id);
+      
+      // Call the onDelete prop function
+      if (typeof onDelete === 'function') {
+        onDelete(line.id);
+        console.log('[LineDrawer] Delete function called for line:', line.id);
+      } else {
+        throw new Error('Delete function not available');
+      }
+      
+      // Close the drawer
+      onClose();
+    } catch (error) {
+      console.error('[LineDrawer] Error deleting line:', error.message);
+      setError(`Failed to delete line: ${error.message}`);
+    }
   };
 
   const handleSave = () => {
@@ -319,12 +350,7 @@ const LineDrawer = ({
               variant="outlined" 
               color="error" 
               startIcon={<DeleteIcon />}
-              onClick={() => {
-                if (onDelete) {
-                  onDelete(line.id);
-                  onClose();
-                }
-              }}
+              onClick={handleDelete}
             >
               Delete
             </Button>
@@ -349,6 +375,18 @@ const LineDrawer = ({
           onClose={() => setSelectedPhoto(null)}
         />
       )}
+      
+      {/* Error snackbar */}
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Drawer>
   );
 };

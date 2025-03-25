@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMapContext } from '../../../map/context/MapContext';
 import { LINE_ICON_PATHS } from '../../constants/line-icons.js';
+import logger from '../../../../utils/logger';
 
 const LineMarker = ({ 
   line, 
@@ -11,7 +12,8 @@ const LineMarker = ({
   map: propMap,
   drawerOpen = false // Add drawerOpen prop with default value
 }) => {
-  console.log('[LineMarker] Rendering LineMarker component for line:', line?.id);
+  // Only log in development mode to reduce console output in production
+  logger.debug('LineMarker', 'Rendering LineMarker component for line:', line?.id);
   const textMarkerRef = useRef(null);
   const textElementRef = useRef(null); // Reference to the text element for zoom scaling
   const iconsMarkerRef = useRef(null); // Reference to the icons marker
@@ -41,7 +43,7 @@ const LineMarker = ({
   // Initial setup of layers and cleanup
   useEffect(() => {
     if (!map || !coordinates.start || !coordinates.end) {
-      console.log('[LineMarker] Skipping layer setup - missing requirements:', {
+      logger.debug('LineMarker', 'Skipping layer setup - missing requirements:', {
         mapExists: !!map,
         hasStartCoord: !!coordinates.start,
         hasEndCoord: !!coordinates.end
@@ -49,28 +51,54 @@ const LineMarker = ({
       return;
     }
 
-    console.log('[LineMarker] Setting up map layers for line:', line.id);
+    logger.debug('LineMarker', 'Setting up map layers for line:', line.id);
 
     // Create source if it doesn't exist
     if (!sourceRef.current) {
-      console.log('[LineMarker] Creating new source and layers');
+      logger.debug('LineMarker', 'Creating new source and layers');
       try {
+        // Check if the source already exists
+        let sourceExists = false;
+        try {
+          sourceExists = map.getSource(lineLayerId.current) !== undefined;
+        } catch (e) {
+          // Source doesn't exist, which is what we want
+          sourceExists = false;
+        }
+        
         // Determine the line coordinates based on whether we have a midpoint
         const lineCoordinates = coordinates.mid 
           ? [coordinates.start, coordinates.mid, coordinates.end] // Two-segment line with midpoint
           : [coordinates.start, coordinates.end]; // Single segment line
         
-        map.addSource(lineLayerId.current, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              type: 'LineString',
-              coordinates: lineCoordinates
-            }
+        // If the source already exists, update it instead of adding a new one
+        if (sourceExists) {
+          logger.debug('LineMarker', `Source ${lineLayerId.current} already exists, updating instead of creating`);
+          const source = map.getSource(lineLayerId.current);
+          if (source) {
+            source.setData({
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: lineCoordinates
+              }
+            });
           }
-        });
+        } else {
+          // Source doesn't exist, create it
+          map.addSource(lineLayerId.current, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: lineCoordinates
+              }
+            }
+          });
+        }
         sourceRef.current = lineLayerId.current;
 
         // Add main line layer - simple, clean style
@@ -90,20 +118,47 @@ const LineMarker = ({
         });
         
         // Add circle marker as a map layer instead of DOM element
-        // First, add a source for the circle
-        map.addSource(circleSourceIdRef.current, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {
-              selected: selected
-            },
-            geometry: {
-              type: 'Point',
-              coordinates: coordinates.start
-            }
+        // First, check if the circle source already exists
+        let circleSourceExists = false;
+        try {
+          circleSourceExists = map.getSource(circleSourceIdRef.current) !== undefined;
+        } catch (e) {
+          // Source doesn't exist, which is what we want
+          circleSourceExists = false;
+        }
+        
+        // If the circle source already exists, update it instead of adding a new one
+        if (circleSourceExists) {
+          logger.debug('LineMarker', `Circle source ${circleSourceIdRef.current} already exists, updating instead of creating`);
+          const circleSource = map.getSource(circleSourceIdRef.current);
+          if (circleSource) {
+            circleSource.setData({
+              type: 'Feature',
+              properties: {
+                selected: selected
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: coordinates.start
+              }
+            });
           }
-        });
+        } else {
+          // Circle source doesn't exist, create it
+          map.addSource(circleSourceIdRef.current, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {
+                selected: selected
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: coordinates.start
+              }
+            }
+          });
+        }
         
         // Add outer circle layer (white with black border)
         map.addLayer({
@@ -166,18 +221,18 @@ const LineMarker = ({
           });
         }
       } catch (error) {
-        console.error('[LineMarker] Error creating map layers:', error);
+        logger.error('LineMarker', 'Error creating map layers:', error);
       }
     }
 
     return () => {
       // Skip cleanup if drawer is open for this line
       if (drawerOpen && selected) {
-        console.log(`[LineMarker] Skipping cleanup for line ${line.id} because drawer is open`);
+        logger.debug('LineMarker', `Skipping cleanup for line ${line.id} because drawer is open`);
         return;
       }
       
-      console.log(`[LineMarker] Starting cleanup for line ${line.id}`);
+      logger.debug('LineMarker', `Starting cleanup for line ${line.id}`);
       
       // Clean up text marker first
       if (textMarkerRef.current) {
@@ -196,12 +251,12 @@ const LineMarker = ({
       const safeRemoveLayer = (layerId) => {
         try {
           if (map && map.getStyle() && map.getLayer(layerId)) {
-            console.log(`[LineMarker] Removing layer: ${layerId}`);
+            logger.debug('LineMarker', `Removing layer: ${layerId}`);
             map.removeLayer(layerId);
             return true;
           }
         } catch (error) {
-          console.error(`[LineMarker] Error removing layer ${layerId}:`, error);
+          logger.error('LineMarker', `Error removing layer ${layerId}:`, error);
         }
         return false;
       };
@@ -209,12 +264,12 @@ const LineMarker = ({
       const safeRemoveSource = (sourceId) => {
         try {
           if (map && map.getStyle() && map.getSource(sourceId)) {
-            console.log(`[LineMarker] Removing source: ${sourceId}`);
+            logger.debug('LineMarker', `Removing source: ${sourceId}`);
             map.removeSource(sourceId);
             return true;
           }
         } catch (error) {
-          console.error(`[LineMarker] Error removing source ${sourceId}:`, error);
+          logger.error('LineMarker', `Error removing source ${sourceId}:`, error);
         }
         return false;
       };
@@ -224,7 +279,7 @@ const LineMarker = ({
       setTimeout(() => {
         // Skip cleanup if drawer was opened during the timeout
         if (drawerOpen && selected) {
-          console.log(`[LineMarker] Skipping delayed cleanup for line ${line.id} because drawer is open`);
+          logger.debug('LineMarker', `Skipping delayed cleanup for line ${line.id} because drawer is open`);
           return;
         }
         
@@ -310,7 +365,7 @@ const LineMarker = ({
   // Create and update text marker
   useEffect(() => {
     if (!map || !coordinates.end) {
-      console.log(`[LineMarker] Skipping text marker creation - missing requirements for line: ${line?.id}`, {
+      logger.debug('LineMarker', `Skipping text marker creation - missing requirements for line: ${line?.id}`, {
         mapExists: !!map,
         hasEndCoord: !!coordinates?.end,
         lineName: line?.name
@@ -320,7 +375,7 @@ const LineMarker = ({
 
     // Create or update text marker if coordinates exist
     // We don't check for line.name here to prevent text from disappearing when drawer opens
-    console.log(`[LineMarker] Managing text marker for line: ${line.id}, name: ${line.name || 'unnamed'}`);
+    logger.debug('LineMarker', `Managing text marker for line: ${line.id}, name: ${line.name || 'unnamed'}`);
 
     // Only recreate the text marker if it doesn't exist or if the name has changed
     const shouldRecreateMarker = !textMarkerRef.current || 
@@ -384,7 +439,7 @@ const LineMarker = ({
       
       container.appendChild(textEl);
       
-      console.log('Text element created with styles:', textEl.style);
+      // Remove verbose style logging
       
       // Determine text alignment based on line direction
       const startPoint = coordinates.start;
@@ -419,7 +474,7 @@ const LineMarker = ({
       // Store the line name in the marker reference for comparison in future renders
       textMarkerRef.current._lineName = line.name;
       
-      console.log('Text marker added to map');
+      logger.debug('LineMarker', 'Text marker added to map');
       
       // Add zoom change listener to update text size only (offset remains fixed)
       const updateTextSize = () => {
@@ -463,7 +518,7 @@ const LineMarker = ({
     // Only proceed if the line has icons
     if (!line.icons || line.icons.length === 0) return;
 
-    console.log(`Managing icons marker for line: ${line.id}, icons: ${line.icons.join(', ')}, selected: ${selected}`);
+    logger.debug('LineMarker', `Managing icons marker for line: ${line.id}, icons: ${line.icons.join(', ')}, selected: ${selected}`);
 
     // Check if we need to create or update the marker
     // We don't want to recreate the marker just because the selected state changed
@@ -473,7 +528,7 @@ const LineMarker = ({
     
     // Only recreate the marker if it doesn't exist or if the icons have changed
     if (shouldCreateMarker || shouldUpdateMarker) {
-      console.log(`${shouldCreateMarker ? 'Creating' : 'Updating'} icons marker for line: ${line.id}`);
+      logger.debug('LineMarker', `${shouldCreateMarker ? 'Creating' : 'Updating'} icons marker for line: ${line.id}`);
       
       // Remove existing marker if it exists
       if (iconsMarkerRef.current) {
@@ -565,7 +620,7 @@ const LineMarker = ({
         .setLngLat(coordinates.end)
         .addTo(map);
       
-      console.log('Icons marker added to map');
+      logger.debug('LineMarker', 'Icons marker added to map');
       
       // Store the line icons in the marker reference for comparison in future renders
       iconsMarkerRef.current._lineIcons = [...line.icons];

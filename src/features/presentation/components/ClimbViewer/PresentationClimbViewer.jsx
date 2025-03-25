@@ -118,11 +118,12 @@ export const PresentationClimbViewer = ({ climb, route, onClose }) => {
       open={Boolean(climb)} 
       onClose={onClose}
       aria-labelledby="climb-viewer-modal"
-      disableScrollLock={true}
+      disableScrollLock={false} // Enable scroll lock to prevent background scrolling
       disableAutoFocus={true}
       keepMounted={true}
       sx={{ 
         zIndex: 9999,
+        overflow: 'scroll', // Enable scrolling on the modal itself
         '& .MuiBackdrop-root': {
           position: 'absolute'
         }
@@ -131,26 +132,22 @@ export const PresentationClimbViewer = ({ climb, route, onClose }) => {
       <Box 
         sx={{
           position: 'absolute',
-          top: '50%',
+          top: '5%',  // Position from top
           left: '50%',
-          transform: 'translate(-50%, -50%)',
+          transform: 'translateX(-50%)', // Only transform X axis
           width: '90%',
           maxWidth: '500px',
           height: 'auto',
-          maxHeight: {
-            xs: '85vh', // Slightly smaller on mobile to ensure it's not cut off
-            sm: '90vh'
-          },
+          maxHeight: 'none', // Remove height constraint
           bgcolor: 'rgba(35, 35, 35, 0.95)',
           border: '1px solid rgba(30, 136, 229, 0.5)',
           borderRadius: 2,
           boxShadow: 24,
-          p: { xs: 2, sm: 4 }, // Less padding on mobile
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+          p: { xs: 2, sm: 3 },
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 9999
+          zIndex: 9999,
+          mb: '5%' // Add margin at the bottom for scrolling space
         }}
       >
         {/* Header with name and close button */}

@@ -101,9 +101,20 @@ export const RoutePresentation = () => {
         useEffect(() => {
             if (initialized || !routes.length)
                 return;
+            
+            // Check if we're already initialized to prevent double initialization
+            if (document.querySelector('[data-route-initialized="true"]')) {
+                console.log('[RoutePresentation] Skipping initialization - already initialized');
+                setInitialized(true);
+                return;
+            }
+            
             // Batch route initialization
             const initializeRoutes = () => {
                 console.log('[RoutePresentation] Starting route initialization');
+                
+                // Mark as initialized to prevent double initialization
+                document.body.setAttribute('data-route-initialized', 'true');
                 
                 // Add all routes in a single batch
                 routes.forEach((route) => {
@@ -135,7 +146,7 @@ export const RoutePresentation = () => {
                 // Check for line data and load it directly
                 if (route.lines) {
                     console.log('[RoutePresentation] Found line data in route:', route.lines.length, 'lines');
-                    console.log('[RoutePresentation] Line data details:', JSON.stringify(route.lines));
+                    // Removed detailed line data logging to improve performance in presentation mode
                     console.log('[RoutePresentation] Provider structure: LineProvider → RouteProvider → RouteContent');
                     console.log('[RoutePresentation] Loading lines directly into LineContext');
                     loadLinesFromRoute(route.lines);
@@ -164,9 +175,10 @@ export const RoutePresentation = () => {
         }, [routes, initialized, addRoute, setCurrentRoute, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute]);
 
         // Add additional logging for lineData
+        // Only log count of lines being passed to avoid excessive logging
         console.log('[RoutePresentation] Passing lineData to PresentationMapView:', {
             lineDataLength: lineData?.length || 0,
-            firstLine: lineData?.length > 0 ? JSON.stringify(lineData[0]) : 'No lines'
+            firstLine: lineData?.length > 0 ? "Line data available" : 'No lines'
         });
         
         return routes.length > 0 ? _jsx(PresentationMapView, { lineData: lineData }) : null;

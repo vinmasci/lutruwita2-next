@@ -15,6 +15,11 @@ const PAVED_SURFACES = ['paved', 'asphalt', 'concrete', 'sealed', 'bitumen', 'ta
 const UNPAVED_SURFACES = ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth', 'ground', 'sand', 'grass', 'compacted', 'crushed_stone', 'woodchips', 'pebblestone', 'mud', 'rock', 'stones', 'gravel;grass'];
 const UNPAVED_HIGHWAYS = ['track', 'trail', 'path'];
 
+// Constants for surface smoothing
+const SMOOTHING_WINDOW_SIZE = 5; // Number of points to consider (current point + points on each side)
+const SMOOTHING_THRESHOLD = 0.4; // Percentage of points in window that must be unpaved to keep a point as unpaved
+const INVERSE_SMOOTHING_THRESHOLD = 0.6; // Percentage of points that must be unpaved to convert a paved point to unpaved
+
 // Constants for road detection
 const VERIFICATION_WINDOW = 3;
 const BEARING_TOLERANCE = 30; // Increased for better matching
@@ -268,6 +273,169 @@ const findNearestRoad = (map: mapboxgl.Map, point: [number, number]): RoadFeatur
   return null;
 };
 
+// Helper function to normalize surface types to just "paved" or "unpaved"
+const normalizeSurfaceType = (surface: string | undefined): string | null => {
+  if (!surface) return null;
+  
+  const surfaceLower = surface.toLowerCase();
+  
+  if (PAVED_SURFACES.includes(surfaceLower)) {
+    return 'paved';
+  } else if (UNPAVED_SURFACES.includes(surfaceLower) || 
+             ['track', 'trail'].includes(surfaceLower)) {
+    return 'unpaved';
+  }
+  
+  return surface; // Keep original if not recognized
+};
+
+// Helper function to smooth surface detection by looking at surrounding points
+const smoothSurfaceDetection = (processedPoints: Point[]): Point[] => {
+  if (!processedPoints || processedPoints.length < SMOOTHING_WINDOW_SIZE) {
+    return processedPoints;
+  }
+  
+  const result = [...processedPoints]; // Create a copy to avoid modifying the original
+  const halfWindow = Math.floor(SMOOTHING_WINDOW_SIZE / 2);
+  
+  // For each point
+  for (let i = 0; i < result.length; i++) {
+    // Skip if the point is not unpaved
+    if (result[i].surface !== 'unpaved' && 
+        !UNPAVED_SURFACES.includes((result[i].surface || '').toLowerCase()) &&
+        !['track', 'trail'].includes((result[i].surface || '').toLowerCase())) {
+      continue;
+    }
+    
+    // Count unpaved points in the window
+    let unpavedCount = 0;
+    let windowSize = 0;
+    
+    // Look at points in the window
+    for (let j = Math.max(0, i - halfWindow); j <= Math.min(result.length - 1, i + halfWindow); j++) {
+      windowSize++;
+      
+      if (result[j].surface === 'unpaved' || 
+          UNPAVED_SURFACES.includes((result[j].surface || '').toLowerCase()) ||
+          ['track', 'trail'].includes((result[j].surface || '').toLowerCase())) {
+        unpavedCount++;
+      }
+    }
+    
+    // If the percentage of unpaved points is below the threshold, convert to paved
+    if (unpavedCount / windowSize < SMOOTHING_THRESHOLD) {
+      console.log(`[Surface Smoothing] Converting point at index ${i} from unpaved to paved (${unpavedCount}/${windowSize} unpaved points in window)`);
+      result[i].surface = 'paved';
+    }
+  }
+  
+  return result;
+};
+
+// Helper function to apply inverse smoothing (paved to unpaved)
+const applyInverseSmoothing = (processedPoints: Point[]): Point[] => {
+  if (!processedPoints || processedPoints.length < SMOOTHING_WINDOW_SIZE) {
+    return processedPoints;
+  }
+  
+  const result = [...processedPoints]; // Create a copy to avoid modifying the original
+  const halfWindow = Math.floor(SMOOTHING_WINDOW_SIZE / 2);
+  
+  // For each point
+  for (let i = 0; i < result.length; i++) {
+    // Skip if the point is not paved
+    if (result[i].surface !== 'paved') {
+      continue;
+    }
+    
+    // Count unpaved points in the window
+    let unpavedCount = 0;
+    let windowSize = 0;
+    
+    // Look at points in the window
+    for (let j = Math.max(0, i - halfWindow); j <= Math.min(result.length - 1, i + halfWindow); j++) {
+      windowSize++;
+      
+      if (result[j].surface === 'unpaved' || 
+          UNPAVED_SURFACES.includes((result[j].surface || '').toLowerCase()) ||
+          ['track', 'trail'].includes((result[j].surface || '').toLowerCase())) {
+        unpavedCount++;
+      }
+    }
+    
+    // If the percentage of unpaved points is ABOVE the inverse threshold, convert to unpaved
+    if (unpavedCount / windowSize > INVERSE_SMOOTHING_THRESHOLD) {
+      console.log(`[Surface Smoothing] Converting point at index ${i} from paved to unpaved (${unpavedCount}/${windowSize} unpaved points in window)`);
+      result[i].surface = 'unpaved';
+    }
+  }
+  
+  return result;
+};
+
+// Helper function to fill in gaps in surface detection
+const fillSurfaceGaps = (processedPoints: Point[]): Point[] => {
+  if (!processedPoints || processedPoints.length < 3) return processedPoints;
+  
+  const result = [...processedPoints]; // Create a copy to avoid modifying the original
+  
+  let startIndex = 0;
+  let knownCategory: string | null = null; // 'paved' or 'unpaved'
+  
+  // First pass: normalize all surface types to 'paved' or 'unpaved'
+  for (let i = 0; i < result.length; i++) {
+    const currentSurface = result[i].surface;
+    if (currentSurface) {
+      const normalizedType = normalizeSurfaceType(currentSurface);
+      // Only update if it's one of our two main categories
+      if (normalizedType === 'paved' || normalizedType === 'unpaved') {
+        (result[i] as any).normalizedSurface = normalizedType;
+      }
+    }
+  }
+  
+  // Second pass: fill in gaps between sections with the same category
+  for (let i = 0; i < result.length; i++) {
+    const currentCategory = (result[i] as any).normalizedSurface;
+    
+    if (currentCategory === 'paved' || currentCategory === 'unpaved') {
+      if (knownCategory === null) {
+        // Start of a new section
+        knownCategory = currentCategory;
+        startIndex = i;
+      } else if (knownCategory === currentCategory) {
+        // End of a section with the same category
+        // Fill in any unknown surfaces in between
+        if (i - startIndex > 1) {
+          console.log(`[Surface Detection] Filling gap from index ${startIndex} to ${i} with surface category: ${knownCategory}`);
+          
+          for (let j = startIndex + 1; j < i; j++) {
+            // Only fill in unknown surfaces
+            if (!result[j].surface) {
+              result[j].surface = knownCategory as 'paved' | 'unpaved';
+              (result[j] as any).normalizedSurface = knownCategory;
+            }
+          }
+        }
+        
+        // Update start for next potential section
+        startIndex = i;
+      } else {
+        // Different category - start a new section
+        knownCategory = currentCategory;
+        startIndex = i;
+      }
+    }
+  }
+  
+  // Clean up temporary property
+  for (let i = 0; i < result.length; i++) {
+    delete (result[i] as any).normalizedSurface;
+  }
+  
+  return result;
+};
+
 // Core surface detection function that processes points one at a time
 export const assignSurfacesViaNearest = async (
   map: mapboxgl.Map,
@@ -400,6 +568,9 @@ export const assignSurfacesViaNearest = async (
             bestSurface = 'paved';
           } else if (UNPAVED_SURFACES.includes(surfaceRaw)) {
             bestSurface = 'unpaved';
+          } else if (['track', 'trail'].includes(road.properties?.highway || '')) {
+            // Tracks and trails are almost always unpaved
+            bestSurface = 'unpaved';
           } else {
             bestSurface = 'unpaved'; // fallback for unknown surfaces
           }
@@ -412,7 +583,23 @@ export const assignSurfacesViaNearest = async (
     cachedRoads = null;
   }
 
-  return results;
+  console.log('[assignSurfacesViaNearest] => Finished initial processing. Filling gaps...');
+  
+  // Apply gap filling to improve surface detection
+  const gapFilledResults = fillSurfaceGaps(results);
+  
+  console.log('[assignSurfacesViaNearest] => Gap filling complete. Applying smoothing...');
+  
+  // Apply smoothing to eliminate false positives at intersections
+  const smoothedResults = smoothSurfaceDetection(gapFilledResults);
+  
+  console.log('[assignSurfacesViaNearest] => Smoothing complete. Applying inverse smoothing...');
+  
+  // Apply inverse smoothing to eliminate false negatives
+  const inverseSmoothedResults = applyInverseSmoothing(smoothedResults);
+  
+  console.log('[assignSurfacesViaNearest] => Finished processing. Returning coords...');
+  return inverseSmoothedResults;
 };
 
 // Add surface detection overlay

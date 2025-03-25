@@ -15,15 +15,16 @@ const BEARING_TOLERANCE = 30; // Increased for better matching
 const VARIANCE_THRESHOLD = 8; // Increased for more flexibility
 const TURN_ANGLE_THRESHOLD = 45; // Increased for sharper turns
 const MIN_SEGMENT_LENGTH = 3; // Reduced for shorter segments
-const DEFAULT_QUERY_BOX = 10; // Reduced default query box
+const DEFAULT_QUERY_BOX = 7; // Reduced default query box
 const JUNCTION_QUERY_BOX = 5; // Reduced junction query box
-const RETRY_DELAY = 5; // Reduced delay between retries for faster processing
+const RETRY_DELAY = 10; // Reduced delay between retries for faster processing
 const MAX_RETRIES = 10; // Reduced retries - will use previous point's surface if failed
-const BATCH_SIZE = 10; // Process points in batches
+const BATCH_SIZE = 3; // Process points in batches
 
 // Constants for surface smoothing
 const SMOOTHING_WINDOW_SIZE = 5; // Number of points to consider (current point + points on each side)
-const SMOOTHING_THRESHOLD = 0.6; // Percentage of points in window that must be unpaved to keep a point as unpaved
+const SMOOTHING_THRESHOLD = 0.4; // Percentage of points in window that must be unpaved to keep a point as unpaved
+const INVERSE_SMOOTHING_THRESHOLD = 0.4; // Percentage of points that must be unpaved to convert a paved point to unpaved
 // Helper to convert [lon, lat] array to LngLatLike object with validation
 const toLngLat = (coord) => {
     if (!coord || coord.length !== 2 || !isFinite(coord[0]) || !isFinite(coord[1])) {
@@ -264,6 +265,47 @@ const smoothSurfaceDetection = (processedPoints) => {
     return result;
 };
 
+// Helper function to apply inverse smoothing (paved to unpaved)
+const applyInverseSmoothing = (processedPoints) => {
+    if (!processedPoints || processedPoints.length < SMOOTHING_WINDOW_SIZE) {
+        return processedPoints;
+    }
+    
+    const result = [...processedPoints]; // Create a copy to avoid modifying the original
+    const halfWindow = Math.floor(SMOOTHING_WINDOW_SIZE / 2);
+    
+    // For each point
+    for (let i = 0; i < result.length; i++) {
+        // Skip if the point is not paved
+        if (result[i].surface !== 'paved') {
+            continue;
+        }
+        
+        // Count unpaved points in the window
+        let unpavedCount = 0;
+        let windowSize = 0;
+        
+        // Look at points in the window
+        for (let j = Math.max(0, i - halfWindow); j <= Math.min(result.length - 1, i + halfWindow); j++) {
+            windowSize++;
+            
+            if (result[j].surface === 'unpaved' || 
+                UNPAVED_SURFACES.includes(result[j].surface?.toLowerCase()) ||
+                ['track', 'trail'].includes(result[j].surface?.toLowerCase())) {
+                unpavedCount++;
+            }
+        }
+        
+        // If the percentage of unpaved points is ABOVE the inverse threshold, convert to unpaved
+        if (unpavedCount / windowSize > INVERSE_SMOOTHING_THRESHOLD) {
+            console.log(`[Surface Smoothing] Converting point at index ${i} from paved to unpaved (${unpavedCount}/${windowSize} unpaved points in window)`);
+            result[i].surface = 'unpaved';
+        }
+    }
+    
+    return result;
+};
+
 // Helper function to fill in gaps in surface detection
 const fillSurfaceGaps = (processedPoints) => {
     if (!processedPoints || processedPoints.length < 3) return processedPoints;
@@ -472,8 +514,13 @@ export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
     // Apply smoothing to eliminate false positives at intersections
     const smoothedResults = smoothSurfaceDetection(gapFilledResults);
     
+    console.log('[assignSurfacesViaNearest] => Smoothing complete. Applying inverse smoothing...');
+    
+    // Apply inverse smoothing to eliminate false negatives
+    const inverseSmoothedResults = applyInverseSmoothing(smoothedResults);
+    
     console.log('[assignSurfacesViaNearest] => Finished processing. Returning coords...');
-    return smoothedResults;
+    return inverseSmoothedResults;
 };
 // Add surface detection overlay
 export const addSurfaceOverlay = async (map, routeFeature) => {

@@ -15,6 +15,7 @@ import { normalizeRoute } from "../utils/routeUtils";
 import { getRouteLocationData } from "../../../utils/geocoding";
 import { getRouteDistance, getUnpavedPercentage, getElevationGain } from "../../gpx/utils/routeUtils";
 import { AuthAlert } from "@/features/auth/components/AuthAlert/AuthAlert";
+import logger from "../../../utils/logger";
 // Type guard to check if a route is a LoadedRoute
 const isLoadedRoute = (route) => {
     return route._type === 'loaded';
@@ -241,13 +242,24 @@ export const RouteProvider = ({ children, }) => {
     const { places, updatePlace } = usePlaceContext();
     
     // Get LineContext for line marker functionality
-    let lineContext;
+    let lineContext = null;
     try {
-        lineContext = useLineContext();
+        // Attempt to get LineContext, but don't throw an error if it's not available
+        const LineContextModule = require('../../lineMarkers/context/LineContext');
+        if (LineContextModule && typeof LineContextModule.useLineContext === 'function') {
+            try {
+                lineContext = LineContextModule.useLineContext();
+                logger.debug('[RouteContext] Successfully accessed LineContext');
+            } catch (error) {
+                // This is expected when the RouteProvider is used outside of a LineProvider
+                logger.debug('[RouteContext] LineContext not available (expected):', error.message);
+            }
+        } else {
+            logger.debug('[RouteContext] LineContext module not available or useLineContext is not a function');
+        }
     } catch (error) {
-        // This is expected when the RouteProvider is used outside of a LineProvider
-        console.log('[RouteContext] LineContext not available:', error.message);
-        lineContext = null;
+        // This is expected when the LineContext module cannot be imported
+        logger.debug('[RouteContext] Could not import LineContext module (expected):', error.message);
     }
     
     // Helper function to upload photos to Cloudinary

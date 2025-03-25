@@ -3,12 +3,13 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { useLineContext } from '../../context/LineContext.jsx';
 import LineMarker from '../LineMarker/LineMarker.jsx';
 import LineDrawer from '../LineDrawer/LineDrawer.jsx';
+import logger from '../../../../utils/logger';
 
 const LineLayer = () => {
-  console.log('[LineLayer] Rendering LineLayer component');
+  logger.debug('LineLayer', 'Rendering LineLayer component');
   
   const { map, isMapReady } = useMapContext();
-  console.log('[LineLayer] Map context:', { 
+  logger.debug('LineLayer', 'Map context:', { 
     mapExists: !!map, 
     isMapReady, 
     mapType: map ? typeof map : 'undefined'
@@ -26,9 +27,8 @@ const LineLayer = () => {
     deleteLine
   } = useLineContext();
   
-  console.log('[LineLayer] Line context:', { 
+  logger.debug('LineLayer', 'Line context:', { 
     linesCount: lines?.length || 0, 
-    linesData: lines,
     isDrawing
   });
 
@@ -67,7 +67,9 @@ const LineLayer = () => {
       // Calculate the midpoint (end of diagonal segment, start of horizontal segment)
       // The vertical component determines how far up/down the diagonal goes
       const midPoint = [
-        startPoint[0] + Math.abs(verticalDistance), // Move horizontally by the same amount as vertical
+        // If mouse is to the left of start point, diagonal should go left
+        // If mouse is to the right of start point, diagonal should go right
+        startPoint[0] + (mousePosition[0] < startPoint[0] ? -Math.abs(verticalDistance) : Math.abs(verticalDistance)),
         startPoint[1] + verticalDistance // Move vertically based on mouse position
       ];
       
@@ -114,7 +116,9 @@ const LineLayer = () => {
     // Calculate the midpoint (end of diagonal segment, start of horizontal segment)
     // The vertical component determines how far up/down the diagonal goes
     const midPoint = [
-      startPoint[0] + Math.abs(verticalDistance), // Move horizontally by the same amount as vertical
+      // If mouse is to the left of start point, diagonal should go left
+      // If mouse is to the right of start point, diagonal should go right
+      startPoint[0] + (mousePosition[0] < startPoint[0] ? -Math.abs(verticalDistance) : Math.abs(verticalDistance)),
       startPoint[1] + verticalDistance // Move vertically based on mouse position
     ];
     
@@ -205,10 +209,10 @@ const LineLayer = () => {
     
     // Log if the line has a midpoint
     if (finalLine.coordinates.mid) {
-      console.log(`[LineLayer] Saving line ${finalLine.id} with midpoint:`, finalLine.coordinates.mid);
+      logger.debug('LineLayer', `Saving line ${finalLine.id} with midpoint:`, finalLine.coordinates.mid);
     }
 
-    console.log('[LineLayer] Saving line:', finalLine);
+    logger.debug('LineLayer', 'Saving line:', finalLine);
 
     if (finalLine.id && finalLine.coordinates) {
       if (lines.some(line => line.id === finalLine.id)) {
@@ -219,7 +223,7 @@ const LineLayer = () => {
       setDrawerOpen(false);
       setSelectedLine(null);
     } else {
-      console.error('Invalid line data:', finalLine);
+      logger.error('LineLayer', 'Invalid line data:', finalLine);
     }
   }, [addLine, updateLine, selectedLine, lines]);
 

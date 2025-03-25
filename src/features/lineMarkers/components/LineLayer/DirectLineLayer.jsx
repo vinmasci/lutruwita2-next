@@ -1,7 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import LineMarker from '../LineMarker/LineMarker.jsx';
 import LineDrawer from '../LineDrawer/LineDrawer.jsx';
 import { useLineContext } from '../../context/LineContext.jsx';
+import { useRouteContext } from '../../../map/context/RouteContext';
+import logger from '../../../../utils/logger';
 
 /**
  * DirectLineLayer component
@@ -12,6 +14,7 @@ import { useLineContext } from '../../context/LineContext.jsx';
  * @param {Object} props
  * @param {Object} props.map - The Mapbox map instance
  * @param {Array} props.lines - The line data to render directly (from loaded route)
+ * @param {Function} props.onLineDeleted - Optional callback when a line is deleted
  */
 const DirectLineLayer = ({ map, lines = [] }) => {
   console.log('[DirectLineLayer] Rendering with map:', !!map);
@@ -35,54 +38,59 @@ const DirectLineLayer = ({ map, lines = [] }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedLine, setSelectedLine] = useState(null);
 
-  // Determine which lines to display - use context lines and add any prop lines not in context
+  // Determine which lines to display - prioritize context lines over prop lines with the same ID
   const displayLines = useCallback(() => {
-    // Start with all context lines
-    const result = [...contextLines];
+    // Create a map of line IDs to lines from context
+    const lineMap = new Map();
+    contextLines.forEach(line => {
+      if (line.id) {
+        lineMap.set(line.id, line);
+      }
+    });
     
-    // Add any prop lines that aren't already in the context
+    // Add prop lines that aren't already in the context
     if (lines && lines.length > 0) {
       lines.forEach(propLine => {
-        // Check if this line is already in the context
-        const exists = result.some(contextLine => contextLine.id === propLine.id);
-        if (!exists) {
-          // Add the line to the result array for display
-          result.push(propLine);
+        // Only add to the map if it doesn't already exist
+        if (propLine.id && !lineMap.has(propLine.id)) {
+          lineMap.set(propLine.id, propLine);
           
           // Also add the line to the context state to ensure it's saved
           // This is important to prevent lines from being lost when saving to MongoDB
+          console.log('[DirectLineLayer] Adding line from props to context state:', propLine.id);
+          
+          // Ensure the line has all required properties, especially preserving the midpoint
+          const enhancedLine = {
+            ...propLine,
+            id: propLine.id,
+            coordinates: propLine.coordinates 
+              ? {
+                  start: propLine.coordinates.start || [0, 0],
+                  end: propLine.coordinates.end || [0, 0],
+                  // Preserve midpoint if it exists
+                  ...(propLine.coordinates.mid ? { mid: propLine.coordinates.mid } : {})
+                }
+              : { start: [0, 0], end: [0, 0] },
+            name: propLine.name || '',
+            icons: Array.isArray(propLine.icons) ? propLine.icons : [],
+            type: propLine.type || 'line'
+          };
+          
+          // Log if the line has a midpoint
+          if (propLine.coordinates?.mid) {
+            console.log('[DirectLineLayer] Line has midpoint:', propLine.id, propLine.coordinates.mid);
+          }
+          
+          // Add to context if not already there
           if (!contextLines.some(line => line.id === propLine.id)) {
-            console.log(`[DirectLineLayer] Adding line ${propLine.id} from props to context state`);
-            
-            // Ensure the line has all required properties, especially preserving the midpoint
-            const enhancedLine = {
-              ...propLine,
-              id: propLine.id || `line-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              coordinates: propLine.coordinates 
-                ? {
-                    start: propLine.coordinates.start || [0, 0],
-                    end: propLine.coordinates.end || [0, 0],
-                    // Preserve midpoint if it exists
-                    ...(propLine.coordinates.mid ? { mid: propLine.coordinates.mid } : {})
-                  }
-                : { start: [0, 0], end: [0, 0] },
-              name: propLine.name || '',
-              icons: Array.isArray(propLine.icons) ? propLine.icons : [],
-              type: propLine.type || 'line'
-            };
-            
-            // Log if the line has a midpoint
-            if (propLine.coordinates?.mid) {
-              console.log(`[DirectLineLayer] Line ${propLine.id} has midpoint:`, propLine.coordinates.mid);
-            }
-            
             addLine(enhancedLine);
           }
         }
       });
     }
     
-    return result;
+    // Convert the map back to an array
+    return Array.from(lineMap.values());
   }, [contextLines, lines, addLine]);
 
   // Handle line click
@@ -111,6 +119,16 @@ const DirectLineLayer = ({ map, lines = [] }) => {
     setDrawerOpen(true);
   }, []);
 
+  // Get access to RouteContext to update loadedLineData
+  let routeContext;
+  try {
+    routeContext = useRouteContext();
+  } catch (error) {
+    // This is expected when the DirectLineLayer is used outside of a RouteProvider
+    console.log('[DirectLineLayer] RouteContext not available:', error.message);
+    routeContext = null;
+  }
+
   // Handle drawer save
   const handleDrawerSave = useCallback((updatedLine) => {
     // Ensure we have all required line data
@@ -132,7 +150,7 @@ const DirectLineLayer = ({ map, lines = [] }) => {
     
     // Log if the line has a midpoint
     if (finalLine.coordinates.mid) {
-      console.log(`[DirectLineLayer] Saving line ${finalLine.id} with midpoint:`, finalLine.coordinates.mid);
+      console.log('[DirectLineLayer] Saving line with midpoint:', finalLine.id, finalLine.coordinates.mid);
     }
 
     console.log('[DirectLineLayer] Saving line:', finalLine);
@@ -149,6 +167,28 @@ const DirectLineLayer = ({ map, lines = [] }) => {
       console.error('[DirectLineLayer] Invalid line data:', finalLine);
     }
   }, [addLine, updateLine, selectedLine, contextLines]);
+
+  // Enhanced delete handler that updates LineContext
+  const handleDeleteLine = useCallback((lineId) => {
+    console.log('[DirectLineLayer] Deleting line with ID:', lineId);
+    
+    try {
+      // Delete from LineContext (which now also updates RouteContext)
+      deleteLine(lineId);
+      console.log('[DirectLineLayer] Successfully deleted line:', lineId);
+    } catch (error) {
+      console.error('[DirectLineLayer] Error deleting line:', error.message);
+    }
+    
+    // Update our local display state to remove the line
+    setSelectedLine(null);
+    setDrawerOpen(false);
+    
+    // Force a re-render by updating a state variable
+    setIsDrawing(false);
+    
+    console.log('[DirectLineLayer] Line deletion process completed for line:', lineId);
+  }, [deleteLine, setIsDrawing]);
 
   // Get the final list of lines to display
   const linesToDisplay = displayLines();
@@ -186,7 +226,7 @@ const DirectLineLayer = ({ map, lines = [] }) => {
         }}
         line={selectedLine}
         onSave={handleDrawerSave}
-        onDelete={deleteLine}
+        onDelete={handleDeleteLine}
       />
     </>
   );

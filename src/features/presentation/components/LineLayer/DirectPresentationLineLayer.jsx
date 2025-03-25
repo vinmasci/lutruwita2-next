@@ -14,24 +14,24 @@ import './DirectPresentationLineLayer.css';
  * @param {Array} props.lines - The line data to render
  */
 const DirectPresentationLineLayer = ({ map, lines = [] }) => {
-  console.log('[DirectPresentationLineLayer] Rendering with map:', !!map);
-  console.log('[DirectPresentationLineLayer] Lines from props:', { 
-    linesCount: lines?.length || 0
-  });
+  // Reduce logging in presentation mode to improve performance
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[DirectPresentationLineLayer] Rendering with map:', !!map);
+    console.log('[DirectPresentationLineLayer] Lines from props:', { 
+      linesCount: lines?.length || 0
+    });
+  }
   
   // Track selected line for UI state
   const [selectedLineId, setSelectedLineId] = useState(null);
   // Track the line being viewed in the modal
   const [viewingLine, setViewingLine] = useState(null);
   
-  // Log the full line data for debugging
-  if (lines && lines.length > 0) {
-    console.log('[DirectPresentationLineLayer] First line data:', JSON.stringify(lines[0], null, 2));
-    console.log('[DirectPresentationLineLayer] Line name:', lines[0].name);
-    console.log('[DirectPresentationLineLayer] Line coordinates:', lines[0].coordinates);
-    console.log('[DirectPresentationLineLayer] Line icons:', lines[0].icons);
-  } else {
-    console.log('[DirectPresentationLineLayer] No lines to render');
+  // Check if we have lines to render
+  if (!lines || lines.length === 0) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DirectPresentationLineLayer] No lines to render');
+    }
     return null;
   }
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { useRouteContext } from '../../map/context/RouteContext';
+import logger from '../../../utils/logger';
 
 const LineContext = createContext(null);
 
@@ -37,12 +38,12 @@ export const LineProvider = ({ children }) => {
   
   // Function to get lines for route saving
   const getLinesForRoute = useCallback(() => {
-    console.log('[LineContext] Getting lines for route saving, total lines:', lines.length);
+    logger.debug('LineContext', 'Getting lines for route saving, total lines:', lines.length);
     
     // Filter out any invalid lines
     const validLines = lines.filter(line => {
       if (!line.id || !line.coordinates || !line.coordinates.start || !line.coordinates.end) {
-        console.warn('[LineContext] Invalid line:', line.id);
+        logger.warn('LineContext', 'Invalid line:', line.id);
         return false;
       }
       return true;
@@ -50,9 +51,9 @@ export const LineProvider = ({ children }) => {
     
     // Log lines with midpoints for debugging
     const linesWithMidpoints = validLines.filter(line => line.coordinates.mid);
-    console.log('[LineContext] Lines with midpoints:', linesWithMidpoints.length);
+    logger.debug('LineContext', 'Lines with midpoints:', linesWithMidpoints.length);
     if (linesWithMidpoints.length > 0) {
-      console.log('[LineContext] Example line with midpoint:', {
+      logger.debug('LineContext', 'Example line with midpoint:', {
         id: linesWithMidpoints[0].id,
         start: linesWithMidpoints[0].coordinates.start,
         mid: linesWithMidpoints[0].coordinates.mid,
@@ -60,27 +61,27 @@ export const LineProvider = ({ children }) => {
       });
     }
     
-    console.log('[LineContext] Valid lines for saving:', validLines.length);
+    logger.debug('LineContext', 'Valid lines for saving:', validLines.length);
     
     // Check for photos in lines
     const linesWithPhotos = validLines.filter(line => line.photos && line.photos.length > 0);
-    console.log('[LineContext] Lines with photos:', linesWithPhotos.length);
+    logger.debug('LineContext', 'Lines with photos:', linesWithPhotos.length);
     
     if (linesWithPhotos.length > 0) {
       // Log photo details for debugging
       linesWithPhotos.forEach(line => {
-        console.log(`[LineContext] Line ${line.id} has ${line.photos.length} photos`);
+        logger.debug('LineContext', `Line ${line.id} has ${line.photos.length} photos`);
         
         // Check if photos have the required properties for Cloudinary upload
         const localPhotos = line.photos.filter(p => p.isLocal === true);
-        console.log(`[LineContext] Line ${line.id} has ${localPhotos.length} local photos that need Cloudinary upload`);
+        logger.debug('LineContext', `Line ${line.id} has ${localPhotos.length} local photos that need Cloudinary upload`);
         
         // Check if local photos have the required _blobs.large property
         const validLocalPhotos = localPhotos.filter(p => p._blobs?.large);
-        console.log(`[LineContext] Line ${line.id} has ${validLocalPhotos.length} valid local photos with _blobs.large property`);
+        logger.debug('LineContext', `Line ${line.id} has ${validLocalPhotos.length} valid local photos with _blobs.large property`);
         
         if (validLocalPhotos.length !== localPhotos.length) {
-          console.warn(`[LineContext] Warning: Line ${line.id} has ${localPhotos.length - validLocalPhotos.length} local photos missing the _blobs.large property needed for Cloudinary upload`);
+          logger.warn('LineContext', `Warning: Line ${line.id} has ${localPhotos.length - validLocalPhotos.length} local photos missing the _blobs.large property needed for Cloudinary upload`);
         }
       });
     }
@@ -138,39 +139,52 @@ export const LineProvider = ({ children }) => {
 
   const deleteLine = (id) => {
     setLines((prevLines) => prevLines.filter((line) => line.id !== id));
+    
+    // Also remove from RouteContext's loadedLineData if available
+    if (routeContext && routeContext.loadedLineData) {
+      console.log('[LineContext] Removing line from RouteContext loadedLineData:', id);
+      
+      // Create a new array without the deleted line
+      const updatedLineData = routeContext.loadedLineData.filter(line => line.id !== id);
+      
+      // Update the loadedLineData directly
+      if (Array.isArray(routeContext.loadedLineData)) {
+        // Clear the array and add the filtered items
+        routeContext.loadedLineData.length = 0;
+        updatedLineData.forEach(line => routeContext.loadedLineData.push(line));
+        console.log('[LineContext] Updated RouteContext loadedLineData, new length:', routeContext.loadedLineData.length);
+      }
+    }
+    
     // Notify RouteContext of line changes
     notifyLineChange();
   };
   
   // Function to load lines from route
   const loadLinesFromRoute = useCallback((routeLines) => {
-    console.log('[LineContext] loadLinesFromRoute function called');
-    console.log('[LineContext] Provider structure: RouteProvider → LineProvider → RouteContent');
+    logger.debug('LineContext', 'loadLinesFromRoute function called');
+    logger.debug('LineContext', 'Provider structure: RouteProvider → LineProvider → RouteContent');
     
     if (!routeLines) {
-      console.log('[LineContext] No lines to load from route');
+      logger.debug('LineContext', 'No lines to load from route');
       return;
     }
     
-    console.log('[LineContext] Loading lines from route:', routeLines.length);
+    logger.debug('LineContext', 'Loading lines from route:', routeLines.length);
     
     // Validate line data structure
     const validLines = routeLines.filter(line => {
       if (!line.id || !line.coordinates || !line.coordinates.start || !line.coordinates.end) {
-        console.warn('[LineContext] Invalid line data structure:', line);
+        logger.warn('LineContext', 'Invalid line data structure:', line);
         return false;
       }
       
-      // Log if the line has a midpoint
-      if (line.coordinates.mid) {
-        console.log(`[LineContext] Line ${line.id} has midpoint:`, line.coordinates.mid);
-      }
+      // Removed midpoint logging to reduce console output
       
-      console.log('[LineContext] Valid line found:', line.id);
       return true;
     });
     
-    console.log('[LineContext] Valid lines count:', validLines.length);
+    logger.debug('LineContext', 'Valid lines count:', validLines.length);
     
     // Process photos in lines if present
     const processedLines = validLines.map(line => {
@@ -179,7 +193,7 @@ export const LineProvider = ({ children }) => {
         return line;
       }
       
-      console.log(`[LineContext] Processing photos for line ${line.id}, found ${line.photos.length} photos`);
+      logger.debug('LineContext', `Processing photos for line ${line.id}, found ${line.photos.length} photos`);
       
       // Process each photo to ensure it has the correct structure
       const processedPhotos = line.photos.map(photo => {
@@ -229,13 +243,13 @@ export const LineProvider = ({ children }) => {
       // Filter out any loaded lines that already exist in the current state
       const newLines = processedLines.filter(line => !existingLineIds.has(line.id));
       
-      console.log(`[LineContext] Merging ${newLines.length} new lines with ${prevLines.length} existing lines`);
+      logger.debug('LineContext', `Merging ${newLines.length} new lines with ${prevLines.length} existing lines`);
       
       // Return the combined array of existing lines plus new lines
       return [...prevLines, ...newLines];
     });
     
-    console.log('[LineContext] Lines loaded and merged successfully');
+    logger.debug('LineContext', 'Lines loaded and merged successfully');
   }, []);
 
   return (
