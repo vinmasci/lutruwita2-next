@@ -48,34 +48,40 @@ export default function PresentationMapView(props) {
             console.log('[PresentationMapView] Routes initialized with unified approach');
         }
     });
-    // Update hover marker when coordinates change
+    
+    // Update hover marker when coordinates change - using GeoJSON source
     useEffect(() => {
-        if (!mapInstance.current) return;
+        if (!mapInstance.current || !isMapReady) return;
         
-        // Remove existing marker
-        if (hoverMarkerRef.current) {
-            hoverMarkerRef.current.remove();
-            hoverMarkerRef.current = null;
-        }
-        
-        // Add new marker if we have coordinates
+        // Update the GeoJSON source if we have coordinates
         if (hoverCoordinates) {
-            const el = document.createElement('div');
-            el.className = 'hover-marker';
-            el.style.width = '16px';
-            el.style.height = '16px';
-            el.style.borderRadius = '50%';
-            el.style.backgroundColor = '#ff0000';
-            el.style.border = '2px solid white';
-            el.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
-            el.style.pointerEvents = 'none'; // Make marker non-interactive to allow clicks to pass through
-            
-            // Create and add the marker without popup
-            hoverMarkerRef.current = new mapboxgl.Marker(el)
-                .setLngLat(hoverCoordinates)
-                .addTo(mapInstance.current);
+            try {
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                }
+            } catch (error) {
+                console.error('[PresentationMapView] Error updating hover point:', error);
+            }
+        } else {
+            // Hide the layer when no coordinates
+            try {
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+            } catch (error) {
+                // Ignore errors when hiding (might happen during initialization)
+            }
         }
-    }, [hoverCoordinates]);
+    }, [hoverCoordinates, isMapReady]);
     
     // Store previous route reference
     // Store previous route reference and current route ID
@@ -225,6 +231,35 @@ export default function PresentationMapView(props) {
                         'fill-extrusion-opacity': 0.6
                     }
                 });
+                
+                // Add hover point source and layer
+                map.addSource('hover-point', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [0, 0] // Initial coordinates
+                        },
+                        properties: {}
+                    }
+                });
+                
+                map.addLayer({
+                    id: 'hover-point',
+                    type: 'circle',
+                    source: 'hover-point',
+                    paint: {
+                        'circle-radius': 8,
+                        'circle-color': '#ff0000',
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-opacity': 0.8
+                    }
+                });
+                
+                // Initially hide the hover point layer
+                map.setLayoutProperty('hover-point', 'visibility', 'none');
                 
             } catch (error) {
                 console.error('[PresentationMapView] Error setting up terrain:', error);
@@ -413,6 +448,14 @@ export default function PresentationMapView(props) {
         mapInstance.current = map;
         return () => {
             if (mapInstance.current) {
+                // Remove the hover point layer and source if they exist
+                if (mapInstance.current.getLayer('hover-point')) {
+                    mapInstance.current.removeLayer('hover-point');
+                }
+                if (mapInstance.current.getSource('hover-point')) {
+                    mapInstance.current.removeSource('hover-point');
+                }
+                
                 mapInstance.current.remove();
                 mapInstance.current = null;
             }
