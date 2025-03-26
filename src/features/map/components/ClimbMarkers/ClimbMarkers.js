@@ -283,9 +283,15 @@ export const ClimbMarkers = ({ map, route }) => {
                 .setLngLat(endCoord)
                 .addTo(map);
 
-                // Add click event to show the climb viewer modal
+                // Add click event to show the climb viewer modal with improved mobile handling
                 const handleClimbClick = (e) => {
+                    // Stop propagation to prevent map from capturing the event
                     e.stopPropagation();
+                    
+                    // Prevent default behavior
+                    e.preventDefault();
+                    
+                    // Immediately set the selected climb without requiring a second click
                     setSelectedClimb(climb);
                 };
                 

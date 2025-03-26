@@ -1,12 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, Button, Snackbar, Alert, Tooltip } from '@mui/material';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Box, Typography, Button, Snackbar, Alert, Tooltip, IconButton } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useMapOverview } from '../../../presentation/context/MapOverviewContext.jsx';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { useLineContext } from '../../../lineMarkers/context/LineContext';
 import { RichTextEditor } from '../../../gpx/components/RouteDescription/RichTextEditor';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import DataObjectIcon from '@mui/icons-material/DataObject';
 import { getRouteDistance, getUnpavedPercentage, getElevationGain } from '../../../gpx/utils/routeUtils';
 
 const BACKGROUND_COLOR = 'rgba(26, 26, 26, 0.9)';
@@ -45,27 +46,29 @@ export const EditableMapOverviewPanel = () => {
 
   // Update editor content when mapOverview changes (e.g., when loading a saved file)
   useEffect(() => {
-    setEditorContent(mapOverview?.description || '');
+    if (mapOverview?.description) {
+      setEditorContent(mapOverview.description);
+    }
   }, [mapOverview?.description]);
 
-  // Automatically insert metadata when the editor is ready and content is empty
-  useEffect(() => {
-    if (editorRef && (!editorContent || editorContent === '<p></p>')) {
-      const metadataHtml = generateMetadataHtml();
-      editorRef.commands.setContent(metadataHtml);
-      updateDescription(metadataHtml);
-    }
-  }, [editorRef, editorContent]);
-
-  // Handle editor content changes
+  // Removed automatic metadata insertion to prevent unexpected behavior
+  // Now metadata will only be inserted when the user clicks the Insert Metadata button
+  
+  // Handle editor content changes - just update local state
   const handleEditorChange = (content) => {
     setEditorContent(content);
-    // Auto-save after a short delay
-    const timeoutId = setTimeout(() => {
-      updateDescription(content);
-    }, 500);
-    return () => clearTimeout(timeoutId);
   };
+  
+  // Auto-save effect - similar to RouteDescriptionPanel approach
+  useEffect(() => {
+    if (editorContent !== mapOverview?.description) {
+      const timeoutId = setTimeout(() => {
+        updateDescription(editorContent);
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [editorContent, mapOverview?.description, updateDescription]);
 
   // Handle manual save
   const handleSave = async () => {
@@ -247,6 +250,7 @@ export const EditableMapOverviewPanel = () => {
               py: 1, 
               display: 'flex', 
               alignItems: 'center', 
+              justifyContent: 'space-between',
               backgroundColor: '#1a1a1a',
               borderBottom: '1px solid rgba(255, 255, 255, 0.1)' 
             },
@@ -258,12 +262,26 @@ export const EditableMapOverviewPanel = () => {
                   sx: { 
                     fontSize: '0.8rem', 
                     fontWeight: 500, 
-                    mr: 3, 
                     fontFamily: 'Futura' 
                   },
                   children: "Edit Map Overview"
                 }
-              )
+              ),
+              _jsx(Tooltip, {
+                title: "Insert Metadata",
+                placement: "top",
+                children: _jsx(IconButton, {
+                  size: "small",
+                  onClick: insertMetadata,
+                  sx: {
+                    color: BUTTON_COLOR,
+                    '&:hover': {
+                      backgroundColor: 'rgba(33, 150, 243, 0.1)'
+                    }
+                  },
+                  children: _jsx(DataObjectIcon, { fontSize: "small" })
+                })
+              })
             ]
           }),
           _jsxs(Box, {

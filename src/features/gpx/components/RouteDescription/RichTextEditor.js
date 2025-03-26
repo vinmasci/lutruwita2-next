@@ -97,7 +97,32 @@ export const RichTextEditor = ({ value, onChange, onEditorReady }) => {
 
     React.useEffect(() => {
         if (editor && value !== editor.getHTML()) {
+            // Store current selection if it exists
+            let currentSelection = null;
+            try {
+                if (editor.state.selection) {
+                    currentSelection = {
+                        from: editor.state.selection.from,
+                        to: editor.state.selection.to
+                    };
+                }
+            } catch (error) {
+                console.log('[RichTextEditor] Could not get selection:', error.message);
+            }
+            
+            // Update content
             editor.commands.setContent(value || '');
+            
+            // Restore selection if it existed
+            if (currentSelection) {
+                try {
+                    setTimeout(() => {
+                        editor.commands.setTextSelection(currentSelection);
+                    }, 0);
+                } catch (error) {
+                    console.log('[RichTextEditor] Could not restore selection:', error.message);
+                }
+            }
         }
     }, [editor, value]);
 

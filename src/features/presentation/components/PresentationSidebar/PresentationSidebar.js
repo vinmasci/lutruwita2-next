@@ -425,10 +425,15 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                         padding: '8px 16px'
                                     }, 
                                     children: [
-                                        _jsx("div", {
-                                            style: { flex: 1, cursor: 'pointer', minWidth: '0', width: '100%' },
-                                            onClick: () => updateRouteAndMap(route),
-                                            children: _jsx(ListItemText, { 
+                                    _jsx("div", {
+                                        style: { flex: 1, cursor: 'pointer', minWidth: '0', width: '100%' },
+                                        onClick: (e) => {
+                                            // Stop propagation to prevent map from capturing the event
+                                            e.stopPropagation();
+                                            // Immediately update the route without requiring a second click
+                                            updateRouteAndMap(route);
+                                        },
+                                        children: _jsx(ListItemText, { 
                                             primary: _jsxs("div", {
                                                 style: { display: 'flex', alignItems: 'center', gap: '10px', minWidth: '0' },
                                                 children: [

@@ -142,8 +142,15 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         })
             .setLngLat(poi.coordinates)
             .addTo(map);
-        // Add click handler to show drawer
-        el.addEventListener('click', () => {
+        // Add click handler to show drawer with improved event handling for mobile
+        el.addEventListener('click', (e) => {
+            // Stop propagation to prevent map from capturing the event
+            e.stopPropagation();
+            
+            // Prevent default behavior
+            e.preventDefault();
+            
+            // Immediately handle the POI selection
             if (onSelectPOI) {
                 onSelectPOI(poi);
             } else {

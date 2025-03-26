@@ -216,20 +216,26 @@ const LineMarker = ({
           }
         });
         
-        // Add click handler for the circle
-        if (onClick) {
-          map.on('click', circleLayerIdRef.current, (e) => {
-            // Prevent the click event from propagating to other layers
-            e.originalEvent.stopPropagation();
-            onClick(line);
-          });
-          
-          // Add click handler for the line
-          map.on('click', lineLayerId.current, (e) => {
-            // Prevent the click event from propagating to other layers
-            e.originalEvent.stopPropagation();
-            onClick(line);
-          });
+          // Add click handler for the circle with improved mobile handling
+          if (onClick) {
+            map.on('click', circleLayerIdRef.current, (e) => {
+              // Prevent the click event from propagating to other layers
+              e.originalEvent.stopPropagation();
+              // Prevent default behavior
+              e.originalEvent.preventDefault();
+              // Immediately handle the click without requiring a second tap
+              onClick(line);
+            });
+            
+            // Add click handler for the line with improved mobile handling
+            map.on('click', lineLayerId.current, (e) => {
+              // Prevent the click event from propagating to other layers
+              e.originalEvent.stopPropagation();
+              // Prevent default behavior
+              e.originalEvent.preventDefault();
+              // Immediately handle the click without requiring a second tap
+              onClick(line);
+            });
           
           // Change cursor to pointer when hovering over the circle
           map.on('mouseenter', circleLayerIdRef.current, () => {
