@@ -262,30 +262,22 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
             minzoom: 12,
             maxzoom: 14,
             paint: {
-              'line-opacity': [
-                'match',
-                ['get', 'surface'],
-                ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-                0, // Make asphalt roads transparent
-                ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                0.5, // 50% opacity for gravel roads
-                1
-              ],
+              'line-opacity': 0, // Set opacity to 0 for all road types to hide them
               'line-color': [
                 'match',
                 ['get', 'surface'],
                 ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-                '#888888', // Fallback color for asphalt roads (won't be visible due to opacity 0)
+                '#888888',
                 ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                '#D35400', // Keep orange color for gravel roads
+                '#D35400',
                 '#888888'
               ],
               'line-width': [
                 'match',
                 ['get', 'surface'],
                 ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                4, // Wider line for gravel roads
-                2  // Default width for other roads
+                4,
+                2
               ]
             }
           });

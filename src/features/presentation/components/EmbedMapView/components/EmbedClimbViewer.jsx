@@ -66,6 +66,42 @@ export const EmbedClimbViewer = ({ climb, route, onClose }) => {
     disableFitBounds: false // Enable automatic fitting of bounds to show the full segment
   };
   
+  // Calculate unpaved percentage for the climb
+  const calculateUnpavedPercentage = (route, climb) => {
+    if (!route.unpavedSections || route.unpavedSections.length === 0) {
+      return 0;
+    }
+    
+    const climbStartDist = climb.startPoint.distance;
+    const climbEndDist = climb.endPoint.distance;
+    const climbLength = climbEndDist - climbStartDist;
+    
+    // Calculate total unpaved distance within the climb
+    let unpavedLength = 0;
+    
+    for (const section of route.unpavedSections) {
+      // Check if unpaved section overlaps with climb
+      const sectionStartDist = section.startIndex * route.statistics.totalDistance / route.geojson.features[0].geometry.coordinates.length;
+      const sectionEndDist = section.endIndex * route.statistics.totalDistance / route.geojson.features[0].geometry.coordinates.length;
+      
+      // Skip if section is completely outside the climb
+      if (sectionEndDist < climbStartDist || sectionStartDist > climbEndDist) {
+        continue;
+      }
+      
+      // Calculate overlap
+      const overlapStart = Math.max(sectionStartDist, climbStartDist);
+      const overlapEnd = Math.min(sectionEndDist, climbEndDist);
+      const overlapLength = overlapEnd - overlapStart;
+      
+      unpavedLength += overlapLength;
+    }
+    
+    // Calculate percentage
+    const percentage = (unpavedLength / climbLength) * 100;
+    return Math.round(percentage);
+  };
+  
   // Create elevation profile data for the climb segment
   const elevationProfileData = useMemo(() => {
     if (!climb || !route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation) {
@@ -154,30 +190,50 @@ export const EmbedClimbViewer = ({ climb, route, onClose }) => {
         }}
       >
         {/* Header with name and close button */}
-        <Box
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            mb: 3
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h6" color="white" sx={{ color }}>
-              {climb.category} Climb
-            </Typography>
-          </Box>
-          <IconButton
-            onClick={onClose}
-            sx={{
-              color: 'white',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)'
-              }
+        <Box sx={{ mb: 3 }}>
+          <Box
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              mb: 1
             }}
           >
-            <Close />
-          </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" color="white" sx={{ color }}>
+                {climb.category} Climb
+              </Typography>
+            </Box>
+            <IconButton
+              onClick={onClose}
+              sx={{
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+            >
+              <Close />
+            </IconButton>
+          </Box>
+          
+          {/* Road name display */}
+          {climb.roadName && (
+            <Typography 
+              variant="subtitle1" 
+              color="rgba(255, 255, 255, 0.7)" 
+              sx={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                fontSize: '0.9rem',
+                mt: 0.5
+              }}
+            >
+              <i className="fa-solid fa-road" style={{ fontSize: '14px', color: '#0288d1', width: '16px' }}></i>
+              {climb.roadName}
+            </Typography>
+          )}
         </Box>
         
         {/* Image slider with map */}
@@ -237,6 +293,17 @@ export const EmbedClimbViewer = ({ climb, route, onClose }) => {
               <i className="fa-solid fa-ranking-star" style={{ fontSize: '14px', color: '#0288d1', width: '16px' }}></i>
               <Typography variant="body2" color="white">
                 FIETS: {climb.fietsScore.toFixed(1)}
+              </Typography>
+            </Box>
+            
+            {/* Unpaved surface information */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span className="fa-stack" style={{ width: '16px', height: '16px', fontSize: '10px' }}>
+                <i className="fa-solid fa-ellipsis fa-stack-1x" style={{ color: '#0288d1', transform: 'translateY(4px)' }} />
+                <i className="fa-solid fa-person-biking fa-stack-1x" style={{ color: '#0288d1', transform: 'translateY(-4px)' }} />
+              </span>
+              <Typography variant="body2" color="white">
+                {calculateUnpavedPercentage(route, climb)}% unpaved
               </Typography>
             </Box>
           </Box>

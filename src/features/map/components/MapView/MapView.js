@@ -142,6 +142,34 @@ function MapViewContent() {
         }
     }, [hoverCoordinates]);
     
+    // Effect to fit bounds when current route changes
+    useEffect(() => {
+        if (!mapInstance.current || !isMapReady || !currentRoute?.geojson)
+            return;
+        
+        // Get route bounds
+        if (currentRoute.geojson?.features?.[0]?.geometry?.type === 'LineString') {
+            const feature = currentRoute.geojson.features[0];
+            const coordinates = feature.geometry.coordinates;
+            
+            if (coordinates && coordinates.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                
+                coordinates.forEach((coord) => {
+                    if (coord.length >= 2) {
+                        bounds.extend([coord[0], coord[1]]);
+                    }
+                });
+                
+                // Always fit bounds to show the entire route with substantial padding
+                mapInstance.current.fitBounds(bounds, {
+                    padding: 200,  // Significant padding to zoom out and show more context
+                    duration: 1500
+                });
+            }
+        }
+    }, [mapInstance, isMapReady, currentRoute]);
+    
     // Initialize routes using the unified approach - moved to component top level
     const { initialized: routesInitialized } = useUnifiedRouteProcessing(routes, {
         batchProcess: true,

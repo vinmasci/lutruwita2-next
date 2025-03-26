@@ -1,189 +1,154 @@
 /**
- * Utility functions for geocoding and reverse geocoding
+ * Utility functions for geocoding and reverse geocoding using Mapbox API
  */
-
-// Default location data
-const DEFAULT_LOCATION = {
-  country: 'Australia',
-  state: '',
-  lga: ''
-};
-
-// Cache for location data to minimize API calls
-const locationCache = new Map();
+import mapboxgl from 'mapbox-gl';
 
 /**
- * Fetches location data (state, LGA) from coordinates using OpenStreetMap Nominatim API
- * 
- * @param {Array} coordinates - [longitude, latitude] array
- * @returns {Promise<Object>} - Object containing country, state and LGA information
+ * Get location data for a route (city, state, country)
+ * @param {Object} route - Route object with geojson data
+ * @returns {Promise<Object>} - Location data object with city, state, country
  */
-export const fetchLocationData = async (coordinates) => {
+export const getRouteLocationData = async (route) => {
+  if (!route || !route.geojson || !route.geojson.features || !route.geojson.features[0]) {
+    console.error('[getRouteLocationData] Invalid route data:', route);
+    return { city: null, state: null, country: null };
+  }
+
   try {
-    if (!coordinates || coordinates.length < 2) {
-      console.error('[geocoding] Invalid coordinates for location lookup:', coordinates);
-      return DEFAULT_LOCATION;
+    // Get the first coordinate from the route
+    const coordinates = route.geojson.features[0].geometry.coordinates;
+    if (!coordinates || !coordinates.length) {
+      console.error('[getRouteLocationData] No coordinates found in route');
+      return { city: null, state: null, country: null };
+    }
+
+    // Use the first coordinate for reverse geocoding
+    const firstCoord = coordinates[0];
+    
+    // Get Mapbox access token from the window object (should be set in the app)
+    const accessToken = mapboxgl?.accessToken;
+    
+    if (!accessToken) {
+      console.error('[getRouteLocationData] Mapbox access token not found');
+      return { city: null, state: null, country: null };
     }
     
-    const [longitude, latitude] = coordinates;
+    // Construct the Mapbox Geocoding API URL
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${firstCoord[0]},${firstCoord[1]}.json?access_token=${accessToken}&types=place,region,country`;
     
-    // Check cache first to avoid unnecessary API calls
-    const cacheKey = `${longitude.toFixed(4)},${latitude.toFixed(4)}`;
-    if (locationCache.has(cacheKey)) {
-      console.log('[geocoding] Using cached location data for', cacheKey);
-      return locationCache.get(cacheKey);
-    }
-    
-    // Tasmania coordinates check (rough bounding box) - use local data for Tasmania
-    if (latitude >= -44 && latitude <= -40 && longitude >= 144 && longitude <= 149) {
-      const tasmaniaData = {
-        country: 'Australia',
-        state: 'Tasmania',
-        lga: determineTasmanianLGA(longitude, latitude)
-      };
-      
-      // Cache the result
-      locationCache.set(cacheKey, tasmaniaData);
-      return tasmaniaData;
-    }
-    
-    // Use OpenStreetMap Nominatim API for reverse geocoding
-    // This is a free service with usage limits (1 request per second)
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`;
-    
-    console.log('[geocoding] Fetching location data from:', url);
-    
-    const response = await fetch(url, {
-      headers: {
-        // Add a user agent as required by Nominatim's usage policy
-        'User-Agent': 'Route-Planner/1.0'
-      }
-    });
+    const response = await fetch(url);
     
     if (!response.ok) {
-      console.warn(`[geocoding] Nominatim API error: ${response.status} ${response.statusText}`);
-      return DEFAULT_LOCATION;
+      throw new Error(`Geocoding API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    console.log('[geocoding] Nominatim response:', data);
     
-    // Extract state and LGA information from the response
-    const locationData = {
-      country: data.address?.country || 'Australia',
-      state: '',
-      lga: ''
-    };
+    // Extract location data from the response
+    let city = null;
+    let state = null;
+    let country = null;
     
-    if (data.address) {
-      // For Australia, the state is usually in state or state_district
-      locationData.state = data.address.state || 
-                          data.address.state_district || 
-                          data.address.region || 
-                          '';
+    if (data.features && data.features.length > 0) {
+      // Look for features by place type
+      const placeFeature = data.features.find(f => f.place_type.includes('place'));
+      const regionFeature = data.features.find(f => f.place_type.includes('region'));
+      const countryFeature = data.features.find(f => f.place_type.includes('country'));
       
-      // LGA could be in county, municipality, city_district, or similar fields
-      locationData.lga = data.address.county || 
-                        data.address.municipality || 
-                        data.address.city_district || 
-                        data.address.district || 
-                        data.address.suburb || 
-                        '';
+      city = placeFeature ? placeFeature.text : null;
+      state = regionFeature ? regionFeature.text : null;
+      country = countryFeature ? countryFeature.text : null;
     }
     
-    console.log('[geocoding] Extracted location data:', locationData);
-    
-    // Cache the result
-    locationCache.set(cacheKey, locationData);
-    return locationData;
+    return { city, state, country };
   } catch (error) {
-    console.error('[geocoding] Error fetching location data:', error);
-    return DEFAULT_LOCATION;
+    console.error('[getRouteLocationData] Error:', error);
+    return { city: null, state: null, country: null };
   }
 };
 
 /**
- * Determines location data for a route based on its first coordinates
- * Uses Nominatim API for all locations to get accurate state and LGA data
- * 
- * @param {Object} route - Route object
- * @returns {Promise<Object>} - Location metadata
+ * Reverse geocode a coordinate to get the nearest road name
+ * @param {Array} coordinates - [longitude, latitude] array
+ * @returns {Promise<string|null>} - Road name or null if not found
  */
-export const getRouteLocationData = async (route) => {
-  // Default location data
-  const metadata = {
-    country: 'Australia',
-    state: '',
-    lga: ''
-  };
-  
-  if (!route || !route.geojson || !route.geojson.features || 
-      !route.geojson.features[0] || !route.geojson.features[0].geometry) {
-    console.warn('[geocoding] Route does not have valid geometry for location lookup');
-    return metadata;
+export const reverseGeocodeForRoad = async (coordinates) => {
+  if (!coordinates || coordinates.length !== 2) {
+    console.error('[reverseGeocodeForRoad] Invalid coordinates:', coordinates);
+    return null;
   }
+
+  const [longitude, latitude] = coordinates;
   
-  const coordinates = route.geojson.features[0].geometry.coordinates;
-  if (!coordinates || !coordinates.length) {
-    console.warn('[geocoding] Route does not have coordinates for location lookup');
-    return metadata;
+  // Get Mapbox access token from the window object (should be set in the app)
+  const accessToken = mapboxgl?.accessToken;
+  
+  if (!accessToken) {
+    console.error('[reverseGeocodeForRoad] Mapbox access token not found');
+    return null;
   }
-  
-  // Get the first point of the route
-  const firstPoint = coordinates[0];
   
   try {
-    // Use the Nominatim API to get location data for all routes
-    const locationData = await fetchLocationData(firstPoint);
-    return locationData;
+    // Construct the Mapbox Geocoding API URL
+    // Documentation: https://docs.mapbox.com/api/search/geocoding/
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${accessToken}&types=address`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Geocoding API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Log the response for debugging
+    console.log('[reverseGeocodeForRoad] Geocoding response:', data);
+    
+    // Extract road name from the response
+    // The first feature is usually the most relevant
+    if (data.features && data.features.length > 0) {
+      // Look for features that are likely to be roads
+      const roadFeatures = data.features.filter(feature => 
+        feature.place_type.includes('address') || 
+        feature.place_type.includes('street') ||
+        (feature.properties && feature.properties.category === 'road')
+      );
+      
+      if (roadFeatures.length > 0) {
+        // Get the road name from the first road feature
+        const roadFeature = roadFeatures[0];
+        
+        // The text property usually contains the road name
+        // The place_name property contains the full address
+        return roadFeature.text || extractRoadFromPlaceName(roadFeature.place_name);
+      }
+      
+      // If no specific road features found, try to extract from the first feature
+      return extractRoadFromPlaceName(data.features[0].place_name);
+    }
+    
+    return null;
   } catch (error) {
-    console.error('[geocoding] Error getting location data:', error);
-    return metadata;
+    console.error('[reverseGeocodeForRoad] Error:', error);
+    return null;
   }
 };
 
 /**
- * Determines the Tasmanian LGA based on coordinates
- * This is a simple approximation based on rough geographic boundaries
- * 
- * @param {number} longitude - Longitude coordinate
- * @param {number} latitude - Latitude coordinate
- * @returns {string} - LGA name
+ * Extract road name from a place name string
+ * @param {string} placeName - Full place name from Mapbox
+ * @returns {string|null} - Road name or null
  */
-function determineTasmanianLGA(longitude, latitude) {
-  // Rough approximation of Tasmanian LGAs based on coordinates
-  // This is a simplified approach and not accurate for all points
+const extractRoadFromPlaceName = (placeName) => {
+  if (!placeName) return null;
   
-  // Hobart area
-  if (latitude >= -43.0 && latitude <= -42.7 && longitude >= 147.1 && longitude <= 147.5) {
-    return 'Hobart';
+  // Place names are usually formatted as "Road Name, City, State, Country"
+  // So we can split by comma and take the first part
+  const parts = placeName.split(',');
+  
+  if (parts.length > 0) {
+    return parts[0].trim();
   }
   
-  // Launceston area
-  if (latitude >= -41.6 && latitude <= -41.3 && longitude >= 147.0 && longitude <= 147.3) {
-    return 'Launceston';
-  }
-  
-  // West Coast
-  if (longitude < 146.0) {
-    return 'West Coast';
-  }
-  
-  // East Coast
-  if (longitude > 148.0) {
-    return 'East Coast';
-  }
-  
-  // Central Highlands
-  if (latitude > -42.5 && longitude < 147.0) {
-    return 'Central Highlands';
-  }
-  
-  // Southern
-  if (latitude < -43.0) {
-    return 'Southern Tasmania';
-  }
-  
-  // Default
-  return 'Tasmania';
-}
+  return null;
+};

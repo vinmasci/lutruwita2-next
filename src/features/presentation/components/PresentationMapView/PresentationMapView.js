@@ -103,25 +103,11 @@ export default function PresentationMapView(props) {
                         bounds.extend([coord[0], coord[1]]);
                     }
                 });
-                // Find the middle coordinate of the route
-                const middleIndex = Math.floor(coordinates.length / 2);
-                const middleCoord = coordinates[middleIndex];
-                if (!previousRouteRef.current) {
-                    // For the first route, fit bounds to set initial zoom
-                    mapInstance.current.fitBounds(bounds, {
-                        padding: 50,
-                        duration: 1500
-                    });
-                }
-                else {
-                    // For subsequent routes, pan to middle coordinate maintaining zoom
-                    mapInstance.current.easeTo({
-                        center: [middleCoord[0], middleCoord[1]],
-                        zoom: mapInstance.current.getZoom(),
-                        duration: 1500,
-                        essential: true
-                    });
-                }
+            // Always fit bounds to show the entire route with substantial padding for maximum context
+            mapInstance.current.fitBounds(bounds, {
+                padding: 200,  // Significantly increased padding to zoom out much more
+                duration: 1500
+            });
                 // Update previous route reference
                 previousRouteRef.current = currentRoute.routeId;
             }

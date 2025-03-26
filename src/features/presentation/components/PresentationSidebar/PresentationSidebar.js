@@ -10,7 +10,7 @@ import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight, Ruler, Settings2, Eye, EyeOff, PowerOff, CirclePower } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight, Ruler, Settings2, Eye, EyeOff, PowerOff, CirclePower, Map } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
 
 export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDistanceMarkersVisibility, isClimbFlagsVisible, toggleClimbFlagsVisibility, isLineMarkersVisible, toggleLineMarkersVisibility }) => {
@@ -34,13 +34,8 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                 addPhoto(route._loadedState.photos.map(deserializePhoto));
             }
         }
+        // Just update the current route - the map view will handle fitting bounds
         setCurrentRoute(route);
-        // Update map state if available
-        if (route._type === 'loaded' && route._loadedState?.mapState && map) {
-            const { center, zoom } = route._loadedState.mapState;
-            map.setCenter(center);
-            map.setZoom(zoom);
-        }
     };
 
     const handleNavigate = (direction) => {
@@ -88,7 +83,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
             backgroundColor: 'rgba(255, 255, 255, 0.1)'
         },
         '&:hover .MuiListItemIcon-root svg': {
-            color: '#ff4d4f'
+            color: '#2196f3' // Changed from #ff4d4f (red) to #2196f3 (Material UI info blue)
         }
     };
 
@@ -110,7 +105,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                             sx: {
                                 ...listItemButtonStyle,
                                 '&[data-active="true"] .MuiListItemIcon-root svg': {
-                                    color: '#4caf50'
+                                    color: '#2196f3' // Changed from #4caf50 (green) to #2196f3 (Material UI info blue)
                                 }
                             }, 
                             children: _jsx(ListItemIcon, { 
@@ -135,8 +130,8 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                             sx: listItemButtonStyle, 
                             children: _jsx(ListItemIcon, { 
                                 children: allComponentsDisabled ? 
-                                    _jsx(CirclePower, { color: "#4caf50" }) : 
-                                    _jsx(PowerOff, { color: "#ff4d4f" }) 
+                                    _jsx(PowerOff, { color: "#ff4d4f" }) : 
+                                    _jsx(CirclePower, { color: "#4caf50" }) 
                             }) 
                         }) 
                     }),
@@ -209,6 +204,20 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                             children: _jsx(ListItemIcon, { 
                                 children: _jsx(AlertTriangle, { 
                                     color: visibleCategories.includes('road-information') ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    _jsx(Tooltip, { 
+                        title: "Trail Information", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => toggleCategoryVisibility('trail-information'),
+                            sx: listItemButtonStyle, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(Map, { 
+                                    color: visibleCategories.includes('trail-information') ? '#4caf50' : '#ff4d4f' 
                                 }) 
                             }) 
                         }) 

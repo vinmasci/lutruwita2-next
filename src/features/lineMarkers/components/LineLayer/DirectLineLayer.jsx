@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import LineMarker from '../LineMarker/LineMarker.jsx';
 import LineDrawer from '../LineDrawer/LineDrawer.jsx';
 import { useLineContext } from '../../context/LineContext.jsx';
@@ -21,6 +21,32 @@ const DirectLineLayer = ({ map, lines = [] }) => {
   console.log('[DirectLineLayer] Lines from props:', { 
     linesCount: lines?.length || 0
   });
+  
+  // Reference to track if we've registered the style.load event listener
+  const styleLoadListenerRef = useRef(false);
+  
+  // Listen for map style changes to ensure lines are preserved
+  useEffect(() => {
+    if (!map || styleLoadListenerRef.current) return;
+    
+    const handleStyleLoad = () => {
+      console.log('[DirectLineLayer] Map style changed, ensuring lines are preserved');
+      // Force a re-render by updating a state variable
+      // This will cause LineMarker components to recreate their layers
+      setForceUpdate(prev => !prev);
+    };
+    
+    map.on('style.load', handleStyleLoad);
+    styleLoadListenerRef.current = true;
+    
+    return () => {
+      map.off('style.load', handleStyleLoad);
+      styleLoadListenerRef.current = false;
+    };
+  }, [map]);
+  
+  // State to force re-render when map style changes
+  const [forceUpdate, setForceUpdate] = useState(false);
   
   // Get access to LineContext for adding/updating lines
   const { 

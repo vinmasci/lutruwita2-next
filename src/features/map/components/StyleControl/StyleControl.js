@@ -48,113 +48,156 @@ class StyleControl {
         });
         this.container = document.createElement('div');
     }
-    recreateCustomLayers() {
-        if (!this.map)
-            return;
-        // Store existing GPX sources and layers before style change
-        const style = this.map.getStyle();
-        if (!style)
-            return;
-        const gpxSources = {};
-        const gpxLayers = {};
-        // Find all GPX-related sources and layers
-        if (style.sources) {
-            Object.entries(style.sources).forEach(([id, source]) => {
-                if (id.includes('route-') || id.includes('unpaved-section-')) {
-                    gpxSources[id] = source;
-                }
-            });
+  recreateCustomLayers() {
+    if (!this.map)
+      return;
+    // Store existing GPX sources and layers before style change
+    const style = this.map.getStyle();
+    if (!style)
+      return;
+    const gpxSources = {};
+    const gpxLayers = {};
+    const lineSources = {};
+    const lineLayers = {};
+    
+    // Find all GPX-related and line-related sources and layers
+    if (style.sources) {
+      Object.entries(style.sources).forEach(([id, source]) => {
+        if (id.includes('route-') || id.includes('unpaved-section-')) {
+          gpxSources[id] = source;
         }
-        if (style.layers) {
-            style.layers.forEach(layer => {
-                if (layer.id.includes('route-') || layer.id.includes('unpaved-section-')) {
-                    gpxLayers[layer.id] = layer;
-                }
-            });
+        // Capture line sources - they typically start with 'line-'
+        if (id.includes('line-') || id.includes('circle-source-line-')) {
+          console.log('[StyleControl] Preserving line source:', id);
+          lineSources[id] = source;
         }
-        // Wait for style to load
-        this.map.once('style.load', () => {
-            // Re-add terrain source
-            if (!this.map?.getSource('mapbox-dem')) {
-                this.map?.addSource('mapbox-dem', {
-                    type: 'raster-dem',
-                    url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                    tileSize: 512,
-                    maxzoom: 14
-                });
-            }
-            // Re-apply terrain settings with device-specific exaggeration
-            const isMobile = window.innerWidth <= 768;
-            console.log('[StyleControl] Re-applying terrain with device detection:', { 
-                isMobile, 
-                width: window.innerWidth,
-                projection: this.map?.getProjection()?.name
-            });
-            
-            this.map?.setTerrain({
-                source: 'mapbox-dem',
-                exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
-            });
-            // Re-add custom roads layer
-            if (!this.map?.getSource('australia-roads')) {
-                const tileUrl = 'https://api.maptiler.com/tiles/5dd3666f-1ce4-4df6-9146-eda62a200bcb/{z}/{x}/{y}.pbf?key=DFSAZFJXzvprKbxHrHXv';
-                this.map?.addSource('australia-roads', {
-                    type: 'vector',
-                    tiles: [tileUrl],
-                    minzoom: 12,
-                    maxzoom: 14
-                });
-            }
-            // Re-add roads layer
-            if (!this.map?.getLayer('custom-roads')) {
-                this.map?.addLayer({
-                    id: 'custom-roads',
-                    type: 'line',
-                    source: 'australia-roads',
-                    'source-layer': 'lutruwita',
-                    minzoom: 12,
-                    maxzoom: 14,
-                    paint: {
-                        'line-opacity': [
-                            'match',
-                            ['get', 'surface'],
-                            ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-                            0, // Make asphalt roads transparent
-                            ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                            0.5, // 50% opacity for gravel roads
-                            1
-                        ],
-                        'line-color': [
-                            'match',
-                            ['get', 'surface'],
-                            ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-                            '#888888', // Fallback color for asphalt roads (won't be visible due to opacity 0)
-                            ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                            '#D35400', // Keep orange color for gravel roads
-                            '#888888'
-                        ],
-                        'line-width': [
-                            'match',
-                            ['get', 'surface'],
-                            ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                            4, // Wider line for gravel roads
-                            2  // Default width for other roads
-                        ]
-                    }
-                });
-            }
-            // Re-add GPX sources and layers
-            Object.entries(gpxSources).forEach(([id, source]) => {
-                if (!this.map?.getSource(id)) {
-                    this.map?.addSource(id, source);
-                }
-            });
-            Object.entries(gpxLayers).forEach(([id, layer]) => {
-                if (!this.map?.getLayer(id)) {
-                    this.map?.addLayer(layer);
-                }
-            });
+      });
+    }
+    if (style.layers) {
+      style.layers.forEach(layer => {
+        if (layer.id.includes('route-') || layer.id.includes('unpaved-section-')) {
+          gpxLayers[layer.id] = layer;
+        }
+        // Capture line layers - they typically start with 'line-' or include 'circle-line-'
+        if (layer.id.includes('line-') || 
+            layer.id.includes('circle-line-') || 
+            layer.id.includes('inner-circle-line-')) {
+          console.log('[StyleControl] Preserving line layer:', layer.id);
+          lineLayers[layer.id] = layer;
+        }
+      });
+    }
+    // Wait for style to load
+    this.map.once('style.load', () => {
+      // Re-add terrain source
+      if (!this.map?.getSource('mapbox-dem')) {
+        this.map?.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+          tileSize: 512,
+          maxzoom: 14
         });
+      }
+      // Re-apply terrain settings with device-specific exaggeration
+      const isMobile = window.innerWidth <= 768;
+      console.log('[StyleControl] Re-applying terrain with device detection:', { 
+        isMobile, 
+        width: window.innerWidth,
+        projection: this.map?.getProjection()?.name
+      });
+      
+      this.map?.setTerrain({
+        source: 'mapbox-dem',
+        exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
+      });
+      // Re-add custom roads layer
+      if (!this.map?.getSource('australia-roads')) {
+        const tileUrl = 'https://api.maptiler.com/tiles/5dd3666f-1ce4-4df6-9146-eda62a200bcb/{z}/{x}/{y}.pbf?key=DFSAZFJXzvprKbxHrHXv';
+        this.map?.addSource('australia-roads', {
+          type: 'vector',
+          tiles: [tileUrl],
+          minzoom: 12,
+          maxzoom: 14
+        });
+      }
+      // Re-add roads layer
+      if (!this.map?.getLayer('custom-roads')) {
+        this.map?.addLayer({
+          id: 'custom-roads',
+          type: 'line',
+          source: 'australia-roads',
+          'source-layer': 'lutruwita',
+          minzoom: 12,
+          maxzoom: 14,
+          paint: {
+            'line-opacity': [
+              'match',
+              ['get', 'surface'],
+              ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
+              0, // Make asphalt roads transparent
+              ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
+              0.5, // 50% opacity for gravel roads
+              1
+            ],
+            'line-color': [
+              'match',
+              ['get', 'surface'],
+              ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
+              '#888888', // Fallback color for asphalt roads (won't be visible due to opacity 0)
+              ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
+              '#D35400', // Keep orange color for gravel roads
+              '#888888'
+            ],
+            'line-width': [
+              'match',
+              ['get', 'surface'],
+              ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
+              4, // Wider line for gravel roads
+              2  // Default width for other roads
+            ]
+          }
+        });
+      }
+      
+      // Re-add GPX sources and layers
+      Object.entries(gpxSources).forEach(([id, source]) => {
+        if (!this.map?.getSource(id)) {
+          this.map?.addSource(id, source);
+        }
+      });
+      Object.entries(gpxLayers).forEach(([id, layer]) => {
+        if (!this.map?.getLayer(id)) {
+          this.map?.addLayer(layer);
+        }
+      });
+      
+      // Re-add line sources and layers
+      console.log('[StyleControl] Re-adding line sources and layers');
+      
+      // First add all sources
+      Object.entries(lineSources).forEach(([id, source]) => {
+        if (!this.map?.getSource(id)) {
+          try {
+            console.log('[StyleControl] Re-adding line source:', id);
+            this.map?.addSource(id, source);
+          } catch (error) {
+            console.error('[StyleControl] Error re-adding line source:', id, error);
+          }
+        }
+      });
+      
+      // Then add all layers
+      Object.entries(lineLayers).forEach(([id, layer]) => {
+        if (!this.map?.getLayer(id)) {
+          try {
+            console.log('[StyleControl] Re-adding line layer:', id);
+            this.map?.addLayer(layer);
+          } catch (error) {
+            console.error('[StyleControl] Error re-adding line layer:', id, error);
+          }
+        }
+      });
+    });
     }
     switchStyle(style) {
         if (!this.map)

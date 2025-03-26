@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import LineMarker from '../../../lineMarkers/components/LineMarker/LineMarker.jsx';
 import { PresentationLineViewer } from '../LineViewer/PresentationLineViewer';
 import './DirectPresentationLineLayer.css';
@@ -21,6 +21,34 @@ const DirectPresentationLineLayer = ({ map, lines = [] }) => {
       linesCount: lines?.length || 0
     });
   }
+  
+  // Reference to track if we've registered the style.load event listener
+  const styleLoadListenerRef = useRef(false);
+  
+  // State to force re-render when map style changes
+  const [forceUpdate, setForceUpdate] = useState(false);
+  
+  // Listen for map style changes to ensure lines are preserved
+  useEffect(() => {
+    if (!map || styleLoadListenerRef.current) return;
+    
+    const handleStyleLoad = () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DirectPresentationLineLayer] Map style changed, ensuring lines are preserved');
+      }
+      // Force a re-render by updating a state variable
+      // This will cause LineMarker components to recreate their layers
+      setForceUpdate(prev => !prev);
+    };
+    
+    map.on('style.load', handleStyleLoad);
+    styleLoadListenerRef.current = true;
+    
+    return () => {
+      map.off('style.load', handleStyleLoad);
+      styleLoadListenerRef.current = false;
+    };
+  }, [map]);
   
   // Track selected line for UI state
   const [selectedLineId, setSelectedLineId] = useState(null);

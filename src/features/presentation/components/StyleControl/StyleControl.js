@@ -109,15 +109,7 @@ class StyleControl {
                     minzoom: 12,
                     maxzoom: 14,
                     paint: {
-                        'line-opacity': [
-                            'match',
-                            ['get', 'surface'],
-                            ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-                            0, // Make asphalt roads transparent
-                            ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                            0.5, // 50% opacity for gravel roads
-                            1
-                        ],
+                        'line-opacity': 0, // Set opacity to 0 for all road types to hide them
                         'line-color': [
                             'match',
                             ['get', 'surface'],

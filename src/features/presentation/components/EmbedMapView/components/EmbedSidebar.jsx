@@ -10,7 +10,7 @@ import { calculateElevationGained, calculateElevationLost } from '../utils/eleva
 import { 
   ListOrdered, Camera, CameraOff, Ruler, AlertTriangle, 
   Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight,
-  Settings2, Eye, EyeOff, PowerOff, CirclePower
+  Settings2, Eye, EyeOff, PowerOff, CirclePower, Map
 } from 'lucide-react';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
@@ -176,7 +176,7 @@ const EmbedSidebar = ({
       backgroundColor: 'rgba(255, 255, 255, 0.1)'
     },
     '&:hover .MuiListItemIcon-root svg': {
-      color: '#ff4d4f'
+      color: '#2196f3' // Changed from #ff4d4f (red) to #2196f3 (Material UI info blue)
     }
   };
   
@@ -192,7 +192,7 @@ const EmbedSidebar = ({
               sx={{
                 ...listItemButtonStyle,
                 '&[data-active="true"] .MuiListItemIcon-root svg': {
-                  color: '#4caf50'
+                  color: '#2196f3' // Changed from #4caf50 (green) to #2196f3 (Material UI info blue)
                 }
               }}
             >
@@ -212,8 +212,8 @@ const EmbedSidebar = ({
             >
               <ListItemIcon>
                 {allComponentsDisabled ? 
-                  <CirclePower color="#4caf50" /> : 
-                  <PowerOff color="#ff4d4f" />}
+                  <PowerOff color="#ff4d4f" /> : 
+                  <CirclePower color="#4caf50" />}
               </ListItemIcon>
             </ListItemButton>
           </Tooltip>
@@ -270,6 +270,19 @@ const EmbedSidebar = ({
               <ListItemIcon>
                 <AlertTriangle
                   color={visiblePOICategories.includes('road-information') ? '#4caf50' : '#ff4d4f'}
+                />
+              </ListItemIcon>
+            </ListItemButton>
+          </Tooltip>
+          
+          <Tooltip title="Trail Information" placement="right">
+            <ListItemButton
+              onClick={() => togglePOICategoryVisibility('trail-information')}
+              sx={listItemButtonStyle}
+            >
+              <ListItemIcon>
+                <Map
+                  color={visiblePOICategories.includes('trail-information') ? '#4caf50' : '#ff4d4f'}
                 />
               </ListItemIcon>
             </ListItemButton>

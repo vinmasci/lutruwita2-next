@@ -3,6 +3,7 @@ import { useMapContext } from '../../context/MapContext';
 import { detectClimbs } from '../../../gpx/utils/climbUtils';
 import mapboxgl from 'mapbox-gl';
 import { PresentationClimbViewer } from '../../../../features/presentation/components/ClimbViewer/PresentationClimbViewer';
+import { reverseGeocodeForRoad } from '../../../../utils/geocoding';
 import './ClimbMarkers.css';
 
 export const ClimbMarkers = ({ map, route }) => {
@@ -111,6 +112,20 @@ export const ClimbMarkers = ({ map, route }) => {
                 if (!startCoord || !endCoord) {
                     return;
                 }
+                
+                // Get road name for the climb using reverse geocoding
+                // We'll use an async function but not await it to avoid blocking the UI
+                reverseGeocodeForRoad(startCoord)
+                    .then(roadName => {
+                        if (roadName) {
+                            // Add the road name to the climb object
+                            climb.roadName = roadName;
+                            console.log(`[ClimbMarkers] Found road name for climb: ${roadName}`);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[ClimbMarkers] Error getting road name:', error);
+                    });
 
                 // Calculate climb stats
                 const distance = (climb.endPoint.distance - climb.startPoint.distance) / 1000; // km

@@ -33,11 +33,22 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
             routes.forEach((route, index) => {
                 if (!route.geojson)
                     return;
-                // Add the route source
-                map.current?.addSource(`route-${index}`, {
-                    type: 'geojson',
-                    data: route.geojson
-                });
+                // Check if source already exists before adding it
+                try {
+                    // Try to get the source - if it exists, this won't throw an error
+                    if (!map.current?.getSource(`route-${index}`)) {
+                        // Source doesn't exist, so add it
+                        map.current?.addSource(`route-${index}`, {
+                            type: 'geojson',
+                            data: route.geojson
+                        });
+                    } else {
+                        // Source exists, update its data
+                        map.current?.getSource(`route-${index}`)?.setData(route.geojson);
+                    }
+                } catch (error) {
+                    console.error(`[MapPreview] Error handling route-${index} source:`, error);
+                }
                 // Add unpaved sections source if they exist
                 if (route.unpavedSections && route.unpavedSections.length > 0) {
                     const features = route.unpavedSections.map(section => ({
@@ -50,58 +61,92 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
                             coordinates: section.coordinates
                         }
                     }));
-                    map.current?.addSource(`unpaved-${index}`, {
-                        type: 'geojson',
-                        data: {
-                            type: 'FeatureCollection',
-                            features
+                    
+                    // Check if unpaved source already exists
+                    try {
+                        if (!map.current?.getSource(`unpaved-${index}`)) {
+                            map.current?.addSource(`unpaved-${index}`, {
+                                type: 'geojson',
+                                data: {
+                                    type: 'FeatureCollection',
+                                    features
+                                }
+                            });
+                        } else {
+                            // Update existing source
+                            map.current?.getSource(`unpaved-${index}`)?.setData({
+                                type: 'FeatureCollection',
+                                features
+                            });
                         }
-                    });
+                    } catch (error) {
+                        console.error(`[MapPreview] Error handling unpaved-${index} source:`, error);
+                    }
                 }
-                // Add border layer
-                map.current?.addLayer({
-                    id: `route-${index}-border`,
-                    type: 'line',
-                    source: `route-${index}`,
-                    layout: {
-                        'line-join': 'round',
-                        'line-cap': 'round'
-                    },
-                    paint: {
-                        'line-color': '#ffffff',
-                        'line-width': 4
+                // Add border layer if it doesn't exist
+                try {
+                    if (!map.current?.getLayer(`route-${index}-border`)) {
+                        map.current?.addLayer({
+                            id: `route-${index}-border`,
+                            type: 'line',
+                            source: `route-${index}`,
+                            layout: {
+                                'line-join': 'round',
+                                'line-cap': 'round'
+                            },
+                            paint: {
+                                'line-color': '#ffffff',
+                                'line-width': 4
+                            }
+                        });
                     }
-                });
-                // Add main route layer
-                map.current?.addLayer({
-                    id: `route-${index}`,
-                    type: 'line',
-                    source: `route-${index}`,
-                    layout: {
-                        'line-join': 'round',
-                        'line-cap': 'round'
-                    },
-                    paint: {
-                        'line-color': route.customMapOptions?.color || '#ee5253',
-                        'line-width': 3
+                } catch (error) {
+                    console.error(`[MapPreview] Error handling route-${index}-border layer:`, error);
+                }
+                
+                // Add main route layer if it doesn't exist
+                try {
+                    if (!map.current?.getLayer(`route-${index}`)) {
+                        map.current?.addLayer({
+                            id: `route-${index}`,
+                            type: 'line',
+                            source: `route-${index}`,
+                            layout: {
+                                'line-join': 'round',
+                                'line-cap': 'round'
+                            },
+                            paint: {
+                                'line-color': route.customMapOptions?.color || '#ee5253',
+                                'line-width': 3
+                            }
+                        });
                     }
-                });
+                } catch (error) {
+                    console.error(`[MapPreview] Error handling route-${index} layer:`, error);
+                }
+                
                 // Add unpaved sections layer if they exist (on top of main route)
                 if (route.unpavedSections && route.unpavedSections.length > 0) {
-                    map.current?.addLayer({
-                        id: `unpaved-${index}`,
-                        type: 'line',
-                        source: `unpaved-${index}`,
-                        layout: {
-                            'line-join': 'round',
-                            'line-cap': 'round'
-                        },
-                        paint: {
-                            'line-color': '#ffffff',
-                            'line-width': 1,
-                            'line-dasharray': [0.3, 3]
+                    try {
+                        if (!map.current?.getLayer(`unpaved-${index}`)) {
+                            map.current?.addLayer({
+                                id: `unpaved-${index}`,
+                                type: 'line',
+                                source: `unpaved-${index}`,
+                                layout: {
+                                    'line-join': 'round',
+                                    'line-cap': 'round'
+                                },
+                                paint: {
+                                    'line-color': '#ffffff',
+                                    'line-width': 1,
+                                    'line-dasharray': [0.3, 3]
+                                }
+                            });
                         }
-                    });
+                    } catch (error) {
+                        console.error(`[MapPreview] Error handling unpaved-${index} layer:`, error);
+                    }
                 }
                 // Extend bounds with this route's coordinates
                 if (route.geojson?.features?.[0]?.geometry?.coordinates) {

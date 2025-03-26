@@ -332,7 +332,8 @@ export const detectClimbs = (data) => {
             averageGradient,
             fietsScore,
             category,
-            color
+            color,
+            roadName: null // Initialize roadName as null, will be populated later
         };
         
         return climb;

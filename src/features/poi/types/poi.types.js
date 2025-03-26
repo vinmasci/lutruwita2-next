@@ -1,6 +1,6 @@
 export const POI_CATEGORIES = {
     'road-information': { label: 'Road Information', color: '#ff5252' },
-    'trail-information': { label: 'Trail Information', color: '#3498db' },
+    'trail-information': { label: 'Trail Information', color: '#ff6348' },
     'accommodation': { label: 'Accommodation', color: '#8e44ad' },
     'food-drink': { label: 'Food & Drink', color: '#e67e22' },
     'natural-features': { label: 'Natural Features', color: '#27ae60' },

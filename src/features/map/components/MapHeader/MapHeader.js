@@ -141,10 +141,12 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                             _jsxs(Box, {
                                 sx: {
                                     display: 'flex',
+                                    flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile, horizontal on larger screens
                                     alignItems: 'center',
                                     justifyContent: 'center', // Center the content
-                                    gap: '8px',
-                                    width: '100%'
+                                    gap: { xs: '2px', sm: '8px' }, // Less gap on mobile
+                                    width: '100%',
+                                    paddingRight: { xs: '80px', sm: '0' } // Add padding on right for mobile to avoid icon overlap
                                 },
                                 children: [
                                     // Centered container for logo and title together
@@ -251,11 +253,13 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                                         ]
                                     }),
                                     
-                                    // Username attribution on the right (if available)
+                                    // Username attribution (if available)
                                     _jsx(Box, {
                                         sx: {
-                                            order: 3, // Explicit ordering to ensure username is third
-                                            minWidth: username ? 'auto' : '0px'
+                                            order: { xs: 4, sm: 3 }, // Different ordering on mobile vs desktop
+                                            minWidth: username ? 'auto' : '0px',
+                                            alignSelf: 'center',
+                                            marginTop: { xs: '-4px', sm: '0' } // Negative margin on mobile to reduce space
                                         },
                                         children: username && (
                                             _jsxs(Typography, {
@@ -264,9 +268,10 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                                                     color: '#ffffff',
                                                     opacity: 0.9,
                                                     fontStyle: 'italic',
-                                                    marginLeft: '4px',
-                                                    marginTop: '3px',
-                                                    alignSelf: 'center'
+                                                    marginLeft: { xs: '0', sm: '4px' }, // No left margin on mobile
+                                                    marginTop: { xs: '0', sm: '3px' },
+                                                    alignSelf: 'center',
+                                                    textAlign: { xs: 'center', sm: 'left' } // Center on mobile, left on desktop
                                                 },
                                                 children: ["by ", username]
                                             })

@@ -52,9 +52,21 @@ const LineMarker = ({
     }
 
     logger.debug('LineMarker', 'Setting up map layers for line:', line.id);
+    
+    // Listen for style.load events to recreate layers after style changes
+    const handleStyleLoad = () => {
+      logger.debug('LineMarker', 'Map style changed, recreating layers for line:', line.id);
+      // If the source and layers were removed during style change, recreate them
+      if (!map.getSource(lineLayerId.current)) {
+        createLineLayers();
+      }
+    };
+    
+    // Add the style.load event listener
+    map.on('style.load', handleStyleLoad);
 
-    // Create source if it doesn't exist
-    if (!sourceRef.current) {
+    // Function to create line layers
+    const createLineLayers = () => {
       logger.debug('LineMarker', 'Creating new source and layers');
       try {
         // Check if the source already exists
@@ -101,7 +113,24 @@ const LineMarker = ({
         }
         sourceRef.current = lineLayerId.current;
 
-        // Add main line layer - simple, clean style
+        // Add shadow line layer first (sits behind the main line)
+        map.addLayer({
+          id: `${lineLayerId.current}-shadow`,
+          type: 'line',
+          source: lineLayerId.current,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#000000', // Black shadow
+            'line-width': 5, // Wider than the main line
+            'line-opacity': 0.5, // Semi-transparent
+            'line-blur': 1 // Soft edge for shadow effect
+          }
+        });
+        
+        // Add main line layer on top of shadow
         map.addLayer({
           id: lineLayerId.current,
           type: 'line',
@@ -223,9 +252,17 @@ const LineMarker = ({
       } catch (error) {
         logger.error('LineMarker', 'Error creating map layers:', error);
       }
+    };
+    
+    // Create source if it doesn't exist
+    if (!sourceRef.current) {
+      createLineLayers();
     }
 
     return () => {
+      // Remove the style.load event listener
+      map.off('style.load', handleStyleLoad);
+      
       // Skip cleanup if drawer is open for this line
       if (drawerOpen && selected) {
         logger.debug('LineMarker', `Skipping cleanup for line ${line.id} because drawer is open`);
@@ -292,14 +329,17 @@ const LineMarker = ({
         // Remove circle source
         safeRemoveSource(circleSourceIdRef.current);
         
-        // Remove extrusion layer first
-        safeRemoveLayer(`${lineLayerId.current}-extrusion`);
+        // Remove layers in reverse order of creation
         
-        // Then remove glow layer
-        safeRemoveLayer(`${lineLayerId.current}-glow`);
-        
-        // Then remove main line layer
+        // Remove main line layer first
         safeRemoveLayer(lineLayerId.current);
+        
+        // Then remove shadow layer
+        safeRemoveLayer(`${lineLayerId.current}-shadow`);
+        
+        // Remove any other layers that might exist
+        safeRemoveLayer(`${lineLayerId.current}-extrusion`);
+        safeRemoveLayer(`${lineLayerId.current}-glow`);
         
         // Finally remove the source after all layers are removed
         if (safeRemoveSource(lineLayerId.current)) {
