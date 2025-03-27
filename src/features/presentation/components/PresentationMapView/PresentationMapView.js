@@ -20,6 +20,7 @@ import DirectPresentationLineLayer from '../LineLayer/DirectPresentationLineLaye
 import { MapProvider } from '../../../map/context/MapContext';
 import { LineProvider } from '../../../lineMarkers/context/LineContext.jsx';
 import { setupScaleListener } from '../../utils/scaleUtils';
+import { setViewportHeight } from '../../../../utils/viewportUtils';
 import './PresentationMapView.css';
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 export default function PresentationMapView(props) {
@@ -39,6 +40,39 @@ export default function PresentationMapView(props) {
         if (containerRef.current) {
             const cleanup = setupScaleListener(containerRef.current);
             return cleanup;
+        }
+    }, []);
+    
+    // Set up viewport height for mobile
+    useEffect(() => {
+        // Set the viewport height initially
+        setViewportHeight();
+        
+        // Update on resize and orientation change
+        const handleResize = () => {
+            setViewportHeight();
+        };
+        
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
+    }, []);
+    
+    // Add initial scroll adjustment for mobile
+    useEffect(() => {
+        // Check if we're on mobile
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // Small timeout to ensure the DOM is ready
+            setTimeout(() => {
+                // Force scroll to top
+                window.scrollTo(0, 0);
+            }, 100);
         }
     }, []);
     // Initialize routes using the unified route processing hook
@@ -279,6 +313,17 @@ export default function PresentationMapView(props) {
         
         // Add mousemove event to set hover coordinates
         map.on('mousemove', (e) => {
+            // Skip trace marker functionality on mobile devices to prevent touch event interception
+            // This fixes the double-press issue with POIs, line components, climb categories, and route list
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                // Clear any existing hover coordinates on mobile
+                if (hoverCoordinates) {
+                    setHoverCoordinates(null);
+                }
+                return;
+            }
+            
             // Get mouse coordinates
             const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
             
@@ -507,14 +552,24 @@ export default function PresentationMapView(props) {
                         zIndex: 1000
                     }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })),
             isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [
-                routes.map(route => {
-                    // Removed debug logging to prevent unnecessary re-renders
+                // First render non-current routes
+                routes.filter(route => 
+                    route.id !== currentRoute?.id && 
+                    route.routeId !== currentRoute?.routeId
+                ).map(route => {
                     return _jsx(RouteLayer, { 
                         map: mapInstance.current, 
                         route: route,
                         key: route.id || route.routeId // Ensure we have a stable key
                     }, route.id || route.routeId);
                 }),
+                
+                // Then render the current route last to ensure it's on top
+                currentRoute && _jsx(RouteLayer, { 
+                    map: mapInstance.current, 
+                    route: currentRoute,
+                    key: currentRoute.id || currentRoute.routeId // Ensure we have a stable key
+                }, currentRoute.id || currentRoute.routeId),
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
                 _jsx(PresentationPhotoLayer, {}),
                 isLineMarkersVisible && _jsx(DirectPresentationLineLayer, { 

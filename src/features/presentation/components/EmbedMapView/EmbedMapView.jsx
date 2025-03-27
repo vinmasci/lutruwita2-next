@@ -8,6 +8,7 @@ import { MAP_STYLES } from '../../../map/components/StyleControl/StyleControl';
 import { PresentationElevationProfilePanel } from '../ElevationProfile/PresentationElevationProfilePanel';
 import { PresentationPOIViewer } from '../POIViewer';
 import { setupScaleListener } from '../../utils/scaleUtils';
+import { setViewportHeight } from '../../../../utils/viewportUtils';
 import { SimpleLightbox } from '../../../photo/components/PhotoPreview/SimpleLightbox';
 import { clusterPhotosPresentation, isCluster as isPhotoCluster, getClusterExpansionZoom as getPhotoClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
 import { clusterPOIs, isCluster as isPOICluster, getClusterExpansionZoom as getPOIClusterExpansionZoom } from '../../../poi/utils/clustering';
@@ -433,34 +434,39 @@ export default function EmbedMapView() {
         });
     };
     
-    // Update hover marker when coordinates change
+    // Update hover point when coordinates change - using GeoJSON source
     useEffect(() => {
-        if (!mapInstance.current) return;
+        if (!mapInstance.current || !isMapReady) return;
         
-        // Remove existing marker
-        if (hoverMarkerRef.current) {
-            hoverMarkerRef.current.remove();
-            hoverMarkerRef.current = null;
-        }
-        
-        // Add new marker if we have coordinates
+        // Update the GeoJSON source if we have coordinates
         if (hoverCoordinates) {
-            const el = document.createElement('div');
-            el.className = 'hover-marker';
-            el.style.width = '16px';
-            el.style.height = '16px';
-            el.style.borderRadius = '50%';
-            el.style.backgroundColor = '#ff0000';
-            el.style.border = '2px solid white';
-            el.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
-            el.style.pointerEvents = 'none'; // Make marker non-interactive to allow clicks to pass through
-            
-            // Create and add the marker without popup
-            hoverMarkerRef.current = new mapboxgl.Marker(el)
-                .setLngLat(hoverCoordinates)
-                .addTo(mapInstance.current);
+            try {
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                }
+            } catch (error) {
+                console.error('[EmbedMapView] Error updating hover point:', error);
+            }
+        } else {
+            // Hide the layer when no coordinates
+            try {
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+            } catch (error) {
+                // Ignore errors when hiding (might happen during initialization)
+            }
         }
-    }, [hoverCoordinates]);
+    }, [hoverCoordinates, isMapReady]);
 
     // Store current route ID reference
     const currentRouteIdRef = useRef(null);
@@ -518,13 +524,78 @@ export default function EmbedMapView() {
         });
         
         map.on('load', () => {
+            // Add styledata event handler to re-add hover point when style changes
+            map.on('styledata', () => {
+                // Reduced logging - only log in development mode
+                if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                    console.log('[EmbedMapView] Style changed, checking if hover-point needs to be re-added');
+                }
+                
+                // Check if the hover-point source exists
+                if (!map.getSource('hover-point')) {
+                    if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                        console.log('[EmbedMapView] Re-adding hover-point source and layer after style change');
+                    }
+                    
+                    try {
+                        // Re-add the source and layer
+                        map.addSource('hover-point', {
+                            type: 'geojson',
+                            data: {
+                                type: 'Feature',
+                                geometry: {
+                                    type: 'Point',
+                                    coordinates: [0, 0]
+                                },
+                                properties: {}
+                            }
+                        });
+                        
+                        map.addLayer({
+                            id: 'hover-point',
+                            type: 'circle',
+                            source: 'hover-point',
+                            paint: {
+                                'circle-radius': 8,
+                                'circle-color': '#ff0000',
+                                'circle-stroke-width': 2,
+                                'circle-stroke-color': '#ffffff',
+                                'circle-opacity': 0.8
+                            }
+                        });
+                        
+                        // Hide the layer initially
+                        map.setLayoutProperty('hover-point', 'visibility', 'none');
+                        
+                        // If we have current hover coordinates, update the source
+                        if (hoverCoordinates) {
+                            map.getSource('hover-point').setData({
+                                type: 'Feature',
+                                geometry: {
+                                    type: 'Point',
+                                    coordinates: hoverCoordinates
+                                },
+                                properties: {}
+                            });
+                            map.setLayoutProperty('hover-point', 'visibility', 'visible');
+                        }
+                    } catch (error) {
+                        console.error('[EmbedMapView] Error re-adding hover point after style change:', error);
+                    }
+                }
+            });
+            
             // Check if style is fully loaded
             const waitForStyleLoaded = () => {
                 if (map.isStyleLoaded()) {
-                    console.log('[EmbedMapView] Map style fully loaded, proceeding with initialization');
+                    if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                        console.log('[EmbedMapView] Map style fully loaded, proceeding with initialization');
+                    }
                     initializeMapAfterStyleLoad();
                 } else {
-                    console.log('[EmbedMapView] Style not fully loaded yet, waiting...');
+                    if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                        console.log('[EmbedMapView] Style not fully loaded yet, waiting...');
+                    }
                     // Wait a bit and check again
                     setTimeout(waitForStyleLoaded, 100);
                 }
@@ -533,18 +604,54 @@ export default function EmbedMapView() {
             // Function to initialize map components after style is loaded
             const initializeMapAfterStyleLoad = () => {
                 try {
-                    // Add terrain
-                    map.addSource('mapbox-dem', {
-                        type: 'raster-dem',
-                        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                        tileSize: 512,
-                        maxzoom: 14
-                    });
+                    // Add terrain - check if source already exists
+                    if (!map.getSource('mapbox-dem')) {
+                        map.addSource('mapbox-dem', {
+                            type: 'raster-dem',
+                            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                            tileSize: 512,
+                            maxzoom: 14
+                        });
+                    }
                     
                     map.setTerrain({
                         source: 'mapbox-dem',
                         exaggeration: 1.5
                     });
+                    
+                    // Add hover point source and layer if it doesn't exist
+                    if (!map.getSource('hover-point')) {
+                        map.addSource('hover-point', {
+                            type: 'geojson',
+                            data: {
+                                type: 'Feature',
+                                geometry: {
+                                    type: 'Point',
+                                    coordinates: [0, 0] // Initial coordinates
+                                },
+                                properties: {}
+                            }
+                        });
+                    }
+                    
+                    // Add hover point layer if it doesn't exist
+                    if (!map.getLayer('hover-point')) {
+                        map.addLayer({
+                            id: 'hover-point',
+                            type: 'circle',
+                            source: 'hover-point',
+                            paint: {
+                                'circle-radius': 8,
+                                'circle-color': '#ff0000',
+                                'circle-stroke-width': 2,
+                                'circle-stroke-color': '#ffffff',
+                                'circle-opacity': 0.8
+                            }
+                        });
+                    }
+                    
+                    // Initially hide the hover point layer
+                    map.setLayoutProperty('hover-point', 'visibility', 'none');
                     
                     setIsMapReady(true);
                 } catch (error) {
@@ -565,6 +672,17 @@ export default function EmbedMapView() {
         
         // Add mousemove event to set hover coordinates
         map.on('mousemove', (e) => {
+            // Skip trace marker functionality on mobile devices to prevent touch event interception
+            // This fixes the double-press issue with POIs, line components, climb categories, and route list
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                // Clear any existing hover coordinates on mobile
+                if (hoverCoordinates) {
+                    setHoverCoordinates(null);
+                }
+                return;
+            }
+            
             // Get mouse coordinates
             const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
             
@@ -698,6 +816,14 @@ export default function EmbedMapView() {
         
         return () => {
             if (mapInstance.current) {
+                // Remove the hover point layer and source if they exist
+                if (mapInstance.current.getLayer('hover-point')) {
+                    mapInstance.current.removeLayer('hover-point');
+                }
+                if (mapInstance.current.getSource('hover-point')) {
+                    mapInstance.current.removeSource('hover-point');
+                }
+                
                 mapInstance.current.remove();
                 mapInstance.current = null;
             }
@@ -715,6 +841,39 @@ export default function EmbedMapView() {
                 setScale(newScale);
             });
             return cleanup;
+        }
+    }, []);
+    
+    // Set up viewport height for mobile
+    useEffect(() => {
+        // Set the viewport height initially
+        setViewportHeight();
+        
+        // Update on resize and orientation change
+        const handleResize = () => {
+            setViewportHeight();
+        };
+        
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
+    }, []);
+    
+    // Add initial scroll adjustment for mobile
+    useEffect(() => {
+        // Check if we're on mobile
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // Small timeout to ensure the DOM is ready
+            setTimeout(() => {
+                // Force scroll to top
+                window.scrollTo(0, 0);
+            }, 100);
         }
     }, []);
     
@@ -970,20 +1129,38 @@ export default function EmbedMapView() {
                     </Box>
                 )}
                 
-                {/* Render route and POIs when map is ready and data is loaded */}
-                {isMapReady && mapInstance.current && !isLoading && !error && (
-                    <>
-                        {/* Initialize routes using the unified approach - moved to component top level */}
-                        {routeData?.allRoutesEnhanced && routeData.allRoutesEnhanced.map(route => (
-                            <RouteContextAdapter key={route.id || route.routeId}>
-                                <SimplifiedRouteLayer
-                                    map={mapInstance.current}
-                                    route={route}
-                                    showDistanceMarkers={isDistanceMarkersVisible && route.id === currentRoute?.id}
-                                    isActive={route.id === currentRoute?.id || route.routeId === currentRoute?.routeId}
-                                />
-                            </RouteContextAdapter>
-                        ))}
+                        {/* Render route and POIs when map is ready and data is loaded */}
+                        {isMapReady && mapInstance.current && !isLoading && !error && (
+                            <>
+                                {/* First render non-current routes */}
+                                {routeData?.allRoutesEnhanced && routeData.allRoutesEnhanced
+                                    .filter(route => 
+                                        route.id !== currentRoute?.id && 
+                                        route.routeId !== currentRoute?.routeId
+                                    )
+                                    .map(route => (
+                                        <RouteContextAdapter key={route.id || route.routeId}>
+                                            <SimplifiedRouteLayer
+                                                map={mapInstance.current}
+                                                route={route}
+                                                showDistanceMarkers={false}
+                                                isActive={false}
+                                            />
+                                        </RouteContextAdapter>
+                                    ))
+                                }
+                                
+                                {/* Then render the current route last to ensure it's on top */}
+                                {routeData?.allRoutesEnhanced && currentRoute && (
+                                    <RouteContextAdapter key={currentRoute.id || currentRoute.routeId}>
+                                        <SimplifiedRouteLayer
+                                            map={mapInstance.current}
+                                            route={currentRoute}
+                                            showDistanceMarkers={isDistanceMarkersVisible}
+                                            isActive={true}
+                                        />
+                                    </RouteContextAdapter>
+                                )}
                         
                         {/* Add DirectEmbedLineLayer for line markers */}
                         {isLineMarkersVisible && (

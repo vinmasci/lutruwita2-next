@@ -110,7 +110,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
             minHeight: '64px',
             maxHeight: '64px',
             width: '100%',
-            position: 'fixed', // Changed from absolute to fixed to prevent layout issues with modals
+            position: 'sticky', // Changed from fixed to sticky for better mobile behavior
             top: 0,
             left: 0,
             right: 0

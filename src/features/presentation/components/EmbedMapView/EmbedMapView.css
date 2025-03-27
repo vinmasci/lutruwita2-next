@@ -4,7 +4,7 @@
 .embed-container {
   display: flex;
   width: 100vw;
-  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100); /* Use CSS variable with fallback */
   overflow: hidden;
   transform-origin: top left;
   /* Initial scale - will be adjusted by JavaScript */
@@ -28,7 +28,7 @@
 
 .map-container {
   width: 100%;
-  height: calc(100vh - 64px); /* Use viewport height instead */
+  height: calc(var(--vh, 1vh) * 100 - 64px); /* Use CSS variable with fallback */
   position: absolute;
   top: 64px; /* Height of the AppBar */
   left: 0;
