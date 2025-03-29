@@ -1,9 +1,14 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime"; // Revert Fragment import
-import React, { useState } from 'react';
-import { Box } from '@mui/material';
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Box, Skeleton } from '@mui/material';
 import Carousel from 'react-material-ui-carousel';
 import { MapPreview } from '../MapPreview/MapPreview';
 import { styled } from '@mui/material/styles';
+import { 
+  getTinyThumbnailUrl, 
+  getOptimizedImageUrl, 
+  generateSrcSet 
+} from '../../../../utils/imageUtils';
 
 // Style the image to fill the entire space, cropping if necessary
 const SlideImage = styled('img')({
@@ -11,13 +16,23 @@ const SlideImage = styled('img')({
   height: '100%',
   objectFit: 'cover', // 'cover' ensures the image fills the container while maintaining aspect ratio
   objectPosition: 'center', // Center the image
-  backgroundColor: '#f0f0f0', // Light gray background while loading
+  backgroundColor: 'transparent', // Transparent background to show placeholder
+  transition: 'opacity 0.3s ease-in-out',
+});
+
+// Placeholder component for images that haven't loaded yet
+const ImagePlaceholder = styled(Skeleton)({
+  width: '100%',
+  height: '100%',
+  transform: 'none',
+  backgroundColor: '#f0f0f0',
 });
 
 // Keep MapWrapper for potential fallback or other uses
 const MapWrapper = styled(Box)({
   width: '100%',
   height: '100%',
+  position: 'relative',
 });
 
 // Wrapper to ensure the carousel takes up the full space
@@ -35,6 +50,21 @@ const CarouselWrapper = styled(Box)({
   }
 });
 
+// Low quality image placeholder - a tiny version of the image that loads quickly
+const LowQualityPlaceholder = styled('img')({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  objectPosition: 'center',
+  filter: 'blur(10px)',
+  transform: 'scale(1.1)', // Slightly larger to prevent blur edges
+  opacity: 0.7,
+  transition: 'opacity 0.3s ease-out',
+});
+
 // Style for the image container
 const ImageContainer = styled(Box)({
   height: '100%',
@@ -43,18 +73,44 @@ const ImageContainer = styled(Box)({
   position: 'relative'
 });
 
-// Remove IconButton and CloseIcon imports if no longer needed
-// import { IconButton } from '@mui/material';
-// import CloseIcon from '@mui/icons-material/Close';
+// Optimized image component with srcset for responsive loading
+const OptimizedImage = React.memo(({ src, alt, onLoad, style, sizes = '100vw' }) => {
+  // Generate srcset for responsive images if it's a Cloudinary URL
+  const srcSet = generateSrcSet(src);
+  
+  // Get an optimized version of the image for the src attribute
+  const optimizedSrc = getOptimizedImageUrl(src, { 
+    width: 800, 
+    quality: 80,
+    format: 'auto'
+  }) || src;
+  
+  return _jsx(SlideImage, {
+    src: optimizedSrc,
+    srcSet: srcSet,
+    sizes: sizes,
+    alt: alt,
+    loading: "lazy",
+    onLoad: onLoad,
+    style: style
+  });
+});
 
-export const ImageSlider = ({
+// Main component
+export const ImageSlider = React.memo(({
   mapPreviewProps,
   photos = [],
   maxPhotos = 10,
-  staticMapUrl // Remove isEditing and onRemovePhoto props
+  staticMapUrl
 }) => {
   // State to track which images have been loaded
   const [loadedImages, setLoadedImages] = useState({});
+  // State to track which images have been requested (to prevent duplicate requests)
+  const [requestedImages, setRequestedImages] = useState({});
+  // State to track which tiny thumbnails have been loaded
+  const [loadedThumbnails, setLoadedThumbnails] = useState({});
+  // Refs to store the actual Image objects for preloading
+  const imageRefs = useRef({});
   
   // Function to mark an image as loaded
   const handleImageLoad = (index) => {
@@ -64,6 +120,77 @@ export const ImageSlider = ({
     }));
   };
   
+  // Function to mark a thumbnail as loaded
+  const handleThumbnailLoad = (index) => {
+    setLoadedThumbnails(prev => ({
+      ...prev,
+      [index]: true
+    }));
+  };
+  
+  // State to track current slide index
+  const [activeStep, setActiveStep] = useState(0);
+  
+  // Throttle function to prevent rapid navigation
+  const [isNavigating, setIsNavigating] = useState(false);
+  
+  // Prepare slides array
+  const hasPhotos = photos && photos.length > 0;
+
+  // Process photos with better selection logic - memoized to avoid recalculation
+  const photoSlides = useMemo(() => {
+    if (!hasPhotos) return [];
+    
+    // Use a consistent subset of photos
+    const photosToUse = photos.length <= maxPhotos 
+      ? photos 
+      : photos.slice(0, maxPhotos);
+    
+    return photosToUse.map(photo => {
+      const url = photo.url || photo.thumbnailUrl;
+      return {
+        url,
+        // Generate tiny thumbnail for blur-up loading
+        thumbnailUrl: getTinyThumbnailUrl(url, { width: 20, quality: 20 })
+      };
+    });
+  }, [photos, hasPhotos, maxPhotos]);
+
+  // Create items array for carousel
+  const items = useMemo(() => {
+    const result = [];
+
+    // Add static map image as the first item if URL exists
+    if (staticMapUrl) {
+      result.push({
+        type: 'static-map',
+        content: staticMapUrl
+      });
+    }
+    // Fallback: Add Mapbox preview if static URL doesn't exist but mapPreviewProps do
+    else if (mapPreviewProps) {
+      result.push({
+        type: 'map',
+        content: mapPreviewProps
+      });
+    }
+
+    // Add photo slides with their thumbnail URLs
+    result.push(...photoSlides.map(photo => ({
+        type: 'photo',
+        content: photo.url,
+        thumbnailUrl: photo.thumbnailUrl
+      }))
+    );
+
+    return result;
+  }, [staticMapUrl, mapPreviewProps, photoSlides]);
+
+  // If there are no photos AND no static map url (or map preview), return null or fallback
+  if (!hasPhotos && !staticMapUrl && !mapPreviewProps) {
+    return null;
+  }
+
   // Only preload the first image and adjacent images to the current one
   const shouldLoadImage = (index) => {
     // Always load the first image
@@ -77,57 +204,44 @@ export const ImageSlider = ({
            (activeStep === 0 && index === items.length - 1) ||
            (activeStep === items.length - 1 && index === 0);
   };
-  // Prepare slides array
-  const hasPhotos = photos && photos.length > 0;
-
-  // Revert photo processing logic
-  const photoSlides = hasPhotos
-    ? (() => {
-        // If we have fewer photos than maxPhotos, just use all of them
-        if (photos.length <= maxPhotos) {
-          return photos.map(photo => photo.url || photo.thumbnailUrl);
-        }
-        // Otherwise, select random photos
-        const shuffled = [...photos].sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, maxPhotos).map(photo => photo.url || photo.thumbnailUrl);
-      })()
-    : [];
-
-  // If there are no photos AND no static map url (or map preview), return null or fallback
-  if (!hasPhotos && !staticMapUrl && !mapPreviewProps) {
-    return null;
-  }
-
-  // Create items array for carousel
-  const items = [];
-
-  // Add static map image as the first item if URL exists
-  if (staticMapUrl) {
-    items.push({
-      type: 'static-map',
-      content: staticMapUrl
-    });
-  }
-  // Fallback: Add Mapbox preview if static URL doesn't exist but mapPreviewProps do
-  else if (mapPreviewProps) {
-     items.push({
-       type: 'map',
-       content: mapPreviewProps
-     });
-  }
-
-  // Revert items.push logic
-  items.push(...photoSlides.map(url => ({
-      type: 'photo',
-      content: url
-    }))
-  );
-
-  // State to track current slide index
-  const [activeStep, setActiveStep] = useState(0);
   
-  // Throttle function to prevent rapid navigation
-  const [isNavigating, setIsNavigating] = useState(false);
+  // Function to preload an image
+  const preloadImage = (url, index) => {
+    // Skip if already requested or not a photo URL
+    if (requestedImages[index] || !url || items[index]?.type !== 'photo') return;
+    
+    // Mark as requested to prevent duplicate requests
+    setRequestedImages(prev => ({
+      ...prev,
+      [index]: true
+    }));
+    
+    // Create a new Image object for preloading
+    const img = new Image();
+    img.onload = () => handleImageLoad(index);
+    img.src = url;
+    
+    // Store the Image object in the ref
+    imageRefs.current[index] = img;
+  };
+  
+  // Preload images when active step changes
+  useEffect(() => {
+    if (items.length === 0) return;
+    
+    // Preload current image and adjacent ones
+    const indicesToPreload = [
+      activeStep,
+      (activeStep + 1) % items.length,
+      (activeStep - 1 + items.length) % items.length
+    ];
+    
+    indicesToPreload.forEach(index => {
+      if (items[index]?.type === 'photo') {
+        preloadImage(items[index].content, index);
+      }
+    });
+  }, [activeStep, items.length]);
   
   const handleNext = () => {
     if (isNavigating) return;
@@ -153,12 +267,24 @@ export const ImageSlider = ({
     }, 300);
   };
   
+  // Only show navigation buttons if there are multiple items to scroll through
+  const showNavButtons = items.length > 1;
+
   return _jsx(CarouselWrapper, {
     children: _jsx(Carousel, {
-      navButtonsAlwaysVisible: true,
+      navButtonsAlwaysVisible: showNavButtons,
+      navButtonsProps: {
+        style: {
+          display: showNavButtons ? 'flex' : 'none', // Hide buttons completely when not needed
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          color: 'white',
+          transform: 'scale(0.7)', // Make buttons smaller
+          padding: '8px'
+        }
+      },
       autoPlay: false,
       animation: "slide", // Use slide animation
-      indicators: true,
+      indicators: showNavButtons, // Only show indicators if there are multiple items
       duration: 300, // Add a reasonable duration
       cycleNavigation: true,
       fullHeightHover: false,
@@ -170,15 +296,6 @@ export const ImageSlider = ({
         // Disable rapid clicking
         style: { 
           pointerEvents: isNavigating ? 'none' : 'auto'
-        }
-      },
-      // Customize the navigation buttons to be smaller and more transparent
-      navButtonsProps: {
-        style: {
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          color: 'white',
-          transform: 'scale(0.7)', // Make buttons smaller
-          padding: '8px'
         }
       },
       // Make the indicators smaller and more subtle
@@ -210,71 +327,71 @@ export const ImageSlider = ({
           // Render static map image
           return _jsx(ImageContainer, {
             children: shouldLoadImage(index) ? (
-              _jsx(SlideImage, {
+              _jsx(OptimizedImage, {
                 src: item.content,
-                alt: "Map location", // Add alt text
-                loading: "lazy", // Native lazy loading
-                onLoad: () => handleImageLoad(index)
+                alt: "Map location",
+                onLoad: () => handleImageLoad(index),
+                style: { opacity: loadedImages[index] ? 1 : 0 },
+                sizes: "(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
               })
             ) : (
               // Placeholder while loading
-              _jsx(Box, {
-                sx: { 
-                  width: '100%', 
-                  height: '100%', 
-                  backgroundColor: '#f0f0f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }
+              _jsx(ImagePlaceholder, {
+                variant: "rectangular",
+                animation: "wave"
               })
-            )
-          }, `slide-${index}`);
+            ),
+            key: `slide-${index}`
+          });
         } else if (item.type === 'map') {
-           // Render Mapbox preview (fallback)
-           return _jsx(MapWrapper, {
-             children: shouldLoadImage(index) ? (
-               _jsx(MapPreview, { ...item.content })
-             ) : (
-               // Placeholder while loading
-               _jsx(Box, {
-                 sx: { 
-                   width: '100%', 
-                   height: '100%', 
-                   backgroundColor: '#f0f0f0',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center'
-                 }
-               })
-             )
-           }, `slide-${index}`);
-        } else { // item.type === 'photo'
-          // Revert to original simple rendering without Fragment or button
-          return _jsx(ImageContainer, {
+          // Render Mapbox preview (fallback)
+          return _jsx(MapWrapper, {
             children: shouldLoadImage(index) ? (
-              _jsx(SlideImage, {
-                src: item.content, // This should be the photo URL
-                alt: `Route photo ${index}`,
-                loading: "lazy", // Native lazy loading
-                onLoad: () => handleImageLoad(index)
-              })
+              _jsx(MapPreview, { ...item.content })
             ) : (
               // Placeholder while loading
-              _jsx(Box, {
-                sx: { 
-                  width: '100%', 
-                  height: '100%', 
-                  backgroundColor: '#f0f0f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }
+              _jsx(ImagePlaceholder, {
+                variant: "rectangular",
+                animation: "wave"
               })
-            )
-          }, `slide-${index}`);
+            ),
+            key: `slide-${index}`
+          });
+        } else { // item.type === 'photo'
+          // Enhanced rendering with blur-up loading
+          return _jsxs(ImageContainer, {
+            children: [
+              // Show tiny thumbnail as placeholder while loading
+              item.thumbnailUrl && !loadedImages[index] && _jsx(LowQualityPlaceholder, {
+                src: item.thumbnailUrl,
+                alt: "",
+                onLoad: () => handleThumbnailLoad(index),
+                style: { 
+                  opacity: loadedThumbnails[index] && !loadedImages[index] ? 0.7 : 0 
+                }
+              }),
+              
+              // Only create actual image element when it should be loaded
+              shouldLoadImage(index) ? (
+                _jsx(OptimizedImage, {
+                  src: item.content,
+                  alt: `Route photo ${index}`,
+                  onLoad: () => handleImageLoad(index),
+                  style: { opacity: loadedImages[index] ? 1 : 0 },
+                  sizes: "(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                })
+              ) : (
+                // Placeholder when not in view and no thumbnail
+                !item.thumbnailUrl && _jsx(ImagePlaceholder, {
+                  variant: "rectangular",
+                  animation: "wave"
+                })
+              )
+            ],
+            key: `slide-${index}`
+          });
         }
       })
     })
   });
-};
+});

@@ -3,6 +3,7 @@ import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMapInitializer } from './hooks/useMapInitializer';
 import { useMapEvents } from './hooks/useMapEvents';
+import { safelyRemoveMap } from '../../utils/mapCleanup';
 import useUnifiedRouteProcessing from '../../hooks/useUnifiedRouteProcessing';
 import { DistanceMarkers } from '../DistanceMarkers/DistanceMarkers';
 import StyleControl, { MAP_STYLES } from '../StyleControl/StyleControl';
@@ -160,19 +161,23 @@ function MapViewContent() {
             const coordinates = feature.geometry.coordinates;
             
             if (coordinates && coordinates.length > 0) {
-                const bounds = new mapboxgl.LngLatBounds();
-                
-                coordinates.forEach((coord) => {
-                    if (coord.length >= 2) {
-                        bounds.extend([coord[0], coord[1]]);
-                    }
-                });
-                
-                // Always fit bounds to show the entire route with substantial padding
-                mapInstance.current.fitBounds(bounds, {
-                    padding: 200,  // Significant padding to zoom out and show more context
-                    duration: 1500
-                });
+                try {
+                    const bounds = new mapboxgl.LngLatBounds();
+                    
+                    coordinates.forEach((coord) => {
+                        if (coord.length >= 2) {
+                            bounds.extend([coord[0], coord[1]]);
+                        }
+                    });
+                    
+                    // Always fit bounds to show the entire route with substantial padding
+                    mapInstance.current.fitBounds(bounds, {
+                        padding: 200,  // Significant padding to zoom out and show more context
+                        duration: 1500
+                    });
+                } catch (error) {
+                    console.error('[MapView] Error fitting bounds to route:', error);
+                }
             }
         }
     }, [mapInstance, isMapReady, currentRoute]);

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { publicRouteService } from '../../services/publicRoute.service';
 import { 
   Container, Typography, Box, Button, Grid,
-  CircularProgress, Alert
+  CircularProgress, Alert, Skeleton
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { RouteCard, RouteCardGrid } from './RouteCard.jsx';
@@ -44,12 +44,69 @@ const BackgroundPattern = styled(Box)({
   zIndex: 0
 });
 
+// Skeleton card for loading state
+const SkeletonCard = () => {
+  return _jsx(Grid, {
+    item: true,
+    xs: 12,
+    sm: 6,
+    md: 3,
+    children: _jsx(Box, {
+      sx: { height: '100%', borderRadius: 1, overflow: 'hidden' },
+      children: [
+        _jsx(Skeleton, {
+          variant: "rectangular",
+          height: 200,
+          width: "100%",
+          animation: "wave"
+        }),
+        _jsx(Box, {
+          sx: { p: 2 },
+          children: [
+            _jsx(Skeleton, {
+              variant: "text",
+              width: "80%",
+              height: 24,
+              animation: "wave"
+            }),
+            _jsx(Skeleton, {
+              variant: "text",
+              width: "60%",
+              height: 20,
+              animation: "wave"
+            }),
+            _jsx(Box, {
+              sx: { display: 'flex', gap: 1, mt: 1 },
+              children: _jsx(Skeleton, {
+                variant: "rectangular",
+                width: 60,
+                height: 20,
+                animation: "wave"
+              })
+            })
+          ]
+        })
+      ]
+    })
+  });
+};
+
+// Skeleton grid for route cards
+const SkeletonGrid = () => {
+  return _jsx(Grid, {
+    container: true,
+    spacing: 4,
+    children: Array(8).fill().map((_, i) => _jsx(SkeletonCard, {}, i))
+  });
+};
+
 export const LandingPage = () => {
   const navigate = useNavigate();
   const { loginWithRedirect } = useAuth0();
   const [allRoutes, setAllRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showRouteCards, setShowRouteCards] = useState(false);
   
   // Use the custom hook for filter logic
   const {
@@ -69,9 +126,10 @@ export const LandingPage = () => {
     handleMapTypeToggle,
     loadMoreRoutes
   } = useRouteFilters(allRoutes);
-  
-  // Fetch routes on component mount
+
+  // Fetch routes on component mount with a delay
   useEffect(() => {
+    // Fetch routes after a delay to prioritize page rendering
     const fetchFeaturedRoutes = async () => {
       try {
         setLoading(true);
@@ -87,7 +145,19 @@ export const LandingPage = () => {
         setLoading(false);
       }
     };
-    fetchFeaturedRoutes();
+    
+    // Delay fetching routes to prioritize page rendering
+    const fetchTimer = setTimeout(fetchFeaturedRoutes, 200);
+    
+    // Delay showing route cards to ensure page loads first
+    const showCardsTimer = setTimeout(() => {
+      setShowRouteCards(true);
+    }, 300);
+    
+    return () => {
+      clearTimeout(fetchTimer);
+      clearTimeout(showCardsTimer);
+    };
   }, []);
   
   return _jsxs(_Fragment, {
@@ -169,8 +239,10 @@ export const LandingPage = () => {
                     ]
                   }),
                   
-                  // Route Cards Grid
-                  _jsx(RouteCardGrid, { routes: displayedRoutes }),
+                  // Route Cards Grid with delayed loading
+                  !loading && displayedRoutes.length > 0 && showRouteCards ? 
+                    _jsx(RouteCardGrid, { routes: displayedRoutes }) : 
+                    _jsx(SkeletonGrid, {}),
                   
                   // Load More Button
                   hasMore && _jsx(Box, {

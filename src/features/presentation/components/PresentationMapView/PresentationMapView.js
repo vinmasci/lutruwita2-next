@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from 'mapbox-gl';
+import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
 import SearchControl from '../SearchControl/SearchControl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import StyleControl, { MAP_STYLES } from '../StyleControl';
@@ -223,40 +224,72 @@ export default function PresentationMapView(props) {
     useEffect(() => {
         if (!mapRef.current)
             return;
+            
+        // Flag to track if component is mounted
+        let isMounted = true;
+            
         // Check if device is mobile
         const initialIsMobile = window.innerWidth <= 768;
         
-        const map = new mapboxgl.Map({
-            container: mapRef.current,
-            style: MAP_STYLES.satellite.url,
-            bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
-            fitBoundsOptions: {
-                padding: 0,
-                pitch: initialIsMobile ? 0 : 45, // Use flat view on mobile
-                bearing: 0
-            },
-            projection: initialIsMobile ? 'mercator' : 'globe', // Use mercator on mobile for better performance
-            maxPitch: 85,
-            width: '100%',
-            height: '100%'
+        // Create map with error handling
+        let map;
+        try {
+            map = new mapboxgl.Map({
+                container: mapRef.current,
+                style: MAP_STYLES.satellite.url,
+                bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds
+                fitBoundsOptions: {
+                    padding: 0,
+                    pitch: initialIsMobile ? 0 : 45, // Use flat view on mobile
+                    bearing: 0
+                },
+                projection: initialIsMobile ? 'mercator' : 'globe', // Use mercator on mobile for better performance
+                maxPitch: 85,
+                width: '100%',
+                height: '100%',
+                failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
+                preserveDrawingBuffer: true, // Needed for screenshots
+                attributionControl: false, // We'll add this manually
+                antialias: true // Enable antialiasing for smoother rendering
+            });
+        } catch (error) {
+            console.error('[PresentationMapView] Error creating map instance:', error);
+            return;
+        }
+        
+        // Add error handling for map
+        map.on('error', (e) => {
+            console.error('[PresentationMapView] Mapbox GL error:', e);
         });
         
         // Import and set map instance in the mapOperationsQueue
         import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
-            setMapInstance(map);
-            // console.log('[PresentationMapView] Map instance set in mapOperationsQueue');
+            if (isMounted) {
+                setMapInstance(map);
+                // console.log('[PresentationMapView] Map instance set in mapOperationsQueue');
+            }
+        }).catch(error => {
+            console.error('[PresentationMapView] Error importing mapOperationsQueue:', error);
         });
         // Log map initialization events
         map.on('load', () => {
+            // Check if component is still mounted
+            if (!isMounted) {
+                console.log('[PresentationMapView] Map loaded but component unmounted, cleaning up');
+                safelyRemoveMap(map);
+                return;
+            }
+            
             try {
                 // Add terrain synchronously
-                
-                map.addSource('mapbox-dem', {
-                    type: 'raster-dem',
-                    url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                    tileSize: 512,
-                    maxzoom: 14
-                });
+                if (!map.getSource('mapbox-dem')) {
+                    map.addSource('mapbox-dem', {
+                        type: 'raster-dem',
+                        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        tileSize: 512,
+                        maxzoom: 14
+                    });
+                }
                 
                 // Get current device type
                 const isCurrentlyMobile = window.innerWidth <= 768;
@@ -516,20 +549,23 @@ export default function PresentationMapView(props) {
     `;
         document.head.appendChild(style);
         mapInstance.current = map;
+        
         return () => {
-            if (mapInstance.current) {
-                // Remove the hover point layer and source if they exist
-                if (mapInstance.current.getLayer('hover-point')) {
-                    mapInstance.current.removeLayer('hover-point');
-                }
-                if (mapInstance.current.getSource('hover-point')) {
-                    mapInstance.current.removeSource('hover-point');
-                }
-                
-                mapInstance.current.remove();
-                mapInstance.current = null;
+            // Mark component as unmounted
+            isMounted = false;
+            
+            // Remove the style element
+            if (style && style.parentNode) {
+                document.head.removeChild(style);
             }
-            document.head.removeChild(style);
+            
+            // Use our enhanced cleanup function to safely remove the map
+            safelyRemoveMap(map).then(() => {
+                console.log('[PresentationMapView] Map cleanup completed in useEffect cleanup');
+            });
+            
+            // Clear the map instance reference
+            mapInstance.current = null;
         };
     }, []);
     const mapContextValue = useMemo(() => ({

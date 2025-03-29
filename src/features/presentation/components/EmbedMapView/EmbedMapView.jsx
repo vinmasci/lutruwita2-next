@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
 import useEmbedRouteProcessing from './hooks/useEmbedRouteProcessing';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { MAP_STYLES } from '../../../map/components/StyleControl/StyleControl';
@@ -486,6 +487,9 @@ export default function EmbedMapView() {
     useEffect(() => {
         if (!mapRef.current || !mapState) return;
         
+        // Flag to track if component is mounted
+        let isMounted = true;
+        
         // Handle case where mapState.style doesn't match any key in MAP_STYLES
         let mapStyle = MAP_STYLES.satellite.url; // Default fallback
         
@@ -513,20 +517,51 @@ export default function EmbedMapView() {
             resolvedStyle: mapStyle 
         });
         
-        const map = new mapboxgl.Map({
-            container: mapRef.current,
-            style: mapStyle,
-            center: mapState.center || [146.5, -42.0],
-            zoom: mapState.zoom || 10, // Default zoom will be overridden by fitBounds
-            bearing: mapState.bearing || 0,
-            pitch: mapState.pitch || 0,
-            width: '100%',
-            height: '100%'
+        // Create map with error handling
+        let map;
+        try {
+            map = new mapboxgl.Map({
+                container: mapRef.current,
+                style: mapStyle,
+                center: mapState.center || [146.5, -42.0],
+                zoom: mapState.zoom || 10, // Default zoom will be overridden by fitBounds
+                bearing: mapState.bearing || 0,
+                pitch: mapState.pitch || 0,
+                width: '100%',
+                height: '100%',
+                failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
+                preserveDrawingBuffer: true, // Needed for screenshots
+                attributionControl: false, // We'll add this manually
+                antialias: true // Enable antialiasing for smoother rendering
+            });
+        } catch (error) {
+            console.error('[EmbedMapView] Error creating map instance:', error);
+            setError('Failed to initialize map. Please try refreshing the page.');
+            return;
+        }
+        
+        // Add error handling for map
+        map.on('error', (e) => {
+            console.error('[EmbedMapView] Mapbox GL error:', e);
+            // Only set error state if component is still mounted
+            if (isMounted) {
+                setError(`Map error: ${e.error?.message || 'Unknown error'}`);
+            }
         });
         
         map.on('load', () => {
+            // Check if component is still mounted
+            if (!isMounted) {
+                console.log('[EmbedMapView] Map loaded but component unmounted, cleaning up');
+                safelyRemoveMap(map);
+                return;
+            }
+            
             // Add styledata event handler to re-add hover point when style changes
             map.on('styledata', () => {
+                // Check if component is still mounted
+                if (!isMounted) return;
+                
                 // Reduced logging - only log in development mode
                 if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
                     console.log('[EmbedMapView] Style changed, checking if hover-point needs to be re-added');
@@ -809,25 +844,27 @@ export default function EmbedMapView() {
         
         // Import and set map instance in the mapOperationsQueue
         import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
-            setMapInstance(map);
-            console.log('[EmbedMapView] Map instance set in mapOperationsQueue');
+            if (isMounted) {
+                setMapInstance(map);
+                console.log('[EmbedMapView] Map instance set in mapOperationsQueue');
+            }
+        }).catch(error => {
+            console.error('[EmbedMapView] Error importing mapOperationsQueue:', error);
         });
         
         mapInstance.current = map;
         
         return () => {
-            if (mapInstance.current) {
-                // Remove the hover point layer and source if they exist
-                if (mapInstance.current.getLayer('hover-point')) {
-                    mapInstance.current.removeLayer('hover-point');
-                }
-                if (mapInstance.current.getSource('hover-point')) {
-                    mapInstance.current.removeSource('hover-point');
-                }
-                
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
+            // Mark component as unmounted
+            isMounted = false;
+            
+            // Use our enhanced cleanup function to safely remove the map
+            safelyRemoveMap(map).then(() => {
+                console.log('[EmbedMapView] Map cleanup completed in useEffect cleanup');
+            });
+            
+            // Clear the map instance reference
+            mapInstance.current = null;
         };
     }, [mapRef, mapState]);
     

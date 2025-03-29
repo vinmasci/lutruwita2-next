@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { setMapInstance } from '../../../utils/mapOperationsQueue';
 import { setupMapScaleListener } from '../../../utils/mapScaleUtils';
+import { safelyRemoveMap } from '../../../utils/mapCleanup';
 import StyleControl, { MAP_STYLES } from '../../../components/StyleControl/StyleControl';
 import SearchControl from '../../../components/SearchControl/SearchControl';
 import PitchControl from '../../../components/PitchControl/PitchControl';
@@ -95,20 +96,38 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
   useEffect(() => {
     if (!mapRef.current) return;
     
+    // Flag to track if component is mounted
+    let isMounted = true;
+    
     // Create map with Tasmania as default bounds
-    const map = new mapboxgl.Map({
-      container: mapRef.current,
-      style: MAP_STYLES.satellite.url,
-      bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds (default)
-      fitBoundsOptions: {
-        padding: 0,
-        pitch: 0,
-        bearing: 0
-      },
-      projection: 'mercator', // Changed from 'globe' to 'mercator' for flat projection
-      maxPitch: 85,
-      width: '100%',
-      height: '100%'  // Explicitly setting width and height to match presentation mode
+    let map;
+    try {
+      map = new mapboxgl.Map({
+        container: mapRef.current,
+        style: MAP_STYLES.satellite.url,
+        bounds: [[144.5, -43.7], [148.5, -40.5]], // Tasmania bounds (default)
+        fitBoundsOptions: {
+          padding: 0,
+          pitch: 0,
+          bearing: 0
+        },
+        projection: 'mercator', // Changed from 'globe' to 'mercator' for flat projection
+        maxPitch: 85,
+        width: '100%',
+        height: '100%',  // Explicitly setting width and height to match presentation mode
+        failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
+        preserveDrawingBuffer: true, // Needed for screenshots
+        attributionControl: false, // We'll add this manually
+        antialias: true // Enable antialiasing for smoother rendering
+      });
+    } catch (error) {
+      console.error('[MapView] Error creating map instance:', error);
+      return;
+    }
+    
+    // Add error handling for map
+    map.on('error', (e) => {
+      console.error('[MapView] Mapbox GL error:', e);
     });
     
     // Add event listeners to track map state changes
@@ -119,6 +138,9 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
     
     // Set the map instance in the queue
     setMapInstance(map);
+    
+    // Store the map instance in the ref
+    mapInstance.current = map;
     
     // Try to get user's location first if in creation mode
     if (window.location.pathname === '/' || window.location.pathname === '' || window.location.pathname === '/editor') {
@@ -178,6 +200,13 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
     
     // Add terrain
       map.on('load', () => {
+      // Check if component is still mounted
+      if (!isMounted) {
+        console.log('[MapView] Map loaded but component unmounted, cleaning up');
+        safelyRemoveMap(map);
+        return;
+      }
+      
       // Make sure the map instance is set in the queue again after load
       setMapInstance(map);
       
@@ -455,38 +484,36 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
       }
     `;
     document.head.appendChild(style);
-    mapInstance.current = map;
     
     // Set up scaling for the map container
     const mapContainer = document.querySelector('.w-full.h-full.relative');
+    let cleanupScaleListener;
     if (mapContainer) {
-      const cleanupScaleListener = setupMapScaleListener(mapContainer);
-      
-      return () => {
-        map.remove();
-        document.head.removeChild(style);
-        // Clean up the scale listener
-        cleanupScaleListener();
-        // Clear the map instance when component unmounts
-        setMapInstance(null);
-      };
+      cleanupScaleListener = setupMapScaleListener(mapContainer);
     }
     
+    // Return cleanup function
     return () => {
-      if (map) {
-        // Remove the hover point layer and source if they exist
-        if (map.getLayer('hover-point')) {
-          map.removeLayer('hover-point');
-        }
-        if (map.getSource('hover-point')) {
-          map.removeSource('hover-point');
-        }
-        
-        map.remove();
-        document.head.removeChild(style);
-        // Clear the map instance when component unmounts
-        setMapInstance(null);
+      // Mark component as unmounted
+      isMounted = false;
+      
+      // Clean up the scale listener if it exists
+      if (cleanupScaleListener) {
+        cleanupScaleListener();
       }
+      
+      // Remove the style element
+      if (style && style.parentNode) {
+        document.head.removeChild(style);
+      }
+      
+      // Use our enhanced cleanup function to safely remove the map
+      safelyRemoveMap(map, setMapInstance).then(() => {
+        console.log('[MapView] Map cleanup completed in useEffect cleanup');
+      });
+      
+      // Clear the map instance reference
+      mapInstance.current = null;
     };
   }, [notifyMapStateChange]);
 

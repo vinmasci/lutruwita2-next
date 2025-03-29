@@ -70,6 +70,7 @@ const CountdownTimer = ({ eventDate }) => {
     _jsxs(Box, {
       sx: {
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         backgroundColor: 'rgba(0, 0, 0, 0.2)',
         borderRadius: '4px',
@@ -78,27 +79,41 @@ const CountdownTimer = ({ eventDate }) => {
         marginTop: { xs: '4px', sm: '0' }
       },
       children: [
-        _jsx(Clock, {
-          size: 16,
-          color: '#ffffff',
-          style: { marginRight: '4px' }
+        _jsxs(Box, {
+          sx: {
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            justifyContent: 'center'
+          },
+          children: [
+            _jsx(Clock, {
+              size: 16,
+              color: '#ffffff',
+              style: { marginRight: '4px' }
+            }),
+            _jsx(Typography, {
+              variant: "body2",
+              sx: {
+                color: '#ffffff',
+                fontWeight: 'bold',
+                fontSize: '1rem' // Increase font size
+              },
+              children: timeLeft.isPast
+                ? "Event has started!"
+                : `${timeLeft.days}d ${timeLeft.hours}h ${timeLeft.minutes}m ${timeLeft.seconds}s`
+            })
+          ]
         }),
-        _jsx(Tooltip, {
-          title: `Event date: ${dayjs(eventDate).format('DD/MM/YYYY HH:mm')}`,
-          arrow: true,
-          placement: "bottom",
-          children: _jsx(Typography, {
-            variant: "body2",
-             sx: {
-               color: '#ffffff',
-               fontWeight: 'bold',
-               cursor: 'pointer',
-               fontSize: '1rem' // Increase font size
-             },
-             children: timeLeft.isPast
-              ? "Event has started!"
-              : `${timeLeft.days}d ${timeLeft.hours}h ${timeLeft.minutes}m ${timeLeft.seconds}s`
-          })
+        _jsx(Typography, {
+          variant: "caption",
+          sx: {
+            color: '#ffffff',
+            fontSize: '0.75rem',
+            marginTop: '2px',
+            textAlign: 'center'
+          },
+          children: `Starts: ${dayjs(eventDate).format('DD/MM/YYYY HH:mm')}`
         })
       ]
     })

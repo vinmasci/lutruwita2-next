@@ -1,14 +1,28 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { safeNavigate } from '../../../../utils/navigationUtils';
 import { 
   Typography, Box, Grid, Card, CardContent, 
-  Chip, Avatar, Divider
+  Chip, Avatar, Divider, Skeleton
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import { Route, Mountain, MoreHorizontal } from 'lucide-react';
-import { ImageSlider } from '../ImageSlider/ImageSlider';
+// Lazy load the ImageSlider component
+const ImageSlider = lazy(() => import('../ImageSlider/ImageSlider').then(module => ({
+  default: module.ImageSlider
+})));
 import { FilterCard } from './FilterCard';
+
+// Placeholder component for the image slider while it's loading
+const ImageSliderPlaceholder = styled(Box)(({ theme }) => ({
+  width: '100%',
+  height: '100%',
+  backgroundColor: '#f0f0f0',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+}));
 
 // Map state abbreviations
 const STATE_ABBREVIATIONS = {
@@ -150,17 +164,23 @@ export const calculateUnpavedPercentage = (route) => {
 // Limit the number of photos to display per card
 const MAX_PHOTOS_PER_CARD = 3;
 
+// Threshold for intersection observer - load when card is 200px from viewport
+const INTERSECTION_THRESHOLD = 0.1;
+const INTERSECTION_MARGIN = '200px';
+
 export const RouteCard = ({ route }) => {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [shouldRenderContent, setShouldRenderContent] = useState(false);
   const cardRef = useRef(null);
   
   // Limit the number of photos to improve performance
   const limitedPhotos = useMemo(() => {
-    if (!route.photos || route.photos.length === 0) return [];
+    // Only process photos if the card is visible to avoid unnecessary work
+    if (!isVisible || !route.photos || route.photos.length === 0) return [];
     return route.photos.slice(0, MAX_PHOTOS_PER_CARD);
-  }, [route.photos]);
+  }, [route.photos, isVisible]);
   
   // Use Intersection Observer to detect when the card is visible
   useEffect(() => {
@@ -171,16 +191,21 @@ export const RouteCard = ({ route }) => {
           // Once visible, disconnect the observer
           observer.disconnect();
           
-          // Mark as loaded after a short delay to allow for rendering
+          // Delay rendering the actual content to prioritize visible UI first
           setTimeout(() => {
-            setIsLoaded(true);
-          }, 100);
+            setShouldRenderContent(true);
+            
+            // Mark as fully loaded after another short delay
+            setTimeout(() => {
+              setIsLoaded(true);
+            }, 100);
+          }, 50);
         }
       },
       {
         root: null, // viewport
-        rootMargin: '200px', // Load a bit before it comes into view
-        threshold: 0.1 // Trigger when 10% of the element is visible
+        rootMargin: INTERSECTION_MARGIN, // Load a bit before it comes into view
+        threshold: INTERSECTION_THRESHOLD // Trigger when 10% of the element is visible
       }
     );
     
@@ -199,36 +224,41 @@ export const RouteCard = ({ route }) => {
     <Grid item xs={12} sm={6} md={3}>
       <StyledCard 
         ref={cardRef}
-        onClick={() => navigate(`/preview/route/${route.persistentId}`)} 
+        onClick={() => safeNavigate(navigate, `/preview/route/${route.persistentId}`, { delay: 150 })} 
         sx={{ cursor: 'pointer' }}
       >
         <MapPreviewWrapper>
-          {isVisible ? (
-            <ImageSlider 
-              mapPreviewProps={{
-                center: route.mapState.center, 
-                zoom: route.mapState.zoom, 
-                routes: route.routes 
-              }}
-              photos={limitedPhotos}
-              maxPhotos={MAX_PHOTOS_PER_CARD}
-            />
+          {shouldRenderContent ? (
+            <Suspense fallback={
+              <ImageSliderPlaceholder>
+                <Skeleton 
+                  variant="rectangular" 
+                  width="100%" 
+                  height="100%" 
+                  animation="wave" 
+                />
+              </ImageSliderPlaceholder>
+            }>
+              <ImageSlider 
+                mapPreviewProps={{
+                  center: route.mapState.center, 
+                  zoom: route.mapState.zoom, 
+                  routes: route.routes 
+                }}
+                photos={limitedPhotos}
+                maxPhotos={MAX_PHOTOS_PER_CARD}
+              />
+            </Suspense>
           ) : (
-            // Placeholder while loading
-            <Box 
-              sx={{ 
-                width: '100%', 
-                height: '100%', 
-                backgroundColor: '#f0f0f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Typography variant="caption" color="text.secondary">
-                Loading...
-              </Typography>
-            </Box>
+            // Initial placeholder while determining visibility
+            <ImageSliderPlaceholder>
+              <Skeleton 
+                variant="rectangular" 
+                width="100%" 
+                height="100%" 
+                animation="wave" 
+              />
+            </ImageSliderPlaceholder>
           )}
         </MapPreviewWrapper>
         <CardContent sx={{ padding: '12px 8px' }}>

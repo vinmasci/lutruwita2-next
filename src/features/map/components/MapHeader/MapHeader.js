@@ -2,7 +2,8 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React from 'react';
 import { AppBar, Toolbar, Typography, Box, IconButton, Tooltip } from '@mui/material';
 import { Home, Map, X } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { withNavigationDelay } from '../../../../utils/navigationUtils';
 import { useRouteContext } from '../../context/RouteContext';
 import CountdownTimer from './CountdownTimer';
 
@@ -224,7 +225,11 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                     fontFamily: 'Fraunces, serif',
                                                     fontWeight: 700,
                                                     color: '#ffffff',
-                                                    textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+                                                    textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    maxWidth: '500px' // Increased to allow more text on desktop before truncation
                                                 },
                                                 children: title || 'Untitled Route'
                                             })
@@ -245,6 +250,11 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                             children: ["by ", username]
                                         })
                                     ),
+                                    
+                                    // We don't need the countdown timer in the header since we have the floating one
+                                    // type === 'event' && eventDate && (
+                                    //     _jsx(CountdownTimer, { eventDate })
+                                    // ),
                                 ]
                             })
                         ]
@@ -259,12 +269,14 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                             // This Box remains on the right due to Toolbar's space-between
                         },
                         children: [
-                            // Restore Home Icon
+                            // Home Icon with navigation delay
                             _jsx(Tooltip, {
                                 title: "Home",
                                 children: _jsx(IconButton, {
-                                    component: Link,
-                                    to: "/",
+                                    // Use onClick with navigation delay instead of Link component
+                                    onClick: withNavigationDelay(() => {
+                                        window.location.href = '/';
+                                    }, { delay: 150 }),
                                     sx: {
                                         ...(isHome ? activeStyle : inactiveStyle),
                                         padding: '8px',
@@ -279,12 +291,14 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                     })
                                 })
                             }),
-                            // Restore Map Editor Icon
+                            // Map Editor Icon with navigation delay
                             _jsx(Tooltip, {
                                 title: "Map Editor",
                                 children: _jsx(IconButton, {
-                                    component: Link,
-                                    to: "/editor",
+                                    // Use onClick with navigation delay instead of Link component
+                                    onClick: withNavigationDelay(() => {
+                                        window.location.href = '/editor';
+                                    }, { delay: 150 }),
                                     sx: {
                                         ...(isEditor ? activeStyle : inactiveStyle),
                                         padding: '8px',

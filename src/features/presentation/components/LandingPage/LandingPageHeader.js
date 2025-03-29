@@ -2,7 +2,8 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React from 'react';
 import { AppBar, Toolbar, Typography, Box, IconButton, Tooltip } from '@mui/material';
 import { Home, Map } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { withNavigationDelay } from '../../../../utils/navigationUtils';
 
 /**
  * LandingPageHeader component displays a header bar with the site title
@@ -81,7 +82,11 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
                                     fontFamily: 'Fraunces, serif',
                                     fontWeight: 700,
                                     color: '#ffffff',
-                                    textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+                                    textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '500px' // Increased to allow more text on desktop before truncation
                                 },
                                 children: title
                             })
@@ -101,8 +106,10 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
                             _jsx(Tooltip, {
                                 title: "Home",
                                 children: _jsx(IconButton, {
-                                    component: Link,
-                                    to: "/",
+                                    // Use onClick with navigation delay instead of Link component
+                                    onClick: withNavigationDelay(() => {
+                                        window.location.href = '/';
+                                    }, { delay: 150 }),
                                     sx: {
                                         ...(isHome ? activeStyle : inactiveStyle),
                                         padding: '8px',
@@ -120,8 +127,10 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
                             _jsx(Tooltip, {
                                 title: "Map Editor",
                                 children: _jsx(IconButton, {
-                                    component: Link,
-                                    to: "/editor",
+                                    // Use onClick with navigation delay instead of Link component
+                                    onClick: withNavigationDelay(() => {
+                                        window.location.href = '/editor';
+                                    }, { delay: 150 }),
                                     sx: {
                                         ...(isEditor ? activeStyle : inactiveStyle),
                                         padding: '8px',
