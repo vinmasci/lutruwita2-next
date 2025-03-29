@@ -6,9 +6,11 @@ import { ICON_PATHS } from '../../constants/icon-paths';
 import { useMapContext } from '../../../map/context/MapContext';
 import logger from '../../../../utils/logger';
 import './MapboxPOIMarker.styles.css';
-const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
+const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, forceDraggable }) => {
     const markerRef = useRef(null);
-    const isDraggable = poi.type === 'draggable';
+    // If forceDraggable is explicitly set (true or false), use that value
+    // Otherwise, determine draggability based on POI type
+    const isDraggable = forceDraggable !== undefined ? forceDraggable : poi.type === 'draggable';
     const iconDefinition = getIconDefinition(poi.icon);
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
     const markerColor = iconDefinition?.style?.color || 

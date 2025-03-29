@@ -85,10 +85,27 @@ export const useRouteService = () => {
         }
     };
     
+    // Helper function to check if we're in presentation mode
+    const isPresentationMode = () => {
+        if (typeof window === 'undefined') return false;
+        
+        // Check if the current URL path indicates presentation mode
+        const path = window.location.pathname;
+        return path.startsWith('/preview') || 
+               path.startsWith('/embed') || 
+               path === '/'; // Landing page is also presentation mode
+    };
+    
     // Set up a periodic token validity check
     if (typeof window !== 'undefined') {
         // Check token validity every 5 minutes
         const tokenCheckInterval = setInterval(() => {
+            // Skip token refresh in presentation mode
+            if (isPresentationMode()) {
+                console.log('[routeService] Skipping token refresh in presentation mode');
+                return;
+            }
+            
             if (AuthenticationManager.needsRefresh()) {
                 console.log('[routeService] Token may be expiring soon, refreshing...');
                 // Silently refresh the token
@@ -112,6 +129,13 @@ export const useRouteService = () => {
         // Set up listeners for authentication events
         window.addEventListener(AUTH_EVENTS.TOKEN_REFRESH_FAILED, (event) => {
             console.warn('[routeService] Token refresh failed:', event.detail.message);
+            
+            // Skip showing the modal in presentation mode
+            if (isPresentationMode()) {
+                console.log('[routeService] Suppressing auth error modal in presentation mode');
+                return;
+            }
+            
             // Show a notification to the user
             if (window.confirm(event.detail.message)) {
                 AuthenticationManager.resetAuth();
@@ -125,6 +149,13 @@ export const useRouteService = () => {
         
         window.addEventListener(AUTH_EVENTS.SESSION_TIMEOUT, (event) => {
             console.warn('[routeService] Session timeout:', event.detail.message);
+            
+            // Skip showing the modal in presentation mode
+            if (isPresentationMode()) {
+                console.log('[routeService] Suppressing session timeout modal in presentation mode');
+                return;
+            }
+            
             // Show a notification to the user
             if (window.confirm(event.detail.message)) {
                 AuthenticationManager.resetAuth();
@@ -133,6 +164,15 @@ export const useRouteService = () => {
     }
     
     const getAuthHeaders = async () => {
+        // For presentation mode, return headers without authentication
+        if (isPresentationMode()) {
+            console.log('[routeService] Using public headers in presentation mode');
+            return {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+        }
+        
         try {
             // Check if token needs refresh
             if (AuthenticationManager.needsRefresh()) {
@@ -164,7 +204,7 @@ export const useRouteService = () => {
         const isJson = contentType && contentType.includes('application/json');
         
         // Check for authentication errors
-        if (response.status === 401 || response.status === 403) {
+        if ((response.status === 401 || response.status === 403) && !isPresentationMode()) {
             console.error('[routeService] Authentication error:', response.status);
             
             // Create a custom error object

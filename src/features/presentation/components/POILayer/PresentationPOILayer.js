@@ -132,10 +132,10 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         <div class="marker-point" style="border-top-color: ${markerColor}"></div>
       </div>
     `;
-        // Create marker with viewport alignment
+        // Create marker with viewport alignment - always non-draggable in presentation mode
         const marker = new mapboxgl.Marker({
             element: el,
-            draggable: false,
+            draggable: false, // Explicitly set to false for presentation mode
             rotationAlignment: 'viewport',
             pitchAlignment: 'viewport',
             anchor: 'center',
@@ -313,6 +313,7 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                 renderedItems.push(
                     _jsx(MapboxPOIMarker, {
                         poi: item.properties.poi,
+                        forceDraggable: false, // Force POIs to be non-draggable in presentation mode
                         onClick: (poi) => {
                             logger.info('PresentationPOILayer', 'POI clicked:', poi);
                             // Ensure we're using the original POI object, not the transformed GeoJSON feature

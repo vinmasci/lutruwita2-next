@@ -83,6 +83,12 @@ export const AuthProvider = function(props) {
 
       // If we're not authenticated, don't do anything
       if (!isAuthenticated) return false;
+      
+      // Skip token refresh in presentation mode
+      if (isPresentationMode()) {
+        console.log('[AuthContext] Skipping token refresh check in presentation mode');
+        return isAuthenticated;
+      }
 
       // Check if token needs refresh (token validity is 50 minutes)
       const tokenValidityDuration = 50 * 60 * 1000; // 50 minutes in milliseconds
@@ -104,6 +110,12 @@ export const AuthProvider = function(props) {
 
   // Function to refresh the token
   const refreshToken = async () => {
+    // Skip token refresh in presentation mode
+    if (isPresentationMode()) {
+      console.log('[AuthContext] Skipping token refresh in presentation mode');
+      return true;
+    }
+    
     try {
       console.log('[AuthContext] Refreshing token...');
       await getAccessTokenSilently({ ignoreCache: true });
@@ -139,6 +151,17 @@ export const AuthProvider = function(props) {
     }
   };
 
+  // Helper function to check if we're in presentation mode
+  const isPresentationMode = () => {
+    if (typeof window === 'undefined') return false;
+    
+    // Check if the current URL path indicates presentation mode
+    const path = window.location.pathname;
+    return path.startsWith('/preview') || 
+           path.startsWith('/embed') || 
+           path === '/'; // Landing page is also presentation mode
+  };
+
   // Set up periodic token refresh
   useEffect(() => {
     // Only set up refresh if authenticated
@@ -146,6 +169,12 @@ export const AuthProvider = function(props) {
 
     // Check token validity every 5 minutes
     const tokenCheckInterval = setInterval(() => {
+      // Skip token refresh in presentation mode
+      if (isPresentationMode()) {
+        console.log('[AuthContext] Skipping token refresh in presentation mode');
+        return;
+      }
+
       const tokenValidityDuration = 50 * 60 * 1000; // 50 minutes in milliseconds
       const needsRefresh = Date.now() - lastTokenRefresh > tokenValidityDuration;
 
