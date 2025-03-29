@@ -232,8 +232,10 @@ export const ImageSlider = React.memo(({
     
     // On mobile, be more conservative with preloading to save bandwidth
     if (isMobile) {
-      // Only load the current image and the next one on mobile
-      return index === activeStep || index === (activeStep + 1) % items.length;
+      // Load current, previous, and next images on mobile as well
+      return index === activeStep ||
+             index === (activeStep - 1 + items.length) % items.length ||
+             index === (activeStep + 1) % items.length;
     }
     
     // On desktop, load current, previous, and next images

@@ -162,7 +162,7 @@ export const calculateUnpavedPercentage = (route) => {
 };
 
 // Limit the number of photos to display per card
-const MAX_PHOTOS_PER_CARD = 3;
+const MAX_PHOTOS_PER_CARD = 5;
 
 // Threshold for intersection observer - load when card is 200px from viewport
 const INTERSECTION_THRESHOLD = 0.1;
@@ -221,7 +221,7 @@ export const RouteCard = ({ route }) => {
   }, []);
   
   return (
-    <Grid item xs={12} sm={6} md={3}>
+    <Grid item xs={12} sm={6} md={4}> {/* Changed md from 3 to 4 */}
       <StyledCard 
         ref={cardRef}
         onClick={() => safeNavigate(navigate, `/preview/route/${route.persistentId}`, { delay: 150 })} 
@@ -375,7 +375,7 @@ export const CombinedRouteCardGrid = ({
   return (
     <Grid container spacing={4}>
       {/* Filter card as the first item */}
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid item xs={12} sm={6} md={4}> {/* Changed md from 3 to 4 */}
         <FilterCard
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}

@@ -14,7 +14,7 @@ export const useRouteFilters = (allRoutes) => {
   // Results
   const [filteredRoutes, setFilteredRoutes] = useState([]);
   const [displayedRoutes, setDisplayedRoutes] = useState([]);
-  const [visibleCount, setVisibleCount] = useState(4);
+  const [visibleCount, setVisibleCount] = useState(3); // Changed initial count to 3
   const [hasMore, setHasMore] = useState(false);
   
   // Dynamically generate available states from route metadata
@@ -73,7 +73,7 @@ export const useRouteFilters = (allRoutes) => {
   };
   
   const loadMoreRoutes = () => {
-    const nextVisibleCount = visibleCount + 4;
+    const nextVisibleCount = visibleCount + 3; // Changed increment to 3
     setVisibleCount(nextVisibleCount);
     setDisplayedRoutes(filteredRoutes.slice(0, nextVisibleCount));
     setHasMore(nextVisibleCount < filteredRoutes.length);
@@ -219,7 +219,7 @@ export const useRouteFilters = (allRoutes) => {
   
   // Reset visible count when filters change
   useEffect(() => {
-    setVisibleCount(4);
+    setVisibleCount(3); // Changed reset count to 3
   }, [
     searchTerm, 
     selectedState, 
