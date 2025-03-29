@@ -72,7 +72,7 @@ export default function PresentationMapView(props) {
             setTimeout(() => {
                 // Force scroll to top
                 window.scrollTo(0, 0);
-            }, 100);
+            }, 500); // Increased timeout to 500ms
         }
     }, []);
     // Initialize routes using the unified route processing hook

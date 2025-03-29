@@ -61,9 +61,9 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
     const categoryColor = POI_CATEGORIES[poi.category]?.color || '#777777'; // Default gray color if category not found
     
     // Prepare photos for the image slider
-    // Map Google photo URLs to the backend proxy endpoint
+    // Use Google photo URLs directly instead of proxying them
     const googlePhotos = (googlePlacesData?.photos || []).map(googlePhotoUrl => ({
-      url: `/api/poi/photo?url=${encodeURIComponent(googlePhotoUrl)}`,
+      url: googlePhotoUrl, // Use the Google URL directly
       source: 'google' // Optional: Add source identifier
     }));
     // Ensure poi.photos is an array and contains objects with a 'url' property
