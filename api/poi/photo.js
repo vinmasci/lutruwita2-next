@@ -3,6 +3,7 @@ import { createApiHandler } from '../lib/middleware.js'; // Assuming middleware 
 
 // Handler for the photo proxy endpoint
 async function handlePhotoProxy(req, res) {
+  console.log('[API Photo Proxy] Function handler entered.'); // <-- ADDED THIS LINE
   const { url: googlePhotoUrl } = req.query;
 
   if (!googlePhotoUrl) {
