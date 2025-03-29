@@ -56,8 +56,23 @@ export const adjustPresentationScale = (container, onScaleChange) => {
     mapArea.style.height = '100%';
   }
   
-  // Ensure the page is scrolled to the top after scaling
-  window.scrollTo(0, 0);
+  // Ensure the page is scrolled to the top after scaling with a small delay
+  setTimeout(() => {
+    // Try to use scrollIntoView on the container if it has an ID
+    const topElement = document.getElementById('presentation-top') || 
+                       document.getElementById('embed-top');
+    
+    if (topElement) {
+      // Use scrollIntoView for more reliable scrolling
+      topElement.scrollIntoView({ 
+        behavior: 'auto', 
+        block: 'start' 
+      });
+    }
+    
+    // Also use window.scrollTo as a fallback
+    window.scrollTo(0, 0);
+  }, 100);
 };
 
 /**

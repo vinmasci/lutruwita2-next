@@ -1,4 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime"; // Revert Fragment import
+import React, { useState } from 'react';
 import { Box } from '@mui/material';
 import Carousel from 'react-material-ui-carousel';
 import { MapPreview } from '../MapPreview/MapPreview';
@@ -10,6 +11,7 @@ const SlideImage = styled('img')({
   height: '100%',
   objectFit: 'cover', // 'cover' ensures the image fills the container while maintaining aspect ratio
   objectPosition: 'center', // Center the image
+  backgroundColor: '#f0f0f0', // Light gray background while loading
 });
 
 // Keep MapWrapper for potential fallback or other uses
@@ -51,6 +53,30 @@ export const ImageSlider = ({
   maxPhotos = 10,
   staticMapUrl // Remove isEditing and onRemovePhoto props
 }) => {
+  // State to track which images have been loaded
+  const [loadedImages, setLoadedImages] = useState({});
+  
+  // Function to mark an image as loaded
+  const handleImageLoad = (index) => {
+    setLoadedImages(prev => ({
+      ...prev,
+      [index]: true
+    }));
+  };
+  
+  // Only preload the first image and adjacent images to the current one
+  const shouldLoadImage = (index) => {
+    // Always load the first image
+    if (index === 0) return true;
+    
+    // Load images adjacent to the current active step
+    return index === activeStep || 
+           index === activeStep - 1 || 
+           index === activeStep + 1 || 
+           // Handle wrapping for the last and first images
+           (activeStep === 0 && index === items.length - 1) ||
+           (activeStep === items.length - 1 && index === 0);
+  };
   // Prepare slides array
   const hasPhotos = photos && photos.length > 0;
 
@@ -97,16 +123,55 @@ export const ImageSlider = ({
     }))
   );
 
+  // State to track current slide index
+  const [activeStep, setActiveStep] = useState(0);
+  
+  // Throttle function to prevent rapid navigation
+  const [isNavigating, setIsNavigating] = useState(false);
+  
+  const handleNext = () => {
+    if (isNavigating) return;
+    
+    setIsNavigating(true);
+    setActiveStep((prevStep) => (prevStep + 1) % items.length);
+    
+    // Add a cooldown period to prevent rapid clicking
+    setTimeout(() => {
+      setIsNavigating(false);
+    }, 300);
+  };
+  
+  const handleBack = () => {
+    if (isNavigating) return;
+    
+    setIsNavigating(true);
+    setActiveStep((prevStep) => (prevStep - 1 + items.length) % items.length);
+    
+    // Add a cooldown period to prevent rapid clicking
+    setTimeout(() => {
+      setIsNavigating(false);
+    }, 300);
+  };
+  
   return _jsx(CarouselWrapper, {
     children: _jsx(Carousel, {
       navButtonsAlwaysVisible: true,
       autoPlay: false,
-      animation: "none", // No animation at all
+      animation: "slide", // Use slide animation
       indicators: true,
-      duration: 0, // No animation duration
+      duration: 300, // Add a reasonable duration
       cycleNavigation: true,
       fullHeightHover: false,
       height: "100%",
+      index: activeStep,
+      next: handleNext,
+      prev: handleBack,
+      navButtonsWrapperProps: {
+        // Disable rapid clicking
+        style: { 
+          pointerEvents: isNavigating ? 'none' : 'auto'
+        }
+      },
       // Customize the navigation buttons to be smaller and more transparent
       navButtonsProps: {
         style: {
@@ -144,23 +209,69 @@ export const ImageSlider = ({
         if (item.type === 'static-map') {
           // Render static map image
           return _jsx(ImageContainer, {
-            children: _jsx(SlideImage, {
-              src: item.content,
-              alt: "Map location" // Add alt text
-            })
+            children: shouldLoadImage(index) ? (
+              _jsx(SlideImage, {
+                src: item.content,
+                alt: "Map location", // Add alt text
+                loading: "lazy", // Native lazy loading
+                onLoad: () => handleImageLoad(index)
+              })
+            ) : (
+              // Placeholder while loading
+              _jsx(Box, {
+                sx: { 
+                  width: '100%', 
+                  height: '100%', 
+                  backgroundColor: '#f0f0f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }
+              })
+            )
           }, `slide-${index}`);
         } else if (item.type === 'map') {
            // Render Mapbox preview (fallback)
            return _jsx(MapWrapper, {
-             children: _jsx(MapPreview, { ...item.content })
+             children: shouldLoadImage(index) ? (
+               _jsx(MapPreview, { ...item.content })
+             ) : (
+               // Placeholder while loading
+               _jsx(Box, {
+                 sx: { 
+                   width: '100%', 
+                   height: '100%', 
+                   backgroundColor: '#f0f0f0',
+                   display: 'flex',
+                   alignItems: 'center',
+                   justifyContent: 'center'
+                 }
+               })
+             )
            }, `slide-${index}`);
         } else { // item.type === 'photo'
           // Revert to original simple rendering without Fragment or button
           return _jsx(ImageContainer, {
-            children: _jsx(SlideImage, {
-              src: item.content, // This should be the photo URL
-              alt: `Route photo ${index}`
-            })
+            children: shouldLoadImage(index) ? (
+              _jsx(SlideImage, {
+                src: item.content, // This should be the photo URL
+                alt: `Route photo ${index}`,
+                loading: "lazy", // Native lazy loading
+                onLoad: () => handleImageLoad(index)
+              })
+            ) : (
+              // Placeholder while loading
+              _jsx(Box, {
+                sx: { 
+                  width: '100%', 
+                  height: '100%', 
+                  backgroundColor: '#f0f0f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }
+              })
+            )
           }, `slide-${index}`);
         }
       })

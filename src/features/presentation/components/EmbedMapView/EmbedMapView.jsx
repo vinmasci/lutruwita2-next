@@ -23,6 +23,7 @@ import RouteContextAdapter from './components/RouteContextAdapter';
 import { PhotoProvider } from '../../../photo/context/PhotoContext';
 import { useRouteDataLoader, filterPhotosByRoute } from './hooks/useRouteDataLoader';
 import MapHeader from '../../../map/components/MapHeader/MapHeader';
+import FloatingCountdownTimer from '../../../map/components/MapHeader/FloatingCountdownTimer';
 import { EmbedClimbMarkers } from './components/EmbedClimbMarkers';
 
 // Import extracted components
@@ -863,17 +864,41 @@ export default function EmbedMapView() {
         };
     }, []);
     
-    // Add initial scroll adjustment for mobile
+    // Add initial scroll adjustment for mobile with multiple attempts
     useEffect(() => {
         // Check if we're on mobile
         const isMobile = window.innerWidth <= 768;
         
         if (isMobile) {
-            // Small timeout to ensure the DOM is ready
-            setTimeout(() => {
-                // Force scroll to top
+            // Function to scroll to top with options
+            const scrollToTop = () => {
+                // Try to use scrollIntoView if available
+                if (containerRef.current) {
+                    containerRef.current.scrollIntoView({ 
+                        behavior: 'auto', 
+                        block: 'start' 
+                    });
+                }
+                
+                // Also use window.scrollTo as a fallback
                 window.scrollTo(0, 0);
-            }, 100);
+            };
+            
+            // Make multiple scroll attempts with increasing timeouts
+            // First attempt - immediate
+            scrollToTop();
+            
+            // Second attempt - short delay
+            setTimeout(scrollToTop, 100);
+            
+            // Third attempt - medium delay
+            setTimeout(scrollToTop, 500);
+            
+            // Fourth attempt - longer delay after content should be loaded
+            setTimeout(scrollToTop, 1000);
+            
+            // Final attempt - very long delay
+            setTimeout(scrollToTop, 2000);
         }
     }, []);
     
@@ -1050,7 +1075,7 @@ export default function EmbedMapView() {
                 <MapOverviewInitializer routeData={routeData} />
                 <MapProvider value={mapContextValue}>
                     <LineProvider>
-                    <div ref={containerRef} className="embed-container">
+                    <div id="embed-top" ref={containerRef} className="embed-container">
             {/* Add the header */}
             <RouteContextAdapter>
                 <MapHeader 
@@ -1062,6 +1087,11 @@ export default function EmbedMapView() {
                     eventDate={routeData?.eventDate} // Keep using routeData for eventDate
                 />
             </RouteContextAdapter>
+            
+            {/* Floating Countdown Timer */}
+            {routeData?.type === 'event' && routeData?.eventDate && (
+                <FloatingCountdownTimer eventDate={routeData.eventDate} />
+            )}
             
             {/* Add the EmbedSidebar */}
             <EmbedSidebar 

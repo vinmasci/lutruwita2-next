@@ -127,10 +127,9 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                     width: '100%'
                 },
                 children: [
-                    // Left side - Countdown Timer (if applicable)
-                    _jsx(Box, { // Wrap in a Box to control spacing if needed, though space-between should handle it
-                        sx: { display: 'flex', alignItems: 'center' },
-                        children: type === 'event' && eventDate && _jsx(CountdownTimer, { eventDate })
+                    // Left side - Empty box for spacing
+                    _jsx(Box, { 
+                        sx: { display: 'flex', alignItems: 'center' }
                     }),
 
                     // Center Box - Title/Attribution

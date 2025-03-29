@@ -8,6 +8,7 @@ import StyleControl, { MAP_STYLES } from '../StyleControl';
 import PitchControl from '../../../map/components/PitchControl/PitchControl';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import MapHeader from '../../../map/components/MapHeader/MapHeader';
+import FloatingCountdownTimer from '../../../map/components/MapHeader/FloatingCountdownTimer';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { RouteLayer } from '../../../map/components/RouteLayer';
 import { ClimbMarkers } from '../../../map/components/ClimbMarkers/ClimbMarkers';
@@ -62,17 +63,41 @@ export default function PresentationMapView(props) {
         };
     }, []);
     
-    // Add initial scroll adjustment for mobile
+    // Add initial scroll adjustment for mobile with multiple attempts
     useEffect(() => {
         // Check if we're on mobile
         const isMobile = window.innerWidth <= 768;
         
         if (isMobile) {
-            // Small timeout to ensure the DOM is ready
-            setTimeout(() => {
-                // Force scroll to top
+            // Function to scroll to top with options
+            const scrollToTop = () => {
+                // Try to use scrollIntoView if available
+                if (containerRef.current) {
+                    containerRef.current.scrollIntoView({ 
+                        behavior: 'auto', 
+                        block: 'start' 
+                    });
+                }
+                
+                // Also use window.scrollTo as a fallback
                 window.scrollTo(0, 0);
-            }, 500); // Increased timeout to 500ms
+            };
+            
+            // Make multiple scroll attempts with increasing timeouts
+            // First attempt - immediate
+            scrollToTop();
+            
+            // Second attempt - short delay
+            setTimeout(scrollToTop, 100);
+            
+            // Third attempt - medium delay
+            setTimeout(scrollToTop, 500);
+            
+            // Fourth attempt - longer delay after content should be loaded
+            setTimeout(scrollToTop, 1000);
+            
+            // Final attempt - very long delay
+            setTimeout(scrollToTop, 2000);
         }
     }, []);
     // Initialize routes using the unified route processing hook
@@ -520,7 +545,7 @@ export default function PresentationMapView(props) {
         poiPlacementMode: false,
         setPoiPlacementMode: () => { }
     }), [isMapReady, hoverCoordinates]);
-    return (_jsx(MapProvider, { value: mapContextValue, children: _jsx(LineProvider, { children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
+    return (_jsx(MapProvider, { value: mapContextValue, children: _jsx(LineProvider, { children: _jsxs("div", { id: "presentation-top", ref: containerRef, className: "presentation-flex-container", children: [
                 _jsx(MapHeader, { 
                     title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route', // Reverted title logic
                     color: headerSettings?.color || '#333333',
@@ -529,6 +554,10 @@ export default function PresentationMapView(props) {
                     type: currentLoadedState?.type, // Keep using currentLoadedState for type
                     eventDate: currentLoadedState?.eventDate // Keep using currentLoadedState for eventDate
                 }),
+                
+                // Floating Countdown Timer
+                currentLoadedState?.type === 'event' && currentLoadedState?.eventDate && 
+                _jsx(FloatingCountdownTimer, { eventDate: currentLoadedState.eventDate }),
                 _jsx(PresentationSidebar, { 
                     isOpen: true,
                     isDistanceMarkersVisible: isDistanceMarkersVisible,

@@ -108,6 +108,7 @@
     "react-material-ui-carousel": "^3.4.2",
     "react-router-dom": "^6.22.3",
     "recharts": "^2.15.0",
+    "sharp": "^0.33.5",
     "stream-browserify": "^3.0.0",
     "styled-components": "^6.1.14",
     "supercluster": "^8.0.1",

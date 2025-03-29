@@ -24,18 +24,23 @@ const MainContent = styled(Box)(({ theme }) => ({
   backgroundColor: theme.palette.background.default
 }));
 
-// Background with subtle pattern
+// Background with CSS pattern instead of image
 const BackgroundPattern = styled(Box)({
   position: 'absolute',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundImage: 'url(/images/contour.jpeg)',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  filter: 'invert(1)',
-  opacity: 0.08,
+  // CSS pattern instead of image
+  backgroundImage: `
+    linear-gradient(45deg, rgba(0, 0, 0, 0.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.05) 75%)
+  `,
+  backgroundSize: '20px 20px',
+  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+  opacity: 0.15,
   zIndex: 0
 });
 

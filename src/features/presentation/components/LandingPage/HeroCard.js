@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, Card, CardContent } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
@@ -17,16 +17,14 @@ const StyledCard = styled(Card)(({ theme }) => ({
   overflow: 'hidden'
 }));
 
+// Solid background with gradient instead of image
 const HeroBackground = styled(Box)({
   position: 'absolute',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundImage: 'url(/images/hero.png)',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  filter: 'brightness(0.55)',
+  background: 'linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 100%)',
   zIndex: 0
 });
 
