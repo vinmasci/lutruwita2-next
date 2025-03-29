@@ -172,12 +172,51 @@ export const safelyRemoveMap = async (map, setMapInstance = null) => {
   console.log('[mapCleanup] Safely removing map instance');
   
   try {
+    // Handle the indoor plugin issue that causes crashes
+    try {
+      // Check if the map has an indoor property and safely remove it
+      if (map._controls) {
+        // Find and remove any indoor controls
+        const indoorControls = map._controls.filter(control => 
+          control.constructor && 
+          control.constructor.name && 
+          control.constructor.name.includes('Indoor')
+        );
+        
+        // Safely remove each indoor control
+        indoorControls.forEach(control => {
+          try {
+            // Try to call the onRemove method if it exists
+            if (typeof control.onRemove === 'function') {
+              control.onRemove(map);
+            }
+            
+            // Try to clear any indoor properties on the map
+            if (map.indoor) {
+              map.indoor = null;
+            }
+          } catch (indoorError) {
+            // Silently catch errors but don't let them stop the cleanup
+            console.warn('[mapCleanup] Error cleaning up indoor control:', indoorError);
+          }
+        });
+      }
+    } catch (indoorError) {
+      // Silently catch errors but don't let them stop the cleanup
+      console.warn('[mapCleanup] Error handling indoor plugin:', indoorError);
+    }
+    
     // Perform full cleanup first
     await performFullMapCleanup(map);
     
-    // Then remove the map
-    map.remove();
-    console.log('[mapCleanup] Map instance removed');
+    // Then remove the map with error handling
+    try {
+      map.remove();
+      console.log('[mapCleanup] Map instance removed');
+    } catch (removeError) {
+      console.warn('[mapCleanup] Error during map.remove():', removeError);
+      // Continue despite the error
+    }
     
     // Clear the map instance reference if a setter was provided
     if (typeof setMapInstance === 'function') {
@@ -187,6 +226,12 @@ export const safelyRemoveMap = async (map, setMapInstance = null) => {
     return Promise.resolve();
   } catch (error) {
     console.error('[mapCleanup] Error safely removing map:', error);
+    
+    // Even if there was an error, try to clear the map instance reference
+    if (typeof setMapInstance === 'function') {
+      setMapInstance(null);
+    }
+    
     return Promise.resolve(); // Still resolve to allow continuation
   }
 };

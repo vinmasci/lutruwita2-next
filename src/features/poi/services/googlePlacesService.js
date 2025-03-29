@@ -5,6 +5,9 @@
  * It handles extracting place IDs from Google Maps URLs and fetching place details.
  */
 
+import logger from '../../../utils/logger';
+import { safeFetch, safeJsonFetch, fetchWithRetry } from '../../../utils/fetchUtils';
+
 // Load Google Maps API script dynamically
 let googleMapsPromise = null;
 
@@ -25,16 +28,24 @@ const loadGoogleMapsApi = () => {
       delete window[callbackName];
     };
     
-    // Create the script element
-    const script = document.createElement('script');
-    const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = reject;
-    
-    // Add the script to the document
-    document.head.appendChild(script);
+    try {
+      // Create the script element
+      const script = document.createElement('script');
+      const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}`;
+      script.async = true;
+      script.defer = true;
+      script.onerror = (error) => {
+        logger.error('googlePlacesService', 'Failed to load Google Maps API:', error);
+        reject(error);
+      };
+      
+      // Add the script to the document
+      document.head.appendChild(script);
+    } catch (error) {
+      logger.error('googlePlacesService', 'Error setting up Google Maps API script:', error);
+      reject(error);
+    }
   });
   
   return googleMapsPromise;
@@ -49,7 +60,7 @@ export const extractPlaceIdFromUrl = async (url) => {
   if (!url) return null;
   
   try {
-    console.log('[googlePlacesService] Extracting place ID from URL:', url);
+    logger.info('googlePlacesService', 'Extracting place ID from URL');
     
     // 1. Try to extract place ID from URL parameters
     const placeIdMatch = url.match(/[?&]place_id=([^&]+)/);
@@ -82,7 +93,7 @@ export const extractPlaceIdFromUrl = async (url) => {
           const lat = parseFloat(latitudeMatch[1]);
           const placeName = decodeURIComponent(placeNameMatch[1].replace(/\+/g, ' '));
           
-          console.log('[googlePlacesService] Extracted coordinates and place name:', { lat, lng, placeName });
+          logger.info('googlePlacesService', 'Extracted coordinates and place name');
           
           // Load the Google Maps API
           await loadGoogleMapsApi();
@@ -99,10 +110,10 @@ export const extractPlaceIdFromUrl = async (url) => {
               radius: 100 // Search within 100 meters of the coordinates
             }, (results, status) => {
               if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                console.log('[googlePlacesService] Found place with textSearch:', results[0]);
+                logger.info('googlePlacesService', 'Found place with textSearch');
                 resolve(results[0].place_id);
               } else {
-                console.error('[googlePlacesService] No places found with textSearch:', { placeName, lat, lng });
+                logger.warn('googlePlacesService', 'No places found with textSearch');
                 
                 // Fall back to nearbySearch if textSearch fails
                 service.nearbySearch({
@@ -111,10 +122,10 @@ export const extractPlaceIdFromUrl = async (url) => {
                   type: ['restaurant', 'cafe', 'food', 'store', 'establishment'] // Filter for businesses
                 }, (results, status) => {
                   if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                    console.log('[googlePlacesService] Found place with nearbySearch:', results[0]);
+                    logger.info('googlePlacesService', 'Found place with nearbySearch');
                     resolve(results[0].place_id);
                   } else {
-                    console.error('[googlePlacesService] No places found with nearbySearch:', { lat, lng });
+                    logger.warn('googlePlacesService', 'No places found with nearbySearch');
                     resolve(null);
                   }
                 });
@@ -127,7 +138,7 @@ export const extractPlaceIdFromUrl = async (url) => {
           const lng = parseFloat(longitudeMatch[1]);
           const lat = parseFloat(latitudeMatch[1]);
           
-          console.log('[googlePlacesService] Extracted coordinates:', { lat, lng });
+          logger.info('googlePlacesService', 'Extracted coordinates');
           
           // Load the Google Maps API
           await loadGoogleMapsApi();
@@ -144,10 +155,10 @@ export const extractPlaceIdFromUrl = async (url) => {
               type: ['restaurant', 'cafe', 'food', 'store', 'establishment'] // Filter for businesses
             }, (results, status) => {
               if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                console.log('[googlePlacesService] Found place with nearbySearch:', results[0]);
+                logger.info('googlePlacesService', 'Found place with nearbySearch');
                 resolve(results[0].place_id);
               } else {
-                console.error('[googlePlacesService] No places found with nearbySearch:', { lat, lng });
+                logger.warn('googlePlacesService', 'No places found with nearbySearch');
                 resolve(null);
               }
             });
@@ -156,7 +167,7 @@ export const extractPlaceIdFromUrl = async (url) => {
         // If we only have place name, use findPlaceFromQuery
         else if (placeNameMatch) {
           const placeName = decodeURIComponent(placeNameMatch[1].replace(/\+/g, ' '));
-          console.log('[googlePlacesService] Extracted place name:', placeName);
+          logger.info('googlePlacesService', 'Extracted place name');
           
           // Load the Google Maps API
           await loadGoogleMapsApi();
@@ -172,17 +183,17 @@ export const extractPlaceIdFromUrl = async (url) => {
               fields: ['place_id']
             }, (results, status) => {
               if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                console.log('[googlePlacesService] Found place with findPlaceFromQuery:', results[0]);
+                logger.info('googlePlacesService', 'Found place with findPlaceFromQuery');
                 resolve(results[0].place_id);
               } else {
-                console.error('[googlePlacesService] No places found with findPlaceFromQuery:', placeName);
+                logger.warn('googlePlacesService', 'No places found with findPlaceFromQuery');
                 resolve(null);
               }
             });
           });
         }
       } catch (error) {
-        console.error('[googlePlacesService] Error processing embed URL:', error);
+        logger.error('googlePlacesService', 'Error processing embed URL:', error);
       }
     }
     
@@ -262,7 +273,7 @@ export const extractPlaceIdFromUrl = async (url) => {
     // If all methods fail, return a fallback for testing
     return 'ChIJP3Sa8ziYEmsRUKgyFmh9AQM'; // Sydney Opera House as fallback
   } catch (error) {
-    console.error('[googlePlacesService] Error extracting place ID:', error);
+    logger.error('googlePlacesService', 'Error extracting place ID:', error);
     // Return a fallback for testing
     return 'ChIJP3Sa8ziYEmsRUKgyFmh9AQM'; // Sydney Opera House as fallback
   }
@@ -334,7 +345,7 @@ const isPlaceOpenNow = (openingHours, utcOffsetMinutes) => {
     return false;
 
   } catch (error) {
-    console.error("[isPlaceOpenNow] Error calculating open status:", error);
+    logger.error('isPlaceOpenNow', 'Error calculating open status:', error);
     return null; // Return null on error
   }
 };
@@ -344,7 +355,7 @@ export const fetchBasicPlaceDetails = async (placeId) => {
   if (!placeId) return null;
   
   try {
-    console.log('[googlePlacesService] Fetching place details for ID:', placeId);
+    logger.info('googlePlacesService', 'Fetching place details for ID:', placeId);
     
     // If the place ID is a fallback from a short URL, return some basic info
     if (placeId.startsWith('shortcode_')) {
@@ -357,73 +368,112 @@ export const fetchBasicPlaceDetails = async (placeId) => {
       };
     }
     
-    // Load the Google Maps API
-    await loadGoogleMapsApi();
+    // Load the Google Maps API with error handling
+    try {
+      await loadGoogleMapsApi();
+    } catch (error) {
+      logger.error('googlePlacesService', 'Failed to load Google Maps API:', error);
+      throw new Error('Failed to load Google Maps API');
+    }
     
     // Create a PlacesService instance
     const map = new window.google.maps.Map(document.createElement('div'));
     const service = new window.google.maps.places.PlacesService(map);
     
-    // Fetch place details
-    return new Promise((resolve) => {
-      service.getDetails({
-        placeId: placeId,
-        // Add 'utc_offset_minutes' and 'opening_hours.periods' to fields
-        fields: ['name', 'formatted_address', 'rating', 'website', 'formatted_phone_number', 'photos', 'opening_hours', 'utc_offset_minutes']
-      }, (place, status) => {
-        // console.log('[googlePlacesService] getDetails API Response:', { status, place }); // Log raw response - REMOVED
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
-          // Calculate isOpen status manually using the helper function
-          const calculatedIsOpen = isPlaceOpenNow(place.opening_hours, place.utc_offset_minutes);
-          console.log(`[googlePlacesService] Calculated isOpen: ${calculatedIsOpen} (Offset: ${place.utc_offset_minutes})`);
-
-          const photoUrls = place.photos ? place.photos.map(photo => photo.getUrl({ maxWidth: 800 })) : [];
-          // console.log('[googlePlacesService] Generated Photo URLs:', photoUrls); // Log generated URLs - REMOVED
-          resolve({
-            name: place.name || 'Unknown Place',
-            address: place.formatted_address || 'Address unavailable',
-            phoneNumber: place.formatted_phone_number || null,
-            website: place.website || null,
-            rating: place.rating || null,
-            photos: photoUrls, // Use the generated URLs
-            openingHours: place.opening_hours ? {
-              // Use the calculated status, fall back to null if calculation failed
-              isOpen: calculatedIsOpen,
-              weekdayText: place.opening_hours.weekday_text || []
-            } : null,
-            // Include offset in returned data if needed elsewhere, otherwise remove
-            // utcOffsetMinutes: place.utc_offset_minutes 
-          });
-        } else {
-          console.error('[googlePlacesService] API returned error:', status);
+    // Fetch place details with timeout and error handling
+    return new Promise((resolve, reject) => {
+      // Create a timeout for the API call
+      const timeout = setTimeout(() => {
+        logger.error('googlePlacesService', 'API call timed out');
+        resolve({
+          name: 'Example Place (Mock)',
+          address: '123 Example Street, Example City',
+          phoneNumber: '(123) 456-7890',
+          website: 'https://example.com',
+          rating: 4.5,
+          photos: [], // Add empty photos array to mock data
+          openingHours: null
+        });
+      }, 5000); // 5 second timeout
+      
+      try {
+        service.getDetails({
+          placeId: placeId,
+          // Add 'utc_offset_minutes' and 'opening_hours.periods' to fields
+          fields: ['name', 'formatted_address', 'rating', 'website', 'formatted_phone_number', 'photos', 'opening_hours', 'utc_offset_minutes']
+        }, (place, status) => {
+          // Clear the timeout since we got a response
+          clearTimeout(timeout);
           
-          // If the API call fails, return mock data for testing
-          resolve({
-            name: 'Example Place (Mock)',
-            address: '123 Example Street, Example City',
-            phoneNumber: '(123) 456-7890',
-            website: 'https://example.com',
-            rating: 4.5,
-            photos: [], // Add empty photos array to mock data
-            openingHours: null
-          });
-        }
-      });
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+            // Calculate isOpen status manually using the helper function
+            const calculatedIsOpen = isPlaceOpenNow(place.opening_hours, place.utc_offset_minutes);
+            logger.debug('googlePlacesService', `Calculated isOpen: ${calculatedIsOpen}`);
+
+            const photoUrls = place.photos ? place.photos.map(photo => photo.getUrl({ maxWidth: 800 })) : [];
+            
+            resolve({
+              name: place.name || 'Unknown Place',
+              address: place.formatted_address || 'Address unavailable',
+              phoneNumber: place.formatted_phone_number || null,
+              website: place.website || null,
+              rating: place.rating || null,
+              photos: photoUrls, // Use the generated URLs
+              openingHours: place.opening_hours ? {
+                // Use the calculated status, fall back to null if calculation failed
+                isOpen: calculatedIsOpen,
+                weekdayText: place.opening_hours.weekday_text || []
+              } : null,
+              // Include offset in returned data if needed elsewhere, otherwise remove
+              // utcOffsetMinutes: place.utc_offset_minutes 
+            });
+          } else {
+            logger.error('googlePlacesService', 'API returned error:', status);
+            
+            // If the API call fails, return mock data for testing
+            resolve({
+              name: 'Example Place (Mock)',
+              address: '123 Example Street, Example City',
+              phoneNumber: '(123) 456-7890',
+              website: 'https://example.com',
+              rating: 4.5,
+              photos: [], // Add empty photos array to mock data
+              openingHours: null
+            });
+          }
+        });
+      } catch (error) {
+        // Clear the timeout if there's an error
+        clearTimeout(timeout);
+        
+        logger.error('googlePlacesService', 'Error in getDetails call:', error);
+        
+        // If the API call fails, return mock data for testing
+        resolve({
+          name: 'Example Place (Mock)',
+          address: '123 Example Street, Example City',
+          phoneNumber: '(123) 456-7890',
+          website: 'https://example.com',
+          rating: 4.5,
+          photos: [], // Add empty photos array to mock data
+          openingHours: null
+        });
+      }
     });
   } catch (error) {
-    console.error('[googlePlacesService] Error fetching place details:', error);
+    logger.error('googlePlacesService', 'Error fetching place details:', error);
     
     // If the API call fails, return mock data for testing
     return {
       name: 'Example Place (Mock)',
       address: '123 Example Street, Example City',
-    phoneNumber: '(123) 456-7890',
-    website: 'https://example.com',
-    rating: 4.5,
-    photos: [], // Add empty photos array to mock data
-    openingHours: null
-  };
-}
+      phoneNumber: '(123) 456-7890',
+      website: 'https://example.com',
+      rating: 4.5,
+      photos: [], // Add empty photos array to mock data
+      openingHours: null
+    };
+  }
 };
 
 /**
@@ -436,52 +486,65 @@ export const fetchPlacePhotos = async (placeId, maxPhotos = 5) => {
   if (!placeId) return null;
   
   try {
-    console.log('[googlePlacesService] Fetching place photos for ID:', placeId);
+    logger.info('googlePlacesService', 'Fetching place photos for ID:', placeId);
     
     // If the place ID is a fallback from a short URL, return empty array
     if (placeId.startsWith('shortcode_')) {
       return [];
     }
     
-    // Load the Google Maps API
-    await loadGoogleMapsApi();
+    // Load the Google Maps API with error handling
+    try {
+      await loadGoogleMapsApi();
+    } catch (error) {
+      logger.error('googlePlacesService', 'Failed to load Google Maps API:', error);
+      throw new Error('Failed to load Google Maps API');
+    }
     
     // Create a PlacesService instance
     const map = new window.google.maps.Map(document.createElement('div'));
     const service = new window.google.maps.places.PlacesService(map);
     
-    // Fetch place details to get photos
+    // Fetch place details to get photos with timeout and error handling
     return new Promise((resolve) => {
-      service.getDetails({
-        placeId: placeId,
-        fields: ['photos']
-      }, (place, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place && place.photos) {
-          // Get photo URLs
-          const photoUrls = place.photos
-            .slice(0, maxPhotos)
-            .map(photo => photo.getUrl({ maxWidth: 800 }));
+      // Create a timeout for the API call
+      const timeout = setTimeout(() => {
+        logger.error('googlePlacesService', 'Photo fetch timed out');
+        resolve([]);
+      }, 5000); // 5 second timeout
+      
+      try {
+        service.getDetails({
+          placeId: placeId,
+          fields: ['photos']
+        }, (place, status) => {
+          // Clear the timeout since we got a response
+          clearTimeout(timeout);
           
-          resolve(photoUrls);
-        } else {
-          // If the API call fails, return mock data for testing
-          resolve([
-            'https://via.placeholder.com/800x600?text=Google+Places+Photo+1',
-            'https://via.placeholder.com/800x600?text=Google+Places+Photo+2',
-            'https://via.placeholder.com/800x600?text=Google+Places+Photo+3'
-          ].slice(0, maxPhotos));
-        }
-      });
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && place && place.photos) {
+            // Get photo URLs
+            const photoUrls = place.photos
+              .slice(0, maxPhotos)
+              .map(photo => photo.getUrl({ maxWidth: 800 }));
+            
+            resolve(photoUrls);
+          } else {
+            // If the API call fails, return empty array
+            logger.warn('googlePlacesService', 'No photos found or API error:', status);
+            resolve([]);
+          }
+        });
+      } catch (error) {
+        // Clear the timeout if there's an error
+        clearTimeout(timeout);
+        
+        logger.error('googlePlacesService', 'Error fetching photos:', error);
+        resolve([]);
+      }
     });
   } catch (error) {
-    console.error('[googlePlacesService] Error fetching place photos:', error);
-    
-    // If the API call fails, return mock data for testing
-    return [
-      'https://via.placeholder.com/800x600?text=Google+Places+Photo+1',
-      'https://via.placeholder.com/800x600?text=Google+Places+Photo+2',
-      'https://via.placeholder.com/800x600?text=Google+Places+Photo+3'
-    ].slice(0, maxPhotos);
+    logger.error('googlePlacesService', 'Error fetching place photos:', error);
+    return [];
   }
 };
 
@@ -496,8 +559,15 @@ export const getTownInfoFromCoords = async (lat, lng, lineName) => { // Added li
   if (lat === undefined || lng === undefined) return null; 
 
   try {
-    console.log('[googlePlacesService] Fetching town info for coords/name:', { lat, lng, lineName });
-    await loadGoogleMapsApi();
+    logger.info('googlePlacesService', 'Fetching town info for coords/name');
+    
+    // Load the Google Maps API with error handling
+    try {
+      await loadGoogleMapsApi();
+    } catch (error) {
+      logger.error('googlePlacesService', 'Failed to load Google Maps API:', error);
+      throw new Error('Failed to load Google Maps API');
+    }
 
     const placesService = new window.google.maps.places.PlacesService(document.createElement('div'));
     const geocoder = new window.google.maps.Geocoder();
@@ -506,66 +576,124 @@ export const getTownInfoFromCoords = async (lat, lng, lineName) => { // Added li
 
     // 1. Try findPlaceFromQuery using lineName first
     if (lineName) {
-      console.log(`[googlePlacesService] Attempting findPlaceFromQuery with name: "${lineName}"`);
+      logger.info('googlePlacesService', `Attempting findPlaceFromQuery with name: "${lineName}"`);
+      
+      // Use a promise with timeout for the query
       const queryResult = await new Promise((resolve) => {
-        placesService.findPlaceFromQuery({
-          query: lineName,
-          fields: ['place_id'], // Only need place_id initially
-          locationBias: { center: { lat, lng }, radius: 5000 } // Bias towards marker location
-        }, (results, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-            console.log('[googlePlacesService] Found place via findPlaceFromQuery:', results[0]);
-            resolve(results[0].place_id);
-          } else {
-            console.warn(`[googlePlacesService] findPlaceFromQuery failed for "${lineName}":`, status);
-            resolve(null);
-          }
-        });
+        // Create a timeout for the API call
+        const timeout = setTimeout(() => {
+          logger.warn('googlePlacesService', 'findPlaceFromQuery timed out');
+          resolve(null);
+        }, 5000); // 5 second timeout
+        
+        try {
+          placesService.findPlaceFromQuery({
+            query: lineName,
+            fields: ['place_id'], // Only need place_id initially
+            locationBias: { center: { lat, lng }, radius: 5000 } // Bias towards marker location
+          }, (results, status) => {
+            // Clear the timeout since we got a response
+            clearTimeout(timeout);
+            
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+              logger.info('googlePlacesService', 'Found place via findPlaceFromQuery');
+              resolve(results[0].place_id);
+            } else {
+              logger.warn('googlePlacesService', `findPlaceFromQuery failed for "${lineName}":`, status);
+              resolve(null);
+            }
+          });
+        } catch (error) {
+          // Clear the timeout if there's an error
+          clearTimeout(timeout);
+          
+          logger.error('googlePlacesService', 'Error in findPlaceFromQuery:', error);
+          resolve(null);
+        }
       });
+      
       placeIdToFetch = queryResult;
     }
 
     // 2. If findPlaceFromQuery failed or no lineName, fallback to geocoding
     if (!placeIdToFetch) {
-      console.log('[googlePlacesService] Falling back to geocoding for coordinates.');
-      const geocodeResult = await new Promise((resolve, reject) => {
-        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-          if (status === window.google.maps.GeocoderStatus.OK && results) {
-            const localityResult = results.find(r => r.types.includes('locality') || r.types.includes('political'));
-            if (localityResult && localityResult.place_id) {
-              console.log('[googlePlacesService] Found locality via geocode fallback:', localityResult);
-              resolve(localityResult.place_id);
+      logger.info('googlePlacesService', 'Falling back to geocoding for coordinates');
+      
+      // Use a promise with timeout for the geocoding
+      const geocodeResult = await new Promise((resolve) => {
+        // Create a timeout for the API call
+        const timeout = setTimeout(() => {
+          logger.warn('googlePlacesService', 'Geocoding timed out');
+          resolve(null);
+        }, 5000); // 5 second timeout
+        
+        try {
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            // Clear the timeout since we got a response
+            clearTimeout(timeout);
+            
+            if (status === window.google.maps.GeocoderStatus.OK && results) {
+              const localityResult = results.find(r => r.types.includes('locality') || r.types.includes('political'));
+              if (localityResult && localityResult.place_id) {
+                logger.info('googlePlacesService', 'Found locality via geocode fallback');
+                resolve(localityResult.place_id);
+              } else {
+                logger.warn('googlePlacesService', 'Geocode fallback found no locality');
+                resolve(null);
+              }
             } else {
-              console.warn('[googlePlacesService] Geocode fallback found no locality.');
+              logger.error('googlePlacesService', 'Geocode fallback failed:', status);
               resolve(null);
             }
-          } else {
-            console.error('[googlePlacesService] Geocode fallback failed:', status);
-            // Don't reject here, just resolve null to allow final detail fetch attempt
-            resolve(null); 
-          }
-        });
+          });
+        } catch (error) {
+          // Clear the timeout if there's an error
+          clearTimeout(timeout);
+          
+          logger.error('googlePlacesService', 'Error in geocoding:', error);
+          resolve(null);
+        }
       });
+      
       placeIdToFetch = geocodeResult;
     }
     
     // 3. If we have a placeId from either method, fetch its details
     if (placeIdToFetch) {
-       console.log(`[googlePlacesService] Fetching details for placeId: ${placeIdToFetch}`);
-       fetchedPlaceData = await new Promise((resolve) => {
-         placesService.getDetails({
-           placeId: placeIdToFetch,
-           fields: ['name', 'editorial_summary', 'formatted_address', 'website', 'reviews'] 
-         }, (place, status) => {
-           if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
-             console.log('[googlePlacesService] Fetched details successfully:', place);
-             resolve(place);
-           } else {
-             console.error(`[googlePlacesService] getDetails failed for ${placeIdToFetch}:`, status);
-             resolve(null); // Resolve null on failure
-           }
-         });
-       });
+      logger.info('googlePlacesService', `Fetching details for placeId: ${placeIdToFetch}`);
+      
+      // Use a promise with timeout for the details
+      fetchedPlaceData = await new Promise((resolve) => {
+        // Create a timeout for the API call
+        const timeout = setTimeout(() => {
+          logger.warn('googlePlacesService', 'getDetails timed out');
+          resolve(null);
+        }, 5000); // 5 second timeout
+        
+        try {
+          placesService.getDetails({
+            placeId: placeIdToFetch,
+            fields: ['name', 'editorial_summary', 'formatted_address', 'website', 'reviews'] 
+          }, (place, status) => {
+            // Clear the timeout since we got a response
+            clearTimeout(timeout);
+            
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+              logger.info('googlePlacesService', 'Fetched details successfully');
+              resolve(place);
+            } else {
+              logger.error('googlePlacesService', `getDetails failed for ${placeIdToFetch}:`, status);
+              resolve(null);
+            }
+          });
+        } catch (error) {
+          // Clear the timeout if there's an error
+          clearTimeout(timeout);
+          
+          logger.error('googlePlacesService', 'Error in getDetails:', error);
+          resolve(null);
+        }
+      });
     }
 
     // 4. Determine final name and summary based on fetched data (if any)
@@ -580,18 +708,19 @@ export const getTownInfoFromCoords = async (lat, lng, lineName) => { // Added li
       } else if (fetchedPlaceData.formatted_address) {
         summaryText = fetchedPlaceData.formatted_address;
       }
-      console.log('[googlePlacesService] Determined summary text:', summaryText);
+      
+      logger.info('googlePlacesService', 'Determined summary text');
+      
       return {
         name: fetchedPlaceData.name || 'Unknown Place',
         summary: summaryText
       };
     } else {
-       console.log('[googlePlacesService] No place details could be fetched.');
-       return null; // Return null if no details were fetched
+      logger.info('googlePlacesService', 'No place details could be fetched');
+      return null;
     }
-
   } catch (error) {
-    console.error('[googlePlacesService] Error in getTownInfoFromCoords:', error);
+    logger.error('googlePlacesService', 'Error in getTownInfoFromCoords:', error);
     return null;
   }
 };
@@ -606,32 +735,58 @@ export const getStateFromCoords = async (lat, lng) => {
   if (lat === undefined || lng === undefined) return null;
 
   try {
-    console.log('[googlePlacesService] Getting state for coords:', { lat, lng });
-    await loadGoogleMapsApi();
+    logger.info('googlePlacesService', 'Getting state for coords');
+    
+    // Load the Google Maps API with error handling
+    try {
+      await loadGoogleMapsApi();
+    } catch (error) {
+      logger.error('googlePlacesService', 'Failed to load Google Maps API:', error);
+      throw new Error('Failed to load Google Maps API');
+    }
+    
     const geocoder = new window.google.maps.Geocoder();
 
-    return new Promise((resolve, reject) => {
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
-          // Find the administrative_area_level_1 component
-          const stateComponent = results[0].address_components.find(comp => 
-            comp.types.includes('administrative_area_level_1')
-          );
-          if (stateComponent) {
-            console.log('[googlePlacesService] Found state:', stateComponent.long_name);
-            resolve(stateComponent.long_name);
+    // Use a promise with timeout for the geocoding
+    return new Promise((resolve) => {
+      // Create a timeout for the API call
+      const timeout = setTimeout(() => {
+        logger.warn('googlePlacesService', 'Geocoding timed out while getting state');
+        resolve(null);
+      }, 5000); // 5 second timeout
+      
+      try {
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          // Clear the timeout since we got a response
+          clearTimeout(timeout);
+          
+          if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
+            // Find the administrative_area_level_1 component
+            const stateComponent = results[0].address_components.find(comp => 
+              comp.types.includes('administrative_area_level_1')
+            );
+            if (stateComponent) {
+              logger.info('googlePlacesService', 'Found state:', stateComponent.long_name);
+              resolve(stateComponent.long_name);
+            } else {
+              logger.warn('googlePlacesService', 'State not found in geocode result');
+              resolve(null);
+            }
           } else {
-            console.warn('[googlePlacesService] State (administrative_area_level_1) not found in geocode result.');
+            logger.error('googlePlacesService', 'Geocode failed while getting state:', status);
             resolve(null);
           }
-        } else {
-          console.error('[googlePlacesService] Geocode failed while getting state:', status);
-          reject(new Error(`Geocode failed with status: ${status}`)); // Reject on failure
-        }
-      });
+        });
+      } catch (error) {
+        // Clear the timeout if there's an error
+        clearTimeout(timeout);
+        
+        logger.error('googlePlacesService', 'Error in geocoding for state:', error);
+        resolve(null);
+      }
     });
   } catch (error) {
-    console.error('[googlePlacesService] Error in getStateFromCoords:', error);
+    logger.error('googlePlacesService', 'Error in getStateFromCoords:', error);
     return null; // Return null on outer error
   }
 };

@@ -1,57 +1,78 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Box, IconButton, Typography, Modal, Link, Rating, CircularProgress } from '@mui/material';
 import { Close, LocationOn, Phone, Language, Star } from '@mui/icons-material';
 import { ImageSlider } from '../ImageSlider/ImageSlider';
 import { POI_CATEGORIES } from '../../../poi/types/poi.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import { fetchBasicPlaceDetails } from '../../../poi/services/googlePlacesService';
+import logger from '../../../../utils/logger';
 
 export const PresentationPOIViewer = ({ poi, onClose }) => {
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [googlePlacesData, setGooglePlacesData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [shouldLoadGoogleData, setShouldLoadGoogleData] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     
-    // Fetch Google Places data if the POI has a place ID
+    // Check if we're on a mobile device
     useEffect(() => {
-        const fetchGooglePlacesData = async () => {
-            console.log('[PresentationPOIViewer] POI data:', poi);
-            
-            // Get the Google Place ID directly from the POI
-            const placeId = poi?.googlePlaceId;
-            
-            if (!placeId) {
-                console.log('[PresentationPOIViewer] No Google Places ID found in POI');
-                return;
-            }
-            
-            try {
-                setLoading(true);
-                setError(null);
-                console.log('[PresentationPOIViewer] Fetching Google Places data for ID:', placeId);
-                
-                const placeDetails = await fetchBasicPlaceDetails(placeId);
-                if (placeDetails) {
-                    console.log('[PresentationPOIViewer] Fetched Google Places data:', placeDetails);
-                    setGooglePlacesData({
-                        ...placeDetails,
-                        placeId: placeId
-                    });
-                } else {
-                    console.error('[PresentationPOIViewer] Failed to fetch Google Places data');
-                    setError('Failed to fetch Google Places data');
-                }
-            } catch (err) {
-                console.error('[PresentationPOIViewer] Error fetching Google Places data:', err);
-                setError(err.message || 'An error occurred while fetching Google Places data');
-            } finally {
-                setLoading(false);
-            }
+        const checkMobile = () => {
+            const mobile = window.innerWidth <= 768 || 
+                /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            setIsMobile(mobile);
         };
         
-        fetchGooglePlacesData();
-    }, [poi?.googlePlaceId]);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        
+        return () => {
+            window.removeEventListener('resize', checkMobile);
+        };
+    }, []);
+    
+    // Lazy load Google Places data only when needed
+    const loadGooglePlacesData = useCallback(async () => {
+        if (!poi?.googlePlaceId || googlePlacesData || loading) return;
+        
+        const placeId = poi.googlePlaceId;
+        
+        if (!placeId) {
+            logger.info('PresentationPOIViewer', 'No Google Places ID found in POI');
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            setError(null);
+            logger.info('PresentationPOIViewer', 'Fetching Google Places data for ID:', placeId);
+            
+            const placeDetails = await fetchBasicPlaceDetails(placeId);
+            if (placeDetails) {
+                logger.info('PresentationPOIViewer', 'Fetched Google Places data successfully');
+                setGooglePlacesData({
+                    ...placeDetails,
+                    placeId: placeId
+                });
+            } else {
+                logger.error('PresentationPOIViewer', 'Failed to fetch Google Places data');
+                setError('Failed to fetch Google Places data');
+            }
+        } catch (err) {
+            logger.error('PresentationPOIViewer', 'Error fetching Google Places data:', err);
+            setError(err.message || 'An error occurred while fetching Google Places data');
+        } finally {
+            setLoading(false);
+        }
+    }, [poi?.googlePlaceId, googlePlacesData, loading]);
+    
+    // Only fetch Google Places data when the user explicitly requests it
+    useEffect(() => {
+        if (shouldLoadGoogleData) {
+            loadGooglePlacesData();
+        }
+    }, [shouldLoadGoogleData, loadGooglePlacesData]);
     
     if (!poi)
         return null;
@@ -82,19 +103,33 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
     // Construct a simple Google Maps Embed URL (/v1/view) for minimal controls
     const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
     const [lng, lat] = poi.coordinates;
-    // Revert to Static Map URL with hybrid type
-    const mapWidth = 600;
-    const mapHeight = 400;
-    const staticMapUrl = apiKey ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=${mapWidth}x${mapHeight}&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${apiKey}` : null;
-    console.log('[PresentationPOIViewer] Static Hybrid Map URL:', staticMapUrl);
+    
+    // Use smaller map size on mobile to reduce data usage
+    const mapWidth = isMobile ? 300 : 600;
+    const mapHeight = isMobile ? 200 : 400;
+    
+    // Only create the static map URL if we need it (not on mobile unless explicitly requested)
+    const staticMapUrl = apiKey && (!isMobile || userPhotos.length === 0) 
+        ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=${mapWidth}x${mapHeight}&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${apiKey}` 
+        : null;
+    
+    // Use logger instead of console.log
+    if (staticMapUrl) {
+        logger.debug('PresentationPOIViewer', 'Static Hybrid Map URL created');
+    }
+    
     const embedMapUrl = null; // Ensure embedMapUrl is null
-
 
     // Always show the image slider (will show map or photos)
     const showImageSlider = true;
     
     // Determine if we should show Google Places section
     const showGooglePlaces = (poi.googlePlaceId) && (googlePlacesData || loading);
+    
+    // Handle Google Places data loading
+    const handleLoadGoogleData = useCallback(() => {
+        setShouldLoadGoogleData(true);
+    }, []);
     
     return _jsxs(_Fragment, { children: [
         _jsx(Modal, { 
@@ -205,7 +240,51 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
                         })
                     }),
                     
-                    // Google Places information (if available)
+                    // Google Places data load button (only show if we have a place ID and haven't loaded data yet)
+                    poi.googlePlaceId && !googlePlacesData && !loading && !shouldLoadGoogleData && (
+                        _jsx(Box, {
+                            sx: {
+                                mb: 3,
+                                display: 'flex',
+                                justifyContent: 'center'
+                            },
+                            children: _jsx(Box, {
+                                onClick: handleLoadGoogleData,
+                                sx: {
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    backgroundColor: 'rgba(66, 133, 244, 0.8)',
+                                    color: 'white',
+                                    py: 1,
+                                    px: 2,
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(66, 133, 244, 1)'
+                                    },
+                                    // Make button bigger and more touch-friendly on mobile
+                                    ...(isMobile && {
+                                        py: 1.5,
+                                        px: 3,
+                                        fontSize: '1.1rem'
+                                    })
+                                },
+                                children: _jsxs(_Fragment, {
+                                    children: [
+                                        _jsx(Star, { sx: { color: '#FFD700' } }),
+                                        _jsx(Typography, {
+                                            variant: isMobile ? "button" : "body2",
+                                            sx: { ml: 1 },
+                                            children: "Load Google Places Information"
+                                        })
+                                    ]
+                                })
+                            })
+                        })
+                    ),
+                    
+                    // Google Places information (if available or loading)
                     showGooglePlaces && _jsxs(Box, {
                         sx: {
                             mb: 3,
