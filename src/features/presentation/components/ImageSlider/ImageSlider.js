@@ -10,6 +10,11 @@ import {
   generateSrcSet 
 } from '../../../../utils/imageUtils';
 
+// Helper function to detect mobile devices
+const isMobileDevice = () => {
+  return window.innerWidth <= 768;
+};
+
 // Style the image to fill the entire space, cropping if necessary
 const SlideImage = styled('img')({
   width: '100%',
@@ -75,24 +80,39 @@ const ImageContainer = styled(Box)({
 
 // Optimized image component with srcset for responsive loading
 const OptimizedImage = React.memo(({ src, alt, onLoad, style, sizes = '100vw' }) => {
+  const isMobile = isMobileDevice();
+  
   // Generate srcset for responsive images if it's a Cloudinary URL
-  const srcSet = generateSrcSet(src);
+  const srcSet = !isMobile ? generateSrcSet(src) : '';
   
   // Get an optimized version of the image for the src attribute
+  // Use lower quality and smaller size for mobile
   const optimizedSrc = getOptimizedImageUrl(src, { 
-    width: 800, 
-    quality: 80,
+    width: isMobile ? 400 : 800, 
+    quality: isMobile ? 60 : 80,
     format: 'auto'
   }) || src;
   
+  // Set appropriate sizes attribute based on device
+  const responsiveSizes = isMobile 
+    ? '100vw' // Full width on mobile
+    : '(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw';
+  
   return _jsx(SlideImage, {
     src: optimizedSrc,
-    srcSet: srcSet,
-    sizes: sizes,
+    srcSet: srcSet, // Only use srcSet on non-mobile
+    sizes: responsiveSizes,
     alt: alt,
     loading: "lazy",
     onLoad: onLoad,
-    style: style
+    style: style,
+    onError: (e) => {
+      // Fallback to original source if optimized version fails
+      if (e.target.src !== src) {
+        console.warn('[ImageSlider] Optimized image failed to load, falling back to original');
+        e.target.src = src;
+      }
+    }
   });
 });
 
@@ -111,6 +131,20 @@ export const ImageSlider = React.memo(({
   const [loadedThumbnails, setLoadedThumbnails] = useState({});
   // Refs to store the actual Image objects for preloading
   const imageRefs = useRef({});
+  // State to track if we're on a mobile device
+  const [isMobile, setIsMobile] = useState(isMobileDevice());
+  
+  // Update mobile state on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(isMobileDevice());
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
   
   // Function to mark an image as loaded
   const handleImageLoad = (index) => {
@@ -196,7 +230,13 @@ export const ImageSlider = React.memo(({
     // Always load the first image
     if (index === 0) return true;
     
-    // Load images adjacent to the current active step
+    // On mobile, be more conservative with preloading to save bandwidth
+    if (isMobile) {
+      // Only load the current image and the next one on mobile
+      return index === activeStep || index === (activeStep + 1) % items.length;
+    }
+    
+    // On desktop, load current, previous, and next images
     return index === activeStep || 
            index === activeStep - 1 || 
            index === activeStep + 1 || 
@@ -219,7 +259,22 @@ export const ImageSlider = React.memo(({
     // Create a new Image object for preloading
     const img = new Image();
     img.onload = () => handleImageLoad(index);
-    img.src = url;
+    img.onerror = (error) => {
+      console.warn(`[ImageSlider] Failed to preload image at index ${index}:`, error);
+      // Still mark as loaded to prevent UI from waiting indefinitely
+      handleImageLoad(index);
+    };
+    
+    // For mobile, use a smaller optimized version
+    if (isMobile) {
+      img.src = getOptimizedImageUrl(url, { 
+        width: 400, 
+        quality: 60,
+        format: 'auto'
+      }) || url;
+    } else {
+      img.src = url;
+    }
     
     // Store the Image object in the ref
     imageRefs.current[index] = img;
@@ -331,14 +386,14 @@ export const ImageSlider = React.memo(({
                 src: item.content,
                 alt: "Map location",
                 onLoad: () => handleImageLoad(index),
-                style: { opacity: loadedImages[index] ? 1 : 0 },
-                sizes: "(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                style: { opacity: loadedImages[index] ? 1 : 0 }
+                // sizes is now handled within the OptimizedImage component
               })
             ) : (
               // Placeholder while loading
               _jsx(ImagePlaceholder, {
                 variant: "rectangular",
-                animation: "wave"
+                animation: isMobile ? "pulse" : "wave" // Use pulse animation on mobile (less GPU intensive)
               })
             ),
             key: `slide-${index}`
@@ -377,14 +432,14 @@ export const ImageSlider = React.memo(({
                   src: item.content,
                   alt: `Route photo ${index}`,
                   onLoad: () => handleImageLoad(index),
-                  style: { opacity: loadedImages[index] ? 1 : 0 },
-                  sizes: "(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw"
+                  style: { opacity: loadedImages[index] ? 1 : 0 }
+                  // sizes is now handled within the OptimizedImage component
                 })
               ) : (
                 // Placeholder when not in view and no thumbnail
                 !item.thumbnailUrl && _jsx(ImagePlaceholder, {
                   variant: "rectangular",
-                  animation: "wave"
+                  animation: isMobile ? "pulse" : "wave" // Use pulse animation on mobile (less GPU intensive)
                 })
               )
             ],

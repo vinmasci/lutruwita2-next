@@ -433,6 +433,13 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                             // Immediately update the route without requiring a second click
                                             updateRouteAndMap(route);
                                         },
+                                        // Add touchstart event handler for mobile devices
+                                        onTouchStart: (e) => {
+                                            // Prevent default to avoid any browser-specific touch behaviors
+                                            e.preventDefault();
+                                            // Stop propagation to ensure no other elements capture this event
+                                            e.stopPropagation();
+                                        },
                                         children: _jsx(ListItemText, { 
                                             primary: _jsxs("div", {
                                                 style: { display: 'flex', alignItems: 'center', gap: '10px', minWidth: '0' },

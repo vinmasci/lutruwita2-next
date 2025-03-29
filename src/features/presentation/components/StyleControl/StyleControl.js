@@ -1,3 +1,5 @@
+import logger from '../../../../utils/logger';
+
 export const MAP_STYLES = {
     satellite: {
         url: 'mapbox://styles/mapbox/satellite-streets-v12',
@@ -79,7 +81,7 @@ class StyleControl {
             }
             // Re-apply terrain settings with device-specific exaggeration
             const isMobile = window.innerWidth <= 768;
-            console.log('[StyleControl] Re-applying terrain with device detection:', { 
+            logger.info('StyleControl', 'Re-applying terrain with device detection:', { 
                 isMobile, 
                 width: window.innerWidth,
                 projection: this.map?.getProjection()?.name

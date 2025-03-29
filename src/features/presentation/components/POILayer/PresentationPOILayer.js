@@ -11,6 +11,7 @@ import { clusterPOIs, isCluster, getClusterExpansionZoom } from '../../../poi/ut
 import { PresentationPOIViewer } from '../POIViewer';
 import POICluster from '../../../poi/components/POICluster/POICluster';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker/MapboxPOIMarker';
+import logger from '../../../../utils/logger';
 import './PresentationPOILayer.css';
 export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     const { currentRoute } = useRouteContext();
@@ -313,14 +314,14 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                     _jsx(MapboxPOIMarker, {
                         poi: item.properties.poi,
                         onClick: (poi) => {
-                            console.log('[PresentationPOILayer] POI clicked:', poi);
+                            logger.info('PresentationPOILayer', 'POI clicked:', poi);
                             // Ensure we're using the original POI object, not the transformed GeoJSON feature
                             const originalPoi = item.properties.poi;
                             if (onSelectPOI) {
-                                console.log('[PresentationPOILayer] Using onSelectPOI');
+                                logger.info('PresentationPOILayer', 'Using onSelectPOI');
                                 onSelectPOI(originalPoi);
                             } else {
-                                console.log('[PresentationPOILayer] Using setSelectedPOI');
+                                logger.info('PresentationPOILayer', 'Using setSelectedPOI');
                                 setSelectedPOI(originalPoi);
                             }
                         },
@@ -333,7 +334,7 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     
     // Always render the POI viewer if needed, regardless of clustering
     if (!onSelectPOI && selectedPOI) {
-        console.log('[PresentationPOILayer] Rendering PresentationPOIViewer with POI:', selectedPOI);
+        logger.info('PresentationPOILayer', 'Rendering PresentationPOIViewer with POI:', selectedPOI);
         return [
             ...renderedItems,
             _jsx(PresentationPOIViewer, {

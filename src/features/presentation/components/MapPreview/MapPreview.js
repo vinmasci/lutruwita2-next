@@ -1,13 +1,33 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+
+// Helper function to detect mobile devices
+const isMobileDevice = () => {
+  return window.innerWidth <= 768;
+};
 export const MapPreview = ({ center, zoom, routes = [], className = '', disableFitBounds = false }) => {
     const mapContainer = useRef(null);
     const map = useRef(null);
+    const [isMobile, setIsMobile] = useState(isMobileDevice());
+    
+    // Update mobile state on resize
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(isMobileDevice());
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
     useEffect(() => {
         if (!mapContainer.current)
             return;
+        
+        // Apply mobile-specific optimizations
         map.current = new mapboxgl.Map({
             container: mapContainer.current,
             style: 'mapbox://styles/mapbox/satellite-streets-v12',
@@ -15,7 +35,11 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
             zoom: zoom,
             interactive: false, // Disable map interactions for preview
             attributionControl: false,
-            animate: false // Disable all map animations
+            animate: false, // Disable all map animations
+            pitch: 0, // Use flat view for better performance
+            antialias: !isMobile, // Disable antialiasing on mobile for better performance
+            preserveDrawingBuffer: true, // Needed for screenshots
+            failIfMajorPerformanceCaveat: false // Don't fail on performance issues
         });
         // Clean up on unmount
         return () => {
@@ -29,6 +53,18 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
             return;
         // Wait for map to load before adding sources and layers
         map.current.once('load', () => {
+            // Skip 3D terrain on mobile for better performance
+            if (!isMobile) {
+                try {
+                    map.current.setTerrain({
+                        source: 'mapbox-dem',
+                        exaggeration: 1.0
+                    });
+                } catch (error) {
+                    console.error('[MapPreview] Error setting terrain:', error);
+                }
+            }
+            
             const bounds = new mapboxgl.LngLatBounds();
             routes.forEach((route, index) => {
                 if (!route.geojson)

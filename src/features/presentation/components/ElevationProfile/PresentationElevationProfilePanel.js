@@ -19,6 +19,7 @@ import { PresentationMapOverviewPanel } from '../MapOverview';
 import mapboxgl from 'mapbox-gl'; // Import mapboxgl
 import MapOverviewContextAdapter from '../EmbedMapView/components/MapOverviewContextAdapter';
 import MapOverviewLoader from '../MapOverview/MapOverviewLoader';
+import logger from '../../../../utils/logger';
 
 const ElevationPanel = styled(Box)(({ theme }) => ({
     position: 'fixed',
@@ -105,7 +106,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         });
         animationTimeoutsRef.current = [];
         
-        console.log('[Flyby] Flyby stopped by user');
+        logger.info('Flyby', 'Flyby stopped by user');
         
         // If we have stored route bounds, fit to them
         if (routeBoundsRef.current && map) {
@@ -127,7 +128,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
     // Function to start the flyby animation - improved implementation with reduced spinning
     const startFlyby = (route) => {
         if (!map || !route?.geojson?.features?.[0]?.geometry?.coordinates) {
-            console.error('[Flyby] No map or route coordinates available');
+            logger.error('Flyby', 'No map or route coordinates available');
             return;
         }
         
@@ -156,7 +157,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             sampledCoords.push(allCoords[allCoords.length - 1]);
         }
         
-        console.log('[Flyby] Starting flyby with', sampledCoords.length, 'points');
+        logger.info('Flyby', 'Starting flyby with', sampledCoords.length, 'points');
         
         // Calculate the overall bearing from start to end
         const overallBearing = calculateBearing(
@@ -192,7 +193,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         
         const flyToNextPoint = () => {
             if (currentIndex >= sampledCoords.length) {
-                console.log('[Flyby] Flyby complete');
+                logger.info('Flyby', 'Flyby complete');
                 
                 // Simply zoom out to show the entire route
                 map.fitBounds(bounds, {

@@ -4,6 +4,7 @@ import { getIconDefinition } from '../../constants/poi-icons';
 import { POI_CATEGORIES } from '../../types/poi.types';
 import { ICON_PATHS } from '../../constants/icon-paths';
 import { useMapContext } from '../../../map/context/MapContext';
+import logger from '../../../../utils/logger';
 import './MapboxPOIMarker.styles.css';
 const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
     const markerRef = useRef(null);
@@ -81,12 +82,12 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
                 
         }
         catch (error) {
-            console.error('Error creating marker:', error);
+            logger.error('MapboxPOIMarker', 'Error creating marker:', error);
         }
         // Handle clicking
         if (onClick) {
             el.addEventListener('click', () => {
-                console.log('[MapboxPOIMarker] Click detected on POI:', poi);
+                logger.info('MapboxPOIMarker', 'Click detected on POI:', poi);
                 onClick(poi);
             });
         }

@@ -1,3 +1,5 @@
+import logger from '../../../../utils/logger';
+
 export const MAP_STYLES = {
     satellite: {
         url: 'mapbox://styles/mapbox/satellite-streets-v12',
@@ -68,7 +70,7 @@ class StyleControl {
         }
         // Capture line sources - they typically start with 'line-'
         if (id.includes('line-') || id.includes('circle-source-line-')) {
-          console.log('[StyleControl] Preserving line source:', id);
+          logger.info('StyleControl', 'Preserving line source:', id);
           lineSources[id] = source;
         }
       });
@@ -82,7 +84,7 @@ class StyleControl {
         if (layer.id.includes('line-') || 
             layer.id.includes('circle-line-') || 
             layer.id.includes('inner-circle-line-')) {
-          console.log('[StyleControl] Preserving line layer:', layer.id);
+          logger.info('StyleControl', 'Preserving line layer:', layer.id);
           lineLayers[layer.id] = layer;
         }
       });
@@ -100,7 +102,7 @@ class StyleControl {
       }
       // Re-apply terrain settings with device-specific exaggeration
       const isMobile = window.innerWidth <= 768;
-      console.log('[StyleControl] Re-applying terrain with device detection:', { 
+      logger.info('StyleControl', 'Re-applying terrain with device detection:', { 
         isMobile, 
         width: window.innerWidth,
         projection: this.map?.getProjection()?.name
@@ -172,16 +174,16 @@ class StyleControl {
       });
       
       // Re-add line sources and layers
-      console.log('[StyleControl] Re-adding line sources and layers');
+      logger.info('StyleControl', 'Re-adding line sources and layers');
       
       // First add all sources
       Object.entries(lineSources).forEach(([id, source]) => {
         if (!this.map?.getSource(id)) {
           try {
-            console.log('[StyleControl] Re-adding line source:', id);
+            logger.info('StyleControl', 'Re-adding line source:', id);
             this.map?.addSource(id, source);
           } catch (error) {
-            console.error('[StyleControl] Error re-adding line source:', id, error);
+            logger.error('StyleControl', 'Error re-adding line source:', id, error);
           }
         }
       });
@@ -190,10 +192,10 @@ class StyleControl {
       Object.entries(lineLayers).forEach(([id, layer]) => {
         if (!this.map?.getLayer(id)) {
           try {
-            console.log('[StyleControl] Re-adding line layer:', id);
+            logger.info('StyleControl', 'Re-adding line layer:', id);
             this.map?.addLayer(layer);
           } catch (error) {
-            console.error('[StyleControl] Error re-adding line layer:', id, error);
+            logger.error('StyleControl', 'Error re-adding line layer:', id, error);
           }
         }
       });
@@ -216,7 +218,7 @@ class StyleControl {
         if (this.onStyleChange && typeof this.onStyleChange === 'function') {
             this.onStyleChange(style);
         }
-        console.debug('[StyleControl] Switching to style:', {
+        logger.debug('StyleControl', 'Switching to style:', {
             style,
             url: MAP_STYLES[style].url,
             currentLayers: this.map.getStyle()?.layers?.map(l => ({
@@ -229,7 +231,7 @@ class StyleControl {
         this.map.setStyle(MAP_STYLES[style].url);
         // Log layers after style load
         this.map.once('style.load', () => {
-            console.debug('[StyleControl] New style loaded:', {
+            logger.debug('StyleControl', 'New style loaded:', {
                 style,
                 layers: this.map.getStyle()?.layers?.map(l => ({
                     id: l.id,
