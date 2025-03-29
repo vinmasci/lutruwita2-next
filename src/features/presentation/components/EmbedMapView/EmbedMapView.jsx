@@ -490,6 +490,9 @@ export default function EmbedMapView() {
         // Flag to track if component is mounted
         let isMounted = true;
         
+        // Check if device is mobile
+        const initialIsMobile = window.innerWidth <= 768;
+        
         // Handle case where mapState.style doesn't match any key in MAP_STYLES
         let mapStyle = MAP_STYLES.satellite.url; // Default fallback
         
@@ -526,13 +529,15 @@ export default function EmbedMapView() {
                 center: mapState.center || [146.5, -42.0],
                 zoom: mapState.zoom || 10, // Default zoom will be overridden by fitBounds
                 bearing: mapState.bearing || 0,
-                pitch: mapState.pitch || 0,
+                pitch: initialIsMobile ? 0 : (mapState.pitch || 0), // Use flat view on mobile
+                projection: 'mercator', // Always use mercator for better performance and compatibility
+                maxPitch: initialIsMobile ? 0 : 85, // Limit pitch on mobile
                 width: '100%',
                 height: '100%',
                 failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
                 preserveDrawingBuffer: true, // Needed for screenshots
                 attributionControl: false, // We'll add this manually
-                antialias: true // Enable antialiasing for smoother rendering
+                antialias: initialIsMobile ? false : true // Disable antialiasing on mobile for better performance
             });
         } catch (error) {
             console.error('[EmbedMapView] Error creating map instance:', error);
@@ -650,10 +655,45 @@ export default function EmbedMapView() {
                         });
                     }
                     
+                    // Get current device type
+                    const isCurrentlyMobile = window.innerWidth <= 768;
+                    
+                    // Set terrain with appropriate exaggeration based on device
+                    // Use no exaggeration on mobile for better performance
                     map.setTerrain({
                         source: 'mapbox-dem',
-                        exaggeration: 1.5
+                        exaggeration: isCurrentlyMobile ? 0.0 : 1.5
                     });
+                    
+                    // Add 3D buildings layer only on non-mobile devices
+                    if (!isCurrentlyMobile) {
+                        try {
+                            map.addLayer({
+                                'id': '3d-buildings',
+                                'source': 'composite',
+                                'source-layer': 'building',
+                                'filter': ['==', 'extrude', 'true'],
+                                'type': 'fill-extrusion',
+                                'minzoom': 15,
+                                'paint': {
+                                    'fill-extrusion-color': '#aaa',
+                                    'fill-extrusion-height': [
+                                        'interpolate', ['linear'], ['zoom'],
+                                        15, 0,
+                                        15.05, ['get', 'height']
+                                    ],
+                                    'fill-extrusion-base': [
+                                        'interpolate', ['linear'], ['zoom'],
+                                        15, 0,
+                                        15.05, ['get', 'min_height']
+                                    ],
+                                    'fill-extrusion-opacity': 0.6
+                                }
+                            });
+                        } catch (error) {
+                            console.error('[EmbedMapView] Error adding 3D buildings layer:', error);
+                        }
+                    }
                     
                     // Add hover point source and layer if it doesn't exist
                     if (!map.getSource('hover-point')) {

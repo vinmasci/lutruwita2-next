@@ -187,28 +187,56 @@ export default function PresentationMapView(props) {
         const map = mapInstance.current;
         
         
-        // Update projection if needed
+        // Update projection if needed - always use mercator on mobile for better performance
         const currentProjection = map.getProjection().name;
         const targetProjection = isMobile ? 'mercator' : 'globe';
         
         if (currentProjection !== targetProjection) {
-            map.setProjection(targetProjection);
+            try {
+                map.setProjection(targetProjection);
+            } catch (error) {
+                console.error('[PresentationMapView] Error setting projection:', error);
+                // Fallback to mercator if there's an error
+                if (currentProjection !== 'mercator') {
+                    try {
+                        map.setProjection('mercator');
+                    } catch (innerError) {
+                        console.error('[PresentationMapView] Error setting fallback projection:', innerError);
+                    }
+                }
+            }
         }
         
-        // Update terrain exaggeration
+        // Update terrain exaggeration - use flat terrain on mobile
         if (map.getTerrain()) {
-            map.setTerrain({
-                source: 'mapbox-dem',
-                exaggeration: isMobile ? 1.0 : 1.5
-            });
+            try {
+                map.setTerrain({
+                    source: 'mapbox-dem',
+                    exaggeration: isMobile ? 0.0 : 1.5 // No exaggeration on mobile for better performance
+                });
+            } catch (error) {
+                console.error('[PresentationMapView] Error updating terrain:', error);
+            }
         }
         
-        // Update pitch if needed
+        // Update pitch if needed - use flat view on mobile
         const currentPitch = map.getPitch();
         const targetPitch = isMobile ? 0 : 45;
         
         if (Math.abs(currentPitch - targetPitch) > 5) {
-            map.setPitch(targetPitch);
+            try {
+                map.setPitch(targetPitch);
+            } catch (error) {
+                console.error('[PresentationMapView] Error setting pitch:', error);
+                // Try to set pitch to 0 as a fallback
+                if (currentPitch !== 0) {
+                    try {
+                        map.setPitch(0);
+                    } catch (innerError) {
+                        console.error('[PresentationMapView] Error setting fallback pitch:', innerError);
+                    }
+                }
+            }
         }
     }, []);
     
@@ -243,14 +271,14 @@ export default function PresentationMapView(props) {
                     pitch: initialIsMobile ? 0 : 45, // Use flat view on mobile
                     bearing: 0
                 },
-                projection: initialIsMobile ? 'mercator' : 'globe', // Use mercator on mobile for better performance
-                maxPitch: 85,
+                projection: 'mercator', // Always use mercator for better performance and compatibility
+                maxPitch: initialIsMobile ? 0 : 85, // Limit pitch on mobile
                 width: '100%',
                 height: '100%',
                 failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
                 preserveDrawingBuffer: true, // Needed for screenshots
                 attributionControl: false, // We'll add this manually
-                antialias: true // Enable antialiasing for smoother rendering
+                antialias: initialIsMobile ? false : true // Disable antialiasing on mobile for better performance
             });
         } catch (error) {
             console.error('[PresentationMapView] Error creating map instance:', error);
@@ -295,34 +323,41 @@ export default function PresentationMapView(props) {
                 const isCurrentlyMobile = window.innerWidth <= 768;
                 
                 // Set terrain with appropriate exaggeration based on device
+                // Use no exaggeration on mobile for better performance
                 map.setTerrain({
                     source: 'mapbox-dem',
-                    exaggeration: isCurrentlyMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
+                    exaggeration: isCurrentlyMobile ? 0.0 : 1.5
                 });
                 
-                // Add 3D buildings layer
-                map.addLayer({
-                    'id': '3d-buildings',
-                    'source': 'composite',
-                    'source-layer': 'building',
-                    'filter': ['==', 'extrude', 'true'],
-                    'type': 'fill-extrusion',
-                    'minzoom': 15,
-                    'paint': {
-                        'fill-extrusion-color': '#aaa',
-                        'fill-extrusion-height': [
-                            'interpolate', ['linear'], ['zoom'],
-                            15, 0,
-                            15.05, ['get', 'height']
-                        ],
-                        'fill-extrusion-base': [
-                            'interpolate', ['linear'], ['zoom'],
-                            15, 0,
-                            15.05, ['get', 'min_height']
-                        ],
-                        'fill-extrusion-opacity': 0.6
+                // Add 3D buildings layer only on non-mobile devices
+                if (!isCurrentlyMobile) {
+                    try {
+                        map.addLayer({
+                            'id': '3d-buildings',
+                            'source': 'composite',
+                            'source-layer': 'building',
+                            'filter': ['==', 'extrude', 'true'],
+                            'type': 'fill-extrusion',
+                            'minzoom': 15,
+                            'paint': {
+                                'fill-extrusion-color': '#aaa',
+                                'fill-extrusion-height': [
+                                    'interpolate', ['linear'], ['zoom'],
+                                    15, 0,
+                                    15.05, ['get', 'height']
+                                ],
+                                'fill-extrusion-base': [
+                                    'interpolate', ['linear'], ['zoom'],
+                                    15, 0,
+                                    15.05, ['get', 'min_height']
+                                ],
+                                'fill-extrusion-opacity': 0.6
+                            }
+                        });
+                    } catch (error) {
+                        console.error('[PresentationMapView] Error adding 3D buildings layer:', error);
                     }
-                });
+                }
                 
                 // Add hover point source and layer
                 map.addSource('hover-point', {
