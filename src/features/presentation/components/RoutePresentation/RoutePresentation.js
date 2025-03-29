@@ -91,7 +91,8 @@ export const RoutePresentation = () => {
 
     // Create a memoized component for route content
     const RouteContent = React.memo(({ route }) => {
-        const { addRoute, setCurrentRoute, updateHeaderSettings } = useRouteContext();
+        // Destructure setCurrentLoadedState and setCurrentLoadedPersistentId
+        const { addRoute, setCurrentRoute, updateHeaderSettings, setCurrentLoadedState, setCurrentLoadedPersistentId } = useRouteContext();
         const { addPhoto } = usePhotoContext();
         const { loadPOIsFromRoute } = usePOIContext();
         const { loadLinesFromRoute } = useLineContext();
@@ -104,15 +105,15 @@ export const RoutePresentation = () => {
             
             // Check if we're already initialized to prevent double initialization
             if (document.querySelector('[data-route-initialized="true"]')) {
-                console.log('[RoutePresentation] Skipping initialization - already initialized');
+                // console.log('[RoutePresentation] Skipping initialization - already initialized');
                 setInitialized(true);
                 return;
             }
             
             // Batch route initialization
             const initializeRoutes = () => {
-                console.log('[RoutePresentation] Starting route initialization');
-                
+                // console.log('[RoutePresentation] Starting route initialization');
+
                 // Mark as initialized to prevent double initialization
                 document.body.setAttribute('data-route-initialized', 'true');
                 
@@ -120,67 +121,81 @@ export const RoutePresentation = () => {
                 routes.forEach((route) => {
                     addRoute(route);
                 });
-                console.log('[RoutePresentation] Added all routes to RouteContext');
-                
+                // console.log('[RoutePresentation] Added all routes to RouteContext');
+
                 // Set initial route once all routes are added
                 setCurrentRoute(routes[0]);
-                console.log('[RoutePresentation] Set current route:', routes[0].routeId);
-                
+                // console.log('[RoutePresentation] Set current route:', routes[0].routeId);
+
                 // Load photos and POIs
                 if (route.photos) {
-                    console.log('[RoutePresentation] Loading photos:', route.photos.length);
+                    // console.log('[RoutePresentation] Loading photos:', route.photos.length);
                     addPhoto(route.photos.map(deserializePhoto));
                 } else {
-                    console.log('[RoutePresentation] No photos to load');
+                    // console.log('[RoutePresentation] No photos to load');
                 }
-                
+
                 if (route.pois) {
-                    console.log('[RoutePresentation] Loading POIs:', 
-                        route.pois.draggable?.length || 0, 'draggable POIs,',
-                        route.pois.places?.length || 0, 'place POIs');
+                    // console.log('[RoutePresentation] Loading POIs:',
+                    //     route.pois.draggable?.length || 0, 'draggable POIs,',
+                    //     route.pois.places?.length || 0, 'place POIs');
                     loadPOIsFromRoute(route.pois);
                 } else {
-                    console.log('[RoutePresentation] No POIs to load');
+                    // console.log('[RoutePresentation] No POIs to load');
                 }
-                
+
                 // Check for line data and load it directly
                 if (route.lines) {
-                    console.log('[RoutePresentation] Found line data in route:', route.lines.length, 'lines');
+                    // console.log('[RoutePresentation] Found line data in route:', route.lines.length, 'lines');
                     // Removed detailed line data logging to improve performance in presentation mode
-                    console.log('[RoutePresentation] Provider structure: LineProvider → RouteProvider → RouteContent');
-                    console.log('[RoutePresentation] Loading lines directly into LineContext');
+                    // console.log('[RoutePresentation] Provider structure: LineProvider → RouteProvider → RouteContent');
+                    // console.log('[RoutePresentation] Loading lines directly into LineContext');
                     loadLinesFromRoute(route.lines);
-                    
+
                     // Store the line data in the parent component's state for direct rendering
                     setLineData(route.lines);
-                    console.log('[RoutePresentation] Stored line data for direct rendering:', route.lines.length, 'lines');
-                    
-                    console.log('[RoutePresentation] Lines loaded directly into LineContext');
+                    // console.log('[RoutePresentation] Stored line data for direct rendering:', route.lines.length, 'lines');
+
+                    // console.log('[RoutePresentation] Lines loaded directly into LineContext');
                 } else {
-                    console.log('[RoutePresentation] No line data found in route');
+                    // console.log('[RoutePresentation] No line data found in route');
                 }
-                
                 // Set header settings if available
                 if (route.headerSettings) {
-                    console.log('[RoutePresentation] Setting header settings:', route.headerSettings);
+                    // console.log('[RoutePresentation] Setting header settings:', route.headerSettings);
                     updateHeaderSettings(route.headerSettings);
                 } else {
                     console.warn('[RoutePresentation] No header settings found in route data');
                 }
-                
+
+                // *** ADDED: Set the overall loaded state and persistent ID ***
+                if (route) {
+                    // console.log('[RoutePresentation] Setting currentLoadedState with fetched route data:', route);
+                    setCurrentLoadedState(route);
+                    if (route.persistentId) {
+                        // console.log('[RoutePresentation] Setting currentLoadedPersistentId:', route.persistentId);
+                        setCurrentLoadedPersistentId(route.persistentId);
+                    } else {
+                         console.warn('[RoutePresentation] persistentId missing from fetched route data');
+                    }
+                } else {
+                     console.warn('[RoutePresentation] Fetched route data is null, cannot set currentLoadedState');
+                }
+                // *** END ADDED ***
+
                 setInitialized(true);
-                console.log('[RoutePresentation] Route initialization completed');
+                // console.log('[RoutePresentation] Route initialization completed');
             };
             initializeRoutes();
-        }, [routes, initialized, addRoute, setCurrentRoute, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute]);
+        }, [route, routes, initialized, addRoute, setCurrentRoute, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute, setCurrentLoadedState, setCurrentLoadedPersistentId]); // Added route, setCurrentLoadedState, setCurrentLoadedPersistentId to dependencies
 
         // Add additional logging for lineData
         // Only log count of lines being passed to avoid excessive logging
-        console.log('[RoutePresentation] Passing lineData to PresentationMapView:', {
-            lineDataLength: lineData?.length || 0,
-            firstLine: lineData?.length > 0 ? "Line data available" : 'No lines'
-        });
-        
+        // console.log('[RoutePresentation] Passing lineData to PresentationMapView:', {
+        //     lineDataLength: lineData?.length || 0,
+        //     firstLine: lineData?.length > 0 ? "Line data available" : 'No lines'
+        // });
+
         return routes.length > 0 ? _jsx(PresentationMapView, { lineData: lineData }) : null;
     });
 

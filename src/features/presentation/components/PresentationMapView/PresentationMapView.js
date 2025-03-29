@@ -79,7 +79,7 @@ export default function PresentationMapView(props) {
     const { initialized: routesInitialized } = useUnifiedRouteProcessing(routes, {
         batchProcess: true,
         onInitialized: () => {
-            console.log('[PresentationMapView] Routes initialized with unified approach');
+            // console.log('[PresentationMapView] Routes initialized with unified approach');
         }
     });
     
@@ -219,7 +219,7 @@ export default function PresentationMapView(props) {
         // Import and set map instance in the mapOperationsQueue
         import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
             setMapInstance(map);
-            console.log('[PresentationMapView] Map instance set in mapOperationsQueue');
+            // console.log('[PresentationMapView] Map instance set in mapOperationsQueue');
         });
         // Log map initialization events
         map.on('load', () => {
@@ -522,10 +522,12 @@ export default function PresentationMapView(props) {
     }), [isMapReady, hoverCoordinates]);
     return (_jsx(MapProvider, { value: mapContextValue, children: _jsx(LineProvider, { children: _jsxs("div", { ref: containerRef, className: "presentation-flex-container", children: [
                 _jsx(MapHeader, { 
-                    title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
+                    title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route', // Reverted title logic
                     color: headerSettings?.color || '#333333',
                     logoUrl: headerSettings?.logoUrl,
-                    username: headerSettings?.username
+                    username: headerSettings?.username,
+                    type: currentLoadedState?.type, // Keep using currentLoadedState for type
+                    eventDate: currentLoadedState?.eventDate // Keep using currentLoadedState for eventDate
                 }),
                 _jsx(PresentationSidebar, { 
                     isOpen: true,

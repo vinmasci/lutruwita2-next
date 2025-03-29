@@ -1,35 +1,75 @@
 import React, { useState } from 'react';
-import { Box, IconButton, Typography, Modal } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import {
+  Box,
+  IconButton,
+  Typography,
+  Modal,
+  CircularProgress,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Card,
+  CardMedia,
+  CardContent,
+  Rating, // For star ratings
+  Divider,
+  Link
+} from '@mui/material';
+import { Close, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import { ImageSlider } from '../ImageSlider/ImageSlider';
 import { LINE_ICON_PATHS } from '../../../lineMarkers/constants/line-icons';
 
-export const PresentationLineViewer = ({ line, onClose }) => {
+// Helper to render star rating
+const renderRating = (rating) => {
+  if (rating === null || rating === undefined) return null;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+      <Rating value={rating} precision={0.1} readOnly size="small" />
+      <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
+        ({rating.toFixed(1)})
+      </Typography>
+    </Box>
+  );
+};
+
+export const PresentationLineViewer = ({
+  line,
+  onClose,
+  isLoadingDetails, // Renamed prop
+  placeDetails      // Renamed prop
+}) => {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
-  
+
+  // Log received props for debugging
+  // console.log('[PresentationLineViewer] Received props:', {
+  //   lineId: line?.id,
+  //   isLoadingDetails, // Use renamed prop in log
+  //   placeDetails      // Use renamed prop in log
+  // });
+
   if (!line) return null;
-  
+
   // Prepare photos for the image slider
   const photos = line.photos || [];
-  
+
   // Create mapPreviewProps for the ImageSlider
   const mapPreviewProps = {
     center: line.coordinates?.start, // Use the line's start coordinates as center
     zoom: 14, // Default zoom level
     routes: [] // No routes to display
   };
-  
+
   return (
     <>
       {/* Main modal with line details */}
-      <Modal 
-        open={Boolean(line)} 
+      <Modal
+        open={Boolean(line)}
         onClose={onClose}
         aria-labelledby="line-viewer-modal"
         disableScrollLock={true}
         disableAutoFocus={true}
         keepMounted={true}
-        sx={{ 
+        sx={{
           zIndex: 9999,
           // Ensure modal doesn't affect other fixed elements
           '& .MuiBackdrop-root': {
@@ -37,7 +77,7 @@ export const PresentationLineViewer = ({ line, onClose }) => {
           }
         }}
       >
-        <Box 
+        <Box
           sx={{
             position: 'absolute',
             top: '50%',
@@ -50,20 +90,23 @@ export const PresentationLineViewer = ({ line, onClose }) => {
             border: '1px solid rgba(30, 136, 229, 0.5)',
             borderRadius: 2,
             boxShadow: 24,
-            p: 4,
-            overflowY: 'auto',
+            // p: 4, // Padding moved to inner boxes
+            // overflowY: 'auto', // Moved to inner content box
             display: 'flex',
             flexDirection: 'column',
-            zIndex: 9999
+            zIndex: 9999,
+            color: 'white' // Ensure default text color is white
           }}
         >
-          {/* Header with name and close button */}
+          {/* Header with name and close button - Add padding here */}
           <Box
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between',
-              mb: 3
+              p: 4, // Add padding to header
+              pb: 2 // Reduce bottom padding for header
+              // mb: 3 // Remove bottom margin, handle spacing with content box
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -81,64 +124,67 @@ export const PresentationLineViewer = ({ line, onClose }) => {
               <Close />
             </IconButton>
           </Box>
-          
-          {/* Image slider - always show regardless of photos */}
-          <Box 
-            sx={{ 
-              height: '250px', 
+
+          {/* Scrollable Content Area */}
+          <Box sx={{ overflowY: 'auto', flexGrow: 1, p: 4, pt: 0 }}>
+            {/* Image slider - always show regardless of photos */}
+            <Box
+              sx={{
+              height: '250px',
               mb: 3,
               position: 'relative',
               borderRadius: '8px',
               overflow: 'hidden'
             }}
           >
-            <ImageSlider 
-              photos={photos} 
+            <ImageSlider
+              photos={photos}
               maxPhotos={10}
               mapPreviewProps={mapPreviewProps}
               alwaysShowMap={true} // Always show the map preview
             />
           </Box>
-          
+
           {/* Description */}
-          <Box 
-            sx={{
-              mb: 3,
-              p: 2,
-              borderRadius: '4px',
-              backgroundColor: 'rgba(45, 45, 45, 0.9)',
-            }}
-          >
-            <Typography 
-              variant="body1" 
-              color="white"
-              sx={{ whiteSpace: 'pre-wrap' }}
+          {line.description && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 2,
+                borderRadius: '4px',
+                backgroundColor: 'rgba(45, 45, 45, 0.9)',
+              }}
             >
-              {line.description || 'No description'}
-            </Typography>
-          </Box>
-          
+              <Typography
+                variant="body1"
+                color="white"
+                sx={{ whiteSpace: 'pre-wrap' }}
+              >
+                {line.description}
+              </Typography>
+            </Box>
+          )}
+
           {/* Icons */}
           {line.icons && line.icons.length > 0 && (
-            <Box>
-              <Typography 
-                variant="subtitle2" 
-                color="white" 
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="white"
                 sx={{ mb: 1 }}
               >
                 Features
               </Typography>
-              <Box 
+              <Box
                 sx={{
                   display: 'flex',
                   flexWrap: 'wrap',
                   gap: 2,
-                  mb: 2
                 }}
               >
                 {line.icons.map(icon => (
-                  <Box 
-                    key={icon} 
+                  <Box
+                    key={icon}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
@@ -150,8 +196,8 @@ export const PresentationLineViewer = ({ line, onClose }) => {
                       height: '50px'
                     }}
                   >
-                    <i 
-                      className={LINE_ICON_PATHS[icon]} 
+                    <i
+                      className={LINE_ICON_PATHS[icon]}
                       style={{
                         fontSize: '24px',
                         color: 'white'
@@ -162,12 +208,48 @@ export const PresentationLineViewer = ({ line, onClose }) => {
               </Box>
             </Box>
           )}
-          
-          {/* Photos grid removed as requested */}
+
+          {/* Town Info and Hotels Section */}
+          <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.2)' }} />
+
+          {/* Use renamed isLoadingDetails prop */}
+          {isLoadingDetails ? ( 
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+              <CircularProgress color="inherit" size={24} />
+            </Box>
+          ) : (
+            <>
+              {/* Quick Facts */}
+              {/* Use renamed placeDetails prop */}
+              {placeDetails && ( 
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" color="white" gutterBottom>
+                    {/* Use placeDetails.name which should match line.name */}
+                    Quick facts about {placeDetails.name} 
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(45, 45, 45, 0.9)', 
+                    }}
+                  >
+                    <Typography variant="body2" color="white" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {/* Use placeDetails.summary */}
+                      {placeDetails.summary} 
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+              {/* Removed extra closing Box tag here */}
+              {/* Hotels section removed */}
+            </>
+          )}
+          </Box> {/* End Scrollable Content Area */}
         </Box>
       </Modal>
-      
-      {/* Photo lightbox modal */}
+
+      {/* Photo lightbox modal (remains unchanged) */}
       <Modal
         open={Boolean(selectedPhoto)}
         onClose={() => setSelectedPhoto(null)}

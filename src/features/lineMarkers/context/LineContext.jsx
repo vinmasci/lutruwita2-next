@@ -90,12 +90,12 @@ export const LineProvider = ({ children }) => {
   }, [lines]);
   
   // Function to save route with lines data
-  const saveRoute = useCallback((name, type, isPublic) => {
+  const saveRoute = useCallback((name, type, isPublic, eventDate) => {
     if (routeContext && routeContext.saveCurrentState) {
       // Get valid lines to pass to RouteContext
       const lineData = getLinesForRoute();
       // Call saveCurrentState with lines data as parameter
-      return routeContext.saveCurrentState(name, type, isPublic, lineData);
+      return routeContext.saveCurrentState(name, type, isPublic, lineData, eventDate);
     }
     return Promise.reject(new Error('RouteContext not available'));
   }, [routeContext, getLinesForRoute]);

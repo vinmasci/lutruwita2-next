@@ -66,11 +66,13 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, dis
       console.log('[SimpleLightbox] Local photos before deletion:', localPhotos.length);
       
       // Call the context delete function with URL instead of ID
+      console.log('[SimpleLightbox] Calling PhotoContext.deletePhoto with URL:', selectedPhoto.url);
       deletePhoto(selectedPhoto.url);
       
       // Call the provided onDelete if available
       if (onDelete) {
         // If onDelete expects an ID, pass the URL as a fallback
+        console.log('[SimpleLightbox] Calling provided onDelete callback');
         onDelete(selectedPhoto.id || selectedPhoto.url);
       }
       
@@ -78,17 +80,22 @@ export const SimpleLightbox = ({ photo, onClose, additionalPhotos, onDelete, dis
       // Use URL for comparison since IDs might be undefined
       const newPhotos = localPhotos.filter(p => p.url !== selectedPhoto.url);
       console.log('[SimpleLightbox] Local photos after deletion:', newPhotos.length);
+      console.log('[SimpleLightbox] Remaining photo URLs:', newPhotos.map(p => p.url));
       setLocalPhotos(newPhotos);
       
       // If there are more photos, navigate to the next one, otherwise close
       if (newPhotos.length > 0) {
         // If we're at the last photo, go to the previous one
         if (selectedIndex >= newPhotos.length) {
+          console.log('[SimpleLightbox] Adjusting selectedIndex to:', newPhotos.length - 1);
           setSelectedIndex(newPhotos.length - 1);
+        } else {
+          console.log('[SimpleLightbox] Keeping selectedIndex at:', selectedIndex);
         }
         // Otherwise, stay at the same index (which will now show the next photo)
       } else {
         // If this was the only photo, close the lightbox
+        console.log('[SimpleLightbox] No photos left, closing lightbox');
         onClose();
       }
     }

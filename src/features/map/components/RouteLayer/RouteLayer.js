@@ -30,6 +30,9 @@ export const RouteLayer = ({ map, route }) => {
     
     // Track if this route has already been rendered
     const renderedRef = useRef(false);
+    
+    // Track if we've already moved this route to front after rendering
+    const movedToFrontAfterRenderRef = useRef(false);
 
     // Function to find and update layer visibility
     const updateLayerVisibility = useCallback(() => {
@@ -180,6 +183,52 @@ export const RouteLayer = ({ map, route }) => {
     useEffect(() => {
         moveRouteToFront();
     }, [moveRouteToFront, currentRoute]);
+    
+    // Additional effect to ensure current route is moved to front after rendering
+    useEffect(() => {
+        // Only proceed if we have all the necessary pieces
+        if (!map || !route || !isStyleLoaded || !currentRoute) {
+            return;
+        }
+        
+        // Get the stable route ID
+        const routeId = route.id || route.routeId;
+        
+        // Extract IDs for comparison, handling different formats
+        const routeIds = [
+            routeId,
+            route.id,
+            route.routeId,
+            // Handle 'route-' prefix variations
+            routeId?.startsWith('route-') ? routeId.substring(6) : `route-${routeId}`
+        ].filter(Boolean); // Remove any undefined/null values
+        
+        const currentRouteIds = [
+            currentRoute?.id,
+            currentRoute?.routeId,
+            // Handle 'route-' prefix variations
+            currentRoute?.id?.startsWith('route-') ? currentRoute.id.substring(6) : currentRoute?.id ? `route-${currentRoute.id}` : null,
+            currentRoute?.routeId?.startsWith('route-') ? currentRoute.routeId.substring(6) : currentRoute?.routeId ? `route-${currentRoute.routeId}` : null
+        ].filter(Boolean); // Remove any undefined/null values
+        
+        // Check if any of the route IDs match any of the current route IDs
+        const isCurrentRoute = currentRoute && routeIds.some(id => 
+            currentRouteIds.some(currentId => 
+                id === currentId || id.toString() === currentId.toString()
+            )
+        );
+        
+        // Only move to front if this is the current route and we haven't already moved it
+        if (isCurrentRoute && renderedRef.current && !movedToFrontAfterRenderRef.current) {
+            console.log('[RouteLayer] Moving current route to front after rendering:', routeId);
+            
+            // Add a small delay to ensure all map operations have completed
+            setTimeout(() => {
+                moveRouteToFront();
+                movedToFrontAfterRenderRef.current = true;
+            }, 500);
+        }
+    }, [map, route, isStyleLoaded, currentRoute, moveRouteToFront, renderedRef.current]);
     
     // Also update visibility when the map style changes
     useEffect(() => {
@@ -378,6 +427,9 @@ export const RouteLayer = ({ map, route }) => {
                     
                     // Mark this route as rendered
                     renderedRef.current = true;
+                    
+                    // Reset the moved to front flag when re-rendering
+                    movedToFrontAfterRenderRef.current = false;
                 } catch (error) {
                     console.error('[RouteLayer] Error in route rendering operation:', error);
                 }

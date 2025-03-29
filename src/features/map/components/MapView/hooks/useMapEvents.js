@@ -49,12 +49,17 @@ export const useMapEvents = ({
       
       // If we have a current route from context, use it directly
       if (currentRoute) {
-        console.log('[useMapEvents] Current route from context:', {
-          id: currentRoute.id,
-          routeId: currentRoute.routeId,
-          type: currentRoute._type,
-          name: currentRoute.name
-        });
+        // Reduced logging - only log in development mode with debug flag
+        const shouldLog = process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true';
+        
+        if (shouldLog) {
+          console.log('[useMapEvents] Current route from context:', {
+            id: currentRoute.id,
+            routeId: currentRoute.routeId,
+            type: currentRoute._type,
+            name: currentRoute.name
+          });
+        }
         
         // Get all possible source IDs for this route
         const possibleSourceIds = [];
@@ -77,8 +82,10 @@ export const useMapEvents = ({
           possibleSourceIds.push(`route-${currentRoute.id}-main`);
         }
         
-        console.log('[useMapEvents] Possible source IDs:', possibleSourceIds);
-        console.log('[useMapEvents] Available sources:', routeSources.map(([id]) => id));
+        if (shouldLog) {
+          console.log('[useMapEvents] Possible source IDs:', possibleSourceIds);
+          console.log('[useMapEvents] Available sources:', routeSources.map(([id]) => id));
+        }
         
         // Try to find a matching source
         for (const sourceId of possibleSourceIds) {
@@ -86,14 +93,18 @@ export const useMapEvents = ({
           if (foundSource) {
             activeRouteSource = foundSource[1];
             activeRouteId = sourceId.replace('-main', '');
-            console.log('[useMapEvents] Found matching source:', sourceId);
+            if (shouldLog) {
+              console.log('[useMapEvents] Found matching source:', sourceId);
+            }
             break;
           }
         }
         
         // If we still couldn't find a source, try a more aggressive approach
         if (!activeRouteSource) {
-          console.log('[useMapEvents] No exact match found, trying partial matches');
+          if (shouldLog) {
+            console.log('[useMapEvents] No exact match found, trying partial matches');
+          }
           
           // Try to find any source that contains parts of the route ID
           for (const [id, source] of routeSources) {
@@ -101,7 +112,9 @@ export const useMapEvents = ({
             if (routeIdPart && id.includes(routeIdPart.replace('route-', ''))) {
               activeRouteSource = source;
               activeRouteId = id.replace('-main', '');
-              console.log('[useMapEvents] Found partial match:', id);
+              if (shouldLog) {
+                console.log('[useMapEvents] Found partial match:', id);
+              }
               break;
             }
           }
@@ -109,10 +122,13 @@ export const useMapEvents = ({
         
         // If we still couldn't find a source, log the issue but don't use a fallback
         if (!activeRouteSource) {
-          console.error('[useMapEvents] Could not find source for current route:', {
-            currentRoute: currentRoute.routeId || currentRoute.id,
-            availableSources: routeSources.map(([id]) => id)
-          });
+          // Keep error logs for important issues
+          if (shouldLog) {
+            console.error('[useMapEvents] Could not find source for current route:', {
+              currentRoute: currentRoute.routeId || currentRoute.id,
+              availableSources: routeSources.map(([id]) => id)
+            });
+          }
           
           // Clear hover coordinates and return
           if (hoverCoordinates) {
@@ -125,7 +141,12 @@ export const useMapEvents = ({
         if (routeSources.length > 0) {
           activeRouteSource = routeSources[0][1];
           activeRouteId = routeSources[0][0].replace('-main', '');
-          console.log('[useMapEvents] No current route, using first route as fallback:', activeRouteId);
+          
+          // Reduced logging - only log in development mode with debug flag
+          const shouldLog = process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true';
+          if (shouldLog) {
+            console.log('[useMapEvents] No current route, using first route as fallback:', activeRouteId);
+          }
         }
       }
       

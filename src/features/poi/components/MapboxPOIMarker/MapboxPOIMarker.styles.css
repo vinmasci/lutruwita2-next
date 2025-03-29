@@ -4,7 +4,7 @@
   flex-direction: column;
   align-items: center;
   transform-style: preserve-3d;
-  transform-origin: center bottom;
+  transform-origin: center bottom; /* Revert origin back to center bottom */
   pointer-events: auto;
   z-index: 1;
 }
@@ -54,8 +54,8 @@
   position: relative;
   z-index: 1;
   transform: scale(var(--marker-scale, 1));
-  transform-origin: center top;
-  transform-origin: center bottom;
+  /* transform-origin: center top; */
+  transform-origin: center bottom; /* Revert origin back to center bottom */
 }
 
 .marker-bubble:hover {

@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime"; // Revert Fragment import
 import { Box } from '@mui/material';
 import Carousel from 'react-material-ui-carousel';
 import { MapPreview } from '../MapPreview/MapPreview';
@@ -12,6 +12,7 @@ const SlideImage = styled('img')({
   objectPosition: 'center', // Center the image
 });
 
+// Keep MapWrapper for potential fallback or other uses
 const MapWrapper = styled(Box)({
   width: '100%',
   height: '100%',
@@ -40,43 +41,62 @@ const ImageContainer = styled(Box)({
   position: 'relative'
 });
 
-export const ImageSlider = ({ mapPreviewProps, photos = [], maxPhotos = 10 }) => {
+// Remove IconButton and CloseIcon imports if no longer needed
+// import { IconButton } from '@mui/material';
+// import CloseIcon from '@mui/icons-material/Close';
+
+export const ImageSlider = ({
+  mapPreviewProps,
+  photos = [],
+  maxPhotos = 10,
+  staticMapUrl // Remove isEditing and onRemovePhoto props
+}) => {
   // Prepare slides array
   const hasPhotos = photos && photos.length > 0;
-  
-  // Get random photos instead of the first ones
-  const photoSlides = hasPhotos 
+
+  // Revert photo processing logic
+  const photoSlides = hasPhotos
     ? (() => {
         // If we have fewer photos than maxPhotos, just use all of them
         if (photos.length <= maxPhotos) {
           return photos.map(photo => photo.url || photo.thumbnailUrl);
         }
-        
         // Otherwise, select random photos
         const shuffled = [...photos].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, maxPhotos).map(photo => photo.url || photo.thumbnailUrl);
       })()
     : [];
-  
-  // If there are no photos, just return the map preview
-  if (!hasPhotos) {
-    return _jsx(MapPreview, { ...mapPreviewProps });
+
+  // If there are no photos AND no static map url (or map preview), return null or fallback
+  if (!hasPhotos && !staticMapUrl && !mapPreviewProps) {
+    return null;
   }
-  
+
   // Create items array for carousel
-  const items = [
-    // First item is always the map
-    {
-      type: 'map',
-      content: mapPreviewProps
-    },
-    // Then add photo items
-    ...photoSlides.map(url => ({
+  const items = [];
+
+  // Add static map image as the first item if URL exists
+  if (staticMapUrl) {
+    items.push({
+      type: 'static-map',
+      content: staticMapUrl
+    });
+  }
+  // Fallback: Add Mapbox preview if static URL doesn't exist but mapPreviewProps do
+  else if (mapPreviewProps) {
+     items.push({
+       type: 'map',
+       content: mapPreviewProps
+     });
+  }
+
+  // Revert items.push logic
+  items.push(...photoSlides.map(url => ({
       type: 'photo',
       content: url
     }))
-  ];
-  
+  );
+
   return _jsx(CarouselWrapper, {
     children: _jsx(Carousel, {
       navButtonsAlwaysVisible: true,
@@ -121,14 +141,24 @@ export const ImageSlider = ({ mapPreviewProps, photos = [], maxPhotos = 10 }) =>
         }
       },
       children: items.map((item, index) => {
-        if (item.type === 'map') {
-          return _jsx(MapWrapper, {
-            children: _jsx(MapPreview, { ...item.content })
-          }, `slide-${index}`);
-        } else {
+        if (item.type === 'static-map') {
+          // Render static map image
           return _jsx(ImageContainer, {
             children: _jsx(SlideImage, {
               src: item.content,
+              alt: "Map location" // Add alt text
+            })
+          }, `slide-${index}`);
+        } else if (item.type === 'map') {
+           // Render Mapbox preview (fallback)
+           return _jsx(MapWrapper, {
+             children: _jsx(MapPreview, { ...item.content })
+           }, `slide-${index}`);
+        } else { // item.type === 'photo'
+          // Revert to original simple rendering without Fragment or button
+          return _jsx(ImageContainer, {
+            children: _jsx(SlideImage, {
+              src: item.content, // This should be the photo URL
               alt: `Route photo ${index}`
             })
           }, `slide-${index}`);

@@ -457,6 +457,16 @@ export const useRouteService = () => {
                 // Include POIs and lines in the transformed data
                 pois: routeData.pois || { draggable: [], places: [] },
                 lines: routeData.lines || [],
+                
+                // Debug logging for POIs
+                ...(routeData.pois && {
+                    _debug_pois: {
+                        draggableCount: routeData.pois.draggable?.length || 0,
+                        placesCount: routeData.pois.places?.length || 0,
+                        poisWithGooglePlaces: routeData.pois.draggable?.filter(poi => poi.googlePlaces)?.length || 0,
+                        firstPoiWithGooglePlaces: routeData.pois.draggable?.find(poi => poi.googlePlaces) || null
+                    }
+                }),
                 data: {
                     // Store all routes in the data structure
                     allRoutes: routeData.routes || [],

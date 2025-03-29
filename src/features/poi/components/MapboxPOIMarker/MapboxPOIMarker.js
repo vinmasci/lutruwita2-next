@@ -73,8 +73,8 @@ const MapboxPOIMarker = ({ poi, onClick, onDragEnd, selected, className, }) => {
                 draggable: isDraggable,
                 rotationAlignment: 'viewport',
                 pitchAlignment: 'viewport',
-                anchor: 'center', // Use center anchor which might be more reliable
-                offset: [0, 0]    // No offset needed
+                anchor: 'center', // Revert anchor to center
+                offset: [0, 0]    // Revert offset to 0
             })
                 .setLngLat({ lng: poi.coordinates[0], lat: poi.coordinates[1] })
                 .addTo(map);

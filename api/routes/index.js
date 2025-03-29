@@ -15,6 +15,7 @@ const RouteSchema = new mongoose.Schema({
   userId: { type: String, required: true, index: true },
   viewCount: { type: Number, default: 0 },
   lastViewed: { type: Date },
+  eventDate: { type: Date }, // Date field for event type routes
   publicId: { type: String, index: true, sparse: true },
   embedUrl: { type: String }, // URL to the pre-processed embed data in Cloudinary
   
@@ -97,7 +98,13 @@ const RouteSchema = new mongoose.Schema({
       category: { type: String, required: true },
       icon: { type: String, required: true },
       photos: [{ type: mongoose.Schema.Types.Mixed }],
-      type: { type: String, enum: ['draggable'], required: true }
+      type: { type: String, enum: ['draggable'], required: true },
+      googlePlaceId: { type: String },
+      googlePlaceUrl: { type: String },
+      googlePlaces: {
+        placeId: { type: String },
+        url: { type: String }
+      }
     }],
     places: [{
       id: { type: String, required: true },
@@ -269,36 +276,40 @@ async function handleCreateRoute(req, res) {
       console.log(`[API] Generating embed data for route: ${route.name}`);
       
       // Create the embed data package
-      const embedData = {
-        id: route._id,
-        persistentId: route.persistentId,
-        name: route.name,
-        routes: route.routes.map(r => ({
-          routeId: r.routeId,
-          name: r.name,
-          color: r.color,
-          geojson: r.geojson,
-          surface: r.surface,
-          unpavedSections: r.unpavedSections,
-          description: r.description // Include the description field
-        })),
-        mapState: route.mapState,
-        pois: route.pois || { draggable: [], places: [] },
-        lines: route.lines || [], // Include the lines array
-        photos: route.photos || [],
-        elevation: route.routes.map(r => r.surface?.elevationProfile || []),
-        description: route.description, // Include the top-level description field
-        headerSettings: route.headerSettings, // Include the header settings
-        mapOverview: route.mapOverview || { description: '' }, // Include the map overview
-        _type: 'loaded',
-        _loadedState: {
+        const embedData = {
+          id: route._id,
+          persistentId: route.persistentId,
           name: route.name,
+          type: route.type, // Include the route type
+          eventDate: route.eventDate, // Include the event date
+          routes: route.routes.map(r => ({
+            routeId: r.routeId,
+            name: r.name,
+            color: r.color,
+            geojson: r.geojson,
+            surface: r.surface,
+            unpavedSections: r.unpavedSections,
+            description: r.description // Include the description field
+          })),
+          mapState: route.mapState,
           pois: route.pois || { draggable: [], places: [] },
-          lines: route.lines || [], // Include lines in _loadedState too
+          lines: route.lines || [], // Include the lines array
           photos: route.photos || [],
-          headerSettings: route.headerSettings, // Include header settings in _loadedState too
-          mapOverview: route.mapOverview || { description: '' } // Include map overview in _loadedState too
-        }
+          elevation: route.routes.map(r => r.surface?.elevationProfile || []),
+          description: route.description, // Include the top-level description field
+          headerSettings: route.headerSettings, // Include the header settings
+          mapOverview: route.mapOverview || { description: '' }, // Include the map overview
+          _type: 'loaded',
+          _loadedState: {
+            name: route.name,
+            type: route.type, // Include the route type in _loadedState
+            eventDate: route.eventDate, // Include the event date in _loadedState
+            pois: route.pois || { draggable: [], places: [] },
+            lines: route.lines || [], // Include lines in _loadedState too
+            photos: route.photos || [],
+            headerSettings: route.headerSettings, // Include header settings in _loadedState too
+            mapOverview: route.mapOverview || { description: '' } // Include map overview in _loadedState too
+          }
       };
       
       // Upload to Cloudinary
@@ -370,7 +381,7 @@ async function handleUpdateRoute(req, res) {
     const { 
       name, description, isPublic, type, data, metadata, 
       mapState, routes: routeSegments, pois, photos, viewCount, lastViewed,
-      headerSettings
+      headerSettings, eventDate // Add eventDate here
     } = req.body;
     
     // Update basic fields
@@ -385,6 +396,14 @@ async function handleUpdateRoute(req, res) {
       }
     }
     if (type) route.type = type;
+    // Add eventDate update logic
+    if (eventDate !== undefined) { // Check if eventDate exists in the payload
+        // If type is 'event', set the date, otherwise set to null
+        route.eventDate = (type === 'event' || route.type === 'event') ? eventDate : null; 
+    } else if (type && type !== 'event' && route.type === 'event') {
+        // Handle case where type changes away from 'event' but eventDate wasn't in payload
+        route.eventDate = null;
+    }
     if (viewCount !== undefined) route.viewCount = viewCount;
     
     // Update isPublic and generate publicId if needed
@@ -471,9 +490,9 @@ async function handleUpdateRoute(req, res) {
     } else {
       route.lastViewed = new Date();
     }
-    
+
     console.log(`[API] Saving updated route to database...`);
-    
+
     // Save to database
     await route.save();
     
@@ -488,6 +507,8 @@ async function handleUpdateRoute(req, res) {
         id: route._id,
         persistentId: route.persistentId,
         name: route.name,
+        type: route.type, // Include the route type
+        eventDate: route.eventDate, // Include the event date
         routes: route.routes.map(r => ({
           routeId: r.routeId,
           name: r.name,
@@ -508,6 +529,8 @@ async function handleUpdateRoute(req, res) {
         _type: 'loaded',
         _loadedState: {
           name: route.name,
+          type: route.type, // Include the route type in _loadedState
+          eventDate: route.eventDate, // Include the event date in _loadedState
           pois: route.pois || { draggable: [], places: [] },
           lines: route.lines || [], // Include lines in _loadedState too
           photos: route.photos || [],
@@ -1407,6 +1430,8 @@ async function handlePartialUpdate(req, res) {
           id: route._id,
           persistentId: route.persistentId,
           name: route.name,
+          type: route.type, // Include the route type
+          eventDate: route.eventDate, // Include the event date
           routes: route.routes.map(r => ({
             routeId: r.routeId,
             name: r.name,
@@ -1427,6 +1452,8 @@ async function handlePartialUpdate(req, res) {
           _type: 'loaded',
           _loadedState: {
             name: route.name,
+            type: route.type, // Include the route type in _loadedState
+            eventDate: route.eventDate, // Include the event date in _loadedState
             pois: route.pois || { draggable: [], places: [] },
             lines: route.lines || [],
             photos: route.photos || [],

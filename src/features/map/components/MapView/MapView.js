@@ -115,32 +115,39 @@ function MapViewContent() {
         });
     }, [isMapReady, routes, addRouteClickHandler]);
 
-    // Update hover marker when coordinates change
+    // Update hover point when coordinates change - using GeoJSON source
     useEffect(() => {
-        if (!mapInstance.current)
-            return;
-        // Remove existing marker
-        if (hoverMarkerRef.current) {
-            hoverMarkerRef.current.remove();
-            hoverMarkerRef.current = null;
-        }
-        // Add new marker if we have coordinates
+        if (!mapInstance.current || !isMapReady) return;
+        
+        // Update the GeoJSON source if we have coordinates
         if (hoverCoordinates) {
-            const el = document.createElement('div');
-            el.className = 'hover-marker';
-            el.style.width = '16px';
-            el.style.height = '16px';
-            el.style.borderRadius = '50%';
-            el.style.backgroundColor = '#ff0000';
-            el.style.border = '2px solid white';
-            el.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
-            
-            // Create and add the marker without popup
-            hoverMarkerRef.current = new mapboxgl.Marker(el)
-                .setLngLat(hoverCoordinates)
-                .addTo(mapInstance.current);
+            try {
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                }
+            } catch (error) {
+                console.error('[MapView] Error updating hover point:', error);
+            }
+        } else {
+            // Hide the layer when no coordinates
+            try {
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+            } catch (error) {
+                // Ignore errors when hiding (might happen during initialization)
+            }
         }
-    }, [hoverCoordinates]);
+    }, [hoverCoordinates, isMapReady]);
     
     // Effect to fit bounds when current route changes
     useEffect(() => {
@@ -317,8 +324,10 @@ function MapViewContent() {
                 description: details.description,
                 category: selectedPOIDetails.category,
                 icon: selectedPOIDetails.iconName,
+                // Include the Google Places link so POIContext can process it
+                googlePlacesLink: details.googlePlacesLink
             };
-            
+
             console.log('[POI_DETAILS_FOR_MONGODB]', JSON.stringify(poiDetails, null, 2));
             
             // Add POI to context
@@ -470,7 +479,9 @@ function MapViewContent() {
         title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
         color: headerSettings.color,
         logoUrl: headerSettings.logoUrl,
-        username: headerSettings.username
+        username: headerSettings.username,
+        type: currentRoute?._loadedState?.type || currentRoute?.type,
+        eventDate: currentRoute?._loadedState?.eventDate || currentRoute?.eventDate
     };
 
     // Create the map container div

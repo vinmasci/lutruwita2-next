@@ -1,6 +1,8 @@
 import React from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import { Box } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { theme } from './theme';
 import MapView from './features/map/components/MapView/MapView';
 import { PhotoProvider } from './features/photo/context/PhotoContext';
@@ -39,6 +41,7 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
         <ThemeProvider theme={theme}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
           <ProcessingProvider>
             <PhotoProvider>
               <PlaceProvider>
@@ -85,6 +88,7 @@ export default function App() {
               </PlaceProvider>
             </PhotoProvider>
           </ProcessingProvider>
+          </LocalizationProvider>
         </ThemeProvider>
         </BrowserRouter>
       </AuthProvider>

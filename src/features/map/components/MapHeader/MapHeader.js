@@ -4,12 +4,13 @@ import { AppBar, Toolbar, Typography, Box, IconButton, Tooltip } from '@mui/mate
 import { Home, Map, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useRouteContext } from '../../context/RouteContext';
+import CountdownTimer from './CountdownTimer';
 
 /**
  * MapHeader component displays a header bar with the route title and attribution
  * Attribution can be either a username or a logo
  */
-const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
+const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDate }) => {
     // Get the updateHeaderSettings function and headerSettings from RouteContext
     const { updateHeaderSettings, headerSettings } = useRouteContext();
     
@@ -122,44 +123,52 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                     justifyContent: 'space-between',
                     minHeight: '64px',
                     height: '64px',
-                    padding: '0',
-                    paddingRight: '16px',
+                    padding: '0 16px', // Add horizontal padding
                     width: '100%'
-                }, 
-                children: 
-                    _jsxs(Box, { 
-                        sx: { 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            width: '100%',
-                            justifyContent: 'center',
-                            position: 'relative'
-                        }, 
+                },
+                children: [
+                    // Left side - Countdown Timer (if applicable)
+                    _jsx(Box, { // Wrap in a Box to control spacing if needed, though space-between should handle it
+                        sx: { display: 'flex', alignItems: 'center' },
+                        children: type === 'event' && eventDate && _jsx(CountdownTimer, { eventDate })
+                    }),
+
+                    // Center Box - Title/Attribution
+                    _jsxs(Box, {
+                        sx: {
+                            display: 'flex',
+                            alignItems: 'center', // Vertically center items in the toolbar
+                            justifyContent: 'center', // Horizontally center the inner content
+                            position: 'absolute', // Position absolutely to allow true centering
+                            left: '50%',
+                            transform: 'translateX(-50%)', // Centering trick
+                            // Ensure it doesn't overlap icons on small screens by limiting width if necessary
+                            // maxWidth: 'calc(100% - 160px)', // Example: Adjust based on icon widths + padding
+                            pointerEvents: 'none', // Prevent center box from capturing clicks meant for map below
+                        },
                         children: [
-                            
-                            // Center - Title with attribution
+                            // Inner content box (Title, Username) - Allow pointer events here
                             _jsxs(Box, {
                                 sx: {
+                                    pointerEvents: 'auto', // Re-enable pointer events for content
                                     display: 'flex',
-                                    flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile, horizontal on larger screens
+                                    flexDirection: 'column', // Stack Title and Username vertically
                                     alignItems: 'center',
-                                    justifyContent: 'center', // Center the content
-                                    gap: { xs: '2px', sm: '8px' }, // Less gap on mobile
-                                    width: '100%',
-                                    paddingRight: { xs: '80px', sm: '0' } // Add padding on right for mobile to avoid icon overlap
+                                    justifyContent: 'center',
+                                    gap: '2px',
                                 },
                                 children: [
-                                    // Centered container for logo and title together
+                                    // Container for logo and title (always row)
                                     _jsxs(Box, {
                                         sx: {
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             gap: '8px',
-                                            position: 'relative'
+                                            position: 'relative',
                                         },
                                         children: [
-                                            // Logo container with clear button
+                                            // Logo container
                                             logoUrl && (
                                                 _jsxs(Box, {
                                                     sx: {
@@ -169,10 +178,10 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                                                     },
                                                     children: [
                                                         // Logo image
-                                                        _jsx(Box, { 
-                                                            component: "img", 
-                                                            src: logoUrl, 
-                                                            alt: "Logo", 
+                                                        _jsx(Box, {
+                                                            component: "img",
+                                                            src: logoUrl,
+                                                            alt: "Logo",
                                                             sx: {
                                                                 height: 40,
                                                                 maxWidth: 120,
@@ -181,40 +190,12 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                                                                 marginTop: '-4px',
                                                                 marginBottom: '-4px'
                                                             },
-                                                            onError: (e) => {
-                                                                // Set a fallback text if the image fails to load
-                                                                if (e.target) {
-                                                                    // Hide the broken image
-                                                                    e.target.style.display = 'none';
-                                                                    
-                                                                    // Create a fallback text element that replaces the image
-                                                                    // instead of appending to the parent
-                                                                    const fallback = document.createElement('span');
-                                                                    fallback.textContent = 'Logo';
-                                                                    fallback.style.color = 'white';
-                                                                    fallback.style.fontStyle = 'italic';
-                                                                    fallback.style.fontSize = '0.8rem';
-                                                                    fallback.style.marginRight = '8px';
-                                                                    
-                                                                    // Replace the image with the fallback text
-                                                                    // This ensures it stays in the same position
-                                                                    const parent = e.target.parentNode;
-                                                                    if (parent) {
-                                                                        // Insert before the image
-                                                                        parent.insertBefore(fallback, e.target);
-                                                                        // Remove the image
-                                                                        parent.removeChild(e.target);
-                                                                    }
-                                                                }
-                                                            },
-                                                            onLoad: () => {
-                                                                // Image loaded successfully
-                                                            }
+                                                            onError: (e) => { /* Fallback logic */ },
+                                                            onLoad: () => { /* Success */ }
                                                         }),
-                                                        
-                                                        // Clear logo button - only show in editor mode, not in embed or presentation mode
-                                                        // Use a more specific check to ensure we're in editor mode
-                                                        (location.pathname === '/editor' || location.pathname === '/editor/') && 
+
+                                                        // Clear logo button
+                                                        (location.pathname === '/editor' || location.pathname === '/editor/') &&
                                                         _jsx(Tooltip, {
                                                             title: "Clear Logo",
                                                             children: _jsx(IconButton, {
@@ -227,9 +208,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                                                                     color: 'white',
                                                                     backgroundColor: 'rgba(0, 0, 0, 0.3)',
                                                                     padding: '2px',
-                                                                    '&:hover': {
-                                                                        backgroundColor: 'rgba(0, 0, 0, 0.5)'
-                                                                    }
+                                                                    '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.5)' }
                                                                 },
                                                                 children: _jsx(X, { size: 14 })
                                                             })
@@ -237,102 +216,94 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username }) => {
                                                     ]
                                                 })
                                             ),
-                                            
+
                                             // Title
-                                            _jsx(Typography, { 
-                                                variant: "h6", 
-                                                component: "div", 
+                                            _jsx(Typography, {
+                                                variant: "h6",
+                                                component: "div",
                                                 sx: {
                                                     fontFamily: 'Fraunces, serif',
                                                     fontWeight: 700,
                                                     color: '#ffffff',
                                                     textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
-                                                }, 
-                                                children: title || 'Untitled Route' 
+                                                },
+                                                children: title || 'Untitled Route'
                                             })
                                         ]
                                     }),
-                                    
-                                    // Username attribution (if available)
-                                    _jsx(Box, {
-                                        sx: {
-                                            order: { xs: 4, sm: 3 }, // Different ordering on mobile vs desktop
-                                            minWidth: username ? 'auto' : '0px',
-                                            alignSelf: 'center',
-                                            marginTop: { xs: '-4px', sm: '0' } // Negative margin on mobile to reduce space
-                                        },
-                                        children: username && (
-                                            _jsxs(Typography, {
-                                                variant: "body2",
-                                                sx: {
-                                                    color: '#ffffff',
-                                                    opacity: 0.9,
-                                                    fontStyle: 'italic',
-                                                    marginLeft: { xs: '0', sm: '4px' }, // No left margin on mobile
-                                                    marginTop: { xs: '0', sm: '3px' },
-                                                    alignSelf: 'center',
-                                                    textAlign: { xs: 'center', sm: 'left' } // Center on mobile, left on desktop
-                                                },
-                                                children: ["by ", username]
-                                            })
-                                        )
-                                    })
-                                ]
-                            }),
-                            
-                            // Right side - Navigation links (moved from left)
-                            _jsxs(Box, { 
-                                sx: { 
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '1px',
-                                    position: 'absolute',
-                                    right: '16px'
-                                },
-                                children: [
-                                    _jsx(Tooltip, {
-                                        title: "Home",
-                                        children: _jsx(IconButton, {
-                                            component: Link,
-                                            to: "/",
+
+                                    // Username attribution (if available) - directly in the column flow
+                                    username && (
+                                        _jsxs(Typography, {
+                                            variant: "body2",
                                             sx: {
-                                                ...(isHome ? activeStyle : inactiveStyle),
-                                                padding: '8px',
-                                                '&:hover': {
-                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                                }
+                                                color: '#ffffff',
+                                                opacity: 0.9,
+                                                fontStyle: 'italic',
+                                                textAlign: 'center',
+                                                width: '100%' // Ensure it takes full width for centering
                                             },
-                                            children: _jsx(Home, { 
-                                                size: 24,
-                                                strokeWidth: isHome ? 2 : 1,
-                                                color: '#ffffff'
-                                            })
+                                            children: ["by ", username]
                                         })
-                                    }),
-                                    _jsx(Tooltip, {
-                                        title: "Map Editor",
-                                        children: _jsx(IconButton, {
-                                            component: Link,
-                                            to: "/editor",
-                                            sx: {
-                                                ...(isEditor ? activeStyle : inactiveStyle),
-                                                padding: '8px',
-                                                '&:hover': {
-                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                                }
-                                            },
-                                            children: _jsx(Map, { 
-                                                size: 24,
-                                                strokeWidth: isEditor ? 2 : 1,
-                                                color: '#ffffff'
-                                            })
-                                        })
-                                    })
+                                    ),
                                 ]
                             })
                         ]
+                    }),
+
+                    // Right side - Navigation links
+                    _jsxs(Box, {
+                        sx: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1px',
+                            // This Box remains on the right due to Toolbar's space-between
+                        },
+                        children: [
+                            // Restore Home Icon
+                            _jsx(Tooltip, {
+                                title: "Home",
+                                children: _jsx(IconButton, {
+                                    component: Link,
+                                    to: "/",
+                                    sx: {
+                                        ...(isHome ? activeStyle : inactiveStyle),
+                                        padding: '8px',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                        }
+                                    },
+                                    children: _jsx(Home, {
+                                        size: 24,
+                                        strokeWidth: isHome ? 2 : 1,
+                                        color: '#ffffff'
+                                    })
+                                })
+                            }),
+                            // Restore Map Editor Icon
+                            _jsx(Tooltip, {
+                                title: "Map Editor",
+                                children: _jsx(IconButton, {
+                                    component: Link,
+                                    to: "/editor",
+                                    sx: {
+                                        ...(isEditor ? activeStyle : inactiveStyle),
+                                        padding: '8px',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                        }
+                                    },
+                                    children: _jsx(Map, {
+                                        size: 24,
+                                        strokeWidth: isEditor ? 2 : 1,
+                                        color: '#ffffff'
+                                    })
+                                })
+                            })
+                        ]
                     })
-            })
+                ] // End of Toolbar children array
+            }) // End of Toolbar
     }));
 };
 
@@ -341,7 +312,9 @@ const arePropsEqual = (prevProps, nextProps) => {
     return prevProps.title === nextProps.title &&
            prevProps.color === nextProps.color &&
            prevProps.logoUrl === nextProps.logoUrl &&
-           prevProps.username === nextProps.username;
+           prevProps.username === nextProps.username &&
+           prevProps.type === nextProps.type &&
+           prevProps.eventDate === nextProps.eventDate;
 };
 
 // Wrap with React.memo with custom equality function

@@ -120,7 +120,7 @@ export const ClimbMarkers = ({ map, route }) => {
                         if (roadName) {
                             // Add the road name to the climb object
                             climb.roadName = roadName;
-                            console.log(`[ClimbMarkers] Found road name for climb: ${roadName}`);
+                            // console.log(`[ClimbMarkers] Found road name for climb: ${roadName}`);
                         }
                     })
                     .catch(error => {

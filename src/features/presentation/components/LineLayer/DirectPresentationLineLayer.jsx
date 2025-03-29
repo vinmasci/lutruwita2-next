@@ -1,6 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react'; // Keep only one import
 import LineMarker from '../../../lineMarkers/components/LineMarker/LineMarker.jsx';
 import { PresentationLineViewer } from '../LineViewer/PresentationLineViewer';
+import { getStateFromCoords } from '../../../poi/services/googlePlacesService'; // Import state getter
+import { fetchWikipediaSummary } from '../../../wikipedia/services/wikipediaService'; 
 import './DirectPresentationLineLayer.css';
 
 /**
@@ -54,6 +56,10 @@ const DirectPresentationLineLayer = ({ map, lines = [] }) => {
   const [selectedLineId, setSelectedLineId] = useState(null);
   // Track the line being viewed in the modal
   const [viewingLine, setViewingLine] = useState(null);
+  // State for place details (renamed)
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false); // Renamed
+  const [placeDetails, setPlaceDetails] = useState(null); // Renamed
+  const currentFetchIdRef = useRef(null); // Ref to track the current fetch operation
   
   // Check if we have lines to render
   if (!lines || lines.length === 0) {
@@ -64,19 +70,72 @@ const DirectPresentationLineLayer = ({ map, lines = [] }) => {
   }
 
   // Handle line click with memoized callback to prevent unnecessary re-renders
-  const handleLineClick = useCallback((line) => {
+  const handleLineClick = useCallback(async (line) => {
     console.log('[DirectPresentationLineLayer] Line clicked:', line.id);
     // In presentation mode, we show the line viewer modal
     setViewingLine(line);
     // Also update the selected state
     setSelectedLineId(line.id);
-  }, []);
+
+    // Fetch town details and hotels
+    if (line?.coordinates?.start) {
+      const fetchId = line.id; // Use line ID as the unique identifier for this fetch
+      currentFetchIdRef.current = fetchId; // Store the ID of the fetch we are starting
+
+      setIsLoadingDetails(true); // Use renamed state
+      setPlaceDetails(null); // Use renamed state
+
+      try {
+        // 1. Get state from coordinates
+        const stateName = await getStateFromCoords(line.coordinates.start[1], line.coordinates.start[0]);
+        console.log('[DirectPresentationLineLayer] Fetched state:', stateName);
+
+        // 2. Fetch Wikipedia summary using name and state
+        const wikiResult = await fetchWikipediaSummary(line.name, stateName);
+
+        console.log('[DirectPresentationLineLayer] Wikipedia info fetched. fetchId:', fetchId, 'currentFetchId:', currentFetchIdRef.current);
+        console.log('[DirectPresentationLineLayer] Data before state update:', { wikiResult });
+        
+        // Only update state if this is still the most recent fetch request
+        if (currentFetchIdRef.current === fetchId) {
+          console.log('[DirectPresentationLineLayer] Updating state for fetchId:', fetchId);
+          // Store name and summary (or fallback)
+          setPlaceDetails({ 
+            name: line.name, // Use the line name as the title
+            summary: wikiResult?.summary || 'No summary found on Wikipedia.' 
+          });
+        } else {
+           console.log('[DirectPresentationLineLayer] Discarding stale fetch results for line:', fetchId);
+        }
+      } catch (error) {
+        console.error('[DirectPresentationLineLayer] Error fetching Wikipedia info:', error); // Updated error message
+         // Only clear state if this is still the most recent fetch request
+        if (currentFetchIdRef.current === fetchId) {
+          console.log('[DirectPresentationLineLayer] Clearing state due to error for fetchId:', fetchId);
+          setPlaceDetails(null);
+        }
+      } finally {
+         // Only stop loading if this is still the most recent fetch request
+        if (currentFetchIdRef.current === fetchId) {
+          setIsLoadingDetails(false); // Use renamed state
+        }
+      }
+    } else {
+      // Clear data if line has no start coordinates (or name)
+      currentFetchIdRef.current = null; // Clear fetch tracker
+      setPlaceDetails(null);
+      setIsLoadingDetails(false);
+    }
+  }, []); // Keep useCallback dependencies empty
   
   // Close the viewer
   const handleCloseViewer = useCallback(() => {
     setViewingLine(null);
     // Optionally deselect the line when closing the viewer
     setSelectedLineId(null);
+    // Clear place data when closing
+    setPlaceDetails(null);
+    setIsLoadingDetails(false);
   }, []);
 
   // Ensure each line has all required properties for rendering
@@ -111,9 +170,11 @@ const DirectPresentationLineLayer = ({ map, lines = [] }) => {
       ))}
       
       {/* Line viewer modal */}
-      <PresentationLineViewer 
-        line={viewingLine} 
-        onClose={handleCloseViewer} 
+      <PresentationLineViewer
+        line={viewingLine}
+        onClose={handleCloseViewer}
+        isLoadingDetails={isLoadingDetails && viewingLine?.id === selectedLineId} // Pass renamed prop
+        placeDetails={viewingLine?.id === selectedLineId ? placeDetails : null} // Pass renamed prop
       />
     </>
   );

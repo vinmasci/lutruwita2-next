@@ -1,14 +1,34 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, ButtonBase, IconButton } from '@mui/material';
+import { TextField, Button, Box, Typography, ButtonBase, IconButton, Tooltip, CircularProgress, Rating, Link, Divider } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ClearIcon from '@mui/icons-material/Clear';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PhoneIcon from '@mui/icons-material/Phone';
+import LanguageIcon from '@mui/icons-material/Language';
+import StarIcon from '@mui/icons-material/Star';
 import { StyledDrawer, DrawerHeader, DrawerContent, DrawerFooter } from '../POIDrawer/POIDrawer.styles';
 import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
 import { POI_CATEGORIES } from '../../types/poi.types';
 import { getIconDefinition } from '../../constants/poi-icons';
 import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoPreviewModal';
+import { usePOIContext } from '../../context/POIContext';
+
+// Debounce function to limit API calls
+const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+            func(...args);
+        }, delay);
+    };
+};
 
 const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
+    const { processGooglePlacesLink } = usePOIContext();
     // Get the icon definition for default name
     const iconDef = getIconDefinition(iconName);
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
@@ -16,6 +36,10 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
     // State for form fields
     const [name, setName] = useState(iconDef?.label || '');
     const [description, setDescription] = useState('');
+    const [googlePlacesLink, setGooglePlacesLink] = useState('');
+    const [googlePlacesData, setGooglePlacesData] = useState(null);
+    const [isProcessingLink, setIsProcessingLink] = useState(false);
+    const [linkError, setLinkError] = useState(null);
     const [photos, setPhotos] = useState([]);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     
@@ -24,9 +48,60 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
         if (isOpen) {
             setName(iconDef?.label || '');
             setDescription('');
+            setGooglePlacesLink('');
+            setGooglePlacesData(null);
+            setIsProcessingLink(false);
+            setLinkError(null);
             setPhotos([]);
         }
     }, [isOpen, iconDef]);
+    
+    // Process Google Places link when it changes
+    const processLink = async (link) => {
+        if (!link) {
+            setGooglePlacesData(null);
+            setIsProcessingLink(false);
+            setLinkError(null);
+            return;
+        }
+        
+        setIsProcessingLink(true);
+        setLinkError(null);
+        
+        try {
+            const data = await processGooglePlacesLink(link);
+            if (data) {
+                setGooglePlacesData(data);
+                // If name is empty or default, use the place name
+                if (!name || name === iconDef?.label) {
+                    setName(data.name);
+                }
+            } else {
+                setGooglePlacesData(null);
+                setLinkError('Could not process Google Places link. Please check the format.');
+            }
+        } catch (error) {
+            console.error('[POIDetailsDrawer] Error processing Google Places link:', error);
+            setGooglePlacesData(null);
+            setLinkError('Error processing link: ' + (error.message || 'Unknown error'));
+        } finally {
+            setIsProcessingLink(false);
+        }
+    };
+    
+    // Debounced version of processLink to avoid too many API calls
+    const debouncedProcessLink = debounce(processLink, 800);
+    
+    // Call processLink when googlePlacesLink changes
+    useEffect(() => {
+        if (googlePlacesLink) {
+            debouncedProcessLink(googlePlacesLink);
+        } else {
+            setGooglePlacesData(null);
+            setIsProcessingLink(false);
+            setLinkError(null);
+        }
+    }, [googlePlacesLink]);
     
     const handlePhotoChange = (event) => {
         if (event.target.files) {
@@ -40,10 +115,24 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
     
     const handleSubmit = (e) => {
         e.preventDefault();
+        
+        // Get the Google Places ID from the UI element directly
+        const placeIdElement = document.querySelector('[data-google-place-id]');
+        const googlePlaceId = placeIdElement ? placeIdElement.getAttribute('data-google-place-id') : null;
+        
+        console.log('[POIDetailsDrawer] Saving POI with Google Place ID:', googlePlaceId);
+        
         onSave({
             name,
             description,
-            photos
+            googlePlacesLink,
+            photos,
+            // Add Google Places ID directly as a property - prioritize the ID from the UI element
+            ...(googlePlaceId && { googlePlaceId }),
+            // Fallback to the ID from the googlePlacesData if the UI element is not available
+            ...(!googlePlaceId && googlePlacesData?.placeId && { googlePlaceId: googlePlacesData.placeId }),
+            // Include the Google Places data if available (for preview in the drawer)
+            ...(googlePlacesData && { googlePlaces: googlePlacesData })
         });
     };
     
@@ -157,7 +246,312 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
                                                 color: 'rgb(255, 255, 255)'
                                             }
                                         } 
-                                    }), 
+                                    }),
+                                    _jsxs(Box, {
+                                        sx: {
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 1
+                                        },
+                                        children: [
+                                            _jsxs(Box, {
+                                                sx: {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 1
+                                                },
+                                                children: [
+                                                    _jsx(TextField, {
+                                                        label: "Google Places Link (optional)",
+                                                        value: googlePlacesLink,
+                                                        onChange: (e) => setGooglePlacesLink(e.target.value),
+                                                        fullWidth: true,
+                                                        variant: "outlined",
+                                                        size: "small",
+                                                        placeholder: "Paste Google Maps link or embed code...",
+                                                        error: !!linkError,
+                                                        helperText: linkError,
+                                                        sx: {
+                                                            backgroundColor: 'rgb(35, 35, 35)',
+                                                            '& .MuiOutlinedInput-root': {
+                                                                '& fieldset': {
+                                                                    borderColor: 'rgb(255, 255, 255)',
+                                                                },
+                                                                '&:hover fieldset': {
+                                                                    borderColor: 'rgb(255, 255, 255)',
+                                                                },
+                                                                '&.Mui-focused fieldset': {
+                                                                    borderColor: 'rgb(255, 255, 255)',
+                                                                }
+                                                            },
+                                                            '& .MuiInputLabel-root': {
+                                                                color: 'rgb(255, 255, 255)'
+                                                            },
+                                                            '& .MuiOutlinedInput-input': {
+                                                                color: 'rgb(255, 255, 255)'
+                                                            },
+                                                            '& .MuiFormHelperText-root': {
+                                                                color: 'rgb(255, 99, 99)'
+                                                            }
+                                                        }
+                                                    }),
+                                                    isProcessingLink ? (
+                                                        _jsx(CircularProgress, { size: 24, sx: { color: 'white' } })
+                                                    ) : (
+                                                        _jsx(Tooltip, {
+                                                            title: "Add a Google Maps link to fetch additional information. For best results, use an embed link from the 'Share' menu in Google Maps.",
+                                                            arrow: true,
+                                                            placement: "top",
+                                                            children: _jsx(IconButton, {
+                                                                size: "small",
+                                                                sx: { color: 'white' },
+                                                                children: _jsx(HelpOutlineIcon, { fontSize: "small" })
+                                                            })
+                                                        })
+                                                    )
+                                                ]
+                                            }),
+                                            
+                                            // Google Places Preview
+                                            googlePlacesData && (
+                                                _jsxs(Box, {
+                                                    sx: {
+                                                        mt: 1,
+                                                        p: 2,
+                                                        backgroundColor: 'rgb(45, 45, 45)',
+                                                        borderRadius: '4px',
+                                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                                    },
+                                                    children: [
+                                                        _jsxs(Box, {
+                                                            sx: { 
+                                                                display: 'flex', 
+                                                                alignItems: 'center', 
+                                                                gap: 1,
+                                                                mb: 1
+                                                            },
+                                                            children: [
+                                                                _jsx(StarIcon, { 
+                                                                    sx: { color: '#FFD700', fontSize: '20px' } 
+                                                                }),
+                                                                _jsx(Typography, {
+                                                                    variant: "subtitle2",
+                                                                    color: "white",
+                                                                    fontWeight: "bold",
+                                                                    children: "Google Places Preview"
+                                                                })
+                                                            ]
+                                                        }),
+                                                        
+                                                        _jsx(Divider, { 
+                                                            sx: { 
+                                                                borderColor: 'rgba(255, 255, 255, 0.1)',
+                                                                my: 1
+                                                            } 
+                                                        }),
+                                                        
+                                                        // Place ID
+                                                        googlePlacesData.placeId && (
+                                                            _jsxs(Box, {
+                                                                sx: { 
+                                                                    display: 'flex', 
+                                                                    mb: 1,
+                                                                    alignItems: 'center'
+                                                                },
+                                                                children: [
+                                                                    _jsx("i", {
+                                                                        className: "lucide-hash",
+                                                                        style: { 
+                                                                            color: 'white', 
+                                                                            marginRight: '8px',
+                                                                            fontSize: '16px'
+                                                                        }
+                                                                    }),
+                                                                    _jsx(Typography, {
+                                                                        variant: "body2",
+                                                                        color: "white",
+                                                                        fontSize: "0.8rem",
+                                                                        // Add data attribute to store the place ID for retrieval in handleSubmit
+                                                                        "data-google-place-id": googlePlacesData.placeId,
+                                                                        children: `Place ID: ${googlePlacesData.placeId}`
+                                                                    })
+                                                                ]
+                                                            })
+                                                        ),
+                                                        
+                                                        // Rating
+                                                        googlePlacesData.rating && (
+                                                            _jsxs(Box, {
+                                                                sx: { 
+                                                                    display: 'flex', 
+                                                                    alignItems: 'center', 
+                                                                    mb: 1
+                                                                },
+                                                                children: [
+                                                                    _jsx(Rating, {
+                                                                        value: googlePlacesData.rating,
+                                                                        precision: 0.1,
+                                                                        readOnly: true,
+                                                                        size: "small"
+                                                                    }),
+                                                                    _jsx(Typography, {
+                                                                        variant: "body2",
+                                                                        color: "white",
+                                                                        ml: 1,
+                                                                        fontSize: "0.8rem",
+                                                                        children: `${googlePlacesData.rating} / 5`
+                                                                    })
+                                                                ]
+                                                            })
+                                                        ),
+                                                        
+                                                        // Address
+                                                        googlePlacesData.address && (
+                                                            _jsxs(Box, {
+                                                                sx: { 
+                                                                    display: 'flex', 
+                                                                    mb: 1,
+                                                                    alignItems: 'flex-start'
+                                                                },
+                                                                children: [
+                                                                    _jsx(LocationOnIcon, {
+                                                                        sx: { 
+                                                                            color: 'white', 
+                                                                            mr: 1,
+                                                                            fontSize: '16px',
+                                                                            mt: '2px'
+                                                                        }
+                                                                    }),
+                                                                    _jsx(Typography, {
+                                                                        variant: "body2",
+                                                                        color: "white",
+                                                                        fontSize: "0.8rem",
+                                                                        children: googlePlacesData.address
+                                                                    })
+                                                                ]
+                                                            })
+                                                        ),
+                                                        
+                                                        // Phone number
+                                                        googlePlacesData.phoneNumber && (
+                                                            _jsxs(Box, {
+                                                                sx: { 
+                                                                    display: 'flex', 
+                                                                    mb: 1,
+                                                                    alignItems: 'center'
+                                                                },
+                                                                children: [
+                                                                    _jsx(PhoneIcon, {
+                                                                        sx: { 
+                                                                            color: 'white', 
+                                                                            mr: 1,
+                                                                            fontSize: '16px'
+                                                                        }
+                                                                    }),
+                                                                    _jsx(Typography, {
+                                                                        variant: "body2",
+                                                                        color: "white",
+                                                                        fontSize: "0.8rem",
+                                                                        children: googlePlacesData.phoneNumber
+                                                                    })
+                                                                ]
+                                                            })
+                                                        ),
+                                                        
+                                                        // Website
+                                                        googlePlacesData.website && (
+                                                            _jsxs(Box, {
+                                                                sx: { 
+                                                                    display: 'flex', 
+                                                                    mb: 1,
+                                                                    alignItems: 'center'
+                                                                },
+                                                                children: [
+                                                                    _jsx(LanguageIcon, {
+                                                                        sx: { 
+                                                                            color: 'white', 
+                                                                            mr: 1,
+                                                                            fontSize: '16px'
+                                                                        }
+                                                                    }),
+                                                                    _jsx(Link, {
+                                                                        href: googlePlacesData.website,
+                                                                        target: "_blank",
+                                                                        rel: "noopener noreferrer",
+                                                                        sx: {
+                                                                            color: '#90caf9',
+                                                                            textDecoration: 'none',
+                                                                            fontSize: "0.8rem",
+                                                                            '&:hover': {
+                                                                                textDecoration: 'underline'
+                                                                            }
+                                                                        },
+                                                                        children: googlePlacesData.website
+                                                                    })
+                                                        ]
+                                                    })
+                                                ),
+                                                
+                                                // Opening Hours
+                                                googlePlacesData.openingHours && (
+                                                    _jsxs(Box, {
+                                                        sx: { 
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            mb: 1
+                                                        },
+                                                        children: [
+                                                            _jsxs(Box, {
+                                                                sx: { 
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    mb: 0.5
+                                                                },
+                                                                children: [
+                                                                    _jsx("i", {
+                                                                        className: "lucide-clock",
+                                                                        style: { 
+                                                                            color: 'white', 
+                                                                            marginRight: '8px',
+                                                                            fontSize: '16px'
+                                                                        }
+                                                                    }),
+                                                                    _jsx(Typography, {
+                                                                        variant: "body2",
+                                                                        color: "white",
+                                                                        fontSize: "0.8rem",
+                                                                        fontWeight: "bold",
+                                                                        children: googlePlacesData.openingHours.isOpen !== null 
+                                                                            ? (googlePlacesData.openingHours.isOpen ? "Open Now" : "Closed Now") 
+                                                                            : "Hours"
+                                                                    })
+                                                                ]
+                                                            }),
+                                                            googlePlacesData.openingHours.weekdayText && googlePlacesData.openingHours.weekdayText.length > 0 && (
+                                                                _jsx(Box, {
+                                                                    sx: { 
+                                                                        pl: 3,
+                                                                        display: 'flex',
+                                                                        flexDirection: 'column'
+                                                                    },
+                                                                    children: googlePlacesData.openingHours.weekdayText.map((day, index) => (
+                                                                        _jsx(Typography, {
+                                                                            variant: "body2",
+                                                                            color: "white",
+                                                                            fontSize: "0.75rem",
+                                                                            children: day
+                                                                        }, index)
+                                                                    ))
+                                                                })
+                                                            )
+                                                        ]
+                                                    })
+                                                )
+                                            ]
+                                        })
+                                            )
+                                        ]
+                                    }),
                                     _jsxs(Button, { 
                                         component: "label", 
                                         variant: "outlined", 

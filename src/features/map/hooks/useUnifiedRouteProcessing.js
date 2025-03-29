@@ -65,8 +65,8 @@ const useUnifiedRouteProcessing = (routes, options = {}) => {
         
         // Process all routes in a single batch
         const processRoutes = () => {
-            console.log('[useUnifiedRouteProcessing] Processing routes:', routes.length);
-            
+            // console.log('[useUnifiedRouteProcessing] Processing routes:', routes.length);
+
             // Process routes in a batch to avoid multiple re-renders
             const processedRoutes = routes.map(route => normalizeRoute(route));
             
@@ -82,17 +82,17 @@ const useUnifiedRouteProcessing = (routes, options = {}) => {
                     routesToProcess.push(route);
                 }
             });
-            
+
             if (routesToProcess.length === 0) {
-                console.log('[useUnifiedRouteProcessing] No new routes to process');
+                // console.log('[useUnifiedRouteProcessing] No new routes to process');
                 setInitialized(true);
                 initializingRef.current = false;
                 onInitialized?.();
                 return;
             }
-            
-            console.log('[useUnifiedRouteProcessing] Processing new routes:', routesToProcess.length);
-            
+
+            // console.log('[useUnifiedRouteProcessing] Processing new routes:', routesToProcess.length);
+
             if (batchProcess) {
                 // Batch process all routes at once
                 routesToProcess.forEach(route => {

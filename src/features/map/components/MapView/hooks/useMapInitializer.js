@@ -181,6 +181,52 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
       // Make sure the map instance is set in the queue again after load
       setMapInstance(map);
       
+      // Add styledata event handler to re-add hover point when style changes
+      map.on('styledata', () => {
+        // Reduced logging - only log in development mode
+        if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+          console.log('[MapView] Style changed, checking if hover-point needs to be re-added');
+        }
+        
+        // Check if the hover-point source exists
+        if (!map.getSource('hover-point')) {
+          console.log('[MapView] Re-adding hover-point source and layer after style change');
+          
+          try {
+            // Re-add the source and layer
+            map.addSource('hover-point', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [0, 0]
+                },
+                properties: {}
+              }
+            });
+            
+            map.addLayer({
+              id: 'hover-point',
+              type: 'circle',
+              source: 'hover-point',
+              paint: {
+                'circle-radius': 8,
+                'circle-color': '#ff0000',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff',
+                'circle-opacity': 0.8
+              }
+            });
+            
+            // Hide the layer initially
+            map.setLayoutProperty('hover-point', 'visibility', 'none');
+          } catch (error) {
+            console.error('[MapView] Error re-adding hover point after style change:', error);
+          }
+        }
+      });
+      
       // Check if style is fully loaded
       const waitForStyleLoaded = () => {
         if (map.isStyleLoaded()) {
@@ -196,12 +242,15 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
       // Function to initialize map components after style is loaded
       const initializeMapAfterStyleLoad = () => {
         try {
-          map.addSource('mapbox-dem', {
-            type: 'raster-dem',
-            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-            tileSize: 512,
-            maxzoom: 14
-          });
+          // Check if mapbox-dem source already exists before adding it
+          if (!map.getSource('mapbox-dem')) {
+            map.addSource('mapbox-dem', {
+              type: 'raster-dem',
+              url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+              tileSize: 512,
+              maxzoom: 14
+            });
+          }
           
           // Check if device is mobile
           const isMobile = window.innerWidth <= 768;
@@ -240,6 +289,40 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
               'fill-extrusion-opacity': 0.6
             }
           });
+          
+          // Add hover point source and layer if they don't exist
+          if (!map.getSource('hover-point')) {
+            map.addSource('hover-point', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [0, 0] // Initial coordinates
+                },
+                properties: {}
+              }
+            });
+          }
+          
+          // Add hover point layer if it doesn't exist
+          if (!map.getLayer('hover-point')) {
+            map.addLayer({
+              id: 'hover-point',
+              type: 'circle',
+              source: 'hover-point',
+              paint: {
+                'circle-radius': 8,
+                'circle-color': '#ff0000',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff',
+                'circle-opacity': 0.8
+              }
+            });
+          }
+          
+          // Initially hide the hover point layer
+          map.setLayoutProperty('hover-point', 'visibility', 'none');
           
           map.on('zoom', () => {
             // Zoom change handler
@@ -390,10 +473,20 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
     }
     
     return () => {
-      map.remove();
-      document.head.removeChild(style);
-      // Clear the map instance when component unmounts
-      setMapInstance(null);
+      if (map) {
+        // Remove the hover point layer and source if they exist
+        if (map.getLayer('hover-point')) {
+          map.removeLayer('hover-point');
+        }
+        if (map.getSource('hover-point')) {
+          map.removeSource('hover-point');
+        }
+        
+        map.remove();
+        document.head.removeChild(style);
+        // Clear the map instance when component unmounts
+        setMapInstance(null);
+      }
     };
   }, [notifyMapStateChange]);
 

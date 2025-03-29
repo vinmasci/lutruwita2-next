@@ -17,6 +17,7 @@ node_modules/
 /.next
 /out
 /src/App.js
+.vite/
 
 # Debug logs
 npm-debug.log*

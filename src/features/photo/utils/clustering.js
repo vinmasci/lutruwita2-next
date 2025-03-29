@@ -26,13 +26,32 @@ export const getPhotoIdentifier = (url) => {
         return null;
     }
     
-    const match = url.match(/\/v(\d+)\//);
-    if (match && match[1]) {
-        return match[1]; // Return the version number
+    // Try to extract the version number from Cloudinary URL
+    const versionMatch = url.match(/\/v(\d+)\//);
+    if (versionMatch && versionMatch[1]) {
+        console.log(`[Clustering] Extracted version identifier: ${versionMatch[1]} from URL: ${url.substring(0, 50)}...`);
+        return versionMatch[1]; // Return the version number
     }
     
-    // Fallback to using the full URL if we can't extract the version
-    return url;
+    // Try to extract the public ID from Cloudinary URL
+    const publicIdMatch = url.match(/\/upload\/(?:v\d+\/)?([^/]+)(?:\.\w+)?$/);
+    if (publicIdMatch && publicIdMatch[1]) {
+        console.log(`[Clustering] Extracted public ID: ${publicIdMatch[1]} from URL: ${url.substring(0, 50)}...`);
+        return publicIdMatch[1]; // Return the public ID
+    }
+    
+    // If we can't extract a clean identifier, use a hash of the URL
+    console.log(`[Clustering] Using full URL as identifier for: ${url.substring(0, 50)}...`);
+    
+    // Create a simple hash of the URL
+    let hash = 0;
+    for (let i = 0; i < url.length; i++) {
+        const char = url.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return `url-${Math.abs(hash).toString(16)}`;
 };
 
 const getClusteredPhotos = (photos, zoom) => {

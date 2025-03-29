@@ -100,10 +100,10 @@ export const reverseGeocodeForRoad = async (coordinates) => {
     }
     
     const data = await response.json();
-    
+
     // Log the response for debugging
-    console.log('[reverseGeocodeForRoad] Geocoding response:', data);
-    
+    // console.log('[reverseGeocodeForRoad] Geocoding response:', data);
+
     // Extract road name from the response
     // The first feature is usually the most relevant
     if (data.features && data.features.length > 0) {

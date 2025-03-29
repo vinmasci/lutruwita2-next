@@ -446,7 +446,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
                 onSave: (formData) => {
                     // Don't close the dialog immediately, let it stay open while saving
                     // The isSaving prop will show the spinner
-                    saveRoute(formData.name, formData.type, formData.isPublic)
+                    saveRoute(formData.name, formData.type, formData.isPublic, formData.eventDate)
                         .then(() => {
                             setSaveDialogOpen(false);
                         })
@@ -457,7 +457,8 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
                 initialValues: currentLoadedState ? {
                     name: currentLoadedState.name,
                     type: currentLoadedState.type || 'tourism',
-                    isPublic: currentLoadedState.isPublic || false
+                    isPublic: currentLoadedState.isPublic || false,
+                    eventDate: currentLoadedState.eventDate || null
                 } : undefined, 
                 isEditing: !!currentLoadedPersistentId,
                 isSaving: isSaving

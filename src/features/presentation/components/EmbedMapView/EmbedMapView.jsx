@@ -1054,10 +1054,12 @@ export default function EmbedMapView() {
             {/* Add the header */}
             <RouteContextAdapter>
                 <MapHeader 
-                    title={currentRoute?.name || 'Untitled Route'}
+                    title={currentRoute?.name || 'Untitled Route'} // Reverted title logic
                     color={routeData?.headerSettings?.color || '#000000'}
                     logoUrl={routeData?.headerSettings?.logoUrl}
                     username={routeData?.headerSettings?.username}
+                    type={routeData?.type} // Keep using routeData for type
+                    eventDate={routeData?.eventDate} // Keep using routeData for eventDate
                 />
             </RouteContextAdapter>
             
