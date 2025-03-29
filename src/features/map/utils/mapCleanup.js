@@ -1,6 +1,7 @@
 /**
  * Utility functions for cleaning up map elements
  */
+import logger from '../../../utils/logger';
 
 /**
  * Removes all mapboxgl markers from the map
@@ -12,34 +13,37 @@
 export const removeAllMapboxMarkers = (map) => {
   if (!map) return;
   
-  console.log('[mapCleanup] Removing all mapboxgl markers from the map');
+  logger.info('mapCleanup', 'Removing all mapboxgl markers from the map');
   
   try {
     // Find all marker elements in the map container
     const mapContainer = map.getContainer();
     if (!mapContainer) {
-      console.warn('[mapCleanup] Map container not found');
+      logger.warn('mapCleanup', 'Map container not found');
       return;
     }
     
     // Find all marker elements
     // Mapbox adds markers as elements with the class 'mapboxgl-marker'
     const markerElements = mapContainer.querySelectorAll('.mapboxgl-marker');
-    console.log(`[mapCleanup] Found ${markerElements.length} mapboxgl markers to remove`);
+    logger.info('mapCleanup', `Found ${markerElements.length} mapboxgl markers to remove`);
     
     // Remove each marker element from the DOM
     markerElements.forEach((element, index) => {
       try {
-        console.log(`[mapCleanup] Removing marker element ${index + 1}`);
+        // Skip detailed marker removal logs on mobile
+        if (window.innerWidth > 768) {
+          logger.debug('mapCleanup', `Removing marker element ${index + 1}`);
+        }
         element.remove();
       } catch (error) {
-        console.error(`[mapCleanup] Error removing marker element ${index + 1}:`, error);
+        logger.error('mapCleanup', `Error removing marker element ${index + 1}:`, error);
       }
     });
     
-    console.log('[mapCleanup] Finished removing mapboxgl markers');
+    logger.info('mapCleanup', 'Finished removing mapboxgl markers');
   } catch (error) {
-    console.error('[mapCleanup] Error removing mapboxgl markers:', error);
+    logger.error('mapCleanup', 'Error removing mapboxgl markers:', error);
   }
 };
 
@@ -53,12 +57,12 @@ export const removeAllMapboxMarkers = (map) => {
 export const performFullMapCleanup = (map) => {
   return new Promise((resolve) => {
     if (!map) {
-      console.log('[mapCleanup] No map instance provided for cleanup');
+      logger.info('mapCleanup', 'No map instance provided for cleanup');
       resolve();
       return;
     }
     
-    console.log('[mapCleanup] Starting comprehensive map cleanup');
+    logger.info('mapCleanup', 'Starting comprehensive map cleanup');
     
     try {
       // First remove all markers
@@ -69,20 +73,20 @@ export const performFullMapCleanup = (map) => {
       try {
         style = map.getStyle();
       } catch (error) {
-        console.warn('[mapCleanup] Could not get map style, map may already be destroyed:', error);
+        logger.warn('mapCleanup', 'Could not get map style, map may already be destroyed:', error);
         resolve();
         return;
       }
       
       if (!style || !style.layers || !style.sources) {
-        console.warn('[mapCleanup] Map style, layers, or sources not available');
+        logger.warn('mapCleanup', 'Map style, layers, or sources not available');
         resolve();
         return;
       }
       
       // Remove all layers first
       const layerIds = style.layers.map(layer => layer.id);
-      console.log(`[mapCleanup] Found ${layerIds.length} layers to remove`);
+      logger.info('mapCleanup', `Found ${layerIds.length} layers to remove`);
       
       layerIds.forEach(layerId => {
         try {
@@ -90,13 +94,13 @@ export const performFullMapCleanup = (map) => {
             map.removeLayer(layerId);
           }
         } catch (error) {
-          console.warn(`[mapCleanup] Error removing layer ${layerId}:`, error);
+          logger.warn('mapCleanup', `Error removing layer ${layerId}:`, error);
         }
       });
       
       // Then remove all sources
       const sourceIds = Object.keys(style.sources);
-      console.log(`[mapCleanup] Found ${sourceIds.length} sources to remove`);
+      logger.info('mapCleanup', `Found ${sourceIds.length} sources to remove`);
       
       sourceIds.forEach(sourceId => {
         try {
@@ -104,7 +108,7 @@ export const performFullMapCleanup = (map) => {
             map.removeSource(sourceId);
           }
         } catch (error) {
-          console.warn(`[mapCleanup] Error removing source ${sourceId}:`, error);
+          logger.warn('mapCleanup', `Error removing source ${sourceId}:`, error);
         }
       });
       
@@ -128,31 +132,31 @@ export const performFullMapCleanup = (map) => {
             // Remove all listeners for this event type
             map.off(eventType);
           } catch (error) {
-            console.warn(`[mapCleanup] Error removing ${eventType} listeners:`, error);
+            logger.warn('mapCleanup', `Error removing ${eventType} listeners:`, error);
           }
         });
         
-        console.log('[mapCleanup] Removed event listeners');
+        logger.info('mapCleanup', 'Removed event listeners');
       } catch (error) {
-        console.warn('[mapCleanup] Error removing event listeners:', error);
+        logger.warn('mapCleanup', 'Error removing event listeners:', error);
       }
       
       // Clear any pending animations or timers
       try {
         map.stop();
-        console.log('[mapCleanup] Stopped all animations');
+        logger.info('mapCleanup', 'Stopped all animations');
       } catch (error) {
-        console.warn('[mapCleanup] Error stopping animations:', error);
+        logger.warn('mapCleanup', 'Error stopping animations:', error);
       }
       
-      console.log('[mapCleanup] Comprehensive map cleanup completed');
+      logger.info('mapCleanup', 'Comprehensive map cleanup completed');
       
       // Add a small delay to ensure all async operations complete
       setTimeout(() => {
         resolve();
       }, 100);
     } catch (error) {
-      console.error('[mapCleanup] Error during map cleanup:', error);
+      logger.error('mapCleanup', 'Error during map cleanup:', error);
       // Still resolve the promise even if there was an error
       resolve();
     }
@@ -169,7 +173,7 @@ export const performFullMapCleanup = (map) => {
 export const safelyRemoveMap = async (map, setMapInstance = null) => {
   if (!map) return Promise.resolve();
   
-  console.log('[mapCleanup] Safely removing map instance');
+  logger.info('mapCleanup', 'Safely removing map instance');
   
   try {
     // Handle the indoor plugin issue that causes crashes
@@ -197,13 +201,13 @@ export const safelyRemoveMap = async (map, setMapInstance = null) => {
             }
           } catch (indoorError) {
             // Silently catch errors but don't let them stop the cleanup
-            console.warn('[mapCleanup] Error cleaning up indoor control:', indoorError);
+            logger.warn('mapCleanup', 'Error cleaning up indoor control:', indoorError);
           }
         });
       }
     } catch (indoorError) {
       // Silently catch errors but don't let them stop the cleanup
-      console.warn('[mapCleanup] Error handling indoor plugin:', indoorError);
+      logger.warn('mapCleanup', 'Error handling indoor plugin:', indoorError);
     }
     
     // Perform full cleanup first
@@ -212,9 +216,9 @@ export const safelyRemoveMap = async (map, setMapInstance = null) => {
     // Then remove the map with error handling
     try {
       map.remove();
-      console.log('[mapCleanup] Map instance removed');
+      logger.info('mapCleanup', 'Map instance removed');
     } catch (removeError) {
-      console.warn('[mapCleanup] Error during map.remove():', removeError);
+      logger.warn('mapCleanup', 'Error during map.remove():', removeError);
       // Continue despite the error
     }
     
@@ -225,7 +229,7 @@ export const safelyRemoveMap = async (map, setMapInstance = null) => {
     
     return Promise.resolve();
   } catch (error) {
-    console.error('[mapCleanup] Error safely removing map:', error);
+    logger.error('mapCleanup', 'Error safely removing map:', error);
     
     // Even if there was an error, try to clear the map instance reference
     if (typeof setMapInstance === 'function') {

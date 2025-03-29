@@ -3,6 +3,7 @@ import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
 import { useRouteContext } from "../../context/RouteContext";
 import { queueRouteOperation, cleanupRouteLayers, safeRemoveLayer, safeRemoveSource } from '../../utils/mapOperationsUtils';
+import logger from '../../../../utils/logger';
 
 // Material UI colors
 const DEFAULT_COLORS = {
@@ -117,20 +118,22 @@ export const RouteLayer = ({ map, route }) => {
             )
         );
         
-        // Debug ID comparison for loaded routes
+        // Debug ID comparison for loaded routes - reduced logging for mobile
         if (route._type === 'loaded') {
-            console.log('[RouteLayer] ID comparison for loaded route:', {
-                routeIds,
-                currentRouteIds,
-                isCurrentRoute,
-                routeType: route._type,
-                loadedState: route._loadedState ? true : false
-            });
+            // Only log minimal info on mobile
+            if (window.innerWidth <= 768) {
+                logger.debug('RouteLayer', `ID comparison: isCurrentRoute=${isCurrentRoute}`);
+            } else {
+                logger.debug('RouteLayer', 'ID comparison for loaded route', {
+                    isCurrentRoute,
+                    routeType: route._type
+                });
+            }
         }
         
         // Only move to front if this is the current route
         if (isCurrentRoute) {
-            console.log('[RouteLayer] Moving route to front:', routeId);
+            logger.info('RouteLayer', 'Moving route to front:', routeId);
             
             // Find all layers for this route
             const mainLayerId = `${routeId}-main-line`;
@@ -140,7 +143,7 @@ export const RouteLayer = ({ map, route }) => {
             // Get all layers in the map
             const style = map.getStyle();
             if (!style || !style.layers) {
-                console.error('[RouteLayer] Map style not available');
+                logger.error('RouteLayer', 'Map style not available');
                 return;
             }
             
@@ -151,25 +154,25 @@ export const RouteLayer = ({ map, route }) => {
             try {
                 // First move the border layer to the top
                 if (map.getLayer(borderLayerId)) {
-                    console.log('[RouteLayer] Moving border layer to front:', borderLayerId);
+                    logger.debug('RouteLayer', 'Moving border layer to front:', borderLayerId);
                     map.moveLayer(borderLayerId, lastLayerId);
                 }
                 
                 // Then move the main line layer above the border
                 if (map.getLayer(mainLayerId)) {
-                    console.log('[RouteLayer] Moving main layer to front:', mainLayerId);
+                    logger.debug('RouteLayer', 'Moving main layer to front:', mainLayerId);
                     map.moveLayer(mainLayerId); // This will place it at the very top
                 }
                 
                 // Finally move the surface layer above everything
                 if (map.getLayer(surfaceLayerId)) {
-                    console.log('[RouteLayer] Moving surface layer to front:', surfaceLayerId);
+                    logger.debug('RouteLayer', 'Moving surface layer to front:', surfaceLayerId);
                     map.moveLayer(surfaceLayerId); // This will place it at the very top
                 }
                 
-                console.log('[RouteLayer] Successfully moved route layers to front');
+                logger.debug('RouteLayer', 'Successfully moved route layers to front');
             } catch (error) {
-                console.error(`[RouteLayer] Error moving current route layers to front:`, error);
+                logger.error('RouteLayer', 'Error moving current route layers to front:', error);
             }
         }
     }, [map, route, isStyleLoaded, currentRoute]);
@@ -220,7 +223,7 @@ export const RouteLayer = ({ map, route }) => {
         
         // Only move to front if this is the current route and we haven't already moved it
         if (isCurrentRoute && renderedRef.current && !movedToFrontAfterRenderRef.current) {
-            console.log('[RouteLayer] Moving current route to front after rendering:', routeId);
+            logger.debug('RouteLayer', 'Moving current route to front after rendering:', routeId);
             
             // Add a small delay to ensure all map operations have completed
             setTimeout(() => {
@@ -272,10 +275,8 @@ export const RouteLayer = ({ map, route }) => {
                 try {
                     // Initial validation of GeoJSON data
                     if (!currentRoute.geojson.features || !currentRoute.geojson.features.length) {
-                        console.error('[RouteLayer] Invalid GeoJSON data:', {
-                            routeId: currentRoute.routeId || currentRoute.id,
-                            geojsonType: currentRoute.geojson.type,
-                            featureCount: currentRoute.geojson.features?.length
+                        logger.error('RouteLayer', 'Invalid GeoJSON data', {
+                            routeId: currentRoute.routeId || currentRoute.id
                         });
                         return;
                     }
@@ -283,7 +284,7 @@ export const RouteLayer = ({ map, route }) => {
                     // Extract and validate geometry
                     const geometry = currentRoute.geojson.features[0].geometry;
                     if (!geometry || geometry.type !== 'LineString') {
-                        console.error('[RouteLayer] Invalid GeoJSON structure:', {
+                        logger.error('RouteLayer', 'Invalid GeoJSON structure', {
                             featureType: geometry?.type,
                             expected: 'LineString'
                         });
@@ -431,7 +432,7 @@ export const RouteLayer = ({ map, route }) => {
                     // Reset the moved to front flag when re-rendering
                     movedToFrontAfterRenderRef.current = false;
                 } catch (error) {
-                    console.error('[RouteLayer] Error in route rendering operation:', error);
+                    logger.error('RouteLayer', 'Error in route rendering operation:', error);
                 }
             }, `render-route-${routeId}`);
 
@@ -447,7 +448,7 @@ export const RouteLayer = ({ map, route }) => {
             };
         }
         catch (error) {
-            console.error('[RouteLayer] Error rendering route:', error);
+            logger.error('RouteLayer', 'Error rendering route:', error);
         }
     }, [map, route, isStyleLoaded, routeVisibility]);
 
@@ -527,15 +528,15 @@ export const RouteLayer = ({ map, route }) => {
             )
         );
         
-        // Debug ID comparison for loaded routes in animation effect
+        // Debug ID comparison for loaded routes in animation effect - reduced logging for mobile
         if (route._type === 'loaded') {
-            console.log('[RouteLayer] Animation ID comparison for loaded route:', {
-                routeIds,
-                currentRouteIds,
-                isCurrentRoute,
-                routeType: route._type,
-                loadedState: route._loadedState ? true : false
-            });
+            // Skip this log entirely on mobile devices
+            if (window.innerWidth > 768) {
+                logger.debug('RouteLayer', 'Animation ID comparison', {
+                    isCurrentRoute,
+                    routeType: route._type
+                });
+            }
         }
         
         if (!isCurrentRoute) {

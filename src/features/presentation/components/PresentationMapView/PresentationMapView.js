@@ -3,6 +3,7 @@ import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from 'mapbox-gl';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
+import logger from '../../../../utils/logger';
 import SearchControl from '../SearchControl/SearchControl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import StyleControl, { MAP_STYLES } from '../StyleControl';
@@ -105,7 +106,7 @@ export default function PresentationMapView(props) {
     const { initialized: routesInitialized } = useUnifiedRouteProcessing(routes, {
         batchProcess: true,
         onInitialized: () => {
-            // console.log('[PresentationMapView] Routes initialized with unified approach');
+            logger.info('PresentationMapView', 'Routes initialized with unified approach');
         }
     });
     
@@ -131,7 +132,7 @@ export default function PresentationMapView(props) {
                     mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
                 }
             } catch (error) {
-                console.error('[PresentationMapView] Error updating hover point:', error);
+                logger.error('PresentationMapView', 'Error updating hover point:', error);
             }
         } else {
             // Hide the layer when no coordinates
@@ -195,13 +196,13 @@ export default function PresentationMapView(props) {
             try {
                 map.setProjection(targetProjection);
             } catch (error) {
-                console.error('[PresentationMapView] Error setting projection:', error);
+                logger.error('PresentationMapView', 'Error setting projection:', error);
                 // Fallback to mercator if there's an error
                 if (currentProjection !== 'mercator') {
                     try {
                         map.setProjection('mercator');
                     } catch (innerError) {
-                        console.error('[PresentationMapView] Error setting fallback projection:', innerError);
+                        logger.error('PresentationMapView', 'Error setting fallback projection:', innerError);
                     }
                 }
             }
@@ -215,7 +216,7 @@ export default function PresentationMapView(props) {
                     exaggeration: isMobile ? 0.0 : 1.5 // No exaggeration on mobile for better performance
                 });
             } catch (error) {
-                console.error('[PresentationMapView] Error updating terrain:', error);
+                logger.error('PresentationMapView', 'Error updating terrain:', error);
             }
         }
         
@@ -227,13 +228,13 @@ export default function PresentationMapView(props) {
             try {
                 map.setPitch(targetPitch);
             } catch (error) {
-                console.error('[PresentationMapView] Error setting pitch:', error);
+                logger.error('PresentationMapView', 'Error setting pitch:', error);
                 // Try to set pitch to 0 as a fallback
                 if (currentPitch !== 0) {
                     try {
                         map.setPitch(0);
                     } catch (innerError) {
-                        console.error('[PresentationMapView] Error setting fallback pitch:', innerError);
+                        logger.error('PresentationMapView', 'Error setting fallback pitch:', innerError);
                     }
                 }
             }
@@ -281,29 +282,36 @@ export default function PresentationMapView(props) {
                 antialias: initialIsMobile ? false : true // Disable antialiasing on mobile for better performance
             });
         } catch (error) {
-            console.error('[PresentationMapView] Error creating map instance:', error);
+            logger.error('PresentationMapView', 'Error creating map instance:', error);
             return;
         }
         
-        // Add error handling for map
+        // Add error handling for map, including special handling for aborted fetches
         map.on('error', (e) => {
-            console.error('[PresentationMapView] Mapbox GL error:', e);
+            // Check if this is an aborted fetch error
+            if (e && e.error && e.error.name === 'AbortError' && e.error.message && e.error.message.includes('Fetch is aborted')) {
+                // Handle aborted fetch errors gracefully - these often happen during cleanup and are normal
+                logger.debug('PresentationMapView', 'Fetch aborted during map operation - this is normal during cleanup');
+            } else {
+                // Log other errors normally
+                logger.error('PresentationMapView', 'Mapbox GL error:', e);
+            }
         });
         
         // Import and set map instance in the mapOperationsQueue
         import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
             if (isMounted) {
                 setMapInstance(map);
-                // console.log('[PresentationMapView] Map instance set in mapOperationsQueue');
+                logger.info('PresentationMapView', 'Map instance set in mapOperationsQueue');
             }
         }).catch(error => {
-            console.error('[PresentationMapView] Error importing mapOperationsQueue:', error);
+            logger.error('PresentationMapView', 'Error importing mapOperationsQueue:', error);
         });
         // Log map initialization events
         map.on('load', () => {
             // Check if component is still mounted
             if (!isMounted) {
-                console.log('[PresentationMapView] Map loaded but component unmounted, cleaning up');
+                logger.info('PresentationMapView', 'Map loaded but component unmounted, cleaning up');
                 safelyRemoveMap(map);
                 return;
             }
@@ -355,7 +363,7 @@ export default function PresentationMapView(props) {
                             }
                         });
                     } catch (error) {
-                        console.error('[PresentationMapView] Error adding 3D buildings layer:', error);
+                        logger.error('PresentationMapView', 'Error adding 3D buildings layer:', error);
                     }
                 }
                 
@@ -389,7 +397,7 @@ export default function PresentationMapView(props) {
                 map.setLayoutProperty('hover-point', 'visibility', 'none');
                 
             } catch (error) {
-                console.error('[PresentationMapView] Error setting up terrain:', error);
+                logger.error('PresentationMapView', 'Error setting up terrain:', error);
             }
             
             setIsMapReady(true);
@@ -400,9 +408,7 @@ export default function PresentationMapView(props) {
         map.on('zoom', () => {
             const zoom = map.getZoom();
         });
-        map.on('error', (e) => {
-            console.error('[PresentationMapView] Map error:', e);
-        });
+        // This is a duplicate error handler, we already have one above
         
         // Add mousemove event to set hover coordinates
         map.on('mousemove', (e) => {
@@ -596,7 +602,7 @@ export default function PresentationMapView(props) {
             
             // Use our enhanced cleanup function to safely remove the map
             safelyRemoveMap(map).then(() => {
-                console.log('[PresentationMapView] Map cleanup completed in useEffect cleanup');
+                logger.info('PresentationMapView', 'Map cleanup completed in useEffect cleanup');
             });
             
             // Clear the map instance reference
