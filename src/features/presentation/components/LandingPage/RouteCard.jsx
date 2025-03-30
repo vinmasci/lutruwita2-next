@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { safeNavigate } from '../../../../utils/navigationUtils';
 import { 
@@ -8,12 +8,12 @@ import {
 import PersonIcon from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import { Route, Mountain, MoreHorizontal } from 'lucide-react';
-// Simplified lazy loading of the ImageSlider component
-const ImageSlider = lazy(() => import('../ImageSlider/ImageSlider'));
+// Import ImageSlider directly without lazy loading
+import ImageSlider from '../ImageSlider/ImageSlider';
 import { FilterCard } from './FilterCard';
 
-// Placeholder component for the image slider while it's loading
-const ImageSliderPlaceholder = styled(Box)(({ theme }) => ({
+// Simple placeholder for images
+const ImagePlaceholder = styled(Box)(({ theme }) => ({
   width: '100%',
   height: '100%',
   backgroundColor: '#f0f0f0',
@@ -162,61 +162,15 @@ export const calculateUnpavedPercentage = (route) => {
 // Limit the number of photos to display per card
 const MAX_PHOTOS_PER_CARD = 5;
 
-// Threshold for intersection observer - load when card is 200px from viewport
-const INTERSECTION_THRESHOLD = 0.1;
-const INTERSECTION_MARGIN = '200px';
-
 export const RouteCard = ({ route }) => {
   const navigate = useNavigate();
-  const [isVisible, setIsVisible] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [shouldRenderContent, setShouldRenderContent] = useState(false);
   const cardRef = useRef(null);
   
   // Limit the number of photos to improve performance
   const limitedPhotos = useMemo(() => {
-    // Only process photos if the card is visible to avoid unnecessary work
-    if (!isVisible || !route.photos || route.photos.length === 0) return [];
+    if (!route.photos || route.photos.length === 0) return [];
     return route.photos.slice(0, MAX_PHOTOS_PER_CARD);
-  }, [route.photos, isVisible]);
-  
-  // Use Intersection Observer to detect when the card is visible
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          // Once visible, disconnect the observer
-          observer.disconnect();
-          
-          // Delay rendering the actual content to prioritize visible UI first
-          setTimeout(() => {
-            setShouldRenderContent(true);
-            
-            // Mark as fully loaded after another short delay
-            setTimeout(() => {
-              setIsLoaded(true);
-            }, 100);
-          }, 50);
-        }
-      },
-      {
-        root: null, // viewport
-        rootMargin: INTERSECTION_MARGIN, // Load a bit before it comes into view
-        threshold: INTERSECTION_THRESHOLD // Trigger when 10% of the element is visible
-      }
-    );
-    
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-    
-    return () => {
-      if (cardRef.current) {
-        observer.unobserve(cardRef.current);
-      }
-    };
-  }, []);
+  }, [route.photos]);
   
   return (
     <Grid item xs={12} sm={6} md={4}> {/* Changed md from 3 to 4 */}
@@ -226,38 +180,16 @@ export const RouteCard = ({ route }) => {
         sx={{ cursor: 'pointer' }}
       >
         <MapPreviewWrapper>
-          {shouldRenderContent ? (
-            <Suspense fallback={
-              <ImageSliderPlaceholder>
-                <Skeleton 
-                  variant="rectangular" 
-                  width="100%" 
-                  height="100%" 
-                  animation="wave" 
-                />
-              </ImageSliderPlaceholder>
-            }>
-              <ImageSlider 
-                mapPreviewProps={{
-                  center: route.mapState.center, 
-                  zoom: route.mapState.zoom, 
-                  routes: route.routes 
-                }}
-                photos={limitedPhotos}
-                maxPhotos={MAX_PHOTOS_PER_CARD}
-              />
-            </Suspense>
-          ) : (
-            // Initial placeholder while determining visibility
-            <ImageSliderPlaceholder>
-              <Skeleton 
-                variant="rectangular" 
-                width="100%" 
-                height="100%" 
-                animation="wave" 
-              />
-            </ImageSliderPlaceholder>
-          )}
+          <ImageSlider 
+            mapPreviewProps={{
+              center: route.mapState.center, 
+              zoom: route.mapState.zoom, 
+              routes: route.routes 
+            }}
+            photos={limitedPhotos}
+            maxPhotos={MAX_PHOTOS_PER_CARD}
+            simplifiedMode={true} // Enable simplified mode for better mobile compatibility
+          />
         </MapPreviewWrapper>
         <CardContent sx={{ padding: '12px 8px' }}>
           {/* Route name */}

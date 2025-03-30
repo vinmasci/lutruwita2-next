@@ -139,17 +139,12 @@ export const ImageSlider = React.memo(({
   mapPreviewProps,
   photos = [],
   maxPhotos = 10,
-  staticMapUrl
+  staticMapUrl,
+  simplifiedMode = false // New prop for simplified mode
 }) => {
-  // State to track which images have been loaded
+  // Simplified state for the simplified mode
   const [loadedImages, setLoadedImages] = useState({});
-  // State to track which images have been requested (to prevent duplicate requests)
-  const [requestedImages, setRequestedImages] = useState({});
-  // State to track which tiny thumbnails have been loaded
   const [loadedThumbnails, setLoadedThumbnails] = useState({});
-  // Refs to store the actual Image objects for preloading
-  const imageRefs = useRef({});
-  // State to track if we're on a mobile device
   const [isMobile, setIsMobile] = useState(isMobileDevice());
   
   // Update mobile state on resize
@@ -202,23 +197,25 @@ export const ImageSlider = React.memo(({
     setShuffledPhotoList(shuffled.slice(0, maxPhotos));
   }, [photos, hasPhotos, maxPhotos]);
 
-// Process photos using the shuffled list - memoized
-const photoSlides = useMemo(() => {
-  return shuffledPhotoList.map(photo => {
-    const url = photo.url || photo.thumbnailUrl;
-    
-    // If this is a Google photo (has isGooglePhoto flag), use the provided thumbnailUrl
-    // Otherwise, generate a tiny thumbnail for blur-up loading
-    const thumbnailUrl = photo.isGooglePhoto 
-      ? photo.thumbnailUrl 
-      : getTinyThumbnailUrl(url, { width: 20, quality: 20 });
-    
-    return {
-      url,
-      thumbnailUrl
-    };
-  });
-}, [shuffledPhotoList]); // Depend on the shuffled state
+  // Process photos using the shuffled list - memoized
+  // In simplified mode, we don't generate thumbnails to reduce complexity
+  const photoSlides = useMemo(() => {
+    return shuffledPhotoList.map(photo => {
+      const url = photo.url || photo.thumbnailUrl;
+      
+      // In simplified mode, skip thumbnail generation
+      const thumbnailUrl = simplifiedMode ? null : (
+        photo.isGooglePhoto 
+          ? photo.thumbnailUrl 
+          : getTinyThumbnailUrl(url, { width: 20, quality: 20 })
+      );
+      
+      return {
+        url,
+        thumbnailUrl
+      };
+    });
+  }, [shuffledPhotoList, simplifiedMode]); // Depend on the shuffled state and simplified mode
 
   // Create items array for carousel - depends on photoSlides which depends on shuffledPhotoList
   const items = useMemo(() => {
@@ -255,78 +252,10 @@ const photoSlides = useMemo(() => {
     return null;
   }
 
-  // Simplified image loading logic - always load images on mobile
+  // In simplified mode, we always load all images
   const shouldLoadImage = (index) => {
-    // On mobile, load all images to prevent issues
-    if (isMobile) return true;
-    
-    // On desktop, use the original selective loading logic
-    // Always load the first image
-    if (index === 0) return true;
-
-    // Load current, previous, and next images
-    return index === activeStep || 
-           index === (activeStep - 1 + items.length) % items.length || // Handle wrap around for previous
-           index === (activeStep + 1) % items.length || // Handle wrap around for next
-           // Handle wrapping for the last and first images
-           (activeStep === 0 && index === items.length - 1) ||
-           (activeStep === items.length - 1 && index === 0);
+    return true;
   };
-  
-  // Function to preload an image
-  const preloadImage = (url, index) => {
-    // Skip if already requested or not a photo URL
-    if (requestedImages[index] || !url || items[index]?.type !== 'photo') return;
-    
-    // Mark as requested to prevent duplicate requests
-    setRequestedImages(prev => ({
-      ...prev,
-      [index]: true
-    }));
-    
-    // Create a new Image object for preloading
-    const img = new Image();
-    img.onload = () => handleImageLoad(index);
-    img.onerror = (error) => {
-      console.warn(`[ImageSlider] Failed to preload image at index ${index}:`, error);
-      // Still mark as loaded to prevent UI from waiting indefinitely
-      handleImageLoad(index);
-    };
-    
-    // Check if this is a Google Places photo
-    const isGooglePhoto = url.includes('googleapis.com');
-    
-    // For Google Photos, use the original URL
-    // For other photos, use the optimized URL
-    img.src = isGooglePhoto 
-      ? url 
-      : (getOptimizedImageUrl(url, { 
-          width: 800, 
-          quality: 80,
-          format: 'auto'
-        }) || url);
-    
-    // Store the Image object in the ref
-    imageRefs.current[index] = img;
-  };
-  
-  // Preload images when active step changes
-  useEffect(() => {
-    if (items.length === 0) return;
-    
-    // Preload current image and adjacent ones
-    const indicesToPreload = [
-      activeStep,
-      (activeStep + 1) % items.length,
-      (activeStep - 1 + items.length) % items.length
-    ];
-    
-    indicesToPreload.forEach(index => {
-      if (items[index]?.type === 'photo') {
-        preloadImage(items[index].content, index);
-      }
-    });
-  }, [activeStep, items.length]);
   
   const handleNext = () => {
     if (isNavigating) return;
@@ -453,39 +382,57 @@ const photoSlides = useMemo(() => {
           });
         } else { // item.type === 'photo'
           // Enhanced rendering with blur-up loading
-          return _jsxs(ImageContainer, {
-            children: [
-              // Show tiny thumbnail as placeholder while loading
-              item.thumbnailUrl && !loadedImages[index] && _jsx(LowQualityPlaceholder, {
-                src: item.thumbnailUrl,
-                alt: "",
-                onLoad: () => handleThumbnailLoad(index),
-                style: { 
-                  opacity: loadedThumbnails[index] && !loadedImages[index] ? 0.7 : 0 
+          // In simplified mode, we use a simpler rendering approach
+          if (simplifiedMode) {
+            return _jsx(ImageContainer, {
+              children: _jsx(SlideImage, {
+                src: item.content,
+                alt: `Route photo ${index}`,
+                onLoad: () => handleImageLoad(index),
+                loading: "eager", // Force eager loading in simplified mode
+                onError: (e) => {
+                  // Fallback to original source if optimized version fails
+                  console.warn('[ImageSlider] Image failed to load:', item.content);
                 }
               }),
-              
-              // Only create actual image element when it should be loaded
-              shouldLoadImage(index) ? (
-                _jsx(OptimizedImage, {
-                  src: item.content,
-                  alt: `Route photo ${index}`,
-                  onLoad: () => handleImageLoad(index),
-                  style: { opacity: loadedImages[index] ? 1 : 0 },
-                  // Pass isGooglePhoto flag if the URL contains "googleapis.com" (Google Places photos)
-                  isGooglePhoto: item.content.includes('googleapis.com')
-                  // sizes is now handled within the OptimizedImage component
-                })
-              ) : (
-                // Placeholder when not in view and no thumbnail
-                !item.thumbnailUrl && _jsx(ImagePlaceholder, {
-                  variant: "rectangular",
-                  animation: "wave" // Use consistent wave animation
-                })
-              )
-            ],
-            key: `slide-${index}`
-          });
+              key: `slide-${index}`
+            });
+          } else {
+            // Original complex rendering with blur-up loading
+            return _jsxs(ImageContainer, {
+              children: [
+                // Show tiny thumbnail as placeholder while loading
+                item.thumbnailUrl && !loadedImages[index] && _jsx(LowQualityPlaceholder, {
+                  src: item.thumbnailUrl,
+                  alt: "",
+                  onLoad: () => handleThumbnailLoad(index),
+                  style: { 
+                    opacity: loadedThumbnails[index] && !loadedImages[index] ? 0.7 : 0 
+                  }
+                }),
+                
+                // Only create actual image element when it should be loaded
+                shouldLoadImage(index) ? (
+                  _jsx(OptimizedImage, {
+                    src: item.content,
+                    alt: `Route photo ${index}`,
+                    onLoad: () => handleImageLoad(index),
+                    style: { opacity: loadedImages[index] ? 1 : 0 },
+                    // Pass isGooglePhoto flag if the URL contains "googleapis.com" (Google Places photos)
+                    isGooglePhoto: item.content.includes('googleapis.com')
+                    // sizes is now handled within the OptimizedImage component
+                  })
+                ) : (
+                  // Placeholder when not in view and no thumbnail
+                  !item.thumbnailUrl && _jsx(ImagePlaceholder, {
+                    variant: "rectangular",
+                    animation: "wave" // Use consistent wave animation
+                  })
+                )
+              ],
+              key: `slide-${index}`
+            });
+          }
         }
       })
     })
