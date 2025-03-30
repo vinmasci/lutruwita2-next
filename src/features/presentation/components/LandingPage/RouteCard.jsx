@@ -8,10 +8,8 @@ import {
 import PersonIcon from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import { Route, Mountain, MoreHorizontal } from 'lucide-react';
-// Lazy load the ImageSlider component
-const ImageSlider = lazy(() => import('../ImageSlider/ImageSlider').then(module => ({
-  default: module.ImageSlider
-})));
+// Simplified lazy loading of the ImageSlider component
+const ImageSlider = lazy(() => import('../ImageSlider/ImageSlider'));
 import { FilterCard } from './FilterCard';
 
 // Placeholder component for the image slider while it's loading

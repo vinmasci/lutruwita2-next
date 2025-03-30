@@ -10,8 +10,18 @@ import {
   generateSrcSet 
 } from '../../../../utils/imageUtils';
 
-// Helper function to detect mobile devices
+// More reliable mobile detection function
 const isMobileDevice = () => {
+  // Check if window exists (for SSR)
+  if (typeof window === 'undefined') return false;
+  
+  // Use user agent as a fallback if matchMedia isn't available
+  if (window.matchMedia) {
+    // This is the most reliable way to detect mobile devices
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+  
+  // Fallback to screen width
   return window.innerWidth <= 768;
 };
 
@@ -245,12 +255,16 @@ const photoSlides = useMemo(() => {
     return null;
   }
 
-  // Only preload the first image and adjacent images to the current one
+  // Simplified image loading logic - always load images on mobile
   const shouldLoadImage = (index) => {
+    // On mobile, load all images to prevent issues
+    if (isMobile) return true;
+    
+    // On desktop, use the original selective loading logic
     // Always load the first image
     if (index === 0) return true;
 
-    // Load current, previous, and next images (consistent for all devices)
+    // Load current, previous, and next images
     return index === activeStep || 
            index === (activeStep - 1 + items.length) % items.length || // Handle wrap around for previous
            index === (activeStep + 1) % items.length || // Handle wrap around for next
@@ -477,3 +491,6 @@ const photoSlides = useMemo(() => {
     })
   });
 });
+
+// Add default export for easier importing
+export default ImageSlider;
