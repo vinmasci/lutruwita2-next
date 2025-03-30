@@ -405,7 +405,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                         backgroundColor: currentRoute?.id === route.id ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
                                         mb: 1.5,
                                         borderRadius: 1,
-                                        transition: 'all 0.2s ease-in-out',
+                                        transition: 'all 0.05s ease-in-out', // Even faster transition
                                         cursor: 'pointer',
                                         border: currentRoute?.id === route.id ? '1px solid rgba(74, 158, 255, 0.5)' : '1px solid transparent',
                                         '&:hover': {
@@ -439,6 +439,8 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                             e.preventDefault();
                                             // Stop propagation to ensure no other elements capture this event
                                             e.stopPropagation();
+                                            // Immediately update the route on touch start for mobile responsiveness
+                                            updateRouteAndMap(route);
                                         },
                                         children: _jsx(ListItemText, { 
                                             primary: _jsxs("div", {

@@ -10,7 +10,7 @@ import { usePhotoContext } from "../../photo/context/PhotoContext";
 import { getPhotoIdentifier } from "../../photo/utils/clustering";
 import { usePhotoService } from "../../photo/services/photoService";
 import { usePlaceContext } from "../../place/context/PlaceContext";
-import { useLineContext } from "../../lineMarkers/context/LineContext";
+// Removed useLineContext import from here, will use it directly in the try/catch
 import { normalizeRoute } from "../utils/routeUtils";
 import { getRouteLocationData } from "../../../utils/geocoding";
 import { getRouteDistance, getUnpavedPercentage, getElevationGain } from "../../gpx/utils/routeUtils";
@@ -255,26 +255,26 @@ export const RouteProvider = ({ children, }) => {
     const photoService = usePhotoService();
     const { places, updatePlace } = usePlaceContext();
 
-    // Get LineContext for line marker functionality
-    let lineContext = null;
+    // LineContext will be dynamically imported and used within loadRoute/saveCurrentState if needed
+    // let lineContext = null; // Removed top-level initialization
+
+    /* Removed the try/catch block that attempted top-level await import
     try {
-        // Attempt to get LineContext, but don't throw an error if it's not available
-        const LineContextModule = require('../../lineMarkers/context/LineContext');
-        if (LineContextModule && typeof LineContextModule.useLineContext === 'function') {
+        // Dynamically import and use LineContext only if needed and available
+        const { useLineContext: dynamicUseLineContext } = await import('../../lineMarkers/context/LineContext');
+        if (typeof dynamicUseLineContext === 'function') {
             try {
-                lineContext = LineContextModule.useLineContext();
-                // logger.debug('[RouteContext] Successfully accessed LineContext');
+                lineContext = dynamicUseLineContext();
+                 logger.debug('[RouteContext] Successfully accessed LineContext dynamically');
             } catch (error) {
-                // This is expected when the RouteProvider is used outside of a LineProvider
-                // logger.debug('[RouteContext] LineContext not available (expected):', error.message);
             }
         } else {
-            // logger.debug('[RouteContext] LineContext module not available or useLineContext is not a function');
+             logger.debug('[RouteContext] LineContext module not available or useLineContext is not a function');
         }
     } catch (error) {
-        // This is expected when the LineContext module cannot be imported
-        // logger.debug('[RouteContext] Could not import LineContext module (expected):', error.message);
+         logger.debug('[RouteContext] Could not import LineContext module (expected):', error.message);
     }
+    */
 
     // Helper function to upload photos to Cloudinary
     const uploadPhotosToCloudinary = async () => {
@@ -853,17 +853,13 @@ export const RouteProvider = ({ children, }) => {
             // });
             partialUpdate.pois = pois;
 
-            // IMPORTANT FIX: Always include all lines in the save data, not just changed ones
-            // This ensures we don't lose existing lines when adding new ones
+            // IMPORTANT FIX: Always include all lines in the save data
             // console.log('[RouteContext] Including lines in save data:', lineData ? lineData.length : 0);
-            // if (lineData && lineData.length > 0) {
-            //     console.log('[RouteContext] Line data details:', JSON.stringify(lineData));
-            // }
             partialUpdate.lines = lineData || [];
 
             // Mark lines as changed to ensure they're saved (use the setter)
             if (lineData && lineData.length > 0) {
-                setChangedSections({ lines: true });
+                setChangedSections(prev => ({...prev, lines: true })); // Use functional update
             }
 
             // Add header settings if they've changed or this is a new route
@@ -1144,22 +1140,20 @@ export const RouteProvider = ({ children, }) => {
                 // Store the line data in state for direct access
                 setLoadedLineData(route.lines);
 
-                // Also try to use LineContext if available (for backward compatibility)
-                if (lineContext) {
-                    // console.log('[RouteContext] LineContext is available');
-
-                    if (typeof lineContext.loadLinesFromRoute === 'function') {
-                        // console.log('[RouteContext] loadLinesFromRoute function is available');
-                        // console.log('[RouteContext] Calling loadLinesFromRoute function from LineContext');
-                        lineContext.loadLinesFromRoute(route.lines);
-                        // console.log('[RouteContext] loadLinesFromRoute function called successfully');
-                    } else {
-                        console.error('[RouteContext] loadLinesFromRoute function not available in LineContext');
-                        console.error('[RouteContext] Available functions in LineContext:',
-                            Object.keys(lineContext).filter(key => typeof lineContext[key] === 'function'));
+                // Dynamically import and use LineContext if available
+                try {
+                    const { useLineContext: dynamicUseLineContext } = await import('../../lineMarkers/context/LineContext');
+                    if (typeof dynamicUseLineContext === 'function') {
+                        const lineContextInstance = dynamicUseLineContext(); // Get instance inside try/catch
+                        if (lineContextInstance && typeof lineContextInstance.loadLinesFromRoute === 'function') {
+                            // console.log('[RouteContext] Dynamically calling loadLinesFromRoute');
+                            lineContextInstance.loadLinesFromRoute(route.lines);
+                        } else {
+                            // console.log('[RouteContext] loadLinesFromRoute not available in dynamic LineContext');
+                        }
                     }
-                } else {
-                    // console.log('[RouteContext] LineContext not available, using direct line data approach instead');
+                } catch (importError) {
+                    // console.log('[RouteContext] Could not dynamically import LineContext (expected if not available):', importError.message);
                 }
             } else {
                 // console.log('[RouteContext] No lines data found in loaded route');

@@ -6,6 +6,7 @@ import { safelyRemoveMap } from '../../../utils/mapCleanup';
 import StyleControl, { MAP_STYLES } from '../../../components/StyleControl/StyleControl';
 import SearchControl from '../../../components/SearchControl/SearchControl';
 import PitchControl from '../../../components/PitchControl/PitchControl';
+import { adjustMapScale } from '../../../utils/mapScaleUtils'; // Added import
 
 // Debug function for road layer
 const debugRoadLayer = (map) => {
@@ -415,10 +416,8 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
       // Manually trigger the scaling function after the map is loaded
       const mapContainer = document.querySelector('.w-full.h-full.relative');
       if (mapContainer) {
-        // Import the adjustMapScale function
-        const { adjustMapScale } = require('../../../utils/mapScaleUtils');
         // Call it directly to ensure proper scaling on initial load
-        adjustMapScale(mapContainer);
+        adjustMapScale(mapContainer); // Removed require, using imported function
       }
     });
     

@@ -230,14 +230,15 @@ export const ImageSlider = React.memo(({
     // Always load the first image
     if (index === 0) return true;
     
-    // On mobile, be more conservative with preloading to save bandwidth
+    // On mobile, preload +/- 2 slides to improve navigation experience
     if (isMobile) {
-      // Load current, previous, and next images on mobile as well
       return index === activeStep ||
              index === (activeStep - 1 + items.length) % items.length ||
-             index === (activeStep + 1) % items.length;
+             index === (activeStep + 1) % items.length ||
+             index === (activeStep - 2 + items.length) % items.length || // Preload previous 2
+             index === (activeStep + 2) % items.length;                   // Preload next 2
     }
-    
+
     // On desktop, load current, previous, and next images
     return index === activeStep || 
            index === activeStep - 1 || 
