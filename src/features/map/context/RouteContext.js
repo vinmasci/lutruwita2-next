@@ -277,11 +277,11 @@ export const RouteProvider = ({ children, }) => {
     }
 
     // Helper function to upload photos to Cloudinary
-    const uploadPhotosToCloudinary = async () => {
-      const localPhotos = photos.filter(p => p.isLocal === true);
-      if (localPhotos.length === 0) return photos;
+    const uploadPhotosToCloudinary = async (photosToUpload) => {
+      const localPhotos = photosToUpload.filter(p => p.isLocal === true);
+      if (localPhotos.length === 0) return photosToUpload;
 
-      const updatedPhotos = [...photos];
+      const updatedPhotos = [...photosToUpload];
 
       for (const photo of localPhotos) {
         if (!photo._blobs?.large) continue;
@@ -701,7 +701,7 @@ export const RouteProvider = ({ children, }) => {
                 if (localPhotos.length > 0) {
                     // console.log(`[RouteContext] Found ${localPhotos.length} local photos to upload`);
                     // Upload local photos to Cloudinary
-                    updatedPhotos = await uploadPhotosToCloudinary();
+                    updatedPhotos = await uploadPhotosToCloudinary(currentPhotos);
                     hasPhotoChanges = true;
 
                     // Log the updated photos after upload

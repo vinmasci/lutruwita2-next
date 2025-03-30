@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useMapStyle } from '../../hooks/useMapStyle';
 import { useRouteState } from "../../hooks/useRouteState";
-import { useRouteContext } from "../../context/RouteContext";
+import { useRouteContext } from "../../context/RouteContext"; // Keep this import
 import { queueRouteOperation, cleanupRouteLayers, safeRemoveLayer, safeRemoveSource } from '../../utils/mapOperationsUtils';
 import logger from '../../../../utils/logger';
 
@@ -14,7 +14,8 @@ const DEFAULT_COLORS = {
 export const RouteLayer = ({ map, route }) => {
     const isStyleLoaded = useMapStyle(map);
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
-    const { currentRoute } = useRouteContext();
+    // Get setCurrentRoute and the full routes array from the context
+    const { currentRoute, setCurrentRoute, routes } = useRouteContext();
 
     // Keep track of the previous color to detect changes
     const prevColorRef = useRef(route?.color);
@@ -398,34 +399,48 @@ export const RouteLayer = ({ map, route }) => {
                         });
                     }
 
-                    // Add hover handlers only for focused routes
-                    if (currentRoute.isFocused) {
-                        const mouseHandler = () => {
-                            mapInstance.getCanvas().style.cursor = 'pointer';
-                            if (visibility.mainRoute) {
-                                mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
-                            }
-                        };
+                    // --- Event Handlers ---
 
-                        const mouseleaveHandler = () => {
-                            mapInstance.getCanvas().style.cursor = '';
-                            mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'none');
-                        };
+                    // Mouse enter/move handler (for cursor and optional hover effect)
+                    const mouseHandler = () => {
+                        mapInstance.getCanvas().style.cursor = 'pointer';
+                        // Optional: Show hover effect if needed (using hoverLayerId)
+                        // if (mapInstance.getLayer(hoverLayerId) && visibility.mainRoute) {
+                        //     mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
+                        // }
+                    };
 
-                        // Add click handler for toggling visibility
-                        const clickHandler = () => {
-                            // Just toggle hover layer visibility, no re-rendering
-                            if (visibility.mainRoute) {
-                                mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'visible');
-                            }
-                        };
+                    // Mouse leave handler
+                    const mouseleaveHandler = () => {
+                        mapInstance.getCanvas().style.cursor = '';
+                        // Optional: Hide hover effect
+                        // if (mapInstance.getLayer(hoverLayerId)) {
+                        //     mapInstance.setLayoutProperty(hoverLayerId, 'visibility', 'none');
+                        // }
+                    };
 
-                        mapInstance.on('click', mainLayerId, clickHandler);
-                        mapInstance.on('mouseenter', mainLayerId, mouseHandler);
-                        mapInstance.on('mousemove', mainLayerId, mouseHandler);
-                        mapInstance.on('mouseleave', mainLayerId, mouseleaveHandler);
-                    }
-                    
+                    // Click handler to set the current route
+                    const clickHandler = (e) => {
+                        // Prevent clicks from propagating to other layers if needed
+                        // e.originalEvent.stopPropagation();
+
+                        // Find the full route object from the context's routes array
+                        const clickedRoute = routes.find(r => (r.id || r.routeId) === routeId);
+
+                        if (clickedRoute) {
+                            logger.debug('RouteLayer', 'Route clicked, setting as current:', routeId);
+                            setCurrentRoute(clickedRoute);
+                        } else {
+                            logger.warn('RouteLayer', 'Clicked route not found in context:', routeId);
+                        }
+                    };
+
+                    // Attach listeners to the main line layer
+                    mapInstance.on('click', mainLayerId, clickHandler);
+                    mapInstance.on('mouseenter', mainLayerId, mouseHandler);
+                    mapInstance.on('mousemove', mainLayerId, mouseHandler); // Keep mousemove for consistent cursor
+                    mapInstance.on('mouseleave', mainLayerId, mouseleaveHandler);
+
                     // Mark this route as rendered
                     renderedRef.current = true;
                     
@@ -438,19 +453,25 @@ export const RouteLayer = ({ map, route }) => {
 
             // Return cleanup function
             return () => {
-                // Clean up event listeners when component unmounts
-                if (map) {
-                    map.off('click', mainLayerId);
-                    map.off('mouseenter', mainLayerId);
-                    map.off('mousemove', mainLayerId);
-                    map.off('mouseleave', mainLayerId);
+                // Clean up event listeners when component unmounts or route changes
+                if (map && map.getLayer(mainLayerId)) { // Check if layer still exists
+                    try {
+                        map.off('click', mainLayerId);
+                        map.off('mouseenter', mainLayerId);
+                        map.off('mousemove', mainLayerId);
+                        map.off('mouseleave', mainLayerId);
+                    } catch (cleanupError) {
+                        // Log error but don't crash if map/layer is gone
+                        logger.warn('RouteLayer', 'Error cleaning up listeners:', cleanupError.message);
+                    }
                 }
             };
         }
         catch (error) {
             logger.error('RouteLayer', 'Error rendering route:', error);
         }
-    }, [map, route, isStyleLoaded, routeVisibility]);
+        // Add setCurrentRoute and routes to dependency array
+    }, [map, route, isStyleLoaded, routeVisibility, setCurrentRoute, routes]);
 
     // Effect to update the line color when the route color changes
     useEffect(() => {

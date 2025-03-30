@@ -80,28 +80,24 @@ const ImageContainer = styled(Box)({
 
 // Optimized image component with srcset for responsive loading
 const OptimizedImage = React.memo(({ src, alt, onLoad, style, sizes = '100vw' }) => {
-  const isMobile = isMobileDevice();
-  
   // Generate srcset for responsive images if it's a Cloudinary URL
-  const srcSet = !isMobile ? generateSrcSet(src) : '';
+  const srcSet = generateSrcSet(src); // Always generate srcset
   
   // Get an optimized version of the image for the src attribute
-  // Use lower quality and smaller size for mobile
+  // Use consistent settings for all devices
   const optimizedSrc = getOptimizedImageUrl(src, { 
-    width: isMobile ? 400 : 800, 
-    quality: isMobile ? 60 : 80,
+    width: 800, 
+    quality: 80,
     format: 'auto'
   }) || src;
   
-  // Set appropriate sizes attribute based on device
-  const responsiveSizes = isMobile 
-    ? '100vw' // Full width on mobile
-    : '(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw';
+  // Use consistent sizes attribute
+  const responsiveSizes = '(max-width: 600px) 100vw, (max-width: 960px) 50vw, 33vw';
   
   return _jsx(SlideImage, {
     src: optimizedSrc,
-    srcSet: srcSet, // Only use srcSet on non-mobile
-    sizes: responsiveSizes,
+    srcSet: srcSet, // Use srcSet always
+    sizes: responsiveSizes, // Use consistent sizes
     alt: alt,
     loading: "lazy",
     onLoad: onLoad,
@@ -171,16 +167,16 @@ export const ImageSlider = React.memo(({
   // Prepare slides array
   const hasPhotos = photos && photos.length > 0;
 
-  // Process photos with better selection logic - memoized to avoid recalculation
-  const photoSlides = useMemo(() => {
+  // State to hold the shuffled photos, initialized once
+  const [shuffledPhotoList] = useState(() => {
     if (!hasPhotos) return [];
-    
-    // Use a consistent subset of photos
-    const photosToUse = photos.length <= maxPhotos 
-      ? photos 
-      : photos.slice(0, maxPhotos);
-    
-    return photosToUse.map(photo => {
+    const shuffled = [...photos].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, maxPhotos);
+  });
+
+  // Process photos using the shuffled list - memoized
+  const photoSlides = useMemo(() => {
+    return shuffledPhotoList.map(photo => {
       const url = photo.url || photo.thumbnailUrl;
       return {
         url,
@@ -188,9 +184,9 @@ export const ImageSlider = React.memo(({
         thumbnailUrl: getTinyThumbnailUrl(url, { width: 20, quality: 20 })
       };
     });
-  }, [photos, hasPhotos, maxPhotos]);
+  }, [shuffledPhotoList]); // Depend on the shuffled state
 
-  // Create items array for carousel
+  // Create items array for carousel - depends on photoSlides which depends on shuffledPhotoList
   const items = useMemo(() => {
     const result = [];
 
@@ -229,20 +225,11 @@ export const ImageSlider = React.memo(({
   const shouldLoadImage = (index) => {
     // Always load the first image
     if (index === 0) return true;
-    
-    // On mobile, preload +/- 2 slides to improve navigation experience
-    if (isMobile) {
-      return index === activeStep ||
-             index === (activeStep - 1 + items.length) % items.length ||
-             index === (activeStep + 1) % items.length ||
-             index === (activeStep - 2 + items.length) % items.length || // Preload previous 2
-             index === (activeStep + 2) % items.length;                   // Preload next 2
-    }
 
-    // On desktop, load current, previous, and next images
+    // Load current, previous, and next images (consistent for all devices)
     return index === activeStep || 
-           index === activeStep - 1 || 
-           index === activeStep + 1 || 
+           index === (activeStep - 1 + items.length) % items.length || // Handle wrap around for previous
+           index === (activeStep + 1) % items.length || // Handle wrap around for next
            // Handle wrapping for the last and first images
            (activeStep === 0 && index === items.length - 1) ||
            (activeStep === items.length - 1 && index === 0);
@@ -268,16 +255,12 @@ export const ImageSlider = React.memo(({
       handleImageLoad(index);
     };
     
-    // For mobile, use a smaller optimized version
-    if (isMobile) {
-      img.src = getOptimizedImageUrl(url, { 
-        width: 400, 
-        quality: 60,
-        format: 'auto'
-      }) || url;
-    } else {
-      img.src = url;
-    }
+    // Use consistent image source for preloading
+    img.src = getOptimizedImageUrl(url, { 
+      width: 800, 
+      quality: 80,
+      format: 'auto'
+    }) || url;
     
     // Store the Image object in the ref
     imageRefs.current[index] = img;
@@ -396,7 +379,7 @@ export const ImageSlider = React.memo(({
               // Placeholder while loading
               _jsx(ImagePlaceholder, {
                 variant: "rectangular",
-                animation: isMobile ? "pulse" : "wave" // Use pulse animation on mobile (less GPU intensive)
+                animation: "wave" // Use consistent wave animation
               })
             ),
             key: `slide-${index}`
@@ -442,7 +425,7 @@ export const ImageSlider = React.memo(({
                 // Placeholder when not in view and no thumbnail
                 !item.thumbnailUrl && _jsx(ImagePlaceholder, {
                   variant: "rectangular",
-                  animation: isMobile ? "pulse" : "wave" // Use pulse animation on mobile (less GPU intensive)
+                  animation: "wave" // Use consistent wave animation
                 })
               )
             ],

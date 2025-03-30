@@ -1,4 +1,6 @@
 import Supercluster from 'supercluster';
+import logger from '../../../utils/logger';
+
 const createIndex = () => {
     return new Supercluster({
         radius: 40, // Clustering radius in pixels (reduced for finer control)
@@ -22,26 +24,33 @@ const createIndex = () => {
 // Helper function to get a unique identifier from a photo URL
 export const getPhotoIdentifier = (url) => {
     if (!url) {
-        console.warn('[Clustering] No URL provided for photo identifier');
+        logger.warn('Clustering', 'No URL provided for photo identifier');
         return null;
     }
     
     // Try to extract the version number from Cloudinary URL
     const versionMatch = url.match(/\/v(\d+)\//);
     if (versionMatch && versionMatch[1]) {
-        console.log(`[Clustering] Extracted version identifier: ${versionMatch[1]} from URL: ${url.substring(0, 50)}...`);
+        logger.debug('Clustering', `Extracted version identifier: ${versionMatch[1]} from URL`);
         return versionMatch[1]; // Return the version number
     }
     
     // Try to extract the public ID from Cloudinary URL
     const publicIdMatch = url.match(/\/upload\/(?:v\d+\/)?([^/]+)(?:\.\w+)?$/);
     if (publicIdMatch && publicIdMatch[1]) {
-        console.log(`[Clustering] Extracted public ID: ${publicIdMatch[1]} from URL: ${url.substring(0, 50)}...`);
+        logger.debug('Clustering', `Extracted public ID: ${publicIdMatch[1]} from URL`);
         return publicIdMatch[1]; // Return the public ID
     }
     
     // If we can't extract a clean identifier, use a hash of the URL
-    console.log(`[Clustering] Using full URL as identifier for: ${url.substring(0, 50)}...`);
+    const isBlobUrl = url.startsWith('blob:');
+    if (isBlobUrl) {
+        // For blob URLs, just log that we're using a hash without including the URL
+        logger.debug('Clustering', 'Using hash for blob URL');
+    } else {
+        // For other URLs, we can include a truncated version
+        logger.debug('Clustering', `Using hash for URL: ${url.substring(0, 30)}...`);
+    }
     
     // Create a simple hash of the URL
     let hash = 0;

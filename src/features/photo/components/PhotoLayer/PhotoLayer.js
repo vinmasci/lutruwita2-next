@@ -6,6 +6,7 @@ import { PhotoMarker } from '../PhotoMarker/PhotoMarker';
 import { PhotoCluster } from '../PhotoCluster/PhotoCluster';
 import { SimpleLightbox } from '../PhotoPreview/SimpleLightbox';
 import { clusterPhotos, isCluster, getClusterExpansionZoom, getPhotoIdentifier } from '../../utils/clustering';
+import logger from '../../../../utils/logger';
 import './PhotoLayer.css';
 export const PhotoLayer = () => {
     const { map } = useMapContext();
@@ -44,11 +45,11 @@ export const PhotoLayer = () => {
     const validPhotos = useMemo(() => {
         return photos.filter(p => {
             if (!p.coordinates) {
-                console.warn('Photo missing coordinates:', p.id);
+                logger.warn('PhotoLayer', `Photo missing coordinates: ${p.id}`);
                 return false;
             }
             if (typeof p.coordinates.lat !== 'number' || typeof p.coordinates.lng !== 'number') {
-                console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
+                logger.warn('PhotoLayer', `Photo has invalid coordinates: ${p.id}`, p.coordinates);
                 return false;
             }
             // Normalize coordinates for safety
@@ -82,12 +83,12 @@ export const PhotoLayer = () => {
     // Function to find the cluster that contains a photo using URL
     const findPhotoCluster = useCallback((photoUrl) => {
         if (!photoUrl) {
-            console.warn('[PhotoLayer] No URL provided to findPhotoCluster');
+            logger.warn('PhotoLayer', 'No URL provided to findPhotoCluster');
             return null;
         }
         
         const photoIdentifier = getPhotoIdentifier(photoUrl);
-        console.log('[PhotoLayer] Looking for photo with identifier:', photoIdentifier);
+        logger.debug('PhotoLayer', `Looking for photo with identifier: ${photoIdentifier}`);
         
         for (const item of clusteredItems) {
             if (isCluster(item) && item.properties.photos) {
@@ -107,19 +108,14 @@ export const PhotoLayer = () => {
 
     // Handle photo click - set both selectedPhoto and selectedCluster
     const handlePhotoClick = useCallback((photo) => {
-        console.log('[PhotoLayer] Photo clicked:', photo.name);
-        console.log('[PhotoLayer] Photo URL:', photo.url);
-        console.log('[PhotoLayer] Photo identifier:', getPhotoIdentifier(photo.url));
-        console.log('[PhotoLayer] Photo coordinates:', photo.coordinates);
-        console.log('[PhotoLayer] Current zoom level:', zoom);
+        logger.debug('PhotoLayer', `Photo clicked: ${photo.name}`);
+        logger.debug('PhotoLayer', `Photo identifier: ${getPhotoIdentifier(photo.url)}`);
+        logger.debug('PhotoLayer', `Current zoom level: ${zoom}`);
         setSelectedPhoto(photo);
         
         // Find if this photo is part of a cluster using URL
         const clusterPhotos = findPhotoCluster(photo.url);
-        console.log('[PhotoLayer] Found cluster photos:', clusterPhotos ? clusterPhotos.length : 'none');
-        if (clusterPhotos) {
-            console.log('[PhotoLayer] Cluster photo URLs:', clusterPhotos.map(p => getPhotoIdentifier(p.url)));
-        }
+        logger.debug('PhotoLayer', `Found cluster photos: ${clusterPhotos ? clusterPhotos.length : 'none'}`);
         setSelectedCluster(clusterPhotos);
     }, [findPhotoCluster, getPhotoIdentifier, zoom]);
 
