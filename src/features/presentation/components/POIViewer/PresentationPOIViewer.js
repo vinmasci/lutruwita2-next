@@ -81,24 +81,36 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
     const categoryColor = POI_CATEGORIES[poi.category]?.color || '#777777'; // Default gray color if category not found
     
-    // Prepare photos for the image slider
-    // Use Google photo URLs directly instead of proxying them
-    const googlePhotos = (googlePlacesData?.photos || []).map(googlePhotoUrl => ({
-      url: googlePhotoUrl, // Use the Google URL directly
-      source: 'google' // Optional: Add source identifier
-    }));
-    // Ensure poi.photos is an array and contains objects with a 'url' property
-    const userPhotos = (poi.photos || []).filter(p => p && p.url).map(p => ({
-        ...p, // Keep original properties if needed
-        url: p.url, // Ensure url property exists
-        source: 'user' // Optional: Add source identifier
-    }));
+// Prepare photos for the image slider
+// Process Google photo URLs to make them compatible with the ImageSlider component
+const googlePhotos = (googlePlacesData?.photos || []).map(googlePhotoUrl => {
+    // For Google photos, we need to create both url and thumbnailUrl properties
+    // since the getTinyThumbnailUrl function only works with Cloudinary URLs
+    return {
+        url: googlePhotoUrl, // Use the Google URL directly
+        thumbnailUrl: googlePhotoUrl, // Use the same URL for thumbnail to bypass getTinyThumbnailUrl
+        source: 'google', // Optional: Add source identifier
+        isGooglePhoto: true // Flag to identify Google photos
+    };
+});
 
-    // Combine user photos and Google photos, respecting the slider's max limit (5)
-    const combinedPhotos = [
-        ...userPhotos,
-        ...googlePhotos
-    ].slice(0, 5); // Apply slice to limit total photos passed to the slider
+// Ensure poi.photos is an array and contains objects with a 'url' property
+const userPhotos = (poi.photos || []).filter(p => p && p.url).map(p => ({
+    ...p, // Keep original properties if needed
+    url: p.url, // Ensure url property exists
+    source: 'user' // Optional: Add source identifier
+}));
+
+// Combine user photos and Google photos, respecting the slider's max limit (5)
+const combinedPhotos = [
+    ...userPhotos,
+    ...googlePhotos
+].slice(0, 5); // Apply slice to limit total photos passed to the slider
+
+// Log the combined photos for debugging
+if (googlePlacesData?.photos?.length > 0) {
+    logger.info('PresentationPOIViewer', 'Combined photos for slider:', combinedPhotos.length);
+}
 
     // Construct a simple Google Maps Embed URL (/v1/view) for minimal controls
     const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;

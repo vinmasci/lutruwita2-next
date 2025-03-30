@@ -79,7 +79,19 @@ const ImageContainer = styled(Box)({
 });
 
 // Optimized image component with srcset for responsive loading
-const OptimizedImage = React.memo(({ src, alt, onLoad, style, sizes = '100vw' }) => {
+const OptimizedImage = React.memo(({ src, alt, onLoad, style, sizes = '100vw', isGooglePhoto = false }) => {
+  // For Google Photos, skip the optimization and srcSet generation
+  if (isGooglePhoto) {
+    return _jsx(SlideImage, {
+      src: src, // Use the original URL directly
+      alt: alt,
+      loading: "lazy",
+      onLoad: onLoad,
+      style: style
+    });
+  }
+  
+  // For non-Google photos, proceed with normal optimization
   // Generate srcset for responsive images if it's a Cloudinary URL
   const srcSet = generateSrcSet(src); // Always generate srcset
   
@@ -167,24 +179,36 @@ export const ImageSlider = React.memo(({
   // Prepare slides array
   const hasPhotos = photos && photos.length > 0;
 
-  // State to hold the shuffled photos, initialized once
-  const [shuffledPhotoList] = useState(() => {
-    if (!hasPhotos) return [];
+  // State to hold the shuffled photos, updated when photos change
+  const [shuffledPhotoList, setShuffledPhotoList] = useState([]);
+  
+  // Update shuffled photos when the input photos change
+  useEffect(() => {
+    if (!hasPhotos) {
+      setShuffledPhotoList([]);
+      return;
+    }
     const shuffled = [...photos].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, maxPhotos);
-  });
+    setShuffledPhotoList(shuffled.slice(0, maxPhotos));
+  }, [photos, hasPhotos, maxPhotos]);
 
-  // Process photos using the shuffled list - memoized
-  const photoSlides = useMemo(() => {
-    return shuffledPhotoList.map(photo => {
-      const url = photo.url || photo.thumbnailUrl;
-      return {
-        url,
-        // Generate tiny thumbnail for blur-up loading
-        thumbnailUrl: getTinyThumbnailUrl(url, { width: 20, quality: 20 })
-      };
-    });
-  }, [shuffledPhotoList]); // Depend on the shuffled state
+// Process photos using the shuffled list - memoized
+const photoSlides = useMemo(() => {
+  return shuffledPhotoList.map(photo => {
+    const url = photo.url || photo.thumbnailUrl;
+    
+    // If this is a Google photo (has isGooglePhoto flag), use the provided thumbnailUrl
+    // Otherwise, generate a tiny thumbnail for blur-up loading
+    const thumbnailUrl = photo.isGooglePhoto 
+      ? photo.thumbnailUrl 
+      : getTinyThumbnailUrl(url, { width: 20, quality: 20 });
+    
+    return {
+      url,
+      thumbnailUrl
+    };
+  });
+}, [shuffledPhotoList]); // Depend on the shuffled state
 
   // Create items array for carousel - depends on photoSlides which depends on shuffledPhotoList
   const items = useMemo(() => {
@@ -255,12 +279,18 @@ export const ImageSlider = React.memo(({
       handleImageLoad(index);
     };
     
-    // Use consistent image source for preloading
-    img.src = getOptimizedImageUrl(url, { 
-      width: 800, 
-      quality: 80,
-      format: 'auto'
-    }) || url;
+    // Check if this is a Google Places photo
+    const isGooglePhoto = url.includes('googleapis.com');
+    
+    // For Google Photos, use the original URL
+    // For other photos, use the optimized URL
+    img.src = isGooglePhoto 
+      ? url 
+      : (getOptimizedImageUrl(url, { 
+          width: 800, 
+          quality: 80,
+          format: 'auto'
+        }) || url);
     
     // Store the Image object in the ref
     imageRefs.current[index] = img;
@@ -309,10 +339,19 @@ export const ImageSlider = React.memo(({
   };
   
   // Only show navigation buttons if there are multiple items to scroll through
-  const showNavButtons = items.length > 1;
+  // Use useMemo to recalculate this value when items change
+  const showNavButtons = useMemo(() => items.length > 1, [items.length]);
+  
+  // Log for debugging
+  useEffect(() => {
+    if (items.length > 1) {
+      console.log('[ImageSlider] Multiple items detected, navigation buttons should be visible:', items.length);
+    }
+  }, [items.length]);
 
   return _jsx(CarouselWrapper, {
     children: _jsx(Carousel, {
+      key: `carousel-${items.length}`, // Add key to force re-render when items change
       navButtonsAlwaysVisible: showNavButtons,
       navButtonsProps: {
         style: {
@@ -418,7 +457,9 @@ export const ImageSlider = React.memo(({
                   src: item.content,
                   alt: `Route photo ${index}`,
                   onLoad: () => handleImageLoad(index),
-                  style: { opacity: loadedImages[index] ? 1 : 0 }
+                  style: { opacity: loadedImages[index] ? 1 : 0 },
+                  // Pass isGooglePhoto flag if the URL contains "googleapis.com" (Google Places photos)
+                  isGooglePhoto: item.content.includes('googleapis.com')
                   // sizes is now handled within the OptimizedImage component
                 })
               ) : (
