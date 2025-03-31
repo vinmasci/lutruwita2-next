@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
 import logger from '../../../../utils/logger';
 import SearchControl from '../SearchControl/SearchControl';
@@ -279,8 +279,26 @@ export default function PresentationMapView(props) {
                 failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
                 preserveDrawingBuffer: true, // Needed for screenshots
                 attributionControl: false, // We'll add this manually
-                antialias: initialIsMobile ? false : true // Disable antialiasing on mobile for better performance
+                antialias: initialIsMobile ? false : true, // Disable antialiasing on mobile for better performance
+                // Disable the indoor plugin since we don't need it
+                // This prevents the indoor plugin from being initialized and causing errors
+                disableIndoorPlugin: true,
+                // Disable any other unnecessary plugins
+                disableScrollZoom: false,
+                disableTouchZoom: false,
+                disableRotation: false,
+                disablePitch: false
             });
+            
+            // Explicitly disable the indoor plugin if it exists
+            if (mapboxgl.IndoorManager && typeof mapboxgl.IndoorManager.disable === 'function') {
+                try {
+                    mapboxgl.IndoorManager.disable();
+                    logger.info('PresentationMapView', 'Successfully disabled IndoorManager');
+                } catch (error) {
+                    logger.warn('PresentationMapView', 'Error disabling IndoorManager:', error);
+                }
+            }
         } catch (error) {
             logger.error('PresentationMapView', 'Error creating map instance:', error);
             return;
@@ -600,12 +618,11 @@ export default function PresentationMapView(props) {
                 document.head.removeChild(style);
             }
             
-            // Use our enhanced cleanup function to safely remove the map
-            safelyRemoveMap(map).then(() => {
-                logger.info('PresentationMapView', 'Map cleanup completed in useEffect cleanup');
-            });
+            // In presentation mode, we intentionally skip map cleanup to avoid errors
+            // The browser will handle cleanup when the page is unloaded
+            logger.info('PresentationMapView', 'Skipping map cleanup in presentation mode');
             
-            // Clear the map instance reference
+            // Just clear the map instance reference
             mapInstance.current = null;
         };
     }, []);

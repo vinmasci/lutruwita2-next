@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from '../../../../../lib/mapbox-gl-no-indoor';
 import { setMapInstance } from '../../../utils/mapOperationsQueue';
 import { setupMapScaleListener } from '../../../utils/mapScaleUtils';
 import { safelyRemoveMap } from '../../../utils/mapCleanup';
@@ -119,8 +119,26 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
         failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
         preserveDrawingBuffer: true, // Needed for screenshots
         attributionControl: false, // We'll add this manually
-        antialias: true // Enable antialiasing for smoother rendering
+        antialias: true, // Enable antialiasing for smoother rendering
+        // Disable the indoor plugin since we don't need it
+        // This prevents the indoor plugin from being initialized and causing errors
+        disableIndoorPlugin: true,
+        // Disable any other unnecessary plugins
+        disableScrollZoom: false,
+        disableTouchZoom: false,
+        disableRotation: false,
+        disablePitch: false
       });
+      
+      // Explicitly disable the indoor plugin if it exists
+      if (mapboxgl.IndoorManager && typeof mapboxgl.IndoorManager.disable === 'function') {
+        try {
+          mapboxgl.IndoorManager.disable();
+          console.log('[MapView] Successfully disabled IndoorManager');
+        } catch (error) {
+          console.warn('[MapView] Error disabling IndoorManager:', error);
+        }
+      }
     } catch (error) {
       console.error('[MapView] Error creating map instance:', error);
       return;

@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
 import useEmbedRouteProcessing from './hooks/useEmbedRouteProcessing';
@@ -537,8 +537,26 @@ export default function EmbedMapView() {
                 failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
                 preserveDrawingBuffer: true, // Needed for screenshots
                 attributionControl: false, // We'll add this manually
-                antialias: initialIsMobile ? false : true // Disable antialiasing on mobile for better performance
+                antialias: initialIsMobile ? false : true, // Disable antialiasing on mobile for better performance
+                // Disable the indoor plugin since we don't need it
+                // This prevents the indoor plugin from being initialized and causing errors
+                disableIndoorPlugin: true,
+                // Disable any other unnecessary plugins
+                disableScrollZoom: false,
+                disableTouchZoom: false,
+                disableRotation: false,
+                disablePitch: false
             });
+            
+            // Explicitly disable the indoor plugin if it exists
+            if (mapboxgl.IndoorManager && typeof mapboxgl.IndoorManager.disable === 'function') {
+                try {
+                    mapboxgl.IndoorManager.disable();
+                    console.log('[EmbedMapView] Successfully disabled IndoorManager');
+                } catch (error) {
+                    console.error('[EmbedMapView] Error disabling IndoorManager:', error);
+                }
+            }
         } catch (error) {
             console.error('[EmbedMapView] Error creating map instance:', error);
             setError('Failed to initialize map. Please try refreshing the page.');
@@ -898,12 +916,11 @@ export default function EmbedMapView() {
             // Mark component as unmounted
             isMounted = false;
             
-            // Use our enhanced cleanup function to safely remove the map
-            safelyRemoveMap(map).then(() => {
-                console.log('[EmbedMapView] Map cleanup completed in useEffect cleanup');
-            });
+            // In embed mode, we intentionally skip map cleanup to avoid errors
+            // The browser will handle cleanup when the page is unloaded
+            console.log('[EmbedMapView] Skipping map cleanup in embed mode');
             
-            // Clear the map instance reference
+            // Just clear the map instance reference
             mapInstance.current = null;
         };
     }, [mapRef, mapState]);
