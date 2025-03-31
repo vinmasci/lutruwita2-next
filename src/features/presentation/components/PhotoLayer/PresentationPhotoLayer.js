@@ -24,21 +24,36 @@ export const PresentationPhotoLayer = () => {
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [selectedCluster, setSelectedCluster] = useState(null);
     const [zoom, setZoom] = useState(null);
-    // Listen for zoom changes
+    // Listen for zoom changes with throttling to reduce recalculations
     useEffect(() => {
         if (!map)
             return;
+            
+        let lastZoomUpdate = 0;
+        const THROTTLE_MS = 150; // Minimum ms between updates
+        
         const handleZoom = () => {
+            const now = Date.now();
+            if (now - lastZoomUpdate < THROTTLE_MS) return;
+            
+            lastZoomUpdate = now;
             const newZoom = map.getZoom();
-            setZoom(newZoom);
+            
+            // Only update if zoom changed significantly (0.5 levels)
+            if (zoom === null || Math.abs(newZoom - zoom) >= 0.5) {
+                setZoom(newZoom);
+            }
         };
+        
         map.on('zoom', handleZoom);
+        
         // Set initial zoom
         setZoom(map.getZoom());
+        
         return () => {
             map.off('zoom', handleZoom);
         };
-    }, [map]);
+    }, [map, zoom]);
     // Helper function to normalize coordinates within valid bounds for safety
     const normalizeCoordinates = useCallback((lng, lat) => {
         // Normalize longitude to [-180, 180]
@@ -69,11 +84,22 @@ export const PresentationPhotoLayer = () => {
                 Math.abs(normalized.lat - p.coordinates.lat) < 90;
         });
     }, [photos, normalizeCoordinates]);
+    // Use rounded zoom level to reduce recalculations
+    const roundedZoom = useMemo(() => {
+        if (zoom === null) return null;
+        return Math.floor(zoom * 2) / 2; // Round to nearest 0.5
+    }, [zoom]);
+    
     const clusteredItems = useMemo(() => {
-        if (!map || zoom === null)
+        if (!map || roundedZoom === null)
             return [];
-        return clusterPhotosPresentation(validPhotos, zoom);
-    }, [validPhotos, map, zoom]); // Remove photos.length dependency as it's already included in validPhotos
+            
+        // Apply extra aggressive clustering at lower zoom levels
+        const isLowZoom = roundedZoom < 6;
+        const options = isLowZoom ? { extraAggressive: true } : undefined;
+        
+        return clusterPhotosPresentation(validPhotos, roundedZoom, undefined, options);
+    }, [validPhotos, map, roundedZoom]); // Use roundedZoom instead of zoom
     const handleClusterClick = useCallback((cluster) => {
         if (!map)
             return;

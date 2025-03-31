@@ -21,45 +21,59 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     const [selectedPOI, setSelectedPOI] = useState(null);
     const [zoom, setZoom] = useState(null);
     const [clusteredItems, setClusteredItems] = useState([]);
-    // Effect to handle POIs visibility and clustering based on zoom
+    // Effect to handle POIs visibility and clustering based on zoom with throttling
     useEffect(() => {
         if (!map)
             return;
-        const handleZoom = () => {
-            const currentZoom = map.getZoom();
-            setZoom(currentZoom);
             
-            // Use requestAnimationFrame to batch DOM updates
-            requestAnimationFrame(() => {
-                // Update zoom level for regular POIs
-                markersRef.current.forEach(({ marker }) => {
-                    const markerElement = marker.getElement();
-                    const container = markerElement.querySelector('.marker-container');
-                    if (container) {
-                        container.setAttribute('data-zoom', Math.floor(currentZoom).toString());
-                    }
-                });
+        let lastZoomUpdate = 0;
+        const THROTTLE_MS = 150; // Minimum ms between updates
+        
+        const handleZoom = () => {
+            const now = Date.now();
+            if (now - lastZoomUpdate < THROTTLE_MS) return;
+            
+            lastZoomUpdate = now;
+            const currentZoom = map.getZoom();
+            
+            // Only update if zoom changed significantly (0.5 levels)
+            if (zoom === null || Math.abs(currentZoom - zoom) >= 0.5) {
+                setZoom(currentZoom);
                 
-                // Place POI functionality is commented out
-                /*
-                // Show/hide place markers based on zoom level
-                placeMarkersRef.current.forEach(({ marker }) => {
-                    if (currentZoom > 8.071) {
-                        marker.addTo(map);
-                    }
-                    else {
-                        marker.remove();
-                    }
+                // Use requestAnimationFrame to batch DOM updates
+                requestAnimationFrame(() => {
+                    // Update zoom level for regular POIs
+                    markersRef.current.forEach(({ marker }) => {
+                        const markerElement = marker.getElement();
+                        const container = markerElement.querySelector('.marker-container');
+                        if (container) {
+                            container.setAttribute('data-zoom', Math.floor(currentZoom).toString());
+                        }
+                    });
+                    
+                    // Place POI functionality is commented out
+                    /*
+                    // Show/hide place markers based on zoom level
+                    placeMarkersRef.current.forEach(({ marker }) => {
+                        if (currentZoom > 8.071) {
+                            marker.addTo(map);
+                        }
+                        else {
+                            marker.remove();
+                        }
+                    });
+                    */
                 });
-                */
-            });
+            }
         };
+        
         map.on('zoom', handleZoom);
         handleZoom(); // Initial check
+        
         return () => {
             map.off('zoom', handleZoom);
         };
-    }, [map]);
+    }, [map, zoom]);
     // Load POIs when route changes
     useEffect(() => {
         if (!currentRoute || currentRoute._type !== 'loaded' || !currentRoute._loadedState?.pois) {
@@ -67,18 +81,28 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         }
         loadPOIsFromRoute(currentRoute._loadedState.pois);
     }, [currentRoute]); // Remove loadPOIsFromRoute from deps since it's a stable context function
+    // Use rounded zoom level to reduce recalculations
+    const roundedZoom = useMemo(() => {
+        if (zoom === null) return null;
+        return Math.floor(zoom * 2) / 2; // Round to nearest 0.5
+    }, [zoom]);
+    
     // Update clustering when POIs or zoom changes
     useEffect(() => {
-        if (!map || zoom === null) return;
+        if (!map || roundedZoom === null) return;
 
         // Get all draggable POIs filtered by visible categories
         const allPOIs = getPOIsForRoute();
         const filteredPOIs = allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category));
         
+        // Apply extra aggressive clustering at lower zoom levels
+        const isLowZoom = roundedZoom < 6;
+        const options = isLowZoom ? { extraAggressive: true } : undefined;
+        
         // Cluster POIs
-        const clusters = clusterPOIs(filteredPOIs, zoom);
+        const clusters = clusterPOIs(filteredPOIs, roundedZoom, options);
         setClusteredItems(clusters);
-    }, [map, zoom, visibleCategories, getPOIsForRoute]);
+    }, [map, roundedZoom, visibleCategories, getPOIsForRoute]);
 
     // Handle cluster click
     const handleClusterClick = (cluster) => {

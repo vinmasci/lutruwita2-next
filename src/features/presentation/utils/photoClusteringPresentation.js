@@ -1,13 +1,25 @@
 import Supercluster from 'supercluster';
+
+// Detect iOS devices
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 // ==========================================
 // 2. SUPERCLUSTER CONFIGURATION
 // ==========================================
 // This creates the clustering engine with specific settings
-const createIndex = () => {
+const createIndex = (radius = 150, maxZoom = 16, minPoints = 2) => {
+    // iOS devices get even more aggressive clustering
+    if (isIOS) {
+        radius = 200;
+        maxZoom = 18;
+        minPoints = 2;
+    }
+    
     return new Supercluster({
-        radius: 80, // Increased clustering radius for more aggressive clustering
-        maxZoom: 12, // Decreased maximum zoom level to cluster points at higher zoom levels
+        radius: radius, // Much more aggressive clustering radius
+        maxZoom: maxZoom, // Higher maximum zoom level to keep points clustered longer
         minZoom: 0, // Minimum zoom level to cluster points
+        minPoints: minPoints, // Cluster even with just 2 points
         map: props => ({
             // Let supercluster handle clustering itself
             // Don't set cluster: true here
@@ -28,7 +40,13 @@ const createIndex = () => {
 // 3. CLUSTERING FUNCTION
 // ==========================================
 // This is where photos are converted to GeoJSON and clustered
-const getClusteredPhotos = (photos, zoom) => {
+const getClusteredPhotos = (photos, zoom, options = {}) => {
+    const { radius = 150, maxZoom = 16, minPoints = 2, extraAggressive = false } = options;
+    
+    // Apply even more aggressive settings if requested
+    const clusterRadius = extraAggressive ? 180 : radius;
+    const clusterMaxZoom = extraAggressive ? 18 : maxZoom;
+    const clusterMinPoints = extraAggressive ? 2 : minPoints;
     // Convert photos to GeoJSON features
     const features = photos
         .filter(p => p.coordinates && p.coordinates.lat && p.coordinates.lng)
@@ -43,8 +61,8 @@ const getClusteredPhotos = (photos, zoom) => {
             coordinates: [photo.coordinates.lng, photo.coordinates.lat]
         }
     }));
-    // Create a new index for each clustering operation
-    const index = createIndex();
+    // Create a new index with the specified parameters
+    const index = createIndex(clusterRadius, clusterMaxZoom, clusterMinPoints);
     // Load features into the index
     index.load(features);
     // Get clusters using fixed bounds
@@ -62,9 +80,18 @@ const getClusteredPhotos = (photos, zoom) => {
 // 4. EXPORTED FUNCTIONS
 // ==========================================
 // Main function that presentation mode uses to get clusters
-export const clusterPhotosPresentation = (photos, zoom, _mapBounds // Ignore mapBounds parameter
-) => {
-    return getClusteredPhotos(photos, Math.floor(zoom));
+export const clusterPhotosPresentation = (photos, zoom, _mapBounds, // Ignore mapBounds parameter
+    options = {}) => {
+    // Round zoom to nearest 0.5 to reduce recalculations
+    const roundedZoom = Math.floor(zoom * 2) / 2;
+    
+    // Apply iOS-specific optimizations
+    const iosOptions = isIOS ? { extraAggressive: true } : {};
+    
+    // Merge provided options with iOS options
+    const mergedOptions = { ...options, ...iosOptions };
+    
+    return getClusteredPhotos(photos, roundedZoom, mergedOptions);
 };
 // WeakMap to store the index for each set of clusters
 const indexMap = new WeakMap();
