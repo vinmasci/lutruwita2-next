@@ -53,6 +53,20 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
             return;
         // Wait for map to load before adding sources and layers
         map.current.once('load', () => {
+            // Add the terrain source first (if it doesn't exist)
+            try {
+                if (!map.current.getSource('mapbox-dem')) {
+                    map.current.addSource('mapbox-dem', {
+                        'type': 'raster-dem',
+                        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        'tileSize': 512,
+                        'maxzoom': 14
+                    });
+                }
+            } catch (error) {
+                console.error('[MapPreview] Error adding terrain source:', error);
+            }
+            
             // Skip 3D terrain on mobile for better performance
             if (!isMobile) {
                 try {
