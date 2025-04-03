@@ -345,8 +345,15 @@ export default function PresentationMapView(props) {
     
     // Initialize map
     useEffect(() => {
+        // Skip initialization if we don't have a valid route ID
+        // This prevents creating a map with the default ID that will be discarded
+        if (!currentRoute?.persistentId && !currentRoute?.routeId) {
+            console.log('[PresentationMapView] ⏭️ Skipping map initialization until route data is available');
+            return;
+        }
+        
         // Generate a stable ID for this map instance based on the route ID
-        const mapId = `map-${currentRoute?.persistentId || currentRoute?.routeId || 'default'}`;
+        const mapId = `map-${currentRoute?.persistentId || currentRoute?.routeId}`;
         
         // Check if map is already registered in the global registry
         if (isMapRegistered(mapId)) {
