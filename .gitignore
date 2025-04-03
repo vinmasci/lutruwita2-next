@@ -59,3 +59,4 @@ docs/SENSITIVE_DOCS.md
 docs/DEPLOYMENT.md
 .vercel
 .env*.local
+node_modules
