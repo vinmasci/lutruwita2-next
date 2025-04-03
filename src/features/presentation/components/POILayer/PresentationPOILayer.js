@@ -7,7 +7,8 @@ import { POI_CATEGORIES } from '../../../poi/types/poi.types';
 import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import { ICON_PATHS } from '../../../poi/constants/icon-paths';
 import { calculatePOIPositions } from '../../../poi/utils/placeDetection';
-import { clusterPOIs, isCluster, getClusterExpansionZoom } from '../../../poi/utils/clustering';
+import { isCluster } from '../../../poi/utils/clustering';
+import { clusterPOIsGeographically } from '../../../poi/utils/geographicClustering';
 import { PresentationPOIViewer } from '../POIViewer';
 import POICluster from '../../../poi/components/POICluster/POICluster';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker/MapboxPOIMarker';
@@ -87,11 +88,11 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         return Math.floor(zoom * 2) / 2; // Round to nearest 0.5
     }, [zoom]);
     
-    // Update clustering when POIs or zoom changes
+    // Use zoom-dependent geographic clustering
     useEffect(() => {
-        if (!map || roundedZoom === null) return;
+        if (!map || zoom === null) return;
 
-        console.log('[PresentationPOILayer] 🔄 Recalculating POI clusters at zoom level:', roundedZoom);
+        console.log('[PresentationPOILayer] 🔄 Creating geographic POI clusters at zoom level:', zoom);
         console.time('poiClustering');
 
         // Get all draggable POIs filtered by visible categories
@@ -104,14 +105,32 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         const filteredPOIs = allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category));
         console.log('[PresentationPOILayer] Filtered POIs for clustering:', filteredPOIs.length);
         
-        // Apply extra aggressive clustering at lower zoom levels
-        const isLowZoom = roundedZoom < 6;
-        const options = isLowZoom ? { extraAggressive: true } : undefined;
-        console.log('[PresentationPOILayer] Using extra aggressive clustering:', isLowZoom);
+        // Detect if device is mobile
+        const isMobile = window.innerWidth <= 768;
         
-        // Cluster POIs
-        const clusters = clusterPOIs(filteredPOIs, roundedZoom, options);
-        console.log('[PresentationPOILayer] Clustering result:', {
+        // Adjust distance threshold based on zoom level
+        let distanceThreshold;
+        if (zoom < 8) {
+            distanceThreshold = isMobile ? 1000 : 800; // Far zoom - large clusters
+            console.log('[PresentationPOILayer] Using large distance threshold:', distanceThreshold);
+        } else if (zoom < 12) {
+            distanceThreshold = isMobile ? 500 : 400; // Medium zoom - medium clusters
+            console.log('[PresentationPOILayer] Using medium distance threshold:', distanceThreshold);
+        } else if (zoom < 15) {
+            distanceThreshold = isMobile ? 200 : 150; // Close zoom - small clusters
+            console.log('[PresentationPOILayer] Using small distance threshold:', distanceThreshold);
+        } else {
+            distanceThreshold = 0; // Very close zoom - no clustering
+            console.log('[PresentationPOILayer] No clustering at high zoom level');
+        }
+        
+        // Use geographic clustering with zoom-dependent distance threshold
+        const clusters = clusterPOIsGeographically(filteredPOIs, {
+            distanceThreshold,
+            isMobile
+        });
+        
+        console.log('[PresentationPOILayer] Geographic clustering result:', {
             totalItems: clusters.length,
             clusters: clusters.filter(item => isCluster(item)).length,
             individualPOIs: clusters.filter(item => !isCluster(item)).length
@@ -119,24 +138,35 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         
         setClusteredItems(clusters);
         console.timeEnd('poiClustering');
-    }, [map, roundedZoom, visibleCategories, getPOIsForRoute]);
+    }, [map, zoom, visibleCategories, getPOIsForRoute]); // Add zoom as dependency
 
-    // Handle cluster click
+    // Handle cluster click - modified for geographic clusters
     const handleClusterClick = (cluster) => {
         if (!map) return;
-        
-        // Get the zoom level to expand this cluster
-        const expansionZoom = getClusterExpansionZoom(cluster.properties.cluster_id, clusteredItems);
-        const targetZoom = Math.min(expansionZoom + 1.5, 20); // Add 1.5 zoom levels, but cap at 20
         
         // Get the cluster's coordinates
         const [lng, lat] = cluster.geometry.coordinates;
         
-        // Zoom to the cluster's location
-        map.easeTo({
-            center: [lng, lat],
-            zoom: targetZoom
-        });
+        // For geographic clusters, we use a fixed zoom increase
+        const currentZoom = map.getZoom();
+        const targetZoom = Math.min(currentZoom + 2, 18); // Add 2 zoom levels, but cap at 18
+        
+        // Detect if device is mobile for smoother performance
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // On mobile, just jump to the new zoom level without animation
+            map.jumpTo({
+                center: [lng, lat],
+                zoom: targetZoom
+            });
+        } else {
+            // On desktop, use smooth animation
+            map.easeTo({
+                center: [lng, lat],
+                zoom: targetZoom
+            });
+        }
     };
 
     // Memoize POI data to prevent unnecessary recalculations

@@ -1,6 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { throttle } from 'lodash'; // Import throttle
+import TracerLayer from '../../../map/components/WebGLTracer/TracerLayer';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
@@ -37,7 +38,7 @@ export default function PresentationMapView(props) {
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
     const routeCoordinatesRef = useRef(null); // Ref for route coordinates
-    const hoverMarkerRef = useRef(null);
+    const tracerLayerRef = useRef(null); // Ref for WebGL tracer layer
     const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
     const [isClimbFlagsVisible, setIsClimbFlagsVisible] = useState(true);
     const [isLineMarkersVisible, setIsLineMarkersVisible] = useState(true);
@@ -137,37 +138,15 @@ export default function PresentationMapView(props) {
         }
     }, [currentRoute]);
     
-    // Update hover marker when coordinates change - using GeoJSON source
+    // Update WebGL tracer when coordinates change
     useEffect(() => {
-        if (!mapInstance.current || !isMapReady) return;
+        if (!mapInstance.current || !isMapReady || !tracerLayerRef.current) return;
         
-        // Update the GeoJSON source if we have coordinates
-        if (hoverCoordinates) {
-            try {
-                const source = mapInstance.current.getSource('hover-point');
-                if (source) {
-                    source.setData({
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: hoverCoordinates
-                        },
-                        properties: {}
-                    });
-                    
-                    // Show the layer
-                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
-                }
-            } catch (error) {
-                logger.error('PresentationMapView', 'Error updating hover point:', error);
-            }
-        } else {
-            // Hide the layer when no coordinates
-            try {
-                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
-            } catch (error) {
-                // Ignore errors when hiding (might happen during initialization)
-            }
+        try {
+            // Update the WebGL tracer layer with the new coordinates
+            tracerLayerRef.current.updateCoordinates(hoverCoordinates);
+        } catch (error) {
+            logger.error('PresentationMapView', 'Error updating WebGL tracer:', error);
         }
     }, [hoverCoordinates, isMapReady]);
     
@@ -296,7 +275,7 @@ export default function PresentationMapView(props) {
         };
     }, [handleDeviceTypeChange]);
 
-    // Throttled mousemove handler using refs and increased sampling/delay
+    // Throttled mousemove handler using refs and optimized sampling/delay
     const throttledMouseMoveHandler = useCallback(throttle((e) => {
         // Skip trace marker functionality on mobile devices
         const isMobile = window.innerWidth <= 768;
@@ -318,15 +297,37 @@ export default function PresentationMapView(props) {
              return;
         }
 
-        // Find the closest point on the active route (optimized with increased sampling)
+        // Find the closest point on the active route using adaptive sampling
         let closestPoint = null;
         let minDistanceSq = Infinity; // Use squared distance to avoid sqrt
-        const sampleRate = 20; // Check every 20th point
-
-        for (let i = 0; i < coordinates.length; i += sampleRate) {
+        
+        // First pass: Use a coarse sampling to find the approximate closest segment
+        const coarseSampleRate = 50; // Check every 50th point initially
+        let bestSegmentStart = 0;
+        
+        for (let i = 0; i < coordinates.length; i += coarseSampleRate) {
             const coord = coordinates[i];
             if (coord && coord.length >= 2) {
                 // Simplified distance calculation (squared Euclidean distance)
+                const dx = coord[0] - mouseCoords[0];
+                const dy = coord[1] - mouseCoords[1];
+                const distanceSq = dx * dx + dy * dy;
+
+                if (distanceSq < minDistanceSq) {
+                    minDistanceSq = distanceSq;
+                    bestSegmentStart = Math.max(0, i - coarseSampleRate);
+                    closestPoint = [coord[0], coord[1]];
+                }
+            }
+        }
+        
+        // Second pass: Fine-grained search in the best segment
+        const segmentEnd = Math.min(coordinates.length, bestSegmentStart + coarseSampleRate * 2);
+        minDistanceSq = Infinity; // Reset for second pass
+        
+        for (let i = bestSegmentStart; i < segmentEnd; i++) {
+            const coord = coordinates[i];
+            if (coord && coord.length >= 2) {
                 const dx = coord[0] - mouseCoords[0];
                 const dy = coord[1] - mouseCoords[1];
                 const distanceSq = dx * dx + dy * dy;
@@ -348,7 +349,7 @@ export default function PresentationMapView(props) {
         } else {
             if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
         }
-    }, 250), []); // Empty dependency array - relies on refs
+    }, 100), []); // Reduced throttle delay for smoother updates - relies on refs
     
     // Initialize map
     useEffect(() => {
@@ -509,34 +510,12 @@ export default function PresentationMapView(props) {
                     }
                 }
                 
-                // Add hover point source and layer
-                map.addSource('hover-point', {
-                    type: 'geojson',
-                    data: {
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: [0, 0] // Initial coordinates
-                        },
-                        properties: {}
-                    }
-                });
+                // Create and add the WebGL tracer layer
+                const tracerLayer = new TracerLayer();
+                map.addLayer(tracerLayer);
+                tracerLayerRef.current = tracerLayer;
                 
-                map.addLayer({
-                    id: 'hover-point',
-                    type: 'circle',
-                    source: 'hover-point',
-                    paint: {
-                        'circle-radius': 8,
-                        'circle-color': '#ff0000',
-                        'circle-stroke-width': 2,
-                        'circle-stroke-color': '#ffffff',
-                        'circle-opacity': 0.8
-                    }
-                });
-                
-                // Initially hide the hover point layer
-                map.setLayoutProperty('hover-point', 'visibility', 'none');
+                logger.info('PresentationMapView', 'Added WebGL tracer layer');
                 
             } catch (error) {
                 logger.error('PresentationMapView', 'Error setting up terrain:', error);
@@ -548,7 +527,30 @@ export default function PresentationMapView(props) {
             console.timeEnd('mapInitialization');
         });
         map.on('style.load', () => {
-            // Style loaded
+            // When style changes, Mapbox removes all custom layers
+            // We need to reset our reference and re-add the layer
+            tracerLayerRef.current = null;
+            
+            try {
+                // Create and add the WebGL tracer layer
+                const tracerLayer = new TracerLayer();
+                map.addLayer(tracerLayer);
+                tracerLayerRef.current = tracerLayer;
+                
+                // If we have current hover coordinates, update the tracer
+                if (hoverCoordinates) {
+                    // Use a small delay to ensure the layer is fully initialized
+                    setTimeout(() => {
+                        if (tracerLayerRef.current) {
+                            tracerLayerRef.current.updateCoordinates(hoverCoordinates);
+                        }
+                    }, 50);
+                }
+                
+                logger.info('PresentationMapView', 'Re-added WebGL tracer layer after style change');
+            } catch (error) {
+                logger.error('PresentationMapView', 'Error re-adding WebGL tracer layer after style change:', error);
+            }
         });
         map.on('zoom', () => {
             const zoom = map.getZoom();
