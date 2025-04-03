@@ -5,6 +5,16 @@ import TracerLayer from '../../../map/components/WebGLTracer/TracerLayer';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
+import { 
+    registerMap, 
+    getRegisteredMap, 
+    isMapRegistered, 
+    setInitializationStatus,
+    getInitializationStatus,
+    createCancellationToken,
+    getCancellationToken,
+    removeCancellationToken
+} from '../../../map/utils/mapRegistry';
 import logger from '../../../../utils/logger';
 import SearchControl from '../SearchControl/SearchControl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -353,17 +363,53 @@ export default function PresentationMapView(props) {
     
     // Initialize map
     useEffect(() => {
-        // Prevent duplicate initialization
-        if (isInitializedRef.current) {
-            console.log('[PresentationMapView] ⏭️ Map already initialized, skipping initialization');
+        // Generate a stable ID for this map instance based on the route ID
+        const mapId = `map-${currentRoute?.persistentId || currentRoute?.routeId || 'default'}`;
+        
+        // Check if map is already registered in the global registry
+        if (isMapRegistered(mapId)) {
+            console.log(`[PresentationMapView] ⏭️ Map with ID ${mapId} already registered, reusing instance`);
+            
+            // Get the existing map instance from the registry
+            const existingMap = getRegisteredMap(mapId);
+            
+            // Update local refs and state
+            mapInstance.current = existingMap;
+            isInitializedRef.current = true;
+            setIsMapReady(true);
+            
             return;
         }
         
-        console.log('[PresentationMapView] 🚀 Map initialization starting');
-        console.time('mapInitialization');
+        // Check local initialization safeguards as a backup
+        if (isInitializedRef.current || mapInstance.current || (mapRef.current && mapRef.current._mapboxgl?.map)) {
+            console.log('[PresentationMapView] ⏭️ Map already initialized or container has existing map, skipping initialization');
+            // If mapInstance.current is null but the container has a map, try to re-assign it
+            if (!mapInstance.current && mapRef.current && mapRef.current._mapboxgl?.map) {
+                console.log('[PresentationMapView] Re-assigning existing map instance from container');
+                mapInstance.current = mapRef.current._mapboxgl.map;
+                isInitializedRef.current = true; // Mark as initialized
+                setIsMapReady(true); // Assume it's ready if it exists
+                
+                // Register this map in the global registry
+                registerMap(mapId, mapInstance.current);
+            }
+            return;
+        }
+        
+        // Create a cancellation token for this initialization
+        const cancellationToken = createCancellationToken(mapId);
+        
+        // Set initialization status
+        setInitializationStatus(mapId, 'initializing');
+        
+        console.log(`[PresentationMapView] 🚀 Map initialization starting for ID: ${mapId}`);
+        console.time(`mapInitialization-${mapId}`);
         
         if (!mapRef.current) {
             console.log('[PresentationMapView] ⚠️ Map ref not available, aborting initialization');
+            setInitializationStatus(mapId, 'failed');
+            removeCancellationToken(mapId);
             return;
         }
             
@@ -377,6 +423,12 @@ export default function PresentationMapView(props) {
         // Create map with error handling
         let map;
         try {
+            // Check if initialization was cancelled
+            if (cancellationToken.isCancelled()) {
+                console.log(`[PresentationMapView] ⚠️ Initialization cancelled for map ${mapId}`);
+                return;
+            }
+            
             console.log('[PresentationMapView] Creating Mapbox instance');
             console.time('mapboxCreate');
             map = new mapboxgl.Map({
@@ -419,6 +471,8 @@ export default function PresentationMapView(props) {
             }
         } catch (error) {
             logger.error('PresentationMapView', 'Error creating map instance:', error);
+            setInitializationStatus(mapId, 'failed');
+            removeCancellationToken(mapId);
             return;
         }
         
@@ -436,7 +490,7 @@ export default function PresentationMapView(props) {
         
         // Import and set map instance in the mapOperationsQueue
         import('../../../map/utils/mapOperationsQueue').then(({ setMapInstance }) => {
-            if (isMounted) {
+            if (isMounted && !cancellationToken.isCancelled()) {
                 setMapInstance(map);
                 logger.info('PresentationMapView', 'Map instance set in mapOperationsQueue');
             }
@@ -447,9 +501,9 @@ export default function PresentationMapView(props) {
         map.on('load', () => {
             console.log('[PresentationMapView] 🔄 Mapbox load event fired');
             
-            // Check if component is still mounted *before* starting setup
-            if (!isMounted) {
-                logger.info('PresentationMapView', 'Map loaded but component already unmounted, skipping setup');
+            // Check if component is still mounted and initialization wasn't cancelled
+            if (!isMounted || cancellationToken.isCancelled()) {
+                logger.info('PresentationMapView', 'Map loaded but component already unmounted or initialization cancelled, skipping setup');
                 console.log('[PresentationMapView] ⚠️ Component unmounted before map load setup could start');
                 // No need to call safelyRemoveMap here, the main cleanup function will handle it
                 return;
@@ -510,46 +564,85 @@ export default function PresentationMapView(props) {
                     }
                 }
                 
-                // Create and add the WebGL tracer layer
-                const tracerLayer = new TracerLayer();
-                map.addLayer(tracerLayer);
-                tracerLayerRef.current = tracerLayer;
-                
-                logger.info('PresentationMapView', 'Added WebGL tracer layer');
+                // Only add WebGL tracer layer on non-mobile devices
+                const isTracerMobile = window.innerWidth <= 768;
+                if (!isTracerMobile) {
+                    try {
+                        // Check if a tracer layer with this ID already exists
+                        if (!map.getLayer('tracer-layer')) {
+                            const tracerLayer = new TracerLayer();
+                            map.addLayer(tracerLayer);
+                            tracerLayerRef.current = tracerLayer;
+                            logger.info('PresentationMapView', 'Added WebGL tracer layer');
+                        } else {
+                            logger.info('PresentationMapView', 'Tracer layer already exists, reusing');
+                            // Try to get a reference to the existing tracer layer
+                            tracerLayerRef.current = map.getLayer('tracer-layer');
+                        }
+                    } catch (error) {
+                        logger.error('PresentationMapView', 'Error adding WebGL tracer layer:', error);
+                    }
+                } else {
+                    logger.info('PresentationMapView', 'Skipping WebGL tracer layer on mobile device');
+                    console.log('[PresentationMapView] ⏭️ Skipping WebGL tracer layer on mobile device');
+                    // Ensure the ref is null so we don't try to use it
+                    tracerLayerRef.current = null;
+                }
                 
             } catch (error) {
                 logger.error('PresentationMapView', 'Error setting up terrain:', error);
             }
             
+            // Register the map in the global registry
+            registerMap(mapId, map);
+            setInitializationStatus(mapId, 'initialized');
+            
             setIsMapReady(true);
             console.timeEnd('mapLoadSetup');
             console.log('[PresentationMapView] ✅ Map is ready');
-            console.timeEnd('mapInitialization');
+            console.timeEnd(`mapInitialization-${mapId}`);
         });
         map.on('style.load', () => {
             // When style changes, Mapbox removes all custom layers
             // We need to reset our reference and re-add the layer
             tracerLayerRef.current = null;
             
-            try {
-                // Create and add the WebGL tracer layer
-                const tracerLayer = new TracerLayer();
-                map.addLayer(tracerLayer);
-                tracerLayerRef.current = tracerLayer;
-                
-                // If we have current hover coordinates, update the tracer
-                if (hoverCoordinates) {
-                    // Use a small delay to ensure the layer is fully initialized
-                    setTimeout(() => {
-                        if (tracerLayerRef.current) {
-                            tracerLayerRef.current.updateCoordinates(hoverCoordinates);
+            // Check if component is still mounted and initialization wasn't cancelled
+            if (!isMounted || cancellationToken.isCancelled()) {
+                return;
+            }
+            
+            // Only add WebGL tracer layer on non-mobile devices
+            const isTracerMobile = window.innerWidth <= 768;
+            if (!isTracerMobile) {
+                try {
+                    // Check if a tracer layer with this ID already exists
+                    if (!map.getLayer('tracer-layer')) {
+                        // Create and add the WebGL tracer layer
+                        const tracerLayer = new TracerLayer();
+                        map.addLayer(tracerLayer);
+                        tracerLayerRef.current = tracerLayer;
+                        
+                        // If we have current hover coordinates, update the tracer
+                        if (hoverCoordinates) {
+                            // Use a small delay to ensure the layer is fully initialized
+                            setTimeout(() => {
+                                if (tracerLayerRef.current) {
+                                    tracerLayerRef.current.updateCoordinates(hoverCoordinates);
+                                }
+                            }, 50);
                         }
-                    }, 50);
+                        
+                        logger.info('PresentationMapView', 'Re-added WebGL tracer layer after style change');
+                    } else {
+                        logger.info('PresentationMapView', 'Tracer layer already exists after style change, skipping');
+                    }
+                } catch (error) {
+                    logger.error('PresentationMapView', 'Error re-adding WebGL tracer layer after style change:', error);
                 }
-                
-                logger.info('PresentationMapView', 'Re-added WebGL tracer layer after style change');
-            } catch (error) {
-                logger.error('PresentationMapView', 'Error re-adding WebGL tracer layer after style change:', error);
+            } else {
+                logger.info('PresentationMapView', 'Skipping WebGL tracer layer on mobile device after style change');
+                console.log('[PresentationMapView] ⏭️ Skipping WebGL tracer layer on mobile device after style change');
             }
         });
         map.on('zoom', () => {
@@ -617,12 +710,24 @@ export default function PresentationMapView(props) {
         mapInstance.current = map;
         
         // Mark as initialized to prevent duplicate initialization
-        isInitializedRef.current = true;
-        console.log('[PresentationMapView] ✅ Map initialization flag set');
+        // Only set this flag if we've successfully created the map instance
+        if (map) {
+            isInitializedRef.current = true;
+            console.log('[PresentationMapView] ✅ Map initialization flag set');
+        } else {
+            console.log('[PresentationMapView] ⚠️ Map creation failed, not setting initialization flag');
+            setInitializationStatus(mapId, 'failed');
+            removeCancellationToken(mapId);
+        }
         
         return () => {
             // Mark component as unmounted
             isMounted = false;
+            
+            // Cancel any ongoing initialization
+            if (cancellationToken) {
+                cancellationToken.cancel();
+            }
             
             // Remove the style element
             if (style && style.parentNode) {
@@ -639,23 +744,17 @@ export default function PresentationMapView(props) {
             // Do NOT reset isInitializedRef here - we want to prevent re-initialization
             // even if the component is unmounted and remounted
 
-            // Ensure map cleanup happens if component unmounts *during* setup
-            return () => {
-                if (!isMounted) {
-                    logger.info('PresentationMapView', 'Cleanup called after unmount');
-                    // If mapInstance exists and hasn't been cleaned up, do it now
-                    if (mapInstance.current) {
-                         logger.info('PresentationMapView', 'Performing delayed map cleanup');
-                         safelyRemoveMap(mapInstance.current);
-                         mapInstance.current = null;
-                    }
-                } else {
-                     logger.info('PresentationMapView', 'Normal cleanup');
-                     // Normal cleanup logic (already handled by the main return)
-                }
-            };
+            // If we're in the middle of initialization and the component unmounts,
+            // log this to help with debugging
+            if (getInitializationStatus(mapId) === 'initializing') {
+                logger.warn('PresentationMapView', 'Component unmounted during map initialization');
+                console.log('[PresentationMapView] ⚠️ Component unmounted during map initialization');
+            }
+            
+            // Remove the cancellation token
+            removeCancellationToken(mapId);
         };
-    }, []);
+    }, [currentRoute?.persistentId, currentRoute?.routeId]);
     const mapContextValue = useMemo(() => ({
         map: mapInstance.current,
         dragPreview: null,
