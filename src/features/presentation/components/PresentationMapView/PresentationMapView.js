@@ -126,10 +126,7 @@ export default function PresentationMapView(props) {
         }
     });
     
-    // Log when routes change to track re-processing
-    useEffect(() => {
-            // Routes changed
-    }, [routes]);
+    // Removed empty useEffect that was causing unnecessary re-renders on route changes
 
     // Effect to update the ref for setHoverCoordinates
     useEffect(() => {

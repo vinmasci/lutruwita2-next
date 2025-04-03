@@ -1,29 +1,68 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouteContext } from '../context/RouteContext';
 
+// Cache for normalized routes to avoid recreating objects
+const normalizedRouteCache = new Map();
+
 /**
  * Normalizes a route object to ensure consistent structure across all modes
+ * Uses a cache to avoid recreating objects for the same route
  * @param {Object} route - The route object to normalize
  * @returns {Object} - The normalized route object
  */
 export const normalizeRoute = (route) => {
-    // Ensure route has a unique ID
-    const routeId = route.routeId || route.id || `route-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Generate a cache key based on stable properties
+    const routeId = route.routeId || route.id;
+    
+    // If we have no ID, we can't cache, so just normalize and return
+    if (!routeId) {
+        const generatedId = `route-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const routeType = route._type || (route._loadedState ? 'loaded' : 'fresh');
+        
+        return {
+            ...route,
+            routeId: generatedId,
+            _type: routeType,
+            color: route.color || '#ee5253',
+            name: route.name || 'Untitled Route',
+        };
+    }
+    
+    // Check if we already have this route in the cache
+    // Use a combination of ID and last modified time (if available) as the cache key
+    const cacheKey = `${routeId}-${route.lastModified || ''}`;
+    
+    if (normalizedRouteCache.has(cacheKey)) {
+        return normalizedRouteCache.get(cacheKey);
+    }
     
     // Determine the route type
     const routeType = route._type || (route._loadedState ? 'loaded' : 'fresh');
     
     // Create a normalized route object
-    return {
+    const normalizedRoute = {
         ...route,
         routeId,
         _type: routeType,
         // Ensure other required properties exist
         color: route.color || '#ee5253',
         name: route.name || 'Untitled Route',
-        // Add any other required properties
     };
+    
+    // Store in cache for future use
+    normalizedRouteCache.set(cacheKey, normalizedRoute);
+    
+    return normalizedRoute;
 };
+
+// Limit cache size to prevent memory leaks
+setInterval(() => {
+    // If cache grows too large, clear oldest entries
+    if (normalizedRouteCache.size > 100) {
+        const keysToDelete = Array.from(normalizedRouteCache.keys()).slice(0, 50);
+        keysToDelete.forEach(key => normalizedRouteCache.delete(key));
+    }
+}, 60000); // Check every minute
 
 /**
  * A unified hook for processing routes across all modes

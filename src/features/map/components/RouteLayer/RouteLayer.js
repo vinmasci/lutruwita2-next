@@ -509,12 +509,18 @@ export const RouteLayer = ({ map, route }) => {
         }
     }, [map, route, isStyleLoaded, route?.color]); // Add route.color as a direct dependency
 
-    // Animation effect for the current route
+    // Animation effect for the current route - disabled on mobile devices
     useEffect(() => {
         // Clear any existing animation interval
         if (animationIntervalRef.current) {
             clearInterval(animationIntervalRef.current);
             animationIntervalRef.current = null;
+        }
+        
+        // Check if device is mobile - disable animation completely on mobile
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            return; // Skip animation entirely on mobile devices
         }
         
         // Only animate for the current route when map is ready
@@ -549,15 +555,12 @@ export const RouteLayer = ({ map, route }) => {
             )
         );
         
-        // Debug ID comparison for loaded routes in animation effect - reduced logging for mobile
+        // Debug ID comparison for loaded routes in animation effect - reduced logging
         if (route._type === 'loaded') {
-            // Skip this log entirely on mobile devices
-            if (window.innerWidth > 768) {
-                logger.debug('RouteLayer', 'Animation ID comparison', {
-                    isCurrentRoute,
-                    routeType: route._type
-                });
-            }
+            logger.debug('RouteLayer', 'Animation ID comparison', {
+                isCurrentRoute,
+                routeType: route._type
+            });
         }
         
         if (!isCurrentRoute) {
