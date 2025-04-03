@@ -68,16 +68,11 @@ export const PresentationPhotoLayer = () => {
     }, []);
     // Filter photos to only include those with valid coordinates
     const validPhotos = useMemo(() => {
-        console.log('[PresentationPhotoLayer] 🔄 Filtering photos for valid coordinates');
-        console.time('photoFiltering');
-        
         const filtered = photos.filter(p => {
             if (!p.coordinates) {
-                console.warn('Photo missing coordinates:', p.id);
                 return false;
             }
             if (typeof p.coordinates.lat !== 'number' || typeof p.coordinates.lng !== 'number') {
-                console.warn('Photo has invalid coordinates:', p.id, p.coordinates);
                 return false;
             }
             // Keep photos with valid coordinates, normalizing if needed
@@ -87,13 +82,6 @@ export const PresentationPhotoLayer = () => {
                 Math.abs(normalized.lat - p.coordinates.lat) < 90;
         });
         
-        console.log('[PresentationPhotoLayer] Filtered photos:', {
-            total: photos.length,
-            valid: filtered.length,
-            invalid: photos.length - filtered.length
-        });
-        
-        console.timeEnd('photoFiltering');
         return filtered;
     }, [photos, normalizeCoordinates]);
     // Use rounded zoom level to reduce recalculations
@@ -104,27 +92,15 @@ export const PresentationPhotoLayer = () => {
     
     const clusteredItems = useMemo(() => {
         if (!map || roundedZoom === null) {
-            console.log('[PresentationPhotoLayer] ⏭️ Skipping photo clustering - no map or zoom');
             return [];
         }
-            
-        console.log('[PresentationPhotoLayer] 🔄 Clustering photos at zoom level:', roundedZoom);
-        console.time('photoClustering');
             
         // Apply extra aggressive clustering at lower zoom levels
         const isLowZoom = roundedZoom < 6;
         const options = isLowZoom ? { extraAggressive: true } : undefined;
-        console.log('[PresentationPhotoLayer] Using extra aggressive clustering:', isLowZoom);
         
         const clusters = clusterPhotosPresentation(validPhotos, roundedZoom, undefined, options);
         
-        console.log('[PresentationPhotoLayer] Clustering result:', {
-            totalItems: clusters.length,
-            clusters: clusters.filter(item => isCluster(item)).length,
-            individualPhotos: clusters.filter(item => !isCluster(item)).length
-        });
-        
-        console.timeEnd('photoClustering');
         return clusters;
     }, [validPhotos, map, roundedZoom]); // Use roundedZoom instead of zoom
     const handleClusterClick = useCallback((cluster) => {

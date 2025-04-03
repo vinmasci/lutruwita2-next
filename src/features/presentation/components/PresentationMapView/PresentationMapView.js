@@ -128,10 +128,7 @@ export default function PresentationMapView(props) {
     
     // Log when routes change to track re-processing
     useEffect(() => {
-        console.log('[PresentationMapView] 🔄 Routes changed, count:', routes?.length || 0);
-        if (routes && routes.length > 0) {
-            console.log('[PresentationMapView] First route ID:', routes[0]?.id || routes[0]?.routeId);
-        }
+            // Routes changed
     }, [routes]);
 
     // Effect to update the ref for setHoverCoordinates
@@ -173,28 +170,16 @@ export default function PresentationMapView(props) {
 
     // Update map state when route changes
     useEffect(() => {
-        console.log('[PresentationMapView] 🔄 Current route changed:', currentRoute?.routeId || currentRoute?.id);
-        
         if (!isMapReady || !mapInstance.current || !currentRoute?.geojson) {
-            console.log('[PresentationMapView] ⏭️ Skipping map update - map not ready or no geojson');
             return;
         }
-        
-        console.log('[PresentationMapView] Updating map for route:', {
-            routeId: currentRoute.routeId || currentRoute.id,
-            hasGeojson: !!currentRoute.geojson,
-            featuresCount: currentRoute.geojson?.features?.length || 0
-        });
         
         // Get route bounds
         if (currentRoute.geojson?.features?.[0]?.geometry?.type === 'LineString') {
             const feature = currentRoute.geojson.features[0];
             const coordinates = feature.geometry.coordinates;
             
-            console.log('[PresentationMapView] Route has', coordinates?.length || 0, 'coordinates');
-            
             if (coordinates && coordinates.length > 0) {
-                console.time('fitBounds');
                 const bounds = new mapboxgl.LngLatBounds();
                 coordinates.forEach((coord) => {
                     if (coord.length >= 2) {
@@ -203,16 +188,13 @@ export default function PresentationMapView(props) {
                 });
                 
                 // Always fit bounds to show the entire route with substantial padding for maximum context
-                console.log('[PresentationMapView] Fitting bounds to route');
                 mapInstance.current.fitBounds(bounds, {
                     padding: 200,  // Significantly increased padding to zoom out much more
                     duration: 1500
                 });
-                console.timeEnd('fitBounds');
                 
                 // Update previous route reference
                 previousRouteRef.current = currentRoute.routeId;
-                console.log('[PresentationMapView] ✅ Map updated for route');
             }
         }
     }, [isMapReady, currentRoute]);

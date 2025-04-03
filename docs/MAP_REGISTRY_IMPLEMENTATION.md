@@ -124,6 +124,8 @@ isCurrentlyLoading = true;
 
 5. **Maintains Stable References**: Map instances are maintained with stable references, preventing unnecessary re-renders.
 
+6. **Mobile Optimization**: The WebGL tracer layer is now disabled on mobile devices, significantly reducing resource usage and preventing crashes on devices with limited WebGL capabilities.
+
 ## Implementation Details
 
 ### Map Registry API

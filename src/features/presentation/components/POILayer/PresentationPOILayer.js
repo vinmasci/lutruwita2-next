@@ -92,18 +92,10 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     useEffect(() => {
         if (!map || zoom === null) return;
 
-        console.log('[PresentationPOILayer] 🔄 Creating geographic POI clusters at zoom level:', zoom);
-        console.time('poiClustering');
-
         // Get all draggable POIs filtered by visible categories
         const allPOIs = getPOIsForRoute();
-        console.log('[PresentationPOILayer] Total POIs:', {
-            draggable: allPOIs.draggable.length,
-            places: allPOIs.places?.length || 0
-        });
         
         const filteredPOIs = allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category));
-        console.log('[PresentationPOILayer] Filtered POIs for clustering:', filteredPOIs.length);
         
         // Detect if device is mobile
         const isMobile = window.innerWidth <= 768;
@@ -112,16 +104,12 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
         let distanceThreshold;
         if (zoom < 8) {
             distanceThreshold = isMobile ? 1000 : 800; // Far zoom - large clusters
-            console.log('[PresentationPOILayer] Using large distance threshold:', distanceThreshold);
         } else if (zoom < 12) {
             distanceThreshold = isMobile ? 500 : 400; // Medium zoom - medium clusters
-            console.log('[PresentationPOILayer] Using medium distance threshold:', distanceThreshold);
         } else if (zoom < 15) {
             distanceThreshold = isMobile ? 200 : 150; // Close zoom - small clusters
-            console.log('[PresentationPOILayer] Using small distance threshold:', distanceThreshold);
         } else {
             distanceThreshold = 0; // Very close zoom - no clustering
-            console.log('[PresentationPOILayer] No clustering at high zoom level');
         }
         
         // Use geographic clustering with zoom-dependent distance threshold
@@ -130,14 +118,7 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
             isMobile
         });
         
-        console.log('[PresentationPOILayer] Geographic clustering result:', {
-            totalItems: clusters.length,
-            clusters: clusters.filter(item => isCluster(item)).length,
-            individualPOIs: clusters.filter(item => !isCluster(item)).length
-        });
-        
         setClusteredItems(clusters);
-        console.timeEnd('poiClustering');
     }, [map, zoom, visibleCategories, getPOIsForRoute]); // Add zoom as dependency
 
     // Handle cluster click - modified for geographic clusters
@@ -172,21 +153,12 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     // Memoize POI data to prevent unnecessary recalculations
     // Memoize POI data based on the actual POIs from context and filter by visible categories
     const poiData = useMemo(() => {
-        console.log('[PresentationPOILayer] 🔄 Recalculating POI data');
-        console.time('poiDataMemo');
-        
         const allPOIs = getPOIsForRoute();
         const result = {
             draggable: allPOIs.draggable.filter(poi => visibleCategories.includes(poi.category)),
             places: [] // Place POI functionality is commented out
         };
         
-        console.log('[PresentationPOILayer] Filtered POI data:', {
-            draggable: result.draggable.length,
-            places: result.places.length
-        });
-        
-        console.timeEnd('poiDataMemo');
         return result;
     }, [visibleCategories, getPOIsForRoute]); // Only update when visible categories change, not on every getPOIsForRoute call
     // Memoize marker creation function
@@ -260,27 +232,18 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
     // Effect to update markers when POI data changes - only used when not clustering
     useEffect(() => {
         if (!map || clusteredItems.length > 0) {
-            console.log('[PresentationPOILayer] ⏭️ Skipping marker creation - using clustering or no map');
             return;
         }
             
-        console.log('[PresentationPOILayer] 🔄 Creating individual POI markers');
-        console.time('markerCreation');
-            
         // Clear existing markers
-        console.log('[PresentationPOILayer] Removing', markersRef.current.length, 'existing markers');
         markersRef.current.forEach(({ marker }) => marker.remove());
         markersRef.current = [];
         
         // Handle regular POIs
-        console.log('[PresentationPOILayer] Creating', poiData.draggable.length, 'POI markers');
         poiData.draggable.forEach((poi) => {
             const markerRef = createMarker(poi);
             markersRef.current.push(markerRef);
         });
-        
-        console.log('[PresentationPOILayer] ✅ Created', markersRef.current.length, 'POI markers');
-        console.timeEnd('markerCreation');
         // Place POI functionality is commented out
         /*
         // Group place POIs by coordinates

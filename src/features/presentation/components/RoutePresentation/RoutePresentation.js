@@ -40,38 +40,24 @@ export const RoutePresentation = () => {
             isCurrentlyLoading = true;
             
             try {
-                console.log('[RoutePresentation] 🔄 START: Fetching route data for ID:', id);
                 setLoading(true);
                 setError(null);
                 
                 const routeData = await publicRouteService.loadRoute(id);
-                console.log('[RoutePresentation] ✅ Received route data:', {
-                    hasData: !!routeData,
-                    persistentId: routeData?.persistentId,
-                    routesCount: routeData?.routes?.length || 0,
-                    dataSize: JSON.stringify(routeData).length,
-                });
 
                 if (!routeData) {
-                    console.error('[RoutePresentation] Route data is null or undefined');
                     setError('Route data is empty');
                     return;
                 }
 
                 if (!routeData.routes || !Array.isArray(routeData.routes)) {
-                    console.error('[RoutePresentation] Missing routes array:', routeData.routes);
                     setError('Invalid route data structure');
                     return;
                 }
 
                 // Only update state if the route ID has changed or route is null
                 if (!route || route.persistentId !== routeData.persistentId) {
-                     console.log('[RoutePresentation] Setting new route state for persistentId:', routeData.persistentId);
                      setRoute(routeData);
-                } else {
-                     console.log('[RoutePresentation] Fetched route data has same persistentId, not updating state reference.');
-                     // Optionally, update specific fields if needed without changing the object reference
-                     // For now, we assume if ID is same, data is same for stability.
                 }
             }
             catch (error) {
@@ -81,7 +67,6 @@ export const RoutePresentation = () => {
             finally {
                 setLoading(false);
                 isCurrentlyLoading = false; // Reset the global loading flag
-                console.log('[RoutePresentation] 🏁 DONE: Route fetching completed');
             }
         };
         
@@ -90,7 +75,6 @@ export const RoutePresentation = () => {
         // Cleanup function to reset loading state if component unmounts during fetch
         return () => {
             if (isCurrentlyLoading) {
-                console.log('[RoutePresentation] 🛑 Component unmounted during fetch, resetting loading state');
                 isCurrentlyLoading = false;
             }
         };
@@ -98,20 +82,15 @@ export const RoutePresentation = () => {
 
     // Just add required fields to server routes
     const routes = useMemo(() => {
-        console.log('[RoutePresentation] 🔄 Processing routes from fetched data');
         if (!route)
             return [];
 
         if (!route.routes || !Array.isArray(route.routes) || route.routes.length === 0) {
-            console.error('[RoutePresentation] Invalid routes array:', route.routes);
             return [];
         }
 
-        console.log('[RoutePresentation] Processing', route.routes.length, 'routes');
-
         return route.routes.map(routeData => {
             if (!routeData.routeId) {
-                console.error('[RoutePresentation] Route data missing routeId:', routeData);
                 return null;
             }
 
@@ -148,7 +127,6 @@ export const RoutePresentation = () => {
         
         // Log mount/unmount for debugging
         logger.info('RouteContent', `Component mounted with route ID: ${routeId}`);
-        console.log('[RouteContent] Component mounted with route ID:', routeId);
         
         // Set mount status to false on unmount
         useEffect(() => {
@@ -156,7 +134,6 @@ export const RoutePresentation = () => {
             
             return () => {
                 logger.info('RouteContent', `Component unmounting with route ID: ${routeId}`);
-                console.log('[RouteContent] Component unmounting with route ID:', routeId);
                 isMountedRef.current = false;
             };
         }, [routeId]);
@@ -165,15 +142,11 @@ export const RoutePresentation = () => {
         useEffect(() => {
             // Skip if already started initialization for this component instance
             if (initializationStartedRef.current) {
-                console.log('[RoutePresentation] ⏭️ Initialization already started for this component instance, skipping');
                 return;
             }
-            
-            console.log('[RoutePresentation] 🔄 RouteContent useEffect triggered. Route ID:', routeId, 'Routes count:', routes.length, 'Already Initialized:', initializedPersistentIds.has(routeId));
 
             // Skip if no routes, invalid route ID, or if this persistent ID has already been initialized globally
             if (!routes.length || !routeId || initializedPersistentIds.has(routeId)) {
-                console.log('[RoutePresentation] ⏭️ Skipping initialization - no routes, invalid route ID, or already initialized globally for this ID');
                 return;
             }
 
@@ -182,101 +155,56 @@ export const RoutePresentation = () => {
 
             // Batch route initialization
             const initializeRoutes = () => {
-                console.log('[RoutePresentation] 🚀 STARTING ROUTE INITIALIZATION');
-                console.time('routeInitialization');
-
                 try {
                     // Add all routes in a single batch
-                    console.log('[RoutePresentation] Adding', routes.length, 'routes to RouteContext');
-                    console.time('addRoutes');
                     routes.forEach((route) => {
                         addRoute(route);
                     });
-                    console.timeEnd('addRoutes');
-                    console.log('[RoutePresentation] ✅ Added all routes to RouteContext');
 
                     // Set initial route once all routes are added
-                    console.log('[RoutePresentation] Setting current route:', routes[0]?.routeId);
                     setCurrentRoute(routes[0]);
-                    console.log('[RoutePresentation] ✅ Current route set');
 
                     // Load photos and POIs
                     if (route.photos) {
-                        console.log('[RoutePresentation] Loading photos:', route.photos.length);
-                        console.time('addPhotos');
                         addPhoto(route.photos.map(deserializePhoto));
-                        console.timeEnd('addPhotos');
-                        console.log('[RoutePresentation] ✅ Photos loaded');
-                    } else {
-                        console.log('[RoutePresentation] No photos to load');
                     }
 
                     if (route.pois) {
-                        console.log('[RoutePresentation] Loading POIs:',
-                            route.pois.draggable?.length || 0, 'draggable POIs,',
-                            route.pois.places?.length || 0, 'place POIs');
-                        console.time('loadPOIs');
                         loadPOIsFromRoute(route.pois);
-                        console.timeEnd('loadPOIs');
-                        console.log('[RoutePresentation] ✅ POIs loaded');
-                    } else {
-                        console.log('[RoutePresentation] No POIs to load');
                     }
 
                     // Check for line data and load it directly
                     if (route.lines) {
-                        console.log('[RoutePresentation] Found line data in route:', route.lines.length, 'lines');
-                        console.time('loadLines');
                         loadLinesFromRoute(route.lines);
-                        console.timeEnd('loadLines');
 
                         // Store the line data in the parent component's state for direct rendering
                         // Only set state if component is still mounted
                         if (isMountedRef.current) {
                             setLineData(route.lines);
-                            console.log('[RoutePresentation] ✅ Lines loaded and stored for direct rendering');
                         } else {
-                            console.log('[RoutePresentation] ⚠️ Component unmounted before setting line data');
                             // Early return if component is unmounted to prevent further processing
                             return;
                         }
-                    } else {
-                        console.log('[RoutePresentation] No line data found in route');
                     }
                     
                     // Set header settings if available
                     if (route.headerSettings) {
                         updateHeaderSettings(route.headerSettings);
-                    } else {
-                        console.warn('[RoutePresentation] No header settings found in route data');
                     }
 
                     // Set the overall loaded state and persistent ID
                     if (route && isMountedRef.current) {
-                        console.log('[RoutePresentation] Setting currentLoadedState with fetched route data');
                         setCurrentLoadedState(route);
                         if (routeId) {
-                            console.log('[RoutePresentation] Setting currentLoadedPersistentId:', routeId);
                             setCurrentLoadedPersistentId(routeId);
-                        } else {
-                            console.warn('[RoutePresentation] persistentId missing from fetched route data');
                         }
-                    } else if (!route) {
-                        console.warn('[RoutePresentation] Fetched route data is null, cannot set currentLoadedState');
-                    } else {
-                        console.warn('[RoutePresentation] Component unmounted, skipping currentLoadedState update');
                     }
 
                     // Mark this persistent ID as initialized globally, only if still mounted
                     if (isMountedRef.current && routeId) {
                         initializedPersistentIds.add(routeId);
-                        console.timeEnd('routeInitialization');
-                        console.log('[RoutePresentation] 🏁 ROUTE INITIALIZATION COMPLETED for ID:', routeId);
-                    } else {
-                        console.log('[RoutePresentation] ⚠️ Component unmounted during initialization, not adding ID to global initialized set:', routeId);
                     }
                 } catch (error) {
-                    console.error('[RoutePresentation] Error during route initialization:', error);
                     logger.error('RoutePresentation', 'Error during route initialization:', error);
                 }
             };
@@ -284,8 +212,6 @@ export const RoutePresentation = () => {
             // Run initialization only if component is mounted
             if (isMountedRef.current) {
                 initializeRoutes();
-            } else {
-                console.log('[RoutePresentation] ⚠️ Component unmounted before initialization could start for ID:', routeId);
             }
         // Dependencies: Only re-run if the specific route object with a valid persistentId changes, or the processed routes array changes.
         }, [route, routes, routeId, addRoute, setCurrentRoute, updateHeaderSettings, setCurrentLoadedState, setCurrentLoadedPersistentId, addPhoto, loadPOIsFromRoute, loadLinesFromRoute]);
@@ -293,7 +219,6 @@ export const RoutePresentation = () => {
         // Conditionally render PresentationMapView based on routes length
         // Loading/error handled by parent overlay
         if (!routes || routes.length === 0) {
-             console.log('[RouteContent] No routes available to render MapView.');
              return null; // Don't render map if no routes
         }
 
