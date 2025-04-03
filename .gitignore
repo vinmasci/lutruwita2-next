@@ -39,6 +39,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# iCloud files
+*.icloud
+
 # TypeScript
 *.tsbuildinfo
 

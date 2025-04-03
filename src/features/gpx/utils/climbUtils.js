@@ -1,12 +1,12 @@
 // Configuration for climb detection
 const CLIMB_CONFIG = {
-    MIN_GRADIENT: 2, // Minimum gradient to consider as climbing (percent)
+    MIN_GRADIENT: 0.5, // Minimum gradient to consider as climbing (percent)
     MIN_LENGTH: 1200, // Minimum length for a climb segment (meters)
     SMOOTHING_WINDOW: 20, // Number of points to use for smoothing elevation data
     PEAK_THRESHOLD: 10, // Minimum elevation difference to consider as a peak (meters)
     VALLEY_MERGE_DIST: 20000, // Maximum distance between valleys to merge climbs (meters)
-    MIN_DOWNHILL_GRADIENT: -1, // Minimum gradient to consider as significant downhill (percent)
-    MIN_DOWNHILL_LENGTH: 600, // Minimum length for a downhill section to reset climb (meters)
+    MIN_DOWNHILL_GRADIENT: -3, // Minimum gradient to consider as significant downhill (percent)
+    MIN_DOWNHILL_LENGTH: 1000, // Minimum length for a downhill section to reset climb (meters)
     LOOK_AHEAD_DISTANCE: 10000, // 10km in meters - how far to look ahead for higher elevation points
 };
 // Category configuration

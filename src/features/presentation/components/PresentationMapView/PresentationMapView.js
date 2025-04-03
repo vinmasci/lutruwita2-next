@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { throttle } from 'lodash'; // Import throttle
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
@@ -30,9 +31,12 @@ export default function PresentationMapView(props) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const containerRef = useRef(null);
+    const isInitializedRef = useRef(false); // Track if map has been initialized
     const [isMapReady, setIsMapReady] = useState(false);
     const { currentRoute, routes, currentLoadedState, headerSettings } = useRouteContext();
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
+    const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
+    const routeCoordinatesRef = useRef(null); // Ref for route coordinates
     const hoverMarkerRef = useRef(null);
     const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
     const [isClimbFlagsVisible, setIsClimbFlagsVisible] = useState(true);
@@ -107,8 +111,31 @@ export default function PresentationMapView(props) {
         batchProcess: true,
         onInitialized: () => {
             logger.info('PresentationMapView', 'Routes initialized with unified approach');
+            console.log('[PresentationMapView] ✅ Routes initialized with unified approach');
         }
     });
+    
+    // Log when routes change to track re-processing
+    useEffect(() => {
+        console.log('[PresentationMapView] 🔄 Routes changed, count:', routes?.length || 0);
+        if (routes && routes.length > 0) {
+            console.log('[PresentationMapView] First route ID:', routes[0]?.id || routes[0]?.routeId);
+        }
+    }, [routes]);
+
+    // Effect to update the ref for setHoverCoordinates
+    useEffect(() => {
+        setHoverCoordinatesRef.current = setHoverCoordinates;
+    }, [setHoverCoordinates]);
+
+    // Effect to cache route coordinates
+    useEffect(() => {
+        if (currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
+            routeCoordinatesRef.current = currentRoute.geojson.features[0].geometry.coordinates;
+        } else {
+            routeCoordinatesRef.current = null; // Clear cache if no coordinates
+        }
+    }, [currentRoute]);
     
     // Update hover marker when coordinates change - using GeoJSON source
     useEffect(() => {
@@ -157,26 +184,46 @@ export default function PresentationMapView(props) {
 
     // Update map state when route changes
     useEffect(() => {
-        if (!isMapReady || !mapInstance.current || !currentRoute?.geojson)
+        console.log('[PresentationMapView] 🔄 Current route changed:', currentRoute?.routeId || currentRoute?.id);
+        
+        if (!isMapReady || !mapInstance.current || !currentRoute?.geojson) {
+            console.log('[PresentationMapView] ⏭️ Skipping map update - map not ready or no geojson');
             return;
+        }
+        
+        console.log('[PresentationMapView] Updating map for route:', {
+            routeId: currentRoute.routeId || currentRoute.id,
+            hasGeojson: !!currentRoute.geojson,
+            featuresCount: currentRoute.geojson?.features?.length || 0
+        });
+        
         // Get route bounds
         if (currentRoute.geojson?.features?.[0]?.geometry?.type === 'LineString') {
             const feature = currentRoute.geojson.features[0];
             const coordinates = feature.geometry.coordinates;
+            
+            console.log('[PresentationMapView] Route has', coordinates?.length || 0, 'coordinates');
+            
             if (coordinates && coordinates.length > 0) {
+                console.time('fitBounds');
                 const bounds = new mapboxgl.LngLatBounds();
                 coordinates.forEach((coord) => {
                     if (coord.length >= 2) {
                         bounds.extend([coord[0], coord[1]]);
                     }
                 });
-            // Always fit bounds to show the entire route with substantial padding for maximum context
-            mapInstance.current.fitBounds(bounds, {
-                padding: 200,  // Significantly increased padding to zoom out much more
-                duration: 1500
-            });
+                
+                // Always fit bounds to show the entire route with substantial padding for maximum context
+                console.log('[PresentationMapView] Fitting bounds to route');
+                mapInstance.current.fitBounds(bounds, {
+                    padding: 200,  // Significantly increased padding to zoom out much more
+                    duration: 1500
+                });
+                console.timeEnd('fitBounds');
+                
                 // Update previous route reference
                 previousRouteRef.current = currentRoute.routeId;
+                console.log('[PresentationMapView] ✅ Map updated for route');
             }
         }
     }, [isMapReady, currentRoute]);
@@ -248,21 +295,89 @@ export default function PresentationMapView(props) {
             window.removeEventListener('resize', handleDeviceTypeChange);
         };
     }, [handleDeviceTypeChange]);
+
+    // Throttled mousemove handler using refs and increased sampling/delay
+    const throttledMouseMoveHandler = useCallback(throttle((e) => {
+        // Skip trace marker functionality on mobile devices
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            // Use ref to set state
+            if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
+            return;
+        }
+
+        if (!mapInstance.current) return; // Ensure map instance exists
+
+        const map = mapInstance.current;
+        const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
+
+        // Use cached coordinates from ref
+        const coordinates = routeCoordinatesRef.current;
+        if (!coordinates || coordinates.length === 0) {
+             if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
+             return;
+        }
+
+        // Find the closest point on the active route (optimized with increased sampling)
+        let closestPoint = null;
+        let minDistanceSq = Infinity; // Use squared distance to avoid sqrt
+        const sampleRate = 20; // Check every 20th point
+
+        for (let i = 0; i < coordinates.length; i += sampleRate) {
+            const coord = coordinates[i];
+            if (coord && coord.length >= 2) {
+                // Simplified distance calculation (squared Euclidean distance)
+                const dx = coord[0] - mouseCoords[0];
+                const dy = coord[1] - mouseCoords[1];
+                const distanceSq = dx * dx + dy * dy;
+
+                if (distanceSq < minDistanceSq) {
+                    minDistanceSq = distanceSq;
+                    closestPoint = [coord[0], coord[1]];
+                }
+            }
+        }
+
+        // Define a threshold distance (squared) - approx 1km
+        // 1km is roughly 0.009 degrees latitude, squared is ~0.000081
+        const distanceThresholdSq = 0.000081;
+
+        // Use ref to set state
+        if (closestPoint && minDistanceSq < distanceThresholdSq) {
+            if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(closestPoint);
+        } else {
+            if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
+        }
+    }, 250), []); // Empty dependency array - relies on refs
     
     // Initialize map
     useEffect(() => {
-        if (!mapRef.current)
+        // Prevent duplicate initialization
+        if (isInitializedRef.current) {
+            console.log('[PresentationMapView] ⏭️ Map already initialized, skipping initialization');
             return;
+        }
+        
+        console.log('[PresentationMapView] 🚀 Map initialization starting');
+        console.time('mapInitialization');
+        
+        if (!mapRef.current) {
+            console.log('[PresentationMapView] ⚠️ Map ref not available, aborting initialization');
+            return;
+        }
             
         // Flag to track if component is mounted
         let isMounted = true;
             
         // Check if device is mobile
         const initialIsMobile = window.innerWidth <= 768;
+        console.log('[PresentationMapView] Device is mobile:', initialIsMobile);
         
         // Create map with error handling
         let map;
         try {
+            console.log('[PresentationMapView] Creating Mapbox instance');
+            console.time('mapboxCreate');
             map = new mapboxgl.Map({
                 container: mapRef.current,
                 style: MAP_STYLES.satellite.url,
@@ -272,7 +387,7 @@ export default function PresentationMapView(props) {
                     pitch: initialIsMobile ? 0 : 45, // Use flat view on mobile
                     bearing: 0
                 },
-                projection: 'mercator', // Always use mercator for better performance and compatibility
+                projection: 'mercator', // Always use mercator for better performance
                 maxPitch: initialIsMobile ? 0 : 85, // Limit pitch on mobile
                 width: '100%',
                 height: '100%',
@@ -289,6 +404,8 @@ export default function PresentationMapView(props) {
                 disableRotation: false,
                 disablePitch: false
             });
+            console.timeEnd('mapboxCreate');
+            console.log('[PresentationMapView] ✅ Mapbox instance created');
             
             // Explicitly disable the indoor plugin if it exists
             if (mapboxgl.IndoorManager && typeof mapboxgl.IndoorManager.disable === 'function') {
@@ -327,14 +444,20 @@ export default function PresentationMapView(props) {
         });
         // Log map initialization events
         map.on('load', () => {
-            // Check if component is still mounted
+            console.log('[PresentationMapView] 🔄 Mapbox load event fired');
+            
+            // Check if component is still mounted *before* starting setup
             if (!isMounted) {
-                logger.info('PresentationMapView', 'Map loaded but component unmounted, cleaning up');
-                safelyRemoveMap(map);
+                logger.info('PresentationMapView', 'Map loaded but component already unmounted, skipping setup');
+                console.log('[PresentationMapView] ⚠️ Component unmounted before map load setup could start');
+                // No need to call safelyRemoveMap here, the main cleanup function will handle it
                 return;
             }
             
+            console.time('mapLoadSetup');
+            
             try {
+                console.log('[PresentationMapView] Adding terrain source and layers');
                 // Add terrain synchronously
                 if (!map.getSource('mapbox-dem')) {
                     map.addSource('mapbox-dem', {
@@ -343,6 +466,7 @@ export default function PresentationMapView(props) {
                         tileSize: 512,
                         maxzoom: 14
                     });
+                    console.log('[PresentationMapView] ✅ Added terrain source');
                 }
                 
                 // Get current device type
@@ -419,6 +543,9 @@ export default function PresentationMapView(props) {
             }
             
             setIsMapReady(true);
+            console.timeEnd('mapLoadSetup');
+            console.log('[PresentationMapView] ✅ Map is ready');
+            console.timeEnd('mapInitialization');
         });
         map.on('style.load', () => {
             // Style loaded
@@ -426,133 +553,11 @@ export default function PresentationMapView(props) {
         map.on('zoom', () => {
             const zoom = map.getZoom();
         });
-        // This is a duplicate error handler, we already have one above
-        
-        // Add mousemove event to set hover coordinates
-        map.on('mousemove', (e) => {
-            // Skip trace marker functionality on mobile devices to prevent touch event interception
-            // This fixes the double-press issue with POIs, line components, climb categories, and route list
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                // Clear any existing hover coordinates on mobile
-                if (hoverCoordinates) {
-                    setHoverCoordinates(null);
-                }
-                return;
-            }
-            
-            // Get mouse coordinates
-            const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
-            
-            // Get all route sources directly from the map
-            const style = map.getStyle();
-            if (!style || !style.sources) {
-                return;
-            }
-            
-            // Find all sources that might contain route data
-            let routeSources = Object.entries(style.sources)
-                .filter(([id, source]) => {
-                    if (id.includes('-main') && source.type === 'geojson') {
-                        const geoJsonSource = source;
-                        if (typeof geoJsonSource.data === 'object' && 
-                            geoJsonSource.data !== null && 
-                            'features' in geoJsonSource.data && 
-                            Array.isArray(geoJsonSource.data.features) && 
-                            geoJsonSource.data.features.length > 0 &&
-                            geoJsonSource.data.features[0].geometry?.type === 'LineString') {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-            
-            
-            // Try to find the active route
-            let activeRouteSource = null;
-            let activeRouteId = null;
-            
-            // First check if we have a current route ID from the ref
-            if (currentRouteIdRef.current) {
-                const currentSourceId = `${currentRouteIdRef.current}-main`;
-                
-                // Find this source in our routeSources
-                const foundSource = routeSources.find(([id]) => id === currentSourceId);
-                if (foundSource) {
-                    activeRouteSource = foundSource[1];
-                    activeRouteId = currentRouteIdRef.current;
-                }
-            }
-            
-            // If we couldn't find the route from the ref, try from the context
-            if (!activeRouteSource && currentRoute) {
-                const routeId = currentRoute.routeId || `route-${currentRoute.id}`;
-                const sourceId = `${routeId}-main`;
-                
-                // Find this source in our routeSources
-                const foundSource = routeSources.find(([id]) => id === sourceId);
-                if (foundSource) {
-                    activeRouteSource = foundSource[1];
-                    activeRouteId = routeId;
-                    // Update the ref if it's different
-                    if (currentRouteIdRef.current !== routeId) {
-                        currentRouteIdRef.current = routeId;
-                    }
-                }
-            }
-            
-            // If we couldn't find the active route from context or ref, try to find it another way
-            if (!activeRouteSource && routeSources.length > 0) {
-                // Fallback to first route if no current route
-                activeRouteSource = routeSources[0][1];
-                activeRouteId = routeSources[0][0].replace('-main', '');
-            }
-            
-            // If we don't have an active route, clear any marker and return
-            if (!activeRouteSource) {
-                if (hoverCoordinates) {
-                    setHoverCoordinates(null);
-                }
-                return;
-            }
-            
-            // Get coordinates from the active route
-            const geoJsonData = activeRouteSource.data;
-            const coordinates = geoJsonData.features[0].geometry.coordinates;
-            
-            
-            // Find the closest point on the active route
-            let closestPoint = null;
-            let minDistance = Infinity;
-            
-            // Check all coordinates in the active route
-            coordinates.forEach((coord) => {
-                if (coord.length >= 2) {
-                    const dx = coord[0] - mouseCoords[0];
-                    const dy = coord[1] - mouseCoords[1];
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestPoint = [coord[0], coord[1]];
-                    }
-                }
-            });
-            
-            
-            // Define a threshold distance - only show marker when close to the route
-            const distanceThreshold = 0.0045; // Approximately 500m at the equator
-            
-            // If we found a closest point on the active route and it's within the threshold
-            if (closestPoint && minDistance < distanceThreshold) {
-                setHoverCoordinates(closestPoint);
-            } else {
-                // If no point found or too far from route, clear the marker
-                setHoverCoordinates(null); // Always clear coordinates when outside threshold
-            }
-        });
-        
-        // Add mouseout event to clear hover coordinates when cursor leaves the map
+
+        // Add throttled mousemove event listener using the memoized handler
+        map.on('mousemove', throttledMouseMoveHandler);
+
+        // Add mouseout event to clear hover coordinates
         map.on('mouseout', () => {
             // Clear hover coordinates when mouse leaves the map
             setHoverCoordinates(null);
@@ -609,6 +614,10 @@ export default function PresentationMapView(props) {
         document.head.appendChild(style);
         mapInstance.current = map;
         
+        // Mark as initialized to prevent duplicate initialization
+        isInitializedRef.current = true;
+        console.log('[PresentationMapView] ✅ Map initialization flag set');
+        
         return () => {
             // Mark component as unmounted
             isMounted = false;
@@ -624,6 +633,25 @@ export default function PresentationMapView(props) {
             
             // Just clear the map instance reference
             mapInstance.current = null;
+            
+            // Do NOT reset isInitializedRef here - we want to prevent re-initialization
+            // even if the component is unmounted and remounted
+
+            // Ensure map cleanup happens if component unmounts *during* setup
+            return () => {
+                if (!isMounted) {
+                    logger.info('PresentationMapView', 'Cleanup called after unmount');
+                    // If mapInstance exists and hasn't been cleaned up, do it now
+                    if (mapInstance.current) {
+                         logger.info('PresentationMapView', 'Performing delayed map cleanup');
+                         safelyRemoveMap(mapInstance.current);
+                         mapInstance.current = null;
+                    }
+                } else {
+                     logger.info('PresentationMapView', 'Normal cleanup');
+                     // Normal cleanup logic (already handled by the main return)
+                }
+            };
         };
     }, []);
     const mapContextValue = useMemo(() => ({

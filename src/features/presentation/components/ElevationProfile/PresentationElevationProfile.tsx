@@ -176,6 +176,36 @@ function createSegments(points: Array<{x: number, y: number, isPaved: boolean}>,
     return segments;
 }
 
+// Haversine formula to calculate distance between two points
+const calculateDistance = (point1: number[], point2: number[]): number => {
+    // Ensure we have at least 2 elements in each point
+    if (point1.length < 2 || point2.length < 2) {
+        return 0; // Return 0 distance if points are invalid
+    }
+    
+    const lon1 = point1[0];
+    const lat1 = point1[1];
+    const lon2 = point2[0];
+    const lat2 = point2[1];
+    
+    // Convert to radians
+    const toRad = (value: number) => value * Math.PI / 180;
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lon2 - lon1);
+    
+    // Haversine formula
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    
+    // Earth's radius in meters
+    const R = 6371e3;
+    return R * c;
+};
+
 interface TooltipProps {
     content: React.ReactNode;
     x: number;
@@ -201,9 +231,9 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
     const [data, setData] = useState<ElevationPoint[]>([]);
     const [climbs, setClimbs] = useState<Climb[]>([]);
     const [stats, setStats] = useState<Stats>({ 
-        elevationGained: 0, 
-        elevationLost: 0, 
-        totalDistance: 0,
+        elevationGained: route.statistics?.elevationGain || 0, 
+        elevationLost: route.statistics?.elevationLoss || 0, 
+        totalDistance: route.statistics?.totalDistance || 0,
         unpavedPercentage: 0
     });
     const [currentProfilePoint, setCurrentProfilePoint] = useState<{ x: number, y: number } | null>(null);
@@ -223,7 +253,6 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
         }
 
         const coordinates = feature.geometry.coordinates;
-        const totalDistance = route.statistics.totalDistance;
 
         // Find the index of the closest coordinate
         let closestIndex = -1;
@@ -241,11 +270,31 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
         });
 
         if (closestIndex >= 0) {
-            // Convert to distance along the route (in km)
-            const distance = (closestIndex / (coordinates.length - 1)) * totalDistance / 1000;
-            const elevation = data[closestIndex]?.elevation || 0;
+            // Calculate cumulative distances using Haversine formula
+            const cumulativeDistances = [0]; // First point is at distance 0
+            let totalDistanceCalculated = 0;
             
-            setCurrentProfilePoint({ x: distance, y: elevation });
+            for (let i = 1; i < coordinates.length; i++) {
+                const distance = calculateDistance(coordinates[i-1], coordinates[i]);
+                totalDistanceCalculated += distance;
+                cumulativeDistances.push(totalDistanceCalculated);
+            }
+            
+            // Get the actual distance at the closest index using Haversine
+            const distanceAlongRoute = cumulativeDistances[closestIndex] / 1000; // in km
+            
+            // Find the closest point in the elevation data
+            const closestDataPoint = data.reduce((closest, point, index) => {
+                const distDiff = Math.abs(point.distance / 1000 - distanceAlongRoute);
+                if (distDiff < closest.diff) {
+                    return { index, diff: distDiff };
+                }
+                return closest;
+            }, { index: 0, diff: Infinity });
+            
+            const elevation = data[closestDataPoint.index]?.elevation || 0;
+            
+            setCurrentProfilePoint({ x: distanceAlongRoute, y: elevation });
         } else {
             setCurrentProfilePoint(null);
         }
@@ -311,21 +360,11 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
             }
 
 
-            // Calculate elevation stats
-            let elevationGained = 0;
-            let elevationLost = 0;
-            for (let i = 1; i < elevationData.length; i++) {
-                const elevDiff = elevationData[i].elevation - elevationData[i - 1].elevation;
-                if (elevDiff > 0) {
-                    elevationGained += elevDiff;
-                } else {
-                    elevationLost += Math.abs(elevDiff);
-                }
-            }
-
+            // Use the elevation gain/loss values from route.statistics
+            // These are now calculated with smoothing during initial GPX processing
             setStats({
-                elevationGained,
-                elevationLost,
+                elevationGained: route.statistics?.elevationGain || 0,
+                elevationLost: route.statistics?.elevationLoss || 0,
                 totalDistance,
                 unpavedPercentage
             });

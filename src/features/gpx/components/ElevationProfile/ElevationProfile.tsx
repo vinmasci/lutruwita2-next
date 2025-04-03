@@ -181,6 +181,46 @@ const Tooltip: React.FC<TooltipProps> = ({ content, x, y }) => {
   );
 };
 
+// Calculate distance between two points using Haversine formula
+const calculateDistance = (point1: number[], point2: number[]): number => {
+  const [lon1, lat1] = point1;
+  const [lon2, lat2] = point2;
+  
+  // Convert to radians
+  const toRad = (value: number) => value * Math.PI / 180;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δφ = toRad(lat2 - lat1);
+  const Δλ = toRad(lon2 - lon1);
+  
+  // Haversine formula
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+  // Earth's radius in meters
+  const R = 6371e3;
+  return R * c;
+};
+
+// Helper function to calculate gradient
+const calculateGradient = (currentPoint: { x: number, y: number } | null, profileData: Point[]): string => {
+  if (!currentPoint) return '0.0%';
+  
+  const currentPointIndex = profileData.findIndex(p => 
+    p.x === currentPoint.x && p.y === currentPoint.y);
+  
+  if (currentPointIndex > 0) {
+    const prevPoint = profileData[currentPointIndex - 1];
+    const elevationChange = currentPoint.y - prevPoint.y;
+    const distanceChange = (currentPoint.x - prevPoint.x) * 1000; // convert to meters
+    const gradientValue = (elevationChange / distanceChange) * 100;
+    return `${Math.round(gradientValue)}%`;
+  }
+  return '0.0%';
+};
+
 export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoading, error }) => {
   const { setHoverCoordinates, hoverCoordinates, map } = useMapContext();
   const [tooltip, setTooltip] = useState<{ content: React.ReactNode; x: number; y: number } | null>(null);
@@ -188,9 +228,9 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
   const [climbs, setClimbs] = useState<Climb[]>([]);
   const [currentProfilePoint, setCurrentProfilePoint] = useState<{ x: number, y: number } | null>(null);
   const [stats, setStats] = useState<Stats>({ 
-    elevationGained: 0, 
-    elevationLost: 0, 
-    totalDistance: 0,
+    elevationGained: route.statistics?.elevationGain || 0, 
+    elevationLost: route.statistics?.elevationLoss || 0, 
+    totalDistance: route.statistics?.totalDistance || 0,
     unpavedPercentage: route.surface?.surfaceTypes?.find(t => t.type === 'trail')?.percentage || 0
   });
 
@@ -211,7 +251,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
       const coordinates = feature.geometry.coordinates;
       
       // Find the closest point on the route to the hover coordinates
-      let closestPoint = null;
+      let closestPoint: number[] | null = null;
       let minDistance = Infinity;
       let closestIndex = -1;
       
@@ -228,11 +268,18 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
       });
       
       if (closestIndex >= 0 && data.length > 0 && data[0].data.length > 0) {
-        // Convert the index to a distance along the route
-        const totalPoints = coordinates.length;
-        const distanceRatio = closestIndex / (totalPoints - 1);
-        const totalDistance = stats.totalDistance;
-        const distanceAlongRoute = distanceRatio * totalDistance / 1000; // in km
+        // Calculate cumulative distances using Haversine formula
+        const cumulativeDistances = [0]; // First point is at distance 0
+        let totalDistanceCalculated = 0;
+        
+        for (let i = 1; i < coordinates.length; i++) {
+          const distance = calculateDistance(coordinates[i-1], coordinates[i]);
+          totalDistanceCalculated += distance;
+          cumulativeDistances.push(totalDistanceCalculated);
+        }
+        
+        // Get the actual distance at the closest index using Haversine
+        const distanceAlongRoute = cumulativeDistances[closestIndex] / 1000; // in km
         
         // Find the closest point in the elevation profile data
         const profileData = data[0].data;
@@ -277,14 +324,51 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
         return;
       }
 
+      // Calculate distance between two points using Haversine formula
+      const calculateDistance = (point1: number[], point2: number[]): number => {
+        const [lon1, lat1] = point1;
+        const [lon2, lat2] = point2;
+        
+        // Convert to radians
+        const toRad = (value: number) => value * Math.PI / 180;
+        const φ1 = toRad(lat1);
+        const φ2 = toRad(lat2);
+        const Δφ = toRad(lat2 - lat1);
+        const Δλ = toRad(lon2 - lon1);
+        
+        // Haversine formula
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        // Earth's radius in meters
+        const R = 6371e3;
+        return R * c;
+      };
+
+      // Calculate cumulative distances for each point
+      const coordinates = feature.geometry.coordinates;
+      const cumulativeDistances = [0]; // First point is at distance 0
+      let totalDistanceCalculated = 0;
+      
+      for (let i = 1; i < coordinates.length; i++) {
+        const distance = calculateDistance(coordinates[i-1], coordinates[i]);
+        totalDistanceCalculated += distance;
+        cumulativeDistances.push(totalDistanceCalculated);
+      }
+
+      // Create elevation data with accurate distances
       const elevationData = elevations.map((elev: number, index: number) => {
-        const distance = (index / (elevations.length - 1)) * totalDistance;
+        // Use the actual cumulative distance for this point
+        const distance = cumulativeDistances[index];
         let isPaved = true;
 
         if (route.unpavedSections) {
           for (const section of route.unpavedSections) {
-            const sectionStartDist = (section.startIndex / (elevations.length - 1)) * totalDistance;
-            const sectionEndDist = (section.endIndex / (elevations.length - 1)) * totalDistance;
+            // Use actual distances for unpaved sections too
+            const sectionStartDist = cumulativeDistances[section.startIndex];
+            const sectionEndDist = cumulativeDistances[section.endIndex];
             if (distance >= sectionStartDist && distance <= sectionEndDist) {
               isPaved = false;
               break;
@@ -310,20 +394,11 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
       const unpavedPercentage = route.surface?.surfaceTypes?.find(t => t.type === 'trail')?.percentage || 
                                (unpavedDistance / totalDistance) * 100;
 
-      let elevationGained = 0;
-      let elevationLost = 0;
-      for (let i = 1; i < elevationData.length; i++) {
-        const elevDiff = elevationData[i].y - elevationData[i - 1].y;
-        if (elevDiff > 0) {
-          elevationGained += elevDiff;
-        } else {
-          elevationLost += Math.abs(elevDiff);
-        }
-      }
-
+      // Use the elevation gain/loss values from route.statistics
+      // These are now calculated with smoothing during initial GPX processing
       setStats({
-        elevationGained,
-        elevationLost,
+        elevationGained: route.statistics?.elevationGain || 0,
+        elevationLost: route.statistics?.elevationLoss || 0,
         totalDistance,
         unpavedPercentage
       });
@@ -744,7 +819,8 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               'grid',
               'axes',
               customLayer,
-              ({ xScale, yScale, innerHeight }) => {
+              (props: { xScale: any; yScale: any; innerHeight: number }) => {
+                const { xScale, yScale, innerHeight } = props;
                 // Render the current position marker
                 if (currentProfilePoint && xScale && yScale) {
                   const x = xScale(currentProfilePoint.x);
@@ -787,7 +863,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                       {/* Elevation and distance text with higher z-index - positioned far to the right */}
                       <g style={{ zIndex: 1000 }}>
                         <foreignObject
-                          x={x > innerWidth * 0.7 ? x - 100 : x + 80}
+                          x={x > 630 ? x - 100 : x + 80} // 900px * 0.7 = 630px (assuming 900px width)
                           y={y}
                           width="110"
                           height="70"
@@ -823,21 +899,8 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <i className="fa-solid fa-percent" style={{ fontSize: '11px', color: '#0288d1', width: '14px' }}></i>
                               <span>
-                                {(() => {
-                                  // Calculate gradient if possible
-                                  const profileData = data[0].data;
-                                  const currentPointIndex = profileData.findIndex(p => 
-                                    p.x === currentProfilePoint.x && p.y === currentProfilePoint.y);
-                                  
-                                  if (currentPointIndex > 0) {
-                                    const prevPoint = profileData[currentPointIndex - 1];
-                                    const elevationChange = currentProfilePoint.y - prevPoint.y;
-                                    const distanceChange = (currentProfilePoint.x - prevPoint.x) * 1000; // convert to meters
-                                    const gradientValue = (elevationChange / distanceChange) * 100;
-                                    return `${Math.round(gradientValue)}%`;
-                                  }
-                                  return '0.0%';
-                                })()}
+                                {/* Calculate gradient */}
+                                {calculateGradient(currentProfilePoint, data[0].data)}
                               </span>
                             </div>
                           </div>
@@ -908,10 +971,35 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                 const feature = route.geojson.features[0];
                 if (feature.geometry.type === 'LineString') {
                   const coordinates = feature.geometry.coordinates;
-                  const index = Math.floor((pointData.x * 1000 / stats.totalDistance) * (coordinates.length - 1));
-                  if (coordinates[index]) {
+                  
+                  // Find the closest point in the data based on actual distance
+                  const targetDistance = pointData.x * 1000; // Convert km to meters
+                  
+                  // Calculate cumulative distances for each point
+                  const cumulativeDistances = [0]; // First point is at distance 0
+                  let totalDistanceCalculated = 0;
+                  
+                  for (let i = 1; i < coordinates.length; i++) {
+                    const distance = calculateDistance(coordinates[i-1], coordinates[i]);
+                    totalDistanceCalculated += distance;
+                    cumulativeDistances.push(totalDistanceCalculated);
+                  }
+                  
+                  // Find the closest point to our target distance
+                  let closestIndex = 0;
+                  let minDistanceDiff = Math.abs(cumulativeDistances[0] - targetDistance);
+                  
+                  for (let i = 1; i < cumulativeDistances.length; i++) {
+                    const distanceDiff = Math.abs(cumulativeDistances[i] - targetDistance);
+                    if (distanceDiff < minDistanceDiff) {
+                      minDistanceDiff = distanceDiff;
+                      closestIndex = i;
+                    }
+                  }
+                  
+                  if (coordinates[closestIndex]) {
                     // Set hover coordinates for the map marker
-                    setHoverCoordinates([coordinates[index][0], coordinates[index][1]]);
+                    setHoverCoordinates([coordinates[closestIndex][0], coordinates[closestIndex][1]]);
                   }
                 }
               }

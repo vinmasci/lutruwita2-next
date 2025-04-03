@@ -7,15 +7,89 @@ import { normalizeRoute } from '../../../../map/hooks/useUnifiedRouteProcessing'
 // Import the CSS for distance markers
 import './SimplifiedRouteLayer.css';
 
-// Get points along route at specified interval using route's total distance
-const getPointsAtInterval = (coordinates, totalDistance, interval) => {
-  const points = [];
-  const numMarkers = Math.floor(totalDistance / interval);
-  for (let i = 1; i <= numMarkers; i++) {
-    const fraction = (i * interval) / totalDistance;
-    const index = Math.floor(fraction * (coordinates.length - 1));
-    points.push(coordinates[index]);
+// Calculate distance between two points using Haversine formula
+const calculateDistance = (point1, point2) => {
+  const [lon1, lat1] = point1;
+  const [lon2, lat2] = point2;
+  
+  // Convert to radians
+  const toRad = (value) => value * Math.PI / 180;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δφ = toRad(lat2 - lat1);
+  const Δλ = toRad(lon2 - lon1);
+  
+  // Haversine formula
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+  // Earth's radius in meters
+  const R = 6371e3;
+  return R * c;
+};
+
+// Get points along route at specified interval using actual cumulative distances
+const getPointsAtInterval = (coordinates, totalDistanceKm, interval) => {
+  // If no coordinates or invalid interval, return empty array
+  if (!coordinates || coordinates.length < 2 || interval <= 0) {
+    return [];
   }
+  
+  const points = [];
+  const cumulativeDistances = [0]; // First point is at distance 0
+  let totalDistanceM = 0;
+  
+  // Calculate cumulative distances for each point
+  for (let i = 1; i < coordinates.length; i++) {
+    const distance = calculateDistance(coordinates[i-1], coordinates[i]);
+    totalDistanceM += distance;
+    cumulativeDistances.push(totalDistanceM);
+  }
+  
+  // Convert interval to meters
+  const intervalM = interval * 1000;
+  
+  // Find points at each interval
+  for (let targetDistance = intervalM; targetDistance < totalDistanceM; targetDistance += intervalM) {
+    // Find the point just before or at our target distance
+    let index = 0;
+    while (index < cumulativeDistances.length - 1 && 
+           cumulativeDistances[index + 1] < targetDistance) {
+      index++;
+    }
+    
+    // If we're at the last point, we can't interpolate
+    if (index >= coordinates.length - 1) {
+      continue;
+    }
+    
+    // If we're exactly at a point, use that point
+    if (cumulativeDistances[index] === targetDistance) {
+      points.push(coordinates[index]);
+      continue;
+    }
+    
+    // Otherwise, we need to interpolate between two points
+    const beforeDist = cumulativeDistances[index];
+    const afterDist = cumulativeDistances[index + 1];
+    const segmentLength = afterDist - beforeDist;
+    
+    // How far along this segment is our target distance?
+    const ratio = (targetDistance - beforeDist) / segmentLength;
+    
+    // Interpolate between the two points
+    const beforePoint = coordinates[index];
+    const afterPoint = coordinates[index + 1];
+    const interpolatedPoint = [
+      beforePoint[0] + ratio * (afterPoint[0] - beforePoint[0]),
+      beforePoint[1] + ratio * (afterPoint[1] - beforePoint[1])
+    ];
+    
+    points.push(interpolatedPoint);
+  }
+  
   return points;
 };
 

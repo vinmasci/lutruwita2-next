@@ -64,17 +64,42 @@ export const useClientGpxProcessing = () => {
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 return acc + (R * c);
             }, 0);
-            let elevationGain = 0;
-            let elevationLoss = 0;
             let maxElevation = elevations.length ? Math.max(...elevations) : 0;
             let minElevation = elevations.length ? Math.min(...elevations) : 0;
-            for (let i = 1; i < elevations.length; i++) {
-                const diff = elevations[i] - elevations[i - 1];
+            
+            // Apply smoothing to elevation data before calculating gain/loss
+            // This reduces the impact of GPS noise on elevation calculations
+            const smoothingWindow = 5;
+            const smoothedElevations = [...elevations]; // Create a copy to avoid modifying original
+            
+            if (elevations.length > smoothingWindow) {
+                for (let i = 0; i < elevations.length; i++) {
+                    const windowStart = Math.max(0, i - Math.floor(smoothingWindow / 2));
+                    const windowEnd = Math.min(elevations.length, i + Math.floor(smoothingWindow / 2) + 1);
+                    const window = elevations.slice(windowStart, windowEnd);
+                    const avgElevation = window.reduce((sum, elevation) => sum + elevation, 0) / window.length;
+                    smoothedElevations[i] = avgElevation;
+                }
+            }
+            
+            // Calculate elevation gain/loss using smoothed data
+            let elevationGain = 0;
+            let elevationLoss = 0;
+            
+            for (let i = 1; i < smoothedElevations.length; i++) {
+                const diff = smoothedElevations[i] - smoothedElevations[i - 1];
                 if (diff > 0)
                     elevationGain += diff;
                 else
                     elevationLoss += Math.abs(diff);
             }
+            
+            console.log('[useClientGpxProcessing] Elevation statistics:', {
+                rawElevationPoints: elevations.length,
+                smoothedElevationPoints: smoothedElevations.length,
+                elevationGain: Math.round(elevationGain),
+                elevationLoss: Math.round(elevationLoss)
+            });
             const statistics = {
                 totalDistance,
                 elevationGain,
