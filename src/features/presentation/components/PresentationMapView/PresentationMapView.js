@@ -670,29 +670,7 @@ export default function PresentationMapView(props) {
         map.addControl(new SearchControl(), 'top-right');
         map.addControl(new StyleControl(), 'top-right');
         
-        // Style controls
-        const style = document.createElement('style');
-        style.textContent = `
-      .mapboxgl-ctrl-group {
-        background-color: rgba(35, 35, 35, 0.9) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-      }
-      .mapboxgl-ctrl-group button {
-        width: 36px !important;
-        height: 36px !important;
-      }
-      .mapboxgl-ctrl-icon {
-        filter: invert(1);
-      }
-      .mapboxgl-ctrl-geolocate {
-        display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-    `;
-        document.head.appendChild(style);
+        // Map control styles are now in PresentationMapView.css
         mapInstance.current = map;
         
         // Mark as initialized to prevent duplicate initialization
@@ -713,11 +691,6 @@ export default function PresentationMapView(props) {
             // Cancel any ongoing initialization
             if (cancellationToken) {
                 cancellationToken.cancel();
-            }
-            
-            // Remove the style element
-            if (style && style.parentNode) {
-                document.head.removeChild(style);
             }
             
             // In presentation mode, we intentionally skip map cleanup to avoid errors

@@ -53,3 +53,26 @@
 .elevation-container > * {
   pointer-events: auto;
 }
+
+/* Map control styling */
+.mapboxgl-ctrl-group {
+  background-color: rgba(35, 35, 35, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.mapboxgl-ctrl-group button {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.mapboxgl-ctrl-icon {
+  filter: invert(1);
+}
+
+.mapboxgl-ctrl-geolocate {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
