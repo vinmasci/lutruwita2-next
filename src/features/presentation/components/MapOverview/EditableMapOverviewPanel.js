@@ -244,45 +244,32 @@ export const EditableMapOverviewPanel = () => {
     children: [
       _jsxs(OverviewContent, {
         children: [
-          _jsxs(Box, {
+          _jsx(Box, {
             sx: { 
               px: 2, 
               py: 1, 
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'space-between',
-              backgroundColor: '#1a1a1a',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)' 
+              justifyContent: 'flex-end'
             },
-            children: [
-              _jsx(Typography, 
-                {
-                  variant: "subtitle2", 
-                  color: "white", 
-                  sx: { 
-                    fontSize: '0.8rem', 
-                    fontWeight: 500, 
-                    fontFamily: 'Futura' 
-                  },
-                  children: "Edit Map Overview"
+            children: _jsx(Button, {
+              variant: "contained",
+              size: "small",
+              onClick: insertMetadata,
+              sx: {
+                backgroundColor: BUTTON_COLOR,
+                color: 'white',
+                fontFamily: 'Futura, sans-serif',
+                fontSize: '0.75rem',
+                textTransform: 'none',
+                padding: '4px 8px',
+                minWidth: 'auto',
+                '&:hover': {
+                  backgroundColor: '#1976d2'
                 }
-              ),
-              _jsx(Tooltip, {
-                title: "Insert Metadata",
-                placement: "top",
-                children: _jsx(IconButton, {
-                  size: "small",
-                  onClick: insertMetadata,
-                  sx: {
-                    color: BUTTON_COLOR,
-                    '&:hover': {
-                      backgroundColor: 'rgba(33, 150, 243, 0.1)'
-                    }
-                  },
-                  children: _jsx(DataObjectIcon, { fontSize: "small" })
-                })
-              })
-            ]
+              },
+              children: "Add Stats"
+            })
           }),
           _jsxs(Box, {
             sx: {
@@ -293,34 +280,6 @@ export const EditableMapOverviewPanel = () => {
               gap: 2
             },
             children: [
-              _jsxs(Box, {
-                sx: {
-                  backgroundColor: '#1e1e1e',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  mb: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2
-                },
-                children: [
-                  _jsx("i", {
-                    className: "fa-solid fa-circle-info",
-                    style: {
-                      color: '#2196f3',
-                      fontSize: '1.2rem'
-                    }
-                  }),
-                  _jsx("div", {
-                    style: {
-                      color: '#a8c7fa',
-                      fontSize: '0.85rem',
-                      fontFamily: 'Futura, sans-serif'
-                    },
-                    children: "Use this editor to create a global overview for your map. This content applies to the entire file, not just individual routes."
-                  })
-                ]
-              }),
               _jsx(Box, {
                 sx: {
                   flex: 1,
@@ -331,7 +290,8 @@ export const EditableMapOverviewPanel = () => {
                 children: _jsx(RichTextEditor, {
                   value: editorContent,
                   onChange: handleEditorChange,
-                  onEditorReady: (editor) => setEditorRef(editor)
+                  onEditorReady: (editor) => setEditorRef(editor),
+                  placeholder: "Edit overview..."
                 })
               }),
               _jsx(Box, {

@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Box, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { useMapOverview } from '../../../presentation/context/MapOverviewContext.jsx';
+import { getMapOverviewData } from '../../../presentation/store/mapOverviewStore';
 
 const EDITOR_BACKGROUND = 'rgb(35, 35, 35)';
 
@@ -17,7 +17,7 @@ const OverviewContent = styled('div')({
  * Displays the global map overview content that applies to the entire file
  */
 export const PresentationMapOverviewPanel = () => {
-  const { mapOverview } = useMapOverview();
+  const mapOverview = getMapOverviewData();
 
   return _jsxs("div", {
     className: "map-overview",

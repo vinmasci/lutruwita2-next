@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { throttle } from 'lodash'; // Import throttle
-import TracerLayer from '../../../map/components/WebGLTracer/TracerLayer';
+import { findClosestPointOnRoute, createRouteSpatialGrid } from '../../../../utils/routeUtils';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
 import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
@@ -48,7 +48,6 @@ export default function PresentationMapView(props) {
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
     const routeCoordinatesRef = useRef(null); // Ref for route coordinates
-    const tracerLayerRef = useRef(null); // Ref for WebGL tracer layer
     const [isDistanceMarkersVisible, setIsDistanceMarkersVisible] = useState(true);
     const [isClimbFlagsVisible, setIsClimbFlagsVisible] = useState(true);
     const [isLineMarkersVisible, setIsLineMarkersVisible] = useState(true);
@@ -133,42 +132,200 @@ export default function PresentationMapView(props) {
         setHoverCoordinatesRef.current = setHoverCoordinates;
     }, [setHoverCoordinates]);
 
-    // Effect to cache route coordinates
+    // Effect to cache route coordinates and create spatial grid for optimization
     useEffect(() => {
         if (currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
-            routeCoordinatesRef.current = currentRoute.geojson.features[0].geometry.coordinates;
+            const coordinates = currentRoute.geojson.features[0].geometry.coordinates;
+            
+            // Use the shared utility function to create the spatial grid
+            const spatialGrid = createRouteSpatialGrid(coordinates);
+            
+            // Store the spatial grid
+            routeCoordinatesRef.current = spatialGrid;
+            
+            console.log('[PresentationMapView] ✅ Created spatial grid for route tracer optimization');
         } else {
             routeCoordinatesRef.current = null; // Clear cache if no coordinates
         }
     }, [currentRoute]);
     
-    // Update WebGL tracer when coordinates change
-    useEffect(() => {
-        if (!mapInstance.current || !isMapReady || !tracerLayerRef.current) return;
-        
-        try {
-            // Update the WebGL tracer layer with the new coordinates
-            tracerLayerRef.current.updateCoordinates(hoverCoordinates);
-        } catch (error) {
-            logger.error('PresentationMapView', 'Error updating WebGL tracer:', error);
-        }
-    }, [hoverCoordinates, isMapReady]);
+    // Store previous hover coordinates for interpolation
+    const prevHoverCoordinatesRef = useRef(null);
+    const animationFrameRef = useRef(null);
     
-    // Store previous route reference
-    // Store previous route reference and current route ID
+    // Function to interpolate between two points
+    const interpolatePoints = useCallback((start, end, progress) => {
+        if (!start || !end) return end;
+        return [
+            start[0] + (end[0] - start[0]) * progress,
+            start[1] + (end[1] - start[1]) * progress
+        ];
+    }, []);
+    
+    // Update hover point with smooth animation
+    useEffect(() => {
+        if (!mapInstance.current || !isMapReady) return;
+        
+        // If no coordinates, hide the layer
+        if (!hoverCoordinates) {
+            try {
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+                prevHoverCoordinatesRef.current = null;
+                
+                // Cancel any ongoing animation
+                if (animationFrameRef.current) {
+                    cancelAnimationFrame(animationFrameRef.current);
+                    animationFrameRef.current = null;
+                }
+            } catch (error) {
+                // Ignore errors when hiding (might happen during initialization)
+            }
+            return;
+        }
+        
+        // If this is the first point or we're far from previous point, don't animate
+        if (!prevHoverCoordinatesRef.current) {
+            try {
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                    prevHoverCoordinatesRef.current = hoverCoordinates;
+                }
+            } catch (error) {
+                logger.error('PresentationMapView', 'Error updating hover point:', error);
+            }
+            return;
+        }
+        
+        // Calculate distance between points to determine if we should animate
+        const dx = hoverCoordinates[0] - prevHoverCoordinatesRef.current[0];
+        const dy = hoverCoordinates[1] - prevHoverCoordinatesRef.current[1];
+        const distanceSq = dx * dx + dy * dy;
+        
+        // If points are too far apart, just jump to the new position
+        if (distanceSq > 0.0001) { // About 1km
+            try {
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    prevHoverCoordinatesRef.current = hoverCoordinates;
+                }
+            } catch (error) {
+                logger.error('PresentationMapView', 'Error updating hover point:', error);
+            }
+            return;
+        }
+        
+        // Cancel any ongoing animation
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        // Animate the transition
+        const startTime = performance.now();
+        const duration = 150; // Animation duration in ms
+        const startPoint = [...prevHoverCoordinatesRef.current];
+        const endPoint = [...hoverCoordinates];
+        
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Use easeOutQuad for smoother deceleration
+            const easedProgress = 1 - (1 - progress) * (1 - progress);
+            
+            try {
+                const source = mapInstance.current?.getSource('hover-point');
+                if (source) {
+                    const interpolated = interpolatePoints(startPoint, endPoint, easedProgress);
+                    
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: interpolated
+                        },
+                        properties: {}
+                    });
+                    
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                    
+                    // Continue animation if not complete
+                    if (progress < 1) {
+                        animationFrameRef.current = requestAnimationFrame(animate);
+                    } else {
+                        prevHoverCoordinatesRef.current = endPoint;
+                        animationFrameRef.current = null;
+                    }
+                }
+            } catch (error) {
+                // If there's an error, stop the animation
+                logger.error('PresentationMapView', 'Error during hover point animation:', error);
+                animationFrameRef.current = null;
+            }
+        };
+        
+        // Start the animation
+        animationFrameRef.current = requestAnimationFrame(animate);
+        
+        // Cleanup function to cancel animation if component unmounts
+        return () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+        };
+    }, [hoverCoordinates, isMapReady, interpolatePoints]);
+    
+    // Store previous route reference, current route ID, and zoom tracking
     const previousRouteRef = useRef(null);
     const currentRouteIdRef = useRef(null);
+    const hasZoomedToCurrentRouteRef = useRef(false);
+    const pendingZoomRef = useRef(false);
+    
     // Update currentRouteIdRef when currentRoute changes
     useEffect(() => {
         if (currentRoute?.routeId) {
+            // If the route ID has changed, reset the zoom tracking
+            if (currentRouteIdRef.current !== currentRoute.routeId) {
+                hasZoomedToCurrentRouteRef.current = false;
+                pendingZoomRef.current = true;
+            }
             currentRouteIdRef.current = currentRoute.routeId;
         }
     }, [currentRoute]);
 
-    // Update map state when route changes
-    useEffect(() => {
-        if (!isMapReady || !mapInstance.current || !currentRoute?.geojson) {
-            return;
+    // Ref to track retry attempts
+    const zoomRetryCountRef = useRef(0);
+    const maxZoomRetries = 5;
+    const zoomRetryTimeoutRef = useRef(null);
+    
+    // Function to zoom to the current route bounds
+    const zoomToCurrentRoute = useCallback(() => {
+        if (!mapInstance.current) {
+            return false;
+        }
+        
+        if (!currentRoute?.geojson) {
+            return false;
         }
         
         // Get route bounds
@@ -184,17 +341,101 @@ export default function PresentationMapView(props) {
                     }
                 });
                 
-                // Always fit bounds to show the entire route with substantial padding for maximum context
-                mapInstance.current.fitBounds(bounds, {
-                    padding: 200,  // Significantly increased padding to zoom out much more
-                    duration: 1500
-                });
-                
-                // Update previous route reference
-                previousRouteRef.current = currentRoute.routeId;
+                try {
+                    // Always fit bounds to show the entire route with substantial padding for maximum context
+                    mapInstance.current.fitBounds(bounds, {
+                        padding: 200,  // Significantly increased padding to zoom out much more
+                        duration: 1500
+                    });
+                    
+                    // Update previous route reference and mark that we've zoomed to this route
+                    previousRouteRef.current = currentRoute.routeId;
+                    hasZoomedToCurrentRouteRef.current = true;
+                    pendingZoomRef.current = false;
+                    zoomRetryCountRef.current = 0; // Reset retry count on success
+                    
+                    // Clear any pending retry timeouts
+                    if (zoomRetryTimeoutRef.current) {
+                        clearTimeout(zoomRetryTimeoutRef.current);
+                        zoomRetryTimeoutRef.current = null;
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    logger.error('PresentationMapView', 'Error during fitBounds:', error);
+                    return false;
+                }
             }
         }
-    }, [isMapReady, currentRoute]);
+        
+        return false;
+    }, [currentRoute]);
+    
+    // Function to attempt zoom with retry logic
+    const attemptZoomWithRetry = useCallback(() => {
+        // Clear any existing retry timeout
+        if (zoomRetryTimeoutRef.current) {
+            clearTimeout(zoomRetryTimeoutRef.current);
+            zoomRetryTimeoutRef.current = null;
+        }
+        
+        const success = zoomToCurrentRoute();
+        
+        // If zoom failed and we haven't exceeded max retries, try again after a delay
+        if (!success && zoomRetryCountRef.current < maxZoomRetries) {
+            zoomRetryCountRef.current++;
+            const retryDelay = 300 * zoomRetryCountRef.current; // Increasing delay with each retry
+            
+            zoomRetryTimeoutRef.current = setTimeout(() => {
+                attemptZoomWithRetry();
+            }, retryDelay);
+        } else if (!success) {
+            // Reset for next attempt
+            zoomRetryCountRef.current = 0;
+        }
+    }, [zoomToCurrentRoute]);
+
+    // Update map state when route changes - with delay for route data to load
+    useEffect(() => {
+        if (!currentRoute?.routeId) {
+            return;
+        }
+        
+        if (!isMapReady || !mapInstance.current) {
+            pendingZoomRef.current = true;
+            return;
+        }
+        
+        // Check if we've already zoomed to this route
+        if (hasZoomedToCurrentRouteRef.current) {
+            return;
+        }
+        
+        // Add a small delay to allow route data to fully load
+        setTimeout(() => {
+            attemptZoomWithRetry();
+        }, 300);
+    }, [isMapReady, currentRoute, attemptZoomWithRetry]);
+    
+    // Handle deferred zooming when map becomes ready
+    useEffect(() => {
+        if (isMapReady && pendingZoomRef.current && !hasZoomedToCurrentRouteRef.current) {
+            // Add a small delay to ensure everything is fully initialized
+            setTimeout(() => {
+                attemptZoomWithRetry();
+            }, 300);
+        }
+    }, [isMapReady, attemptZoomWithRetry]);
+    
+    // Cleanup zoom retry timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (zoomRetryTimeoutRef.current) {
+                clearTimeout(zoomRetryTimeoutRef.current);
+                zoomRetryTimeoutRef.current = null;
+            }
+        };
+    }, []);
     // Function to handle device type changes (e.g., orientation changes)
     const handleDeviceTypeChange = useCallback(() => {
         if (!mapInstance.current) return;
@@ -264,81 +505,132 @@ export default function PresentationMapView(props) {
         };
     }, [handleDeviceTypeChange]);
 
-    // Throttled mousemove handler using refs and optimized sampling/delay
+    // We're now using the shared utility function findClosestPointOnRoute from routeUtils.ts
+    
+    // Direct marker update reference to avoid React state updates
+    const directMarkerUpdateRef = useRef({
+        active: false,
+        lastUpdate: 0
+    });
+    
+    // Throttled mousemove handler using the optimized closest point finder with direct updates
     const throttledMouseMoveHandler = useCallback(throttle((e) => {
         // Skip trace marker functionality on mobile devices
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
-            // Use ref to set state
-            if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
+            // Hide marker and clear state
+            try {
+                if (mapInstance.current) {
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+                }
+                if (setHoverCoordinatesRef.current) {
+                    setHoverCoordinatesRef.current(null);
+                }
+            } catch (error) {
+                // Ignore errors when hiding
+            }
             return;
         }
 
         if (!mapInstance.current) return; // Ensure map instance exists
 
-        const map = mapInstance.current;
         const mouseCoords = [e.lngLat.lng, e.lngLat.lat];
-
-        // Use cached coordinates from ref
-        const coordinates = routeCoordinatesRef.current;
-        if (!coordinates || coordinates.length === 0) {
-             if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
-             return;
-        }
-
-        // Find the closest point on the active route using adaptive sampling
-        let closestPoint = null;
-        let minDistanceSq = Infinity; // Use squared distance to avoid sqrt
         
-        // First pass: Use a coarse sampling to find the approximate closest segment
-        const coarseSampleRate = 50; // Check every 50th point initially
-        let bestSegmentStart = 0;
+        // Use the shared utility function to find the closest point
+        const closestPoint = findClosestPointOnRoute(mouseCoords, routeCoordinatesRef.current);
         
-        for (let i = 0; i < coordinates.length; i += coarseSampleRate) {
-            const coord = coordinates[i];
-            if (coord && coord.length >= 2) {
-                // Simplified distance calculation (squared Euclidean distance)
-                const dx = coord[0] - mouseCoords[0];
-                const dy = coord[1] - mouseCoords[1];
-                const distanceSq = dx * dx + dy * dy;
-
-                if (distanceSq < minDistanceSq) {
-                    minDistanceSq = distanceSq;
-                    bestSegmentStart = Math.max(0, i - coarseSampleRate);
-                    closestPoint = [coord[0], coord[1]];
+        // If no closest point found, hide the marker
+        if (!closestPoint) {
+            try {
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+                // Also update React state for consistency
+                if (setHoverCoordinatesRef.current) {
+                    setHoverCoordinatesRef.current(null);
                 }
+            } catch (error) {
+                // Ignore errors when hiding
+            }
+            return;
+        }
+        
+        try {
+            // Get the hover-point source
+            const source = mapInstance.current.getSource('hover-point');
+            if (source) {
+                // Update the source data directly
+                source.setData({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: closestPoint
+                    },
+                    properties: {}
+                });
+                
+                // Show the layer if it's hidden
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                
+                // Track that we've directly updated the marker
+                directMarkerUpdateRef.current.active = true;
+                directMarkerUpdateRef.current.lastUpdate = performance.now();
+                
+                // Always update React state to keep elevation profile in sync
+                // This is necessary for components that depend on the hover coordinates
+                if (setHoverCoordinatesRef.current) {
+                    setHoverCoordinatesRef.current(closestPoint);
+                }
+                directMarkerUpdateRef.current.lastUpdate = performance.now();
+            }
+        } catch (error) {
+            // If direct update fails, fall back to React state update
+            logger.error('PresentationMapView', 'Error directly updating hover point:', error);
+            if (setHoverCoordinatesRef.current) {
+                setHoverCoordinatesRef.current(closestPoint);
             }
         }
+    }, 30), []); // Reduced throttle delay for smoother updates
+    
+    // Function to add hover point marker to map
+    const addHoverPointMarker = useCallback((map) => {
+        if (!map) return;
         
-        // Second pass: Fine-grained search in the best segment
-        const segmentEnd = Math.min(coordinates.length, bestSegmentStart + coarseSampleRate * 2);
-        minDistanceSq = Infinity; // Reset for second pass
-        
-        for (let i = bestSegmentStart; i < segmentEnd; i++) {
-            const coord = coordinates[i];
-            if (coord && coord.length >= 2) {
-                const dx = coord[0] - mouseCoords[0];
-                const dy = coord[1] - mouseCoords[1];
-                const distanceSq = dx * dx + dy * dy;
-
-                if (distanceSq < minDistanceSq) {
-                    minDistanceSq = distanceSq;
-                    closestPoint = [coord[0], coord[1]];
-                }
+        try {
+            // Add hover point source and layer if it doesn't exist
+            if (!map.getSource('hover-point')) {
+                map.addSource('hover-point', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [0, 0] // Initial coordinates
+                        },
+                        properties: {}
+                    }
+                });
+                
+                map.addLayer({
+                    id: 'hover-point',
+                    type: 'circle',
+                    source: 'hover-point',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#ff0000',
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-opacity': 0.8
+                    }
+                });
+                
+                // Initially hide the layer
+                map.setLayoutProperty('hover-point', 'visibility', 'none');
+                
+                logger.info('PresentationMapView', 'Added GeoJSON hover point layer');
             }
+        } catch (error) {
+            logger.error('PresentationMapView', 'Error adding GeoJSON hover point layer:', error);
         }
-
-        // Define a threshold distance (squared) - approx 1km
-        // 1km is roughly 0.009 degrees latitude, squared is ~0.000081
-        const distanceThresholdSq = 0.000081;
-
-        // Use ref to set state
-        if (closestPoint && minDistanceSq < distanceThresholdSq) {
-            if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(closestPoint);
-        } else {
-            if (setHoverCoordinatesRef.current) setHoverCoordinatesRef.current(null);
-        }
-    }, 100), []); // Reduced throttle delay for smoother updates - relies on refs
+    }, []);
     
     // Initialize map
     useEffect(() => {
@@ -550,29 +842,13 @@ export default function PresentationMapView(props) {
                     }
                 }
                 
-                // Only add WebGL tracer layer on non-mobile devices
+                // Add hover point source and layer - only on non-mobile devices
                 const isTracerMobile = window.innerWidth <= 768;
                 if (!isTracerMobile) {
-                    try {
-                        // Check if a tracer layer with this ID already exists
-                        if (!map.getLayer('tracer-layer')) {
-                            const tracerLayer = new TracerLayer();
-                            map.addLayer(tracerLayer);
-                            tracerLayerRef.current = tracerLayer;
-                            logger.info('PresentationMapView', 'Added WebGL tracer layer');
-                        } else {
-                            logger.info('PresentationMapView', 'Tracer layer already exists, reusing');
-                            // Try to get a reference to the existing tracer layer
-                            tracerLayerRef.current = map.getLayer('tracer-layer');
-                        }
-                    } catch (error) {
-                        logger.error('PresentationMapView', 'Error adding WebGL tracer layer:', error);
-                    }
+                    addHoverPointMarker(map);
                 } else {
-                    logger.info('PresentationMapView', 'Skipping WebGL tracer layer on mobile device');
-                    console.log('[PresentationMapView] ⏭️ Skipping WebGL tracer layer on mobile device');
-                    // Ensure the ref is null so we don't try to use it
-                    tracerLayerRef.current = null;
+                    logger.info('PresentationMapView', 'Skipping hover point layer on mobile device');
+                    console.log('[PresentationMapView] ⏭️ Skipping hover point layer on mobile device');
                 }
                 
             } catch (error) {
@@ -589,46 +865,35 @@ export default function PresentationMapView(props) {
             console.timeEnd(`mapInitialization-${mapId}`);
         });
         map.on('style.load', () => {
-            // When style changes, Mapbox removes all custom layers
-            // We need to reset our reference and re-add the layer
-            tracerLayerRef.current = null;
+            // When style changes, Mapbox removes all custom sources and layers
+            // We need to re-add them
             
             // Check if component is still mounted and initialization wasn't cancelled
             if (!isMounted || cancellationToken.isCancelled()) {
                 return;
             }
             
-            // Only add WebGL tracer layer on non-mobile devices
+            // Only add hover point layer on non-mobile devices
             const isTracerMobile = window.innerWidth <= 768;
             if (!isTracerMobile) {
-                try {
-                    // Check if a tracer layer with this ID already exists
-                    if (!map.getLayer('tracer-layer')) {
-                        // Create and add the WebGL tracer layer
-                        const tracerLayer = new TracerLayer();
-                        map.addLayer(tracerLayer);
-                        tracerLayerRef.current = tracerLayer;
-                        
-                        // If we have current hover coordinates, update the tracer
-                        if (hoverCoordinates) {
-                            // Use a small delay to ensure the layer is fully initialized
-                            setTimeout(() => {
-                                if (tracerLayerRef.current) {
-                                    tracerLayerRef.current.updateCoordinates(hoverCoordinates);
-                                }
-                            }, 50);
-                        }
-                        
-                        logger.info('PresentationMapView', 'Re-added WebGL tracer layer after style change');
-                    } else {
-                        logger.info('PresentationMapView', 'Tracer layer already exists after style change, skipping');
-                    }
-                } catch (error) {
-                    logger.error('PresentationMapView', 'Error re-adding WebGL tracer layer after style change:', error);
+                // Use the shared function to add the hover point marker
+                addHoverPointMarker(map);
+                
+                // If we have current hover coordinates, update the source
+                if (hoverCoordinates && map.getSource('hover-point')) {
+                    map.getSource('hover-point').setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    map.setLayoutProperty('hover-point', 'visibility', 'visible');
                 }
             } else {
-                logger.info('PresentationMapView', 'Skipping WebGL tracer layer on mobile device after style change');
-                console.log('[PresentationMapView] ⏭️ Skipping WebGL tracer layer on mobile device after style change');
+                logger.info('PresentationMapView', 'Skipping hover point layer on mobile device after style change');
+                console.log('[PresentationMapView] ⏭️ Skipping hover point layer on mobile device after style change');
             }
         });
         map.on('zoom', () => {

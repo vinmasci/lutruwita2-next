@@ -106,26 +106,26 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
         sx: {
             backgroundColor: color || '#000000',
             boxShadow: 3,
-            borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
-            zIndex: 1000,
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
-            width: '100%',
-            position: 'sticky', // Changed from fixed to sticky for better mobile behavior
+             borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+             zIndex: 1000,
+             height: '72px',      // Increased height
+             minHeight: '72px',   // Increased height
+             maxHeight: '72px',   // Increased height
+             width: '100%',
+             position: 'sticky', // Changed from fixed to sticky for better mobile behavior
             top: 0,
             left: 0,
             right: 0
         }, 
         children: 
             _jsx(Toolbar, { 
-                sx: { 
-                    display: 'flex', 
-                    justifyContent: 'space-between',
-                    minHeight: '64px',
-                    height: '64px',
-                    padding: '0 16px', // Add horizontal padding
-                    width: '100%'
+                 sx: {
+                     display: 'flex',
+                     justifyContent: 'space-between',
+                     minHeight: '72px',   // Increased height
+                     height: '72px',      // Increased height
+                     padding: '0 16px', // Add horizontal padding
+                     width: '100%'
                 },
                 children: [
                     // Left side - Empty box for spacing
@@ -150,22 +150,22 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                             // Inner content box (Title, Username) - Allow pointer events here
                             _jsxs(Box, {
                                 sx: {
-                                    pointerEvents: 'auto', // Re-enable pointer events for content
-                                    display: 'flex',
-                                    flexDirection: 'column', // Stack Title and Username vertically
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '2px',
-                                },
-                                children: [
-                                    // Container for logo and title (always row)
-                                    _jsxs(Box, {
-                                        sx: {
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px',
-                                            position: 'relative',
+                                     pointerEvents: 'auto', // Re-enable pointer events for content
+                                      display: 'flex',
+                                      flexDirection: 'column', // Stack Title and Username vertically
+                                       // alignItems: 'center', // Keep removed
+                                       // justifyContent: 'center', // Keep removed
+                                       gap: '0px', // Reduced gap to 0px
+                                   },
+                                 children: [
+                                      // Container for logo and title (always row)
+                                      _jsxs(Box, {
+                                          sx: {
+                                              display: 'flex',
+                                              alignItems: 'center', // Re-added: Align logo and title vertically on their row
+                                              justifyContent: 'center',
+                                              gap: '8px',
+                                              position: 'relative',
                                         },
                                         children: [
                                             // Logo container
@@ -181,16 +181,17 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                         _jsx(Box, {
                                                             component: "img",
                                                             src: logoUrl,
-                                                            alt: "Logo",
-                                                            sx: {
-                                                                height: 40,
-                                                                maxWidth: 120,
-                                                                objectFit: 'contain',
-                                                                marginRight: '8px',
-                                                                marginTop: '-4px',
-                                                                marginBottom: '-4px'
-                                                            },
-                                                            onError: (e) => { /* Fallback logic */ },
+                                                             alt: "Logo",
+                                                              sx: {
+                                                                  height: 48, // Reduced height slightly
+                                                                  maxWidth: 140, // Adjusted max width
+                                                                  objectFit: 'contain',
+                                                                  marginRight: '8px',
+                                                                  // Re-add margins for 48px logo in 72px header (72-48=24 -> 12px top/bottom)
+                                                                  marginTop: '-12px', 
+                                                                  marginBottom: '-12px' 
+                                                              },
+                                                             onError: (e) => { /* Fallback logic */ },
                                                             onLoad: () => { /* Success */ }
                                                         }),
 
@@ -225,11 +226,12 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                     fontFamily: 'Fraunces, serif',
                                                     fontWeight: 700,
                                                     color: '#ffffff',
-                                                    textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                                                    textShadow: '2px 2px 3px rgba(0,0,0,0.8)', // Stronger, bigger shadow
                                                     whiteSpace: 'nowrap',
-                                                    overflow: 'hidden',
+                                                    overflow: 'hidden', // Keep this, but add padding
                                                     textOverflow: 'ellipsis',
-                                                    maxWidth: '500px' // Increased to allow more text on desktop before truncation
+                                                    maxWidth: '500px', // Increased to allow more text on desktop before truncation
+                                                    padding: '5px' // Add padding to allow shadow room
                                                 },
                                                 children: title || 'Untitled Route'
                                             })
@@ -283,11 +285,13 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                         '&:hover': {
                                             backgroundColor: 'rgba(255, 255, 255, 0.1)'
                                         }
+                                        // Removed filter from IconButton
                                     },
                                     children: _jsx(Home, {
                                         size: 24,
-                                        strokeWidth: isHome ? 2 : 1,
-                                        color: '#ffffff'
+                                        strokeWidth: 2, // Make consistently thicker
+                                        color: '#ffffff',
+                                        style: { filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.7))' } // Add shadow to icon
                                     })
                                 })
                             }),
@@ -305,11 +309,13 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                         '&:hover': {
                                             backgroundColor: 'rgba(255, 255, 255, 0.1)'
                                         }
+                                        // Removed filter from IconButton
                                     },
                                     children: _jsx(Map, {
                                         size: 24,
-                                        strokeWidth: isEditor ? 2 : 1,
-                                        color: '#ffffff'
+                                        strokeWidth: 2, // Make consistently thicker
+                                        color: '#ffffff',
+                                        style: { filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.7))' } // Add shadow to icon
                                     })
                                 })
                             })

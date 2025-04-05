@@ -14,7 +14,7 @@ import { LoadDialog } from './LoadDialog';
 import { EmbedDialog } from './EmbedDialog.jsx';
 import { removeAllMapboxMarkers } from '../../utils/mapCleanup';
 
-export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine, onItemClick }) => {
+export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine, onAddMapOverview, onItemClick }) => {
     const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
     const { map } = useMapContext();
     const { clearPOIs, setPoiMode } = usePOIContext();
@@ -315,6 +315,15 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             onClick: () => {
                 onItemClick('gpx');
                 onUploadGpx();
+            }
+        },
+        {
+            id: 'mapOverview',
+            icon: SidebarIcons.actions.mapOverview,
+            text: 'Map Overview',
+            onClick: () => {
+                onItemClick('mapOverview');
+                onAddMapOverview();
             }
         },
         {

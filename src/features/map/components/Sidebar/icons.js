@@ -1,7 +1,8 @@
-import { Route, Upload, Save, FolderOpen, Camera, MapPin, Eraser, RefreshCw, Code, Settings2 } from 'lucide-react';
+import { Route, Upload, Save, FolderOpen, Camera, MapPin, Eraser, RefreshCw, Code, Settings2, FileText } from 'lucide-react';
 export const SidebarIcons = {
     actions: {
         gpx: Route,
+        mapOverview: FileText,  // New icon for Map Overview
         upload: Upload,
         save: Save,
         load: FolderOpen,

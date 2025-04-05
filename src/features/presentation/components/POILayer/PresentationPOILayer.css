@@ -148,9 +148,9 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background-color: rgba(47, 54, 64, 1) !important;
+  /* background-color removed */
   position: relative !important;
-  border-radius: 30% !important;
+  /* border-radius removed */
 }
 
 .poi-marker .poi-icon {

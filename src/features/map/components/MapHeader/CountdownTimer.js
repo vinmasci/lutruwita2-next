@@ -69,14 +69,13 @@ const CountdownTimer = ({ eventDate }) => {
   return (
     _jsxs(Box, {
       sx: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.2)',
-        borderRadius: '4px',
-        padding: '4px 8px',
-        marginLeft: { xs: '0', sm: '16px' },
-        marginTop: { xs: '4px', sm: '0' }
+         display: 'flex',
+         flexDirection: 'column',
+         alignItems: 'center',
+         // Removed backgroundColor and borderRadius to avoid double background
+         padding: '4px 8px', // Keep padding for internal spacing
+         marginLeft: { xs: '0', sm: '16px' },
+         marginTop: { xs: '4px', sm: '0' }
       },
       children: [
         _jsxs(Box, {

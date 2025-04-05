@@ -15,10 +15,7 @@ import DownloadIcon from '@mui/icons-material/Download'; // Download icon for GP
 import { downloadRouteAsGpx } from '../../../../utils/gpx/export'; // Import GPX export utility
 import { PresentationRouteDescriptionPanel } from '../RouteDescription';
 import { PresentationWeatherProfilePanel } from '../WeatherProfile';
-import { PresentationMapOverviewPanel } from '../MapOverview';
 import mapboxgl from 'mapbox-gl'; // Import mapboxgl
-import MapOverviewContextAdapter from '../EmbedMapView/components/MapOverviewContextAdapter';
-import MapOverviewLoader from '../MapOverview/MapOverviewLoader';
 import logger from '../../../../utils/logger';
 
 const ElevationPanel = styled(Box)(({ theme }) => ({
@@ -82,7 +79,7 @@ const TabButton = ({ tab, label, activeTab, onClick, isCollapsed, setIsCollapsed
 
 export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive: externalIsFlyByActive, handleFlyByClick: externalHandleFlyByClick }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [activeTab, setActiveTab] = useState('elevation'); // 'elevation' | 'description' | 'weather'
+    const [activeTab, setActiveTab] = useState('elevation'); // 'elevation' | 'description' | 'weather' (mapOverview removed)
     const [isMaximized, setIsMaximized] = useState(false);
     const [internalIsFlyByActive, setInternalIsFlyByActive] = useState(false); // Internal state for fly-by functionality
     const { map } = useMapContext();
@@ -315,14 +312,6 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                         setIsCollapsed: setIsCollapsed
                     }),
                     _jsx(TabButton, {
-                        tab: 'mapOverview',
-                        label: 'Map Overview',
-                        activeTab: activeTab,
-                        onClick: () => setActiveTab('mapOverview'),
-                        isCollapsed: isCollapsed,
-                        setIsCollapsed: setIsCollapsed
-                    }),
-                    _jsx(TabButton, {
                         tab: 'description',
                         label: 'Description',
                         activeTab: activeTab,
@@ -446,12 +435,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                     ? route && _jsx(PresentationRouteDescriptionPanel, { route: route, key: "description" })
                     : activeTab === 'weather'
                     ? route && _jsx(PresentationWeatherProfilePanel, { route: route, key: "weather" })
-                    : _jsxs(MapOverviewContextAdapter, { 
-                        children: [
-                          _jsx(MapOverviewLoader, {}),
-                          _jsx(PresentationMapOverviewPanel, { key: "mapOverview" })
-                        ]
-                      })
+                    : null
             })
         ] 
     });

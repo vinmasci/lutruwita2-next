@@ -24,17 +24,18 @@ export const StyledDrawer = styled(Drawer)({
         }
     }
 });
-export const NestedDrawer = styled(Drawer)(({ theme }) => {
+export const NestedDrawer = styled(Drawer)(({ theme, customWidth }) => {
     return {
-        width: theme.breakpoints.values.sm ? '264px' : '100%',
+        width: customWidth || (theme.breakpoints.values.sm ? '264px' : '100%'),
         flexShrink: 0,
         whiteSpace: 'nowrap',
         position: 'absolute',
         top: '64px', // Position below the header
         height: 'calc(100% - 64px)', // Adjust height to account for header
         '& .MuiDrawer-paper': {
-            width: theme.breakpoints.values.sm ? '264px' : '100%',
-            backgroundColor: '#1a1a1a',
+            width: customWidth || (theme.breakpoints.values.sm ? '264px' : '100%'),
+            backgroundColor: 'rgba(26, 26, 26, 0.9)', // Added transparency (0.9 alpha)
+            backdropFilter: 'blur(5px)', // Optional: adds a slight blur effect behind
             borderRight: '1px solid #333',
             color: '#ffffff',
             overflowX: 'hidden',

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import { useState, lazy, Suspense } from 'react';
+import { Box, Typography, CircularProgress } from '@mui/material';
 import { 
   List, ListItem, ListItemButton, ListItemIcon, ListItemText, 
   Tooltip, Divider, IconButton 
@@ -10,11 +10,14 @@ import { calculateElevationGained, calculateElevationLost } from '../utils/eleva
 import { 
   ListOrdered, Camera, CameraOff, Ruler, AlertTriangle, 
   Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight,
-  Settings2, Eye, EyeOff, PowerOff, CirclePower, Map
+  Settings2, Eye, EyeOff, PowerOff, CirclePower, Map, FileText, ChevronLeft
 } from 'lucide-react';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import { StyledDrawer, NestedDrawer } from '../../PresentationSidebar/PresentationSidebar.styles';
+
+// Lazy-load the Map Overview drawer component
+const LazyMapOverviewDrawer = lazy(() => import('../../../MapOverview/PresentationMapOverviewDrawer'));
 
 // Enhanced sidebar component that mimics PresentationSidebar without using contexts
 const EmbedSidebar = ({ 
@@ -37,6 +40,7 @@ const EmbedSidebar = ({
   map
 }) => {
   const [isNestedOpen, setIsNestedOpen] = useState(true);
+  const [isMapOverviewOpen, setIsMapOverviewOpen] = useState(false);
   const [allComponentsDisabled, setAllComponentsDisabled] = useState(false);
   const [previouslyVisiblePOICategories, setPreviouslyVisiblePOICategories] = useState([]);
   
@@ -187,17 +191,49 @@ const EmbedSidebar = ({
           {/* Routes icon at the very top */}
           <Tooltip title="Routes" placement="right">
             <ListItemButton
-              onClick={() => setIsNestedOpen(!isNestedOpen)}
+              onClick={() => {
+                // Close map overview drawer if it's open
+                if (isMapOverviewOpen) {
+                  setIsMapOverviewOpen(false);
+                }
+                // Toggle routes drawer
+                setIsNestedOpen(!isNestedOpen);
+              }}
               data-active={isNestedOpen}
               sx={{
                 ...listItemButtonStyle,
                 '&[data-active="true"] .MuiListItemIcon-root svg': {
-                  color: '#2196f3' // Changed from #4caf50 (green) to #2196f3 (Material UI info blue)
+                  color: 'white' // Changed from blue to white
                 }
               }}
             >
               <ListItemIcon>
-                <ListOrdered />
+                {isNestedOpen ? _jsx(ChevronLeft, { color: "white" }) : _jsx(ListOrdered, { color: "white" })}
+              </ListItemIcon>
+            </ListItemButton>
+          </Tooltip>
+          
+          {/* Add Map Overview icon below Routes icon */}
+          <Tooltip title="Map Overview" placement="right">
+            <ListItemButton
+              onClick={() => {
+                // Close route list drawer if it's open
+                if (isNestedOpen) {
+                  setIsNestedOpen(false);
+                }
+                // Toggle map overview drawer
+                setIsMapOverviewOpen(!isMapOverviewOpen);
+              }}
+              data-active={isMapOverviewOpen}
+              sx={{
+                ...listItemButtonStyle,
+                '&[data-active="true"] .MuiListItemIcon-root svg': {
+                  color: 'white'
+                }
+              }}
+            >
+              <ListItemIcon>
+                {isMapOverviewOpen ? _jsx(ChevronLeft, { color: "white" }) : _jsx(FileText, { color: "white" })}
               </ListItemIcon>
             </ListItemButton>
           </Tooltip>
@@ -380,6 +416,28 @@ const EmbedSidebar = ({
           </Tooltip>
         </List>
       </StyledDrawer>
+      
+      {/* Add Map Overview drawer */}
+      <NestedDrawer
+        variant="persistent"
+        anchor="left"
+        open={isMapOverviewOpen}
+        customWidth={528} // Double width (264*2) for Map Overview to match creation mode
+        sx={{
+          '& .MuiDrawer-paper': {
+            top: '64px', // Position below the header
+            height: 'calc(100% - 64px)', // Adjust height to account for header
+            marginLeft: '56px', // Account for the sidebar width
+            paddingTop: '0px', // Remove any top padding
+            backgroundColor: 'rgba(26, 26, 26, 0.6)', // Increased transparency (0.6 alpha)
+            backdropFilter: 'blur(3px)' // Reduced blur effect
+          }
+        }}
+      >
+        <Suspense fallback={<CircularProgress />}>
+          <LazyMapOverviewDrawer />
+        </Suspense>
+      </NestedDrawer>
       
       {/* Nested drawer for routes list */}
       <NestedDrawer

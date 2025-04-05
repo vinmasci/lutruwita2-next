@@ -12,8 +12,9 @@ import { normalizeRoute } from '../../utils/routeUtils';
 // Lazy load components
 const LazyUploader = lazy(() => import('../../../gpx/components/Uploader/Uploader'));
 const LazyPhotoUploader = lazy(() => import('../../../photo/components/Uploader/PhotoUploader'));
+const LazyMapOverviewDrawer = lazy(() => import('../../../presentation/components/MapOverview/MapOverviewDrawer'));
 export const Sidebar = (props) => {
-    const { isDrawerOpen, activeDrawer, handleUploadGpx, handleAddPOI, handleAddPhotos, handleAddLine } = useSidebar(props);
+    const { isDrawerOpen, activeDrawer, handleUploadGpx, handleAddPOI, handleAddPhotos, handleAddLine, handleAddMapOverview } = useSidebar(props);
     const { addPhoto, deletePhoto } = usePhotoContext();
     const handleUploadComplete = async (result) => {
         // Normalize the route before passing it to MapView
@@ -27,6 +28,8 @@ export const Sidebar = (props) => {
                 return (_jsx(Suspense, { fallback: _jsx(Box, { sx: { p: 2, display: 'flex', justifyContent: 'center' }, children: _jsx(CircularProgress, {}) }), children: _jsx(LazyUploader, { onUploadComplete: handleUploadComplete, onDeleteRoute: props.onDeleteRoute }) }));
             case 'photos':
                 return (_jsx(Suspense, { fallback: _jsx(Box, { sx: { p: 2, display: 'flex', justifyContent: 'center' }, children: _jsx(CircularProgress, {}) }), children: _jsx(LazyPhotoUploader, { onUploadComplete: addPhoto, onDeletePhoto: deletePhoto }) }));
+            case 'mapOverview':
+                return (_jsx(Suspense, { fallback: _jsx(Box, { sx: { p: 2, display: 'flex', justifyContent: 'center' }, children: _jsx(CircularProgress, {}) }), children: _jsx(LazyMapOverviewDrawer, {}) }));
             case 'poi':
                 return null; // POI drawer is handled by NestedDrawer
             default:
@@ -38,11 +41,13 @@ export const Sidebar = (props) => {
         onUploadGpx: () => handleUploadGpx(), 
         onAddPOI: () => handleAddPOI(), 
         onAddPhotos: () => handleAddPhotos(),
-        onAddLine: () => handleAddLine()
+        onAddLine: () => handleAddLine(),
+        onAddMapOverview: () => handleAddMapOverview()
     }), _jsx(Auth0Login, {})] }) }), _jsxs(_Fragment, { children: [_jsx(NestedDrawer, { 
                         variant: "persistent", 
                         anchor: "left", 
-                        open: isDrawerOpen, 
+                        open: isDrawerOpen,
+                        customWidth: activeDrawer === 'mapOverview' ? 528 : undefined, // Double width (264*2) for Map Overview
                         onClose: () => {
                             switch (activeDrawer) {
                                 case 'gpx':
@@ -56,6 +61,9 @@ export const Sidebar = (props) => {
                                     break;
                                 case 'line':
                                     handleAddLine();
+                                    break;
+                                case 'mapOverview':
+                                    handleAddMapOverview();
                                     break;
                             }
                         },

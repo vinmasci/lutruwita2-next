@@ -86,12 +86,15 @@ const DirectEmbedLineLayer = ({ map, lines = [] }) => {
       try {
         // 1. Get state from coordinates
         const stateName = await getStateFromCoords(line.coordinates.start[1], line.coordinates.start[0]);
-        console.log('[DirectEmbedLineLayer] Fetched state:', stateName);
-        
-        // 2. Fetch Wikipedia summary using name and state
-        const wikiResult = await fetchWikipediaSummary(line.name, stateName);
+         console.log('[DirectEmbedLineLayer] Fetched state:', stateName);
 
-        console.log('[DirectEmbedLineLayer] Wikipedia info fetched. fetchId:', fetchId, 'currentFetchId:', currentFetchIdRef.current);
+         // Clean the line name to remove trailing parentheses content
+         const cleanedName = line.name.replace(/\s*\([^)]*\)$/, '').trim();
+         
+         // 2. Fetch Wikipedia summary using cleaned name and state
+         const wikiResult = await fetchWikipediaSummary(cleanedName, stateName);
+
+         console.log('[DirectEmbedLineLayer] Wikipedia info fetched. fetchId:', fetchId, 'currentFetchId:', currentFetchIdRef.current);
         console.log('[DirectEmbedLineLayer] Data before state update:', { wikiResult });
 
         // Only update state if this is still the most recent fetch request

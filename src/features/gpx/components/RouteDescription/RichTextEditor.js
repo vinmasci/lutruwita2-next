@@ -9,6 +9,7 @@ import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
+import HardBreak from '@tiptap/extension-hard-break';
 import { Box, IconButton, Divider, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button } from '@mui/material';
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
 import FormatItalicIcon from '@mui/icons-material/FormatItalic';
@@ -19,6 +20,7 @@ import TitleIcon from '@mui/icons-material/Title';
 import LinkIcon from '@mui/icons-material/Link';
 import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
 import BorderColorIcon from '@mui/icons-material/BorderColor';
+import KeyboardReturnIcon from '@mui/icons-material/KeyboardReturn';
 
 const BACKGROUND_COLOR = 'rgba(26, 26, 26, 0.9)';
 const EDITOR_BACKGROUND = 'rgb(35, 35, 35)';
@@ -41,7 +43,7 @@ const highlightColors = {
     'Yellow': '#ffeb3b'
 };
 
-export const RichTextEditor = ({ value, onChange, onEditorReady }) => {
+export const RichTextEditor = ({ value, onChange, onEditorReady, placeholder = 'Enter description...' }) => {
     const [textColorMenuAnchor, setTextColorMenuAnchor] = useState(null);
     const [highlightMenuAnchor, setHighlightMenuAnchor] = useState(null);
     const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -76,8 +78,13 @@ export const RichTextEditor = ({ value, onChange, onEditorReady }) => {
                 multicolor: true
             }),
             Placeholder.configure({
-                placeholder: 'Enter description...',
+                placeholder,
                 showOnlyWhenEditable: true
+            }),
+            HardBreak.configure({
+                HTMLAttributes: {
+                    class: 'line-break'
+                }
             })
         ],
         content: value || '',
@@ -312,6 +319,18 @@ export const RichTextEditor = ({ value, onChange, onEditorReady }) => {
                                     }
                                 },
                                 children: _jsx(BorderColorIcon, { fontSize: "small" })
+                            }),
+                            _jsx(IconButton, {
+                                size: "small",
+                                onClick: () => editor.chain().focus().setHardBreak().run(),
+                                title: "Insert Line Break",
+                                sx: {
+                                    color: 'white',
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(33, 150, 243, 0.1)'
+                                    }
+                                },
+                                children: _jsx(KeyboardReturnIcon, { fontSize: "small" })
                             })
                         ]
                     })

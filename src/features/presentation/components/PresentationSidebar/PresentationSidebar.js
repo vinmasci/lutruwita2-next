@@ -1,25 +1,31 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, Suspense, useEffect } from 'react';
+import { useState, Suspense, useEffect, lazy } from 'react';
 import { List, ListItem, ListItemButton, ListItemIcon, ListItemText, Box, Typography, IconButton, CircularProgress, Tooltip, Divider } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
+import { getMapOverviewData } from '../../../presentation/store/mapOverviewStore';
 import { useRouteState } from '../../../map/hooks/useRouteState';
 import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { ErrorBoundary } from '../../../../components/ErrorBoundary';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight, Ruler, Settings2, Eye, EyeOff, PowerOff, CirclePower, Map } from 'lucide-react';
+import { ListOrdered, Camera, CameraOff, AlertTriangle, Tent, Coffee, Mountain, Building, Bus, MapPinCheck, FlagTriangleRight, Ruler, Settings2, Eye, EyeOff, PowerOff, CirclePower, Map, FileText, ChevronLeft } from 'lucide-react';
 import { StyledDrawer, NestedDrawer } from './PresentationSidebar.styles';
+
+// Lazy-load the Map Overview drawer component
+const LazyMapOverviewDrawer = lazy(() => import('../MapOverview/PresentationMapOverviewDrawer'));
 
 export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDistanceMarkersVisibility, isClimbFlagsVisible, toggleClimbFlagsVisibility, isLineMarkersVisible, toggleLineMarkersVisibility }) => {
     const { routes, currentRoute, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
     const { loadPOIsFromRoute, visibleCategories, toggleCategoryVisibility } = usePOIContext();
     const { addPhoto, isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
+    const mapOverview = getMapOverviewData();
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
     const [isNestedOpen, setIsNestedOpen] = useState(true);
+    const [isMapOverviewOpen, setIsMapOverviewOpen] = useState(false);
     const [allComponentsDisabled, setAllComponentsDisabled] = useState(false);
     const [previouslyVisibleCategories, setPreviouslyVisibleCategories] = useState([]);
     const currentIndex = routes.findIndex(route => route.id === currentRoute?.id);
@@ -99,17 +105,58 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         placement: "right", 
                         children: _jsx(ListItemButton, { 
                             onClick: () => {
+                                // Close map overview drawer if it's open
+                                if (isMapOverviewOpen) {
+                                    setIsMapOverviewOpen(false);
+                                }
+                                // Toggle routes drawer
                                 setIsNestedOpen(!isNestedOpen);
                             },
                             'data-active': isNestedOpen,
                             sx: {
                                 ...listItemButtonStyle,
                                 '&[data-active="true"] .MuiListItemIcon-root svg': {
-                                    color: '#2196f3' // Changed from #4caf50 (green) to #2196f3 (Material UI info blue)
+                                    color: 'white' // Changed from blue to white
                                 }
                             }, 
                             children: _jsx(ListItemIcon, { 
-                                children: _jsx(ListOrdered, {}) 
+                                children: isNestedOpen ? _jsx(ChevronLeft, { color: "white" }) : _jsx(ListOrdered, { color: "white" }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    // Add Map Overview icon below Routes icon - disabled if no map overview data
+                    _jsx(Tooltip, { 
+                        title: mapOverview?.description ? "Map Overview" : "No Map Overview Available", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: () => {
+                                // Only toggle if there's map overview data
+                                if (mapOverview?.description) {
+                                    // Close route list drawer if it's open
+                                    if (isNestedOpen) {
+                                        setIsNestedOpen(false);
+                                    }
+                                    // Toggle map overview drawer
+                                    setIsMapOverviewOpen(!isMapOverviewOpen);
+                                }
+                            },
+                            'data-active': isMapOverviewOpen,
+                            disabled: !mapOverview?.description,
+                            sx: {
+                                ...listItemButtonStyle,
+                                '&[data-active="true"] .MuiListItemIcon-root svg': {
+                                    color: 'white'
+                                },
+                                '&.Mui-disabled': {
+                                    opacity: 0.5,
+                                    cursor: 'not-allowed'
+                                }
+                            }, 
+                            children: _jsx(ListItemIcon, { 
+                                children: isMapOverviewOpen ? 
+                                    _jsx(ChevronLeft, { color: "white" }) : 
+                                    _jsx(FileText, { color: mapOverview?.description ? "white" : "rgba(255, 255, 255, 0.3)" }) 
                             }) 
                         }) 
                     }),
@@ -323,6 +370,29 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                 ] 
             }) 
         }),
+        // Add Map Overview drawer
+        _jsx(NestedDrawer, {
+            variant: "persistent",
+            anchor: "left",
+            open: isMapOverviewOpen,
+            customWidth: 528, // Double width (264*2) for Map Overview to match creation mode
+            sx: {
+                '& .MuiDrawer-paper': {
+                    top: '64px', // Position below the header
+                    height: 'calc(100% - 64px)', // Adjust height to account for header
+                    marginLeft: '56px', // Account for the sidebar width
+                    paddingTop: '0px', // Remove any top padding
+                    backgroundColor: 'rgba(26, 26, 26, 0.6)', // Increased transparency (0.6 alpha)
+                    backdropFilter: 'blur(3px)' // Reduced blur effect
+                }
+            },
+            children: _jsx(Suspense, {
+                fallback: _jsx(CircularProgress, {}),
+                children: _jsx(LazyMapOverviewDrawer, {})
+            })
+        }),
+        
+        // Routes drawer
         _jsx(NestedDrawer, { 
             variant: "persistent", 
             anchor: "left", 

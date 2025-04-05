@@ -79,6 +79,17 @@ export const useSidebar = (props) => {
             props.onAddPOI();
         }
     };
+
+    const handleAddMapOverview = () => {
+        if (activeDrawer === 'mapOverview') {
+            setIsDrawerOpen(false);
+            setActiveDrawer(null);
+        } else {
+            setIsDrawerOpen(true);
+            setActiveDrawer('mapOverview');
+            props.onItemClick('mapOverview');
+        }
+    };
     return {
         isDrawerOpen,
         activeDrawer,
@@ -92,6 +103,7 @@ export const useSidebar = (props) => {
         handleAddPOI,
         handleAddPhotos,
         handleAddLine,
+        handleAddMapOverview,
         stopDrawing
     };
 };

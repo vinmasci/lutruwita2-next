@@ -1,15 +1,15 @@
 import { styled } from '@mui/material/styles';
 import MuiDrawer from '@mui/material/Drawer';
-export const NestedDrawer = styled(MuiDrawer)(({ theme }) => ({
+export const NestedDrawer = styled(MuiDrawer)(({ theme, customWidth }) => ({
     position: 'absolute',
     left: 0,
     top: 64, // Add top position to account for header height
-    width: 264,
+    width: customWidth || 264,
     flexShrink: 0,
     zIndex: 100,
     height: 'calc(100% - 64px)', // Adjust height to account for header
     '& .MuiDrawer-paper': {
-        width: 264,
+        width: customWidth || 264,
         backgroundColor: 'rgb(35, 35, 35)',
         borderLeft: '1px solid #333',
         color: '#ffffff',
