@@ -17,7 +17,7 @@ import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import { StyledDrawer, NestedDrawer } from '../../PresentationSidebar/PresentationSidebar.styles';
 
 // Lazy-load the Map Overview drawer component
-const LazyMapOverviewDrawer = lazy(() => import('../../../MapOverview/PresentationMapOverviewDrawer.jsx'));
+const LazyMapOverviewDrawer = lazy(() => import('../../MapOverview/PresentationMapOverviewDrawer.jsx'));
 
 // Enhanced sidebar component that mimics PresentationSidebar without using contexts
 const EmbedSidebar = ({ 
