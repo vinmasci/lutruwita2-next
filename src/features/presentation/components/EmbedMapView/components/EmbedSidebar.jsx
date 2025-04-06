@@ -208,7 +208,7 @@ const EmbedSidebar = ({
               }}
             >
               <ListItemIcon>
-                {isNestedOpen ? _jsx(ChevronLeft, { color: "white" }) : _jsx(ListOrdered, { color: "white" })}
+                {isNestedOpen ? <ChevronLeft color="white" /> : <ListOrdered color="white" />}
               </ListItemIcon>
             </ListItemButton>
           </Tooltip>
@@ -233,7 +233,7 @@ const EmbedSidebar = ({
               }}
             >
               <ListItemIcon>
-                {isMapOverviewOpen ? _jsx(ChevronLeft, { color: "white" }) : _jsx(FileText, { color: "white" })}
+                {isMapOverviewOpen ? <ChevronLeft color="white" /> : <FileText color="white" />}
               </ListItemIcon>
             </ListItemButton>
           </Tooltip>

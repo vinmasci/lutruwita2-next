@@ -1187,26 +1187,28 @@ export default function EmbedMapView() {
                 <FloatingCountdownTimer eventDate={routeData.eventDate} />
             )}
             
-            {/* Add the EmbedSidebar */}
-            <EmbedSidebar 
-                isOpen={true} 
-                isDistanceMarkersVisible={isDistanceMarkersVisible}
-                toggleDistanceMarkersVisibility={toggleDistanceMarkersVisibility}
-                routeData={routeData}
-                currentRoute={currentRoute}
-                setCurrentRoute={setCurrentRoute}
-                isPhotosVisible={isPhotosVisible}
-                togglePhotosVisibility={togglePhotosVisibility}
-                isClimbFlagsVisible={isClimbFlagsVisible}
-                toggleClimbFlagsVisibility={toggleClimbFlagsVisibility}
-                isLineMarkersVisible={isLineMarkersVisible}
-                toggleLineMarkersVisibility={toggleLineMarkersVisibility}
-                visiblePOICategories={visiblePOICategories}
-                togglePOICategoryVisibility={togglePOICategoryVisibility}
-                routeVisibility={routeVisibility}
-                toggleRouteVisibility={toggleRouteVisibility}
-                map={mapInstance.current}
-            />
+            {/* Add the EmbedSidebar, wrapped in adapter */}
+            <RouteContextAdapter>
+                <EmbedSidebar 
+                    isOpen={true} 
+                    isDistanceMarkersVisible={isDistanceMarkersVisible}
+                    toggleDistanceMarkersVisibility={toggleDistanceMarkersVisibility}
+                    routeData={routeData}
+                    currentRoute={currentRoute}
+                    setCurrentRoute={setCurrentRoute}
+                    isPhotosVisible={isPhotosVisible}
+                    togglePhotosVisibility={togglePhotosVisibility}
+                    isClimbFlagsVisible={isClimbFlagsVisible}
+                    toggleClimbFlagsVisibility={toggleClimbFlagsVisibility}
+                    isLineMarkersVisible={isLineMarkersVisible}
+                    toggleLineMarkersVisibility={toggleLineMarkersVisibility}
+                    visiblePOICategories={visiblePOICategories}
+                    togglePOICategoryVisibility={togglePOICategoryVisibility}
+                    routeVisibility={routeVisibility}
+                    toggleRouteVisibility={toggleRouteVisibility}
+                    map={mapInstance.current}
+                />
+            </RouteContextAdapter>
             
             {/* Map area */}
             <div className="embed-map-area">

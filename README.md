@@ -22,7 +22,7 @@ A web application for visualizing and sharing hiking routes in Tasmania.
 - Redis
 - Auth0 account
 - Mapbox account
-- Digital Ocean account (for production deployment)
+- Vercel CLI (for local development and deployment)
 
 ### Local Development Setup
 
@@ -34,57 +34,65 @@ A web application for visualizing and sharing hiking routes in Tasmania.
 
 2. Set up environment variables:
    ```bash
-   # Copy environment templates
-   cp docs/ENV_VARIABLES.template.md docs/ENV_VARIABLES.md
-   cp docs/DEPLOYMENT.template.md docs/DEPLOYMENT.md
-   
-   # Create local env files
-   cp .env.production.template .env.local
-   cd server && cp .env.local.template .env
+   # Create local env file for the frontend
+   cp .env.vercel.template .env.local 
+   # Note: Vercel CLI (`vercel dev`) might require additional environment setup 
+   # depending on your Vercel project configuration (e.g., linked project env variables).
+   # Populate .env.local with your local development keys (Mapbox, Auth0, MongoDB connection string, etc.)
    ```
-   
-   See [docs/SENSITIVE_DOCS.md](docs/SENSITIVE_DOCS.md) for details on handling sensitive configuration files.
 
 3. Install dependencies:
    ```bash
+   # Install root dependencies (frontend)
    npm install
-   cd server && npm install
+   
+   # Install API dependencies
+   cd api && npm install
+   cd .. 
    ```
 
 4. Start development servers:
    ```bash
-   # In one terminal
-   npm run dev
-   
-   # In another terminal
-   cd server && npm run dev
+   # Run frontend and API functions locally using Vercel CLI
+   vercel dev 
+   # Or run frontend separately if needed: npm run dev
    ```
 
 The application will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8080
+- Frontend: http://localhost:3000 (or the port specified by `vercel dev`)
+- Backend API: Served by `vercel dev` under the `/api` path (e.g., http://localhost:3000/api/routes)
 
-### Production Deployment
+### Production Deployment (Vercel)
 
-For Digital Ocean deployment, see [docs/DEPLOYMENT.template.md](docs/DEPLOYMENT.template.md) for detailed instructions.
-
-For Vercel deployment, see [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md) and [docs/VERCEL_MIGRATION_MASTERPLAN.md](docs/VERCEL_MIGRATION_MASTERPLAN.md) for the serverless migration process.
+Deployment is handled via Vercel. Connect your Git repository to a Vercel project. See [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md) for more details if available.
 
 ## Project Structure
 
 ```
 .
-├── docs/               # Project documentation
-├── public/            # Static assets
-├── server/            # Backend server
-│   ├── src/           # Server source code
-│   └── package.json   # Server dependencies
-├── src/               # Frontend source code
-│   ├── components/    # React components
-│   ├── features/      # Feature modules
-│   ├── lib/           # Shared utilities
-│   └── types/         # TypeScript types
-└── package.json       # Frontend dependencies
+├── api/               # Vercel Serverless Functions (Backend)
+│   ├── gpx/
+│   ├── health/
+│   ├── lib/
+│   ├── models/
+│   ├── photos/
+│   ├── poi/
+│   ├── routes/
+│   ├── user/
+│   └── package.json   # API dependencies
+├── docs/              # Project documentation
+├── public/            # Static assets served by Vite
+├── src/               # Frontend source code (React/Vite)
+│   ├── components/    # Reusable UI components
+│   ├── features/      # Feature modules (map, poi, photo, etc.)
+│   ├── lib/           # Shared utilities/libraries
+│   ├── types/         # TypeScript types
+│   └── App.jsx        # Main application component
+│   └── main.jsx       # Entry point
+├── .env.local         # Local environment variables for frontend
+├── package.json       # Frontend dependencies and scripts
+├── vercel.json        # Vercel deployment configuration
+└── vite.config.ts     # Vite configuration
 ```
 
 ## Contributing
@@ -98,8 +106,7 @@ For Vercel deployment, see [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md
 - Never commit sensitive information or credentials
 - Store all secrets in environment variables
 - Use GitHub Secrets for CI/CD credentials
-- See [docs/SENSITIVE_DOCS.md](docs/SENSITIVE_DOCS.md) for handling sensitive documentation
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+(Specify License if applicable)

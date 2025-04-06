@@ -18,18 +18,25 @@ This approach ensures:
 
 ## Project Structure
 
-The application follows a feature-based architecture, with clear separation between client and server code. Each feature is self-contained with its own components, services, types, and utilities.
-
-For a detailed breakdown of the project structure, including descriptions of all directories and key files, please refer to [DIR.md](./DIR.md).
+The application follows a feature-based architecture, with clear separation between the frontend (React/Vite) and the backend (Vercel Serverless Functions). Each feature is self-contained where possible, with its own components, services, types, and utilities within the `src/` (frontend) and `api/` (backend) directories.
 
 Here's a high-level overview of the main directories:
 ```
 /
-├── src/                    # Client-side code with feature modules
-├── server/                 # Server-side code with feature modules
+├── src/                    # Frontend source code (React/Vite)
+│   ├── components/         # Reusable UI components
+│   ├── features/           # Feature modules (map, poi, photo, etc.)
+│   ├── lib/                # Shared utilities/libraries
+│   └── ...
+├── api/                    # Backend Vercel Serverless Functions
+│   ├── gpx/
+│   ├── photos/
+│   ├── poi/
+│   ├── routes/
+│   └── ...
 ├── docs/                   # Project documentation
-├── public/                 # Static assets
-└── uploads/                # Temporary file storage
+├── public/                 # Static assets served by Vite
+└── ...                     # Configuration files (package.json, vercel.json, etc.)
 ```
 
 ## Core Features
@@ -74,9 +81,9 @@ The application is split into two main modes:
   - Uploader for GPX file handling
   - ElevationProfile for elevation visualization
   - Route display on map
-- Server-side processing:
+- Backend processing (in `api/gpx` function):
   - File validation and parsing
-  - Progress tracking via SSE
+  # TODO: Add details on progress tracking if applicable
   - Map matching service integration
   - Surface type detection
 
@@ -128,27 +135,26 @@ The application uses React Context for state management, with separate contexts 
 - POIs (POIContext)
 - Photos (PhotoContext)
 
-## Server Architecture
+## Backend Architecture (Vercel Serverless Functions)
+
+The backend logic is implemented as Vercel Serverless Functions located in the `api/` directory. Each function typically handles a specific feature or endpoint (e.g., `api/routes`, `api/photos`).
 
 ### API Structure
-- Feature-based routing
-- Middleware for:
-  - Authentication (for editing endpoints)
-  - File uploads
-  - Route validation
-  - Error handling
-- Public endpoints for map viewing
+- Routing is defined in `vercel.json` and maps URL paths to specific serverless function files (e.g., `/api/routes` maps to `api/routes/index.js`).
+- Middleware-like logic (authentication checks, validation) is generally handled within each function handler or potentially using Vercel Edge Middleware (if configured).
+- Public vs. private endpoints are controlled by authentication checks within the relevant function handlers.
 
 ### Data Processing
-- GPX processing with progress tracking
-- Photo storage and optimization
-- POI data management
-- Route saving/loading
+- Serverless functions handle tasks like:
+  - GPX processing
+  - Photo storage interaction (e.g., S3 pre-signed URLs, Cloudinary)
+  - POI data management (database interactions)
+  - Route saving/loading (database interactions)
+- Functions are stateless and rely on external services (Database, Cache, Storage) for persistence.
 
 ### Type Safety
-- Shared type definitions between client/server
-- Strict validation middleware
-- Error type definitions
+- Shared type definitions between frontend (`src/types`) and backend (`api/lib/types` or similar) can help maintain consistency, although they might need careful management.
+- Input validation within each function handler is crucial.
 
 ## Development Tools
 
