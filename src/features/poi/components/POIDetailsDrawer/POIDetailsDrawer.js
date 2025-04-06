@@ -1,6 +1,6 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, ButtonBase, IconButton, Tooltip, CircularProgress, Rating, Link, Divider } from '@mui/material';
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { useState, useEffect, useCallback } from 'react';
+import { TextField, Button, Box, Typography, ButtonBase, IconButton, Tooltip, CircularProgress, Rating, Link, Divider, List, ListItem, ListItemText, ListItemIcon } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ClearIcon from '@mui/icons-material/Clear';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -27,8 +27,8 @@ const debounce = (func, delay) => {
     };
 };
 
-const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
-    const { processGooglePlacesLink } = usePOIContext();
+const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, onSave }) => {
+    const { processGooglePlacesLink, searchPlaces } = usePOIContext();
     // Get the icon definition for default name
     const iconDef = getIconDefinition(iconName);
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
@@ -43,6 +43,11 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
     const [photos, setPhotos] = useState([]);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     
+    // State for auto-search
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchError, setSearchError] = useState(null);
+    
     // Reset form when drawer opens with new POI
     useEffect(() => {
         if (isOpen) {
@@ -53,8 +58,76 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
             setIsProcessingLink(false);
             setLinkError(null);
             setPhotos([]);
+            setSearchResults([]);
+            setIsSearching(false);
+            setSearchError(null);
         }
     }, [isOpen, iconDef]);
+    
+    // Auto-search for places when name changes
+    const searchForPlaces = useCallback(async (searchName) => {
+        if (!searchName || searchName.trim() === '' || !isOpen) {
+            setSearchResults([]);
+            return;
+        }
+        
+        // Don't search if the name is just the default icon label
+        if (searchName === iconDef?.label) {
+            setSearchResults([]);
+            return;
+        }
+        
+        setIsSearching(true);
+        setSearchError(null);
+        
+        try {
+            // We need coordinates to search
+            if (!coordinates) {
+                console.warn('[POIDetailsDrawer] Cannot search without coordinates');
+                setSearchError('Cannot search without coordinates');
+                setIsSearching(false);
+                return;
+            }
+            
+            const results = await searchPlaces(searchName, coordinates);
+            setSearchResults(results);
+        } catch (error) {
+            console.error('[POIDetailsDrawer] Error searching for places:', error);
+            setSearchError('Error searching for places');
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [isOpen, iconDef?.label, coordinates, searchPlaces]);
+    
+    // Debounced version of searchForPlaces
+    const debouncedSearch = useCallback(debounce(searchForPlaces, 800), [searchForPlaces]);
+    
+    // Trigger search when name changes
+    useEffect(() => {
+        if (isOpen && name && name.trim() !== '') {
+            debouncedSearch(name);
+        } else {
+            setSearchResults([]);
+        }
+    }, [isOpen, name, debouncedSearch]);
+    
+    // Handle place selection from search results
+    const handleSelectPlace = async (place) => {
+        if (!place || !place.placeId) return;
+        
+        // Set the name from the selected place
+        setName(place.name);
+        
+        // Set the Google Places link
+        setGooglePlacesLink(place.url);
+        
+        // Process the link to get place details
+        await processLink(place.url);
+        
+        // Clear search results after selection
+        setSearchResults([]);
+    };
     
     // Process Google Places link when it changes
     const processLink = async (link) => {
@@ -189,34 +262,122 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, onSave }) => {
                                             })
                                         ] 
                                     }), 
-                                    _jsx(TextField, { 
-                                        label: "Name", 
-                                        value: name, 
-                                        onChange: (e) => setName(e.target.value), 
-                                        fullWidth: true, 
-                                        variant: "outlined", 
-                                        size: "small", 
-                                        sx: {
-                                            backgroundColor: 'rgb(35, 35, 35)',
-                                            '& .MuiOutlinedInput-root': {
-                                                '& fieldset': {
-                                                    borderColor: 'rgb(255, 255, 255)',
-                                                },
-                                                '&:hover fieldset': {
-                                                    borderColor: 'rgb(255, 255, 255)',
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: 'rgb(255, 255, 255)',
-                                                }
-                                            },
-                                            '& .MuiInputLabel-root': {
-                                                color: 'rgb(255, 255, 255)'
-                                            },
-                                            '& .MuiOutlinedInput-input': {
-                                                color: 'rgb(255, 255, 255)'
-                                            }
-                                        } 
-                                    }), 
+                                    _jsxs(Box, {
+                                        sx: { position: 'relative' },
+                                        children: [
+                                            _jsx(TextField, { 
+                                                label: "Name", 
+                                                value: name, 
+                                                onChange: (e) => setName(e.target.value), 
+                                                fullWidth: true, 
+                                                variant: "outlined", 
+                                                size: "small", 
+                                                sx: {
+                                                    backgroundColor: 'rgb(35, 35, 35)',
+                                                    '& .MuiOutlinedInput-root': {
+                                                        '& fieldset': {
+                                                            borderColor: 'rgb(255, 255, 255)',
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: 'rgb(255, 255, 255)',
+                                                        },
+                                                        '&.Mui-focused fieldset': {
+                                                            borderColor: 'rgb(255, 255, 255)',
+                                                        }
+                                                    },
+                                                    '& .MuiInputLabel-root': {
+                                                        color: 'rgb(255, 255, 255)'
+                                                    },
+                                                    '& .MuiOutlinedInput-input': {
+                                                        color: 'rgb(255, 255, 255)'
+                                                    }
+                                                } 
+                                            }),
+                                            isSearching && (
+                                                _jsx(CircularProgress, {
+                                                    size: 20,
+                                                    sx: {
+                                                        position: 'absolute',
+                                                        right: 12,
+                                                        top: 12,
+                                                        color: 'white'
+                                                    }
+                                                })
+                                            ),
+                                            
+                                            // Search results dropdown
+                                            searchResults.length > 0 && (
+                                                _jsx(List, {
+                                                    sx: {
+                                                        position: 'absolute',
+                                                        width: '100%',
+                                                        maxHeight: '200px',
+                                                        overflowY: 'auto',
+                                                        backgroundColor: 'rgb(45, 45, 45)',
+                                                        color: 'white',
+                                                        zIndex: 1000,
+                                                        borderRadius: '4px',
+                                                        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.5)',
+                                                        mt: 0.5
+                                                    },
+                                                    children: searchResults.map((place, index) => (
+                                                        _jsxs(ListItem, {
+                                                            button: true,
+                                                            onClick: () => handleSelectPlace(place),
+                                                            sx: {
+                                                                borderBottom: index < searchResults.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                                                                '&:hover': {
+                                                                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                                                }
+                                                            },
+                                                            children: [
+                                                                place.icon && (
+                                                                    _jsx(ListItemIcon, {
+                                                                        sx: { minWidth: '36px' },
+                                                                        children: _jsx("img", {
+                                                                            src: place.icon,
+                                                                            alt: "",
+                                                                            style: { width: '20px', height: '20px' }
+                                                                        })
+                                                                    })
+                                                                ),
+                                                                _jsxs(ListItemText, {
+                                                                    primary: place.name,
+                                                                    secondary: place.address || place.vicinity,
+                                                                    primaryTypographyProps: {
+                                                                        color: 'white',
+                                                                        fontSize: '0.9rem'
+                                                                    },
+                                                                    secondaryTypographyProps: {
+                                                                        color: 'rgba(255, 255, 255, 0.7)',
+                                                                        fontSize: '0.8rem'
+                                                                    }
+                                                                }),
+                                                                place.rating && (
+                                                                    _jsxs(Box, {
+                                                                        sx: { display: 'flex', alignItems: 'center', ml: 1 },
+                                                                        children: [
+                                                                            _jsx(Rating, {
+                                                                                value: place.rating,
+                                                                                readOnly: true,
+                                                                                size: "small",
+                                                                                precision: 0.1
+                                                                            }),
+                                                                            _jsx(Typography, {
+                                                                                variant: "caption",
+                                                                                sx: { ml: 0.5, color: 'rgba(255, 255, 255, 0.7)' },
+                                                                                children: place.rating.toFixed(1)
+                                                                            })
+                                                                        ]
+                                                                    })
+                                                                )
+                                                            ]
+                                                        }, place.placeId)
+                                                    ))
+                                                })
+                                            )
+                                        ]
+                                    }),
                                     _jsx(TextField, { 
                                         label: "Description (optional)", 
                                         value: description, 

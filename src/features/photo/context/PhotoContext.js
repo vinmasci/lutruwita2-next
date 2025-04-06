@@ -43,7 +43,15 @@ export const PhotoProvider = ({ children }) => {
         }
     }, [routeContext]);
     const addPhoto = (newPhotos) => {
-        setPhotos(prev => [...prev, ...newPhotos]);
+        // Ensure all new photos have a caption field
+        const photosWithCaption = newPhotos.map(photo => ({
+            ...photo,
+            caption: photo.caption || '' // Ensure caption exists
+        }));
+        
+        console.log('[PhotoContext] Adding photos with captions:', photosWithCaption.length);
+        
+        setPhotos(prev => [...prev, ...photosWithCaption]);
         notifyPhotoChange('add');
     };
     const deletePhoto = (photoUrl) => {
@@ -119,36 +127,57 @@ export const PhotoProvider = ({ children }) => {
             return;
         }
         
+        // Log the update for debugging
+        console.log('[PhotoContext] Updating photo with identifier:', identifier);
+        console.log('[PhotoContext] Updates:', updates);
+        
         setPhotos(prev => prev.map(p => {
             const photoId = getPhotoIdentifier(p.url);
-            return photoId === identifier ? { ...p, ...updates } : p;
+            if (photoId === identifier) {
+                // Initialize caption as empty string if it doesn't exist and we're trying to update it
+                if (updates.caption !== undefined && p.caption === undefined) {
+                    console.log('[PhotoContext] Adding caption field to photo that didn\'t have one');
+                    return { ...p, caption: '', ...updates };
+                }
+                return { ...p, ...updates };
+            }
+            return p;
         }));
         notifyPhotoChange('update');
     };
     const loadPhotos = (newPhotos) => {
-        // console.log('[PhotoContext] Loading photos:', newPhotos ? newPhotos.length : 0);
+        console.log('[PhotoContext] Loading photos:', newPhotos ? newPhotos.length : 0);
 
         if (!newPhotos || newPhotos.length === 0) {
-            // console.log('[PhotoContext] No photos to load, clearing photos array');
+            console.log('[PhotoContext] No photos to load, clearing photos array');
             setPhotos([]);
             return;
         }
 
         // Log photo identifiers for debugging
-        // if (newPhotos.length > 0) {
-        //     console.log('[PhotoContext] Loading photos with identifiers:',
-        //         newPhotos.map(p => getPhotoIdentifier(p.url)));
-        // }
+        if (newPhotos.length > 0) {
+            console.log('[PhotoContext] Loading photos with identifiers:',
+                newPhotos.map(p => getPhotoIdentifier(p.url)));
+        }
 
-        // Convert SerializedPhoto to ProcessedPhoto
-        const processedPhotos = newPhotos.map(photo => ({
-            ...photo,
-            dateAdded: new Date(photo.dateAdded || Date.now())
-        }));
+        // Convert SerializedPhoto to ProcessedPhoto and ensure caption field exists
+        const processedPhotos = newPhotos.map(photo => {
+            // Ensure caption field exists, initialize as empty string if it doesn't
+            const hasCaption = photo.caption !== undefined;
+            if (!hasCaption) {
+                console.log('[PhotoContext] Adding missing caption field to photo:', getPhotoIdentifier(photo.url));
+            }
+            
+            return {
+                ...photo,
+                caption: photo.caption || '', // Ensure caption exists
+                dateAdded: new Date(photo.dateAdded || Date.now())
+            };
+        });
 
         // Replace existing photos entirely
         setPhotos(processedPhotos);
-        // console.log('[PhotoContext] Photos loaded successfully:', processedPhotos.length);
+        console.log('[PhotoContext] Photos loaded successfully:', processedPhotos.length);
 
         // Don't notify RouteContext when loading photos from route
         // as this is not a user-initiated change

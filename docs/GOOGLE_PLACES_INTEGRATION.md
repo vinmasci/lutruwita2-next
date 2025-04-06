@@ -14,6 +14,17 @@ The Google Places API integration allows users to:
 
 ### Adding a Google Places Link to a POI
 
+There are two ways to add Google Places information to a POI:
+
+#### Method 1: Auto-search (New!)
+
+1. When creating a POI, simply type its name in the "Name" field
+2. The system will automatically search for matching places near the POI's location
+3. A dropdown will appear with search results showing place names, addresses, and ratings
+4. Click on a result to select it and automatically populate the POI with Google Places data
+
+#### Method 2: Manual Link Entry
+
 1. When creating or editing a POI, paste a Google Maps link in the "Google Places Link" field
 2. The system supports various Google Maps link formats:
    - Regular Google Maps links (e.g., `https://www.google.com/maps/place/...`)
@@ -49,18 +60,26 @@ The implementation follows these principles:
 1. **Store minimal data**: Only the place ID and URL are stored in the database
 2. **Fetch on demand**: Place details are fetched in real-time when viewing a POI
 3. **Graceful degradation**: If the API is unavailable, the POI still works with basic information
+4. **Auto-search**: Automatically search for places based on name and coordinates
 
 ### Components
 
 1. **Google Places Service** (`src/features/poi/services/googlePlacesService.js`)
    - Handles extracting place IDs from various URL formats
    - Provides functions to fetch place details from the Google Places API
+   - Implements search functionality for places by name and coordinates
 
 2. **POI Context** (`src/features/poi/context/POIContext.js`)
    - Processes Google Places links when a POI is created
    - Stores the place ID and URL in the POI object
+   - Provides a search interface for components to find places
 
-3. **Presentation POI Viewer** (`src/features/presentation/components/POIViewer/PresentationPOIViewer.js`)
+3. **POI Details Components** (`src/features/poi/components/POIDetailsDrawer/POIDetailsDrawer.js` and `src/features/poi/components/POIDetailsModal/POIDetailsModal.jsx`)
+   - Implement auto-search functionality when typing a POI name
+   - Display search results in a dropdown
+   - Allow selection of places from search results
+
+4. **Presentation POI Viewer** (`src/features/presentation/components/POIViewer/PresentationPOIViewer.js`)
    - Fetches and displays Google Places information in presentation mode
    - Shows loading state while fetching data
    - Handles errors gracefully
@@ -97,3 +116,5 @@ The system can extract place IDs from various Google Maps URL formats:
 2. Support more URL formats
 3. Add more place details (opening hours, reviews, etc.)
 4. Improve error handling and fallback mechanisms
+5. Enhance search results with more details and filtering options
+6. Add a map preview for search results

@@ -12,6 +12,7 @@ const PhotoSchema = new mongoose.Schema({
   thumbnailUrl: { type: String },
   size: { type: Number },
   mimeType: { type: String },
+  caption: { type: String }, // Add caption field
   metadata: {
     location: {
       type: { type: String, enum: ['Point'], default: 'Point' },
@@ -56,7 +57,8 @@ async function handleCreatePhoto(req, res) {
       mimeType, 
       metadata, 
       poiId, 
-      routeId 
+      routeId,
+      caption
     } = req.body;
     
     // Create a new photo record
@@ -71,6 +73,7 @@ async function handleCreatePhoto(req, res) {
       metadata,
       poiId,
       routeId,
+      caption, // Include caption field
       persistentId: req.body.persistentId || `photo_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
     });
     
@@ -270,11 +273,12 @@ async function handleUpdatePhoto(req, res) {
     }
     
     // Update fields
-    const { metadata, poiId, routeId } = req.body;
+    const { metadata, poiId, routeId, caption } = req.body;
     
     if (metadata) photo.metadata = { ...photo.metadata, ...metadata };
     if (poiId !== undefined) photo.poiId = poiId;
     if (routeId !== undefined) photo.routeId = routeId;
+    if (caption !== undefined) photo.caption = caption;
     
     photo.updatedAt = new Date();
     

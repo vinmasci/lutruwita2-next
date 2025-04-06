@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useEffect, useCallback } from 'react'; // Import useCallback
 // Add imports needed for Google Places link/preview
-import { Box, IconButton, Typography, Dialog, DialogContent, TextField, Button, Modal, Link, Rating, CircularProgress } from '@mui/material';
+import { Box, IconButton, Typography, Dialog, DialogContent, TextField, Button, Modal, Link, Rating, CircularProgress, List, ListItem, ListItemText, ListItemIcon } from '@mui/material';
 import { Close, Edit, Save, Cancel, Delete, LocationOn, Phone, Language, Star } from '@mui/icons-material'; // Add necessary icons
 import { POI_CATEGORIES } from '../../types/poi.types';
 import { getIconDefinition } from '../../constants/poi-icons';
@@ -10,7 +10,7 @@ import { usePOIContext } from '../../context/POIContext';
 // Import fetchBasicPlaceDetails if it's used for preview (it's used by processGooglePlacesLink in context)
 
 export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
-    const { pois, removePOI, processGooglePlacesLink } = usePOIContext(); // Get processGooglePlacesLink from context
+    const { pois, removePOI, processGooglePlacesLink, searchPlaces } = usePOIContext(); // Get processGooglePlacesLink and searchPlaces from context
     const [poi, setPoi] = useState(initialPoi);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -25,6 +25,10 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
     // State for view mode Google Places data
     const [viewModePlaceData, setViewModePlaceData] = useState(null);
     const [isLoadingViewData, setIsLoadingViewData] = useState(false);
+    // State for auto-search
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchError, setSearchError] = useState(null);
 
 
     // Initialize edited states
@@ -133,6 +137,72 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
             }, delay);
         };
     }, []); // Empty dependency array as debounce itself doesn't depend on component state/props
+    
+    // Auto-search for places when name changes
+    const searchForPlaces = useCallback(async (searchName) => {
+        if (!searchName || searchName.trim() === '' || !isEditing) {
+            setSearchResults([]);
+            return;
+        }
+        
+        // Don't search if the name is just the default icon label
+        const iconDef = getIconDefinition(poi?.icon);
+        if (searchName === iconDef?.label) {
+            setSearchResults([]);
+            return;
+        }
+        
+        setIsSearching(true);
+        setSearchError(null);
+        
+        try {
+            // We need coordinates to search
+            if (!poi?.coordinates) {
+                console.warn('[POIViewer] Cannot search without coordinates');
+                setSearchError('Cannot search without coordinates');
+                setIsSearching(false);
+                return;
+            }
+            
+            const results = await searchPlaces(searchName, poi.coordinates);
+            setSearchResults(results);
+        } catch (error) {
+            console.error('[POIViewer] Error searching for places:', error);
+            setSearchError('Error searching for places');
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [isEditing, poi?.icon, poi?.coordinates, searchPlaces]);
+    
+    // Debounced version of searchForPlaces
+    const debouncedSearch = useCallback(debounce(searchForPlaces, 800), [searchForPlaces]);
+    
+    // Trigger search when name changes
+    useEffect(() => {
+        if (isEditing && editedName && editedName.trim() !== '') {
+            debouncedSearch(editedName);
+        } else {
+            setSearchResults([]);
+        }
+    }, [isEditing, editedName, debouncedSearch]);
+    
+    // Handle place selection from search results
+    const handleSelectPlace = async (place) => {
+        if (!place || !place.placeId) return;
+        
+        // Set the name from the selected place
+        setEditedName(place.name);
+        
+        // Set the Google Places link
+        setEditedGooglePlacesLink(place.url);
+        
+        // Process the link to get place details
+        await processLinkInput(place.url);
+        
+        // Clear search results after selection
+        setSearchResults([]);
+    };
 
     // Function to process link input (memoized)
     const processLinkInput = useCallback(async (link) => {
@@ -255,15 +325,66 @@ export const POIViewer = ({ poi: initialPoi, onClose, onUpdate }) => {
                                         }
                                     }),
                                     isEditing ? (
-                                        _jsx(TextField, {
-                                            value: editedName,
-                                            onChange: (e) => setEditedName(e.target.value),
-                                            variant: "standard",
-                                            sx: {
-                                                input: { color: 'white', fontSize: '1.25rem' },
-                                                '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255, 255, 255, 0.42)' },
-                                                '& .MuiInput-underline:hover:before': { borderBottomColor: 'rgba(255, 255, 255, 0.87)' },
-                                            }
+                                        _jsxs(Box, {
+                                            sx: { position: 'relative' },
+                                            children: [
+                                                _jsx(TextField, {
+                                                    value: editedName,
+                                                    onChange: (e) => setEditedName(e.target.value),
+                                                    variant: "standard",
+                                                    sx: {
+                                                        input: { color: 'white', fontSize: '1.25rem' },
+                                                        '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255, 255, 255, 0.42)' },
+                                                        '& .MuiInput-underline:hover:before': { borderBottomColor: 'rgba(255, 255, 255, 0.87)' },
+                                                    }
+                                                }),
+                                                isSearching && (
+                                                    _jsx(CircularProgress, {
+                                                        size: 16,
+                                                        sx: {
+                                                            position: 'absolute',
+                                                            right: 0,
+                                                            top: 8,
+                                                            color: 'white'
+                                                        }
+                                                    })
+                                                ),
+                                                
+                                                // Search results dropdown
+                                                searchResults.length > 0 && (
+                                                    _jsx(List, {
+                                                        sx: {
+                                                            position: 'absolute',
+                                                            width: '100%',
+                                                            maxHeight: '200px',
+                                                            overflowY: 'auto',
+                                                            backgroundColor: 'rgb(45, 45, 45)',
+                                                            color: 'white',
+                                                            zIndex: 1000,
+                                                            borderRadius: '4px',
+                                                            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.5)',
+                                                            mt: 0.5
+                                                        },
+                                                        children: searchResults.map((place, index) => (
+                                                            _jsx(ListItem, {
+                                                                button: true,
+                                                                onClick: () => handleSelectPlace(place),
+                                                                sx: {
+                                                                    borderBottom: index < searchResults.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                                                                    '&:hover': {
+                                                                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                                                    },
+                                                                    py: 0.5
+                                                                },
+                                                                children: _jsx(Typography, { 
+                                                                    color: 'white', 
+                                                                    children: place.name 
+                                                                })
+                                                            }, place.placeId)
+                                                        ))
+                                                    })
+                                                )
+                                            ]
                                         })
                                     ) : (
                                         _jsx(Typography, { variant: "h6", color: "white", children: poi.name })

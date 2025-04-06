@@ -3,28 +3,48 @@ import {
   Paper, 
   IconButton, 
   Typography, 
-  Box
+  Box,
+  Button,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import { 
   Close as CloseIcon, 
   NavigateNext as NextIcon, 
-  NavigateBefore as PrevIcon
+  NavigateBefore as PrevIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { useMapContext } from '../../../map/context/MapContext';
+import { usePhotoContext } from '../../context/PhotoContext';
 
 /**
- * A small modal component for displaying photos in presentation mode
+ * An enhanced modal component for displaying photos in creation mode
  * Features:
- * - Shows photos in a small fixed-position modal 
+ * - Shows photos in a fixed-position modal with improved styling
  * - Navigation arrows to cycle through nearby photos
- * - Map pans to the location of the current photos
+ * - Map pans to the location of the current photo with 3D perspective
+ * - Photos ordered by route position
  * 
  * @param {Object} props - Component props
  * @param {Object} props.photo - The photo to display
- * @param {Function} props.onClose - Function to call when closing the modal
+ * @param {Function} props.onClose - Function to call when closing the lightbox
  * @param {Array} props.additionalPhotos - Optional array of additional photos for navigation
+ * @param {number} props.initialIndex - Initial index of the photo in the additionalPhotos array
+ * @param {Function} props.onPhotoChange - Function to call when changing photos
+ * @param {Function} props.onDelete - Optional function to call when deleting a photo
+ * @param {boolean} props.disableDelete - Optional flag to disable the delete button
  */
-export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0, onPhotoChange }) => {
+export const PhotoModal = ({ 
+  photo, 
+  onClose, 
+  additionalPhotos, 
+  initialIndex = 0, 
+  onPhotoChange,
+  onDelete,
+  disableDelete = false
+}) => {
   // Get map context for panning
   const { map } = useMapContext();
   
@@ -32,11 +52,16 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   const photos = additionalPhotos || [photo];
   
   // Use the initialIndex prop to set the initial selectedIndex
-  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
+  const [selectedIndex, setSelectedIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [imageError, setImageError] = useState(false);
   
-  // Local state to track photos
+  // Local state to track photos after deletion
   const [localPhotos, setLocalPhotos] = useState(photos);
+  const [caption, setCaption] = useState('');
+  const [isEditingCaption, setIsEditingCaption] = useState(false);
+  
+  // Get the photo context for operations
+  const { deletePhoto, updatePhoto } = usePhotoContext();
   
   // Update local photos when props change and update the selected index
   useEffect(() => {
@@ -51,6 +76,14 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   
   // Get the currently selected photo
   const selectedPhoto = localPhotos[selectedIndex];
+  
+  // Initialize caption when selected photo changes
+  useEffect(() => {
+    if (selectedPhoto) {
+      setCaption(selectedPhoto.caption || '');
+      setIsEditingCaption(false);
+    }
+  }, [selectedPhoto]);
   
   // Call onPhotoChange when the selected photo changes
   useEffect(() => {
@@ -93,6 +126,49 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
       });
     }
   }, [localPhotos, selectedIndex, map]);
+  
+  // Delete handler
+  const handleDelete = useCallback(() => {
+    if (selectedPhoto) {
+      console.log('[PhotoModal] Deleting photo:', selectedPhoto.name);
+      console.log('[PhotoModal] Selected photo URL:', selectedPhoto.url);
+      console.log('[PhotoModal] Local photos before deletion:', localPhotos.length);
+      
+      // Call the context delete function with URL instead of ID
+      console.log('[PhotoModal] Calling PhotoContext.deletePhoto with URL:', selectedPhoto.url);
+      deletePhoto(selectedPhoto.url);
+      
+      // Call the provided onDelete if available
+      if (onDelete) {
+        // If onDelete expects an ID, pass the URL as a fallback
+        console.log('[PhotoModal] Calling provided onDelete callback');
+        onDelete(selectedPhoto.id || selectedPhoto.url);
+      }
+      
+      // Update local photos state to reflect the deletion
+      // Use URL for comparison since IDs might be undefined
+      const newPhotos = localPhotos.filter(p => p.url !== selectedPhoto.url);
+      console.log('[PhotoModal] Local photos after deletion:', newPhotos.length);
+      console.log('[PhotoModal] Remaining photo URLs:', newPhotos.map(p => p.url));
+      setLocalPhotos(newPhotos);
+      
+      // If there are more photos, navigate to the next one, otherwise close
+      if (newPhotos.length > 0) {
+        // If we're at the last photo, go to the previous one
+        if (selectedIndex >= newPhotos.length) {
+          console.log('[PhotoModal] Adjusting selectedIndex to:', newPhotos.length - 1);
+          setSelectedIndex(newPhotos.length - 1);
+        } else {
+          console.log('[PhotoModal] Keeping selectedIndex at:', selectedIndex);
+        }
+        // Otherwise, stay at the same index (which will now show the next photo)
+      } else {
+        // If this was the only photo, close the lightbox
+        console.log('[PhotoModal] No photos left, closing lightbox');
+        onClose();
+      }
+    }
+  }, [selectedPhoto, deletePhoto, onDelete, localPhotos, selectedIndex, onClose]);
   
   // Pan to the initial photo when the popup opens and pitch the map
   useEffect(() => {
@@ -330,29 +406,119 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         )}
       </Box>
       
-      {/* Caption display */}
-      {selectedPhoto.caption && selectedPhoto.caption.trim() !== '' && (
-        <Box 
-          sx={{
-            p: 1.5, 
-            bgcolor: "rgba(0,0,0,0.5)",
-            borderTop: "1px solid rgba(255,255,255,0.1)"
-          }}
-        >
-          <Typography 
-            variant="body2" 
-            color="white"
+      {/* Caption input or display */}
+      <Box 
+        sx={{
+          p: 1.5, 
+          bgcolor: "rgba(0,0,0,0.5)",
+          borderTop: "1px solid rgba(255,255,255,0.1)"
+        }}
+      >
+        {isEditingCaption ? (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Add a caption..."
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              autoFocus
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: 'white',
+                  '& fieldset': {
+                    borderColor: 'rgba(255,255,255,0.3)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'rgba(255,255,255,0.5)',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'primary.main',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'rgba(255,255,255,0.7)',
+                },
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton 
+                      onClick={() => {
+                        // Save the caption
+                        if (selectedPhoto) {
+                          // Update the photo in context
+                          updatePhoto(selectedPhoto.url, { caption });
+                          
+                          // Update the local photos array
+                          const updatedPhotos = localPhotos.map(p => 
+                            p.url === selectedPhoto.url ? { ...p, caption } : p
+                          );
+                          setLocalPhotos(updatedPhotos);
+                          
+                          // Exit editing mode
+                          setIsEditingCaption(false);
+                        }
+                      }}
+                      edge="end"
+                      sx={{ color: 'white' }}
+                    >
+                      <SaveIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  // Save the caption on Enter key
+                  if (selectedPhoto) {
+                    updatePhoto(selectedPhoto.url, { caption });
+                    const updatedPhotos = localPhotos.map(p => 
+                      p.url === selectedPhoto.url ? { ...p, caption } : p
+                    );
+                    setLocalPhotos(updatedPhotos);
+                    setIsEditingCaption(false);
+                  }
+                } else if (e.key === 'Escape') {
+                  // Cancel editing on Escape key
+                  setCaption(selectedPhoto?.caption || '');
+                  setIsEditingCaption(false);
+                }
+              }}
+            />
+          </Box>
+        ) : (
+          <Box 
             sx={{ 
-              fontStyle: 'normal',
-              opacity: 1
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              minHeight: '40px'
             }}
           >
-            {selectedPhoto.caption}
-          </Typography>
-        </Box>
-      )}
+            <Typography 
+              variant="body2" 
+              color="white"
+              sx={{ 
+                flex: 1,
+                fontStyle: caption ? 'normal' : 'italic',
+                opacity: caption ? 1 : 0.7
+              }}
+            >
+              {caption || "No caption"}
+            </Typography>
+            <IconButton 
+              onClick={() => setIsEditingCaption(true)}
+              size="small"
+              sx={{ color: 'white' }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
+      </Box>
       
-      {/* Footer with photo count and route info */}
+      {/* Footer with photo count, route info, and delete button */}
       <Box 
         sx={{
           p: 1.5, 
@@ -375,6 +541,20 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         <Typography variant="caption" color="white">
           {selectedIndex + 1} / {localPhotos.length}
         </Typography>
+        
+        {/* Delete button (right side) */}
+        {!disableDelete && (
+          <Button
+            startIcon={<DeleteIcon />}
+            onClick={handleDelete}
+            color="error"
+            variant="outlined"
+            size="small"
+            sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}
+          >
+            Delete
+          </Button>
+        )}
       </Box>
       
       {/* Close button in top-right corner */}

@@ -68,6 +68,12 @@ export const extractPlaceIdFromUrl = async (url) => {
       return placeIdMatch[1];
     }
     
+    // 1.5. Try to extract place ID from the format: ?q=place_id:XXXX
+    const placeIdColonMatch = url.match(/[?&]q=place_id:([^&]+)/);
+    if (placeIdColonMatch && placeIdColonMatch[1]) {
+      return placeIdColonMatch[1];
+    }
+    
     // 2. Try to extract coordinates from embed URL or iframe
     // First, check if this is an iframe and extract the src attribute
     let embedUrl = url;
@@ -320,12 +326,6 @@ const isPlaceOpenNow = (openingHours, utcOffsetMinutes) => {
            return true;
          }
          // We also need to check periods from the *previous* day that might close *today*
-         // This logic gets complex quickly. Google's isOpen() likely handles this better if it works.
-         // Let's stick to simpler same-day checks for now unless isOpen() proves unreliable.
-
-      } else if (period.close) {
-        // Normal same-day period
-        const openTimeMinutes = parseInt(period.open.time.substring(0, 2)) * 60 + parseInt(period.open.time.substring(2, 4));
         const closeTimeMinutes = parseInt(period.close.time.substring(0, 2)) * 60 + parseInt(period.close.time.substring(2, 4));
 
         if (currentTimeMinutes >= openTimeMinutes && currentTimeMinutes < closeTimeMinutes) {
@@ -544,6 +544,118 @@ export const fetchPlacePhotos = async (placeId, maxPhotos = 5) => {
     });
   } catch (error) {
     logger.error('googlePlacesService', 'Error fetching place photos:', error);
+    return [];
+  }
+};
+
+/**
+ * Search for places by name and coordinates
+ * @param {string} name - The name to search for
+ * @param {Array<number>} coordinates - [longitude, latitude] coordinates
+ * @param {number} radius - Search radius in meters (default: 100)
+ * @returns {Promise<Array>} - Array of place results or empty array if none found
+ */
+export const searchPlacesByNameAndCoords = async (name, coordinates, radius = 100) => {
+  if (!name || !coordinates || coordinates.length !== 2) {
+    logger.warn('googlePlacesService', 'Invalid parameters for place search');
+    return [];
+  }
+
+  try {
+    logger.info('googlePlacesService', `Searching for places with name "${name}" near coordinates [${coordinates[0]}, ${coordinates[1]}]`);
+    
+    // Load the Google Maps API
+    try {
+      await loadGoogleMapsApi();
+    } catch (error) {
+      logger.error('googlePlacesService', 'Failed to load Google Maps API:', error);
+      throw new Error('Failed to load Google Maps API');
+    }
+    
+    // Create a PlacesService instance
+    const map = new window.google.maps.Map(document.createElement('div'));
+    const service = new window.google.maps.places.PlacesService(map);
+    
+    // Extract coordinates (API expects [lat, lng] but our app uses [lng, lat])
+    const lng = coordinates[0];
+    const lat = coordinates[1];
+    
+    // Use a promise with timeout for the search
+    return new Promise((resolve) => {
+      // Create a timeout for the API call
+      const timeout = setTimeout(() => {
+        logger.warn('googlePlacesService', 'Place search timed out');
+        resolve([]);
+      }, 5000); // 5 second timeout
+      
+      try {
+        // First try textSearch with the name as query and location bias
+        service.textSearch({
+          query: name,
+          location: { lat, lng },
+          radius: radius
+        }, (results, status) => {
+          // Clear the timeout since we got a response
+          clearTimeout(timeout);
+          
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+            logger.info('googlePlacesService', `Found ${results.length} places with textSearch`);
+            
+            // Process results to a simpler format
+            const processedResults = results.map(place => ({
+              placeId: place.place_id,
+              name: place.name,
+              address: place.formatted_address,
+              rating: place.rating,
+              types: place.types,
+              icon: place.icon,
+              // Create a Google Maps embed URL for this place
+              url: `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3000!2d0!3d0!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s${place.place_id}!2s${encodeURIComponent(place.name)}!5e0!3m2!1sen!2sus!4v1600000000000!5m2!1sen!2sus`
+            }));
+            
+            resolve(processedResults);
+          } else {
+            logger.warn('googlePlacesService', `No places found with textSearch for "${name}"`);
+            
+            // Fall back to nearbySearch if textSearch fails
+            service.nearbySearch({
+              location: { lat, lng },
+              radius: radius,
+              keyword: name
+            }, (results, status) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+                logger.info('googlePlacesService', `Found ${results.length} places with nearbySearch`);
+                
+                // Process results to a simpler format
+                const processedResults = results.map(place => ({
+                  placeId: place.place_id,
+                  name: place.name,
+                  vicinity: place.vicinity, // nearbySearch returns vicinity instead of formatted_address
+                  rating: place.rating,
+                  types: place.types,
+                  icon: place.icon,
+                  // Create a Google Maps embed URL for this place
+                  url: `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3000!2d0!3d0!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s${place.place_id}!2s${encodeURIComponent(place.name)}!5e0!3m2!1sen!2sus!4v1600000000000!5m2!1sen!2sus`
+                }));
+                
+                resolve(processedResults);
+              } else {
+                logger.warn('googlePlacesService', `No places found with nearbySearch for "${name}"`);
+                resolve([]);
+              }
+            });
+          }
+        });
+      } catch (error) {
+        // Clear the timeout if there's an error
+        clearTimeout(timeout);
+        
+        logger.error('googlePlacesService', 'Error in place search:', error);
+        resolve([]);
+      }
+    });
+  } catch (error) {
+    logger.error('googlePlacesService', 'Error in searchPlacesByNameAndCoords:', error);
     return [];
   }
 };

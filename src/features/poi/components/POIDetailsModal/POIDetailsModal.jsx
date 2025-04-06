@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Dialog,
   DialogTitle,
@@ -9,14 +9,35 @@ import {
   Box, 
   Typography, 
   ButtonBase,
-  IconButton
+  IconButton,
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Rating
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { POI_CATEGORIES } from '../../types/poi.types';
 import { getIconDefinition } from '../../constants/poi-icons';
 import { PhotoPreviewModal } from '../../../photo/components/PhotoPreview/PhotoPreviewModal';
+import { usePOIContext } from '../../context/POIContext';
 
-const POIDetailsModal = ({ isOpen, onClose, iconName, category, onSave, readOnly = false }) => {
+// Debounce function to limit API calls
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
+};
+
+const POIDetailsModal = ({ isOpen, onClose, iconName, category, coordinates, onSave, readOnly = false }) => {
+  const { searchPlaces, processGooglePlacesLink } = usePOIContext();
   // Get the icon definition for default name
   const iconDef = getIconDefinition(iconName);
   
@@ -26,17 +47,131 @@ const POIDetailsModal = ({ isOpen, onClose, iconName, category, onSave, readOnly
   // State for form fields
   const [name, setName] = useState(iconDef?.label || '');
   const [description, setDescription] = useState('');
+  const [googlePlacesLink, setGooglePlacesLink] = useState('');
+  const [googlePlacesData, setGooglePlacesData] = useState(null);
+  const [isProcessingLink, setIsProcessingLink] = useState(false);
+  const [linkError, setLinkError] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  
+  // State for auto-search
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   
   // Reset form when modal opens with new POI
   useEffect(() => {
     if (isOpen) {
       setName(iconDef?.label || '');
       setDescription('');
+      setGooglePlacesLink('');
+      setGooglePlacesData(null);
+      setIsProcessingLink(false);
+      setLinkError(null);
       setPhotos([]);
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchError(null);
     }
   }, [isOpen, iconDef]);
+  
+  // Auto-search for places when name changes
+  const searchForPlaces = useCallback(async (searchName) => {
+    if (!searchName || searchName.trim() === '' || !isOpen || readOnly) {
+      setSearchResults([]);
+      return;
+    }
+    
+    // Don't search if the name is just the default icon label
+    if (searchName === iconDef?.label) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setIsSearching(true);
+    setSearchError(null);
+    
+    try {
+      // We need coordinates to search
+      if (!coordinates) {
+        console.warn('[POIDetailsModal] Cannot search without coordinates');
+        setSearchError('Cannot search without coordinates');
+        setIsSearching(false);
+        return;
+      }
+      
+      const results = await searchPlaces(searchName, coordinates);
+      setSearchResults(results);
+    } catch (error) {
+      console.error('[POIDetailsModal] Error searching for places:', error);
+      setSearchError('Error searching for places');
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [isOpen, readOnly, iconDef?.label, coordinates, searchPlaces]);
+  
+  // Debounced version of searchForPlaces
+  const debouncedSearch = useCallback(debounce(searchForPlaces, 800), [searchForPlaces]);
+  
+  // Trigger search when name changes
+  useEffect(() => {
+    if (isOpen && name && name.trim() !== '' && !readOnly) {
+      debouncedSearch(name);
+    } else {
+      setSearchResults([]);
+    }
+  }, [isOpen, name, readOnly, debouncedSearch]);
+  
+  // Process Google Places link
+  const processLink = async (link) => {
+    if (!link) {
+      setGooglePlacesData(null);
+      setIsProcessingLink(false);
+      setLinkError(null);
+      return;
+    }
+    
+    setIsProcessingLink(true);
+    setLinkError(null);
+    
+    try {
+      const data = await processGooglePlacesLink(link);
+      if (data) {
+        setGooglePlacesData(data);
+        // If name is empty or default, use the place name
+        if (!name || name === iconDef?.label) {
+          setName(data.name);
+        }
+      } else {
+        setGooglePlacesData(null);
+        setLinkError('Could not process Google Places link. Please check the format.');
+      }
+    } catch (error) {
+      console.error('[POIDetailsModal] Error processing Google Places link:', error);
+      setGooglePlacesData(null);
+      setLinkError('Error processing link: ' + (error.message || 'Unknown error'));
+    } finally {
+      setIsProcessingLink(false);
+    }
+  };
+  
+  // Handle place selection from search results
+  const handleSelectPlace = async (place) => {
+    if (!place || !place.placeId) return;
+    
+    // Set the name from the selected place
+    setName(place.name);
+    
+    // Set the Google Places link
+    setGooglePlacesLink(place.url);
+    
+    // Process the link to get place details
+    await processLink(place.url);
+    
+    // Clear search results after selection
+    setSearchResults([]);
+  };
   
   const handlePhotoChange = (event) => {
     if (event.target.files) {
@@ -49,7 +184,12 @@ const POIDetailsModal = ({ isOpen, onClose, iconName, category, onSave, readOnly
     onSave({
       name,
       description,
-      photos
+      googlePlacesLink,
+      photos,
+      // Include the Google Places data if available
+      ...(googlePlacesData && { googlePlaces: googlePlacesData }),
+      // Include the Google Place ID if available
+      ...(googlePlacesData?.placeId && { googlePlaceId: googlePlacesData.placeId })
     });
   };
   
@@ -104,35 +244,85 @@ const POIDetailsModal = ({ isOpen, onClose, iconName, category, onSave, readOnly
                 </Typography>
               </Box>
               
-              <TextField 
-                label="Name" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                fullWidth 
-                variant="outlined" 
-                size="small"
-                disabled={readOnly}
-                sx={{
-                  backgroundColor: 'rgb(35, 35, 35)',
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': {
-                      borderColor: 'rgb(255, 255, 255)',
+              <Box sx={{ position: 'relative' }}>
+                <TextField 
+                  label="Name" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  fullWidth 
+                  variant="outlined" 
+                  size="small"
+                  disabled={readOnly}
+                  sx={{
+                    backgroundColor: 'rgb(35, 35, 35)',
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': {
+                        borderColor: 'rgb(255, 255, 255)',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'rgb(255, 255, 255)',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: 'rgb(255, 255, 255)',
+                      }
                     },
-                    '&:hover fieldset': {
-                      borderColor: 'rgb(255, 255, 255)',
+                    '& .MuiInputLabel-root': {
+                      color: 'rgb(255, 255, 255)'
                     },
-                    '&.Mui-focused fieldset': {
-                      borderColor: 'rgb(255, 255, 255)',
+                    '& .MuiOutlinedInput-input': {
+                      color: 'rgb(255, 255, 255)'
                     }
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: 'rgb(255, 255, 255)'
-                  },
-                  '& .MuiOutlinedInput-input': {
-                    color: 'rgb(255, 255, 255)'
-                  }
-                }}
-              />
+                  }}
+                />
+                {isSearching && (
+                  <CircularProgress
+                    size={20}
+                    sx={{
+                      position: 'absolute',
+                      right: 12,
+                      top: 12,
+                      color: 'white'
+                    }}
+                  />
+                )}
+                
+                {/* Search results dropdown */}
+                {searchResults.length > 0 && (
+                  <List
+                    sx={{
+                      position: 'absolute',
+                      width: '100%',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      backgroundColor: 'rgb(45, 45, 45)',
+                      color: 'white',
+                      zIndex: 1000,
+                      borderRadius: '4px',
+                      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.5)',
+                      mt: 0.5
+                    }}
+                  >
+                    {searchResults.map((place, index) => (
+                      <ListItem
+                        key={place.placeId}
+                        button
+                        onClick={() => handleSelectPlace(place)}
+                        sx={{
+                          borderBottom: index < searchResults.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                          },
+                          py: 0.5
+                        }}
+                      >
+                        <Typography color="white">
+                          {place.name}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
               
               <TextField 
                 label="Description (optional)" 

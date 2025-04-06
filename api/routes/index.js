@@ -80,6 +80,7 @@ const RouteSchema = new mongoose.Schema({
     url: { type: String },
     thumbnailUrl: { type: String },
     dateAdded: { type: String },
+    caption: { type: String }, // Add caption field to photos in routes
     coordinates: {
       lat: { type: Number },
       lng: { type: Number }

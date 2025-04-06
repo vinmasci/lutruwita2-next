@@ -2,7 +2,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useReducer, useState, useMemo, useCallback } from 'react';
 import { useRouteContext } from '../../map/context/RouteContext';
 import { v4 as uuidv4 } from 'uuid';
-import { extractPlaceIdFromUrl, fetchBasicPlaceDetails } from '../services/googlePlacesService';
+import { extractPlaceIdFromUrl, fetchBasicPlaceDetails, searchPlacesByNameAndCoords } from '../services/googlePlacesService';
 // Reducer
 const poiReducer = (state, action) => {
     switch (action.type) {
@@ -120,6 +120,23 @@ export const POIProvider = ({ children }) => {
             routeContext.setChangedSections(prev => ({...prev, pois: true}));
         }
     }, [routeContext]);
+    // Search for places by name and coordinates
+    const searchPlaces = async (name, coordinates) => {
+        if (!name || !coordinates) {
+            console.warn('[POIContext] Invalid parameters for place search');
+            return [];
+        }
+
+        try {
+            console.log('[POIContext] Searching for places with name:', name);
+            const results = await searchPlacesByNameAndCoords(name, coordinates);
+            return results;
+        } catch (error) {
+            console.error('[POIContext] Error searching for places:', error);
+            return [];
+        }
+    };
+
     // Process Google Places link to get place ID
     const processGooglePlacesLink = async (link) => {
         if (!link) return null;
@@ -484,7 +501,8 @@ export const POIProvider = ({ children }) => {
             setVisibleCategories,
             toggleCategoryVisibility,
             getVisiblePOIs,
-            processGooglePlacesLink // Expose the function to process Google Places links
+            processGooglePlacesLink, // Expose the function to process Google Places links
+            searchPlaces // Expose the function to search for places
         }, children: children }));
 };
 // Custom hook for using POI context

@@ -217,7 +217,8 @@ export const usePhotoService = () => {
                 publicId: result.public_id,
                 metadata,
                 width: result.width,
-                height: result.height
+                height: result.height,
+                caption: '' // Initialize with empty caption
               });
             } catch (error) {
               reject(new Error(`Failed to parse upload response: ${error.message}`));
