@@ -590,7 +590,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                             padding: '8px 12px',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
                             borderRadius: '4px',
-                            fontFamily: 'Futura',
+                            fontFamily: 'Lato',
                             fontSize: '12px',
                             color: 'white'
                         }}>
@@ -854,7 +854,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                             fontSize: '0.8rem', 
                             fontWeight: 500, 
                             mr: 3, 
-                            fontFamily: 'Futura' 
+                            fontFamily: 'Lato' 
                         }}
                     >
                         Elevation Profile: {route.name}
@@ -871,7 +871,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                             color="text.secondary" 
                             sx={{ 
                                 fontSize: '0.75rem', 
-                                fontFamily: 'Futura',
+                                fontFamily: 'Lato',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1
@@ -885,7 +885,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                             color="text.secondary" 
                             sx={{ 
                                 fontSize: '0.75rem', 
-                                fontFamily: 'Futura',
+                                fontFamily: 'Lato',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1
@@ -899,7 +899,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                             color="text.secondary" 
                             sx={{ 
                                 fontSize: '0.75rem', 
-                                fontFamily: 'Futura',
+                                fontFamily: 'Lato',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1
@@ -913,7 +913,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                             color="text.secondary" 
                             sx={{ 
                                 fontSize: '0.75rem', 
-                                fontFamily: 'Futura',
+                                fontFamily: 'Lato',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 1
@@ -939,7 +939,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         color="text.secondary" 
                         sx={{ 
                             fontSize: '0.75rem', 
-                            fontFamily: 'Futura',
+                            fontFamily: 'Lato',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 1
@@ -957,7 +957,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         color="text.secondary" 
                         sx={{ 
                             fontSize: '0.75rem', 
-                            fontFamily: 'Futura',
+                            fontFamily: 'Lato',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 1
@@ -1014,14 +1014,14 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                                     text: {
                                         fill: 'rgba(255, 255, 255, 0.7)',
                                         fontSize: 11,
-                                        fontFamily: 'Futura'
+                                        fontFamily: 'Lato'
                                     }
                                 },
                                 legend: {
                                     text: {
                                         fill: 'rgba(255, 255, 255, 0.7)',
                                         fontSize: 12,
-                                        fontFamily: 'Futura'
+                                        fontFamily: 'Lato'
                                     }
                                 }
                             },
@@ -1049,8 +1049,8 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                                     padding: '8px 12px',
                                     border: '1px solid rgba(255, 255, 255, 0.15)',
                                     borderRadius: '4px',
-                                    fontFamily: 'Futura',
-                                    color: 'white'
+                            fontFamily: 'Lato',
+                            color: 'white'
                                 }}>
                                     <div>Elevation data</div>
                                 </div>

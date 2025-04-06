@@ -11,7 +11,8 @@ const PresentationMapOverviewDrawer = () => {
       flexDirection: 'column', 
       height: '100%',
       backgroundColor: 'rgba(35, 35, 35, 0.8)', // Increased transparency (0.6 alpha)
-      backdropFilter: 'blur(2px)' // Reduced blur effect
+      backdropFilter: 'blur(2px)', // Reduced blur effect
+      fontFamily: '"Lato", sans-serif'
     }}>
       {/* Title removed as requested */}
       <Box sx={{ 
@@ -22,9 +23,14 @@ const PresentationMapOverviewDrawer = () => {
         py: 2,
         pb: 120,
         color: 'white',
+        fontFamily: '"Lato", sans-serif',
         '& a': {
           color: '#2196f3',
-          textDecoration: 'underline'
+          textDecoration: 'underline',
+          fontFamily: '"Lato", sans-serif'
+        },
+        '& *': {
+          fontFamily: '"Lato", sans-serif'
         }
       }}>
         {/* Empty box to add space at the top */}

@@ -194,6 +194,13 @@ export const RoutePresentation = () => {
 
                     // Set the overall loaded state and persistent ID
                     if (route && isMountedRef.current) {
+                        // Make sure mapOverview is included in the loaded state
+                        if (route.mapOverview) {
+                            console.log('[RoutePresentation] Found mapOverview data in route:', route.mapOverview);
+                        } else {
+                            console.log('[RoutePresentation] No mapOverview data found in route');
+                        }
+                        
                         setCurrentLoadedState(route);
                         if (routeId) {
                             setCurrentLoadedPersistentId(routeId);

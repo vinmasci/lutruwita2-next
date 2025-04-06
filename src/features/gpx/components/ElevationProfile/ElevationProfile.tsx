@@ -552,7 +552,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               padding: '8px 12px',
               border: '1px solid rgba(255, 255, 255, 0.15)',
               borderRadius: '4px',
-              fontFamily: 'Futura',
+              fontFamily: 'Lato',
               fontSize: '12px',
               color: 'white'
             }}>
@@ -684,7 +684,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               fontSize: '0.8rem', 
               fontWeight: 500, 
               mr: 3, 
-              fontFamily: 'Futura' 
+              fontFamily: 'Lato' 
             }}
           >
             Elevation Profile: {route.name}
@@ -701,7 +701,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               color="text.secondary" 
               sx={{ 
                 fontSize: '0.75rem', 
-                fontFamily: 'Futura',
+                fontFamily: 'Lato',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1
@@ -715,7 +715,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               color="text.secondary" 
               sx={{ 
                 fontSize: '0.75rem', 
-                fontFamily: 'Futura',
+                fontFamily: 'Lato',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1
@@ -729,10 +729,10 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
               color="text.secondary" 
               sx={{ 
                 fontSize: '0.75rem', 
-                fontFamily: 'Futura',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1
+              fontFamily: 'Lato',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
               }}
             >
               <i className="fa-solid fa-down-right" style={{ color: '#0288d1' }} />
@@ -769,7 +769,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
             color="text.secondary" 
             sx={{ 
               fontSize: '0.75rem', 
-              fontFamily: 'Futura',
+              fontFamily: 'Lato',
               display: 'flex',
               alignItems: 'center',
               gap: 1
@@ -787,7 +787,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
             color="text.secondary" 
             sx={{ 
               fontSize: '0.75rem', 
-              fontFamily: 'Futura',
+              fontFamily: 'Lato',
               display: 'flex',
               alignItems: 'center',
               gap: 1
@@ -1025,7 +1025,7 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
                     borderRadius: '4px'
                   }}>
                     <div style={{ 
-                      fontFamily: 'Futura',
+                      fontFamily: 'Lato',
                       color: 'white',
                       display: 'flex',
                       gap: '4px'

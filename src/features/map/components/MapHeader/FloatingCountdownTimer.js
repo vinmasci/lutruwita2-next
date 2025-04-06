@@ -16,7 +16,7 @@ const FloatingCountdownTimer = ({ eventDate }) => {
        sx: {
          position: 'absolute',
          top: '72px', // Position just below the NEW header navbar height
-         right: '20px', // Position on the right side
+         right: '10px', // Position on the right side
          marginRight: '60px', // Add margin to avoid overlapping with map controls
          zIndex: 900, // Below header (1000) but above map (1)
          marginTop: '8px', // Small gap from header
@@ -24,7 +24,7 @@ const FloatingCountdownTimer = ({ eventDate }) => {
          borderRadius: '4px', // Rounded corners
          backgroundColor: 'rgba(0, 0, 0, 0.5)', // More transparent background (0.8 opacity for the component overall)
          padding: '4px 12px', // More horizontal padding
-         backdropFilter: 'blur(4px)', // Blur effect for modern browsers
+         backdropFilter: 'blur(2px)', // Blur effect for modern browsers
          border: '1px solid rgba(255, 255, 255, 0.2)', // Subtle border
       },
       children: _jsx(CountdownTimer, { eventDate })

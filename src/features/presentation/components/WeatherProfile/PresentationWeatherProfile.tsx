@@ -19,7 +19,7 @@ const WeatherContent = styled('div')({
   },
   '& .recharts-text': {
     fill: 'rgba(255, 255, 255, 0.7)',
-    fontFamily: 'Futura'
+    fontFamily: 'Lato'
   }
 });
 
@@ -103,17 +103,17 @@ const getPrecipitationInfo = (month: string, precipitation: number): {
   if (percentage <= 30) return { 
     condition: 'Very dry', 
     icon: 'fa-solid fa-sun', 
-    color: '#ff4500' // Orange-red
+    color: '#ff9800' // Orange (changed from orange-red)
   };
   if (percentage <= 70) return { 
     condition: 'Dry', 
     icon: 'fa-solid fa-cloud-sun', 
-    color: '#ff9800' // Orange
+    color: '#ffeb3b' // Yellow (changed from orange)
   };
   if (percentage <= 130) return { 
     condition: 'Average rainfall', 
     icon: 'fa-solid fa-cloud-sun-rain', 
-    color: '#ffeb3b' // Yellow
+    color: '#ffffff' // White (changed from yellow)
   };
   if (percentage <= 200) return { 
     condition: 'Wet', 
@@ -188,7 +188,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '4px',
         p: 1.5,
-        fontFamily: 'Futura'
+        fontFamily: 'Lato'
       }}>
         <Typography sx={{ fontSize: '0.8rem', color: 'white', mb: 1, fontFamily: 'Futura' }}>
           {label}
@@ -426,7 +426,7 @@ export const PresentationWeatherProfile: React.FC<PresentationWeatherProfileProp
     return (
       <WeatherContent className="flex flex-col items-center justify-center gap-2">
         <CircularProgress size={24} sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
-        <Typography sx={{ fontFamily: 'Futura', color: 'rgba(255, 255, 255, 0.7)' }}>
+        <Typography sx={{ fontFamily: 'Lato', color: 'rgba(255, 255, 255, 0.7)' }}>
           Loading weather data...
         </Typography>
       </WeatherContent>
@@ -440,7 +440,7 @@ export const PresentationWeatherProfile: React.FC<PresentationWeatherProfileProp
     <div className="weather-profile h-full">
       <WeatherContent>
         <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <Typography variant="subtitle2" color="white" sx={{ fontSize: '0.8rem', fontWeight: 500, mr: 3, fontFamily: 'Futura' }}>
+          <Typography variant="subtitle2" color="white" sx={{ fontSize: '0.8rem', fontWeight: 500, mr: 3, fontFamily: 'Lato' }}>
             Weather Data: {location}
           </Typography>
         </Box>
@@ -455,18 +455,19 @@ export const PresentationWeatherProfile: React.FC<PresentationWeatherProfileProp
             borderRight: '1px solid rgba(255, 255, 255, 0.1)',
             overflowY: 'auto',
             py: 2,
-            px: 3 // Added more padding on the left and right
+            px: 3, // Added more padding on the left and right
+            // Using the same background color as the historical data chart
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <LocationOnIcon fontSize="small" sx={{ color: 'white' }} />
-              <Typography variant="subtitle2" color="white" sx={{ fontSize: '0.8rem', fontFamily: 'Futura' }}>
+              <Typography variant="subtitle2" color="white" sx={{ fontSize: '0.8rem', fontFamily: 'Lato' }}>
                 {location}
               </Typography>
             </Box>
             
             <Typography variant="subtitle2" color="white" sx={{ 
               fontSize: '0.9rem', 
-              fontFamily: 'Futura', 
+              fontFamily: 'Lato', 
               fontWeight: 'bold',
               mb: 1,
               mt: 1
@@ -479,11 +480,38 @@ export const PresentationWeatherProfile: React.FC<PresentationWeatherProfileProp
               <ForecastDay key={day.date} elevation={0}>
                 <Typography variant="subtitle2" color="white" sx={{ 
                   fontSize: '0.85rem', 
-                  fontFamily: 'Futura', 
+                  fontFamily: 'Lato', 
                   fontWeight: 'bold',
                   mb: 0.5
                 }}>
-                  {index === 0 ? 'Today' : day.day}
+                  {(() => {
+                    // Extract date parts from the date string (format: YYYY-MM-DD)
+                    const dateParts = day.date.split('-');
+                    if (dateParts.length !== 3) return index === 0 ? 'Today' : day.day;
+                    
+                    const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                    
+                    // Format the date to show day and month
+                    const dayNum = dateObj.getDate();
+                    const monthName = dateObj.toLocaleString('default', { month: 'long' });
+                    
+                    // Add ordinal suffix to day number
+                    const getOrdinalSuffix = (day: number) => {
+                      if (day > 3 && day < 21) return 'th';
+                      switch (day % 10) {
+                        case 1: return 'st';
+                        case 2: return 'nd';
+                        case 3: return 'rd';
+                        default: return 'th';
+                      }
+                    };
+                    
+                    const dayWithSuffix = `${dayNum}${getOrdinalSuffix(dayNum)}`;
+                    
+                    return index === 0 
+                      ? `Today ${dayWithSuffix} ${monthName}` 
+                      : `${day.day} ${dayWithSuffix} ${monthName}`;
+                  })()}
                 </Typography>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
@@ -516,7 +544,7 @@ export const PresentationWeatherProfile: React.FC<PresentationWeatherProfileProp
                   )}
                   <Typography variant="body2" color="white" sx={{ 
                     fontSize: '0.75rem', 
-                    fontFamily: 'Futura'
+                    fontFamily: 'Lato'
                   }}>
                     {day.weatherDescription}
                   </Typography>
@@ -632,24 +660,8 @@ export const PresentationWeatherProfile: React.FC<PresentationWeatherProfileProp
                           {payload.value}
                         </text>
                         
-                        {/* Temperature icon - positioned to the left */}
-                        <foreignObject x={-24} y={20} width={24} height={24}>
-                          <div style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center' 
-                          }}>
-                            <i className={tempIcon.icon} style={{ 
-                              color: tempIcon.color, 
-                              fontSize: '14px' 
-                            }} />
-                          </div>
-                        </foreignObject>
-                        
-                        {/* Precipitation icon - positioned to the right */}
-                        <foreignObject x={0} y={20} width={24} height={24}>
+                        {/* Precipitation icon only */}
+                        <foreignObject x={-12} y={20} width={24} height={24}>
                           <div style={{ 
                             width: '100%', 
                             height: '100%', 

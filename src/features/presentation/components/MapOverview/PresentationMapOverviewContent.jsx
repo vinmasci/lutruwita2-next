@@ -15,7 +15,11 @@ export const PresentationMapOverviewContent = () => {
           wordWrap: 'break-word',
           wordBreak: 'break-word',
           overflowWrap: 'break-word',
-          whiteSpace: 'normal'
+          whiteSpace: 'normal',
+          fontFamily: '"Lato", sans-serif',
+          '& h1, & h2, & h3, & h4, & h5, & h6, & p, & li, & span': {
+            fontFamily: '"Lato", sans-serif'
+          }
         }}
         dangerouslySetInnerHTML={{
           __html: mapOverview.description
@@ -26,7 +30,7 @@ export const PresentationMapOverviewContent = () => {
 
   // If no map overview, display metadata from the route
   return (
-    <Box sx={{ color: 'white' }}>
+    <Box sx={{ color: 'white', fontFamily: '"Lato", sans-serif' }}>
       {/* Route title as heading */}
       <Typography 
         variant="h4" 
@@ -34,7 +38,7 @@ export const PresentationMapOverviewContent = () => {
           color: '#2196f3', // Material UI Blue
           fontWeight: 500,
           mb: 1,
-          fontFamily: 'Futura'
+          fontFamily: '"Lato", sans-serif'
         }}
       >
         {currentLoadedState?.name || 'Untitled Route'}
@@ -43,14 +47,14 @@ export const PresentationMapOverviewContent = () => {
       {/* Location info */}
       <Box sx={{ mb: 2 }}>
         {currentLoadedState?.routeSummary?.states?.length > 0 && (
-          <Typography variant="body1" sx={{ mb: 0.5 }}>
+          <Typography variant="body1" sx={{ mb: 0.5, fontFamily: '"Lato", sans-serif' }}>
             <strong style={{ color: '#2196f3' }}>State: </strong>
             {currentLoadedState.routeSummary.states.join(', ')}
           </Typography>
         )}
         
         {currentLoadedState?.routeSummary?.lgas?.length > 0 && (
-          <Typography variant="body1" sx={{ mb: 0.5 }}>
+          <Typography variant="body1" sx={{ mb: 0.5, fontFamily: '"Lato", sans-serif' }}>
             <strong style={{ color: '#2196f3' }}>Region: </strong>
             {currentLoadedState.routeSummary.lgas.join(', ')}
           </Typography>
@@ -68,10 +72,10 @@ export const PresentationMapOverviewContent = () => {
       >
         {/* Distance stat */}
         <Box>
-          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
+          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold', fontFamily: '"Lato", sans-serif' }}>
             Distance
           </Typography>
-          <Typography variant="body1">
+          <Typography variant="body1" sx={{ fontFamily: '"Lato", sans-serif' }}>
             {currentLoadedState?.routeSummary?.totalDistance 
               ? `${currentLoadedState.routeSummary.totalDistance} km` 
               : 'N/A'}
@@ -80,10 +84,10 @@ export const PresentationMapOverviewContent = () => {
         
         {/* Elevation Gain stat */}
         <Box>
-          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
+          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold', fontFamily: '"Lato", sans-serif' }}>
             Elevation Gain
           </Typography>
-          <Typography variant="body1">
+          <Typography variant="body1" sx={{ fontFamily: '"Lato", sans-serif' }}>
             {currentLoadedState?.routeSummary?.totalAscent 
               ? `${currentLoadedState.routeSummary.totalAscent} m` 
               : 'N/A'}
@@ -92,10 +96,10 @@ export const PresentationMapOverviewContent = () => {
         
         {/* Unpaved percentage */}
         <Box>
-          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
+          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold', fontFamily: '"Lato", sans-serif' }}>
             Unpaved
           </Typography>
-          <Typography variant="body1">
+          <Typography variant="body1" sx={{ fontFamily: '"Lato", sans-serif' }}>
             {currentLoadedState?.routeSummary?.unpavedPercentage !== undefined 
               ? `${currentLoadedState.routeSummary.unpavedPercentage}%` 
               : 'N/A'}
@@ -104,10 +108,10 @@ export const PresentationMapOverviewContent = () => {
         
         {/* Route type */}
         <Box>
-          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
+          <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold', fontFamily: '"Lato", sans-serif' }}>
             Route Type
           </Typography>
-          <Typography variant="body1">
+          <Typography variant="body1" sx={{ fontFamily: '"Lato", sans-serif' }}>
             {currentLoadedState?.routeSummary?.isLoop 
               ? 'Loop' 
               : 'Point to Point'}
@@ -117,10 +121,10 @@ export const PresentationMapOverviewContent = () => {
       
       {/* File info */}
       <Box sx={{ mb: 2 }}>
-        <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
+        <Typography variant="body1" sx={{ color: '#2196f3', fontWeight: 'bold', fontFamily: '"Lato", sans-serif' }}>
           Type
         </Typography>
-        <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
+        <Typography variant="body1" sx={{ textTransform: 'capitalize', fontFamily: '"Lato", sans-serif' }}>
           {currentLoadedState?.type || 'Bikepacking'}
         </Typography>
       </Box>

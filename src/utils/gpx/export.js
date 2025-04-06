@@ -24,6 +24,16 @@ export const geojsonToGpx = (geojson, routeName = 'Unnamed Route') => {
 
   const coordinates = routeFeature.geometry.coordinates;
   
+  // Get elevation data from coordinateProperties if available
+  const elevations = routeFeature.properties?.coordinateProperties?.elevation || [];
+  
+  // Log elevation data for debugging
+  console.log('[gpxExport] Elevation data:', {
+    count: elevations.length,
+    coordCount: coordinates.length,
+    sample: elevations.slice(0, 5)
+  });
+  
   // Create GPX XML
   let gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Lutruwita Route Planner" xmlns="http://www.topografix.com/GPX/1/1">
@@ -35,11 +45,12 @@ export const geojsonToGpx = (geojson, routeName = 'Unnamed Route') => {
     <name>${escapeXml(routeName)}</name>
     <trkseg>`;
 
-  // Add track points
-  coordinates.forEach(coord => {
+  // Add track points with elevation data from coordinateProperties
+  coordinates.forEach((coord, index) => {
     const lon = coord[0];
     const lat = coord[1];
-    const ele = coord[2] || 0; // Elevation might be optional
+    // Use elevation from coordinateProperties if available, otherwise fallback to coord[2] or 0
+    const ele = (index < elevations.length) ? elevations[index] : (coord[2] || 0);
     
     gpx += `
       <trkpt lat="${lat}" lon="${lon}">

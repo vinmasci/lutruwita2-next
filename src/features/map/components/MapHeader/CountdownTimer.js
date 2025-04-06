@@ -74,7 +74,7 @@ const CountdownTimer = ({ eventDate }) => {
          alignItems: 'center',
          // Removed backgroundColor and borderRadius to avoid double background
          padding: '4px 8px', // Keep padding for internal spacing
-         marginLeft: { xs: '0', sm: '16px' },
+         marginLeft: { xs: '0', sm: '0' }, // Removed margin to center the text
          marginTop: { xs: '4px', sm: '0' }
       },
       children: [

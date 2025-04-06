@@ -13,7 +13,7 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
     const [googlePlacesData, setGooglePlacesData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [shouldLoadGoogleData, setShouldLoadGoogleData] = useState(false);
+    const [shouldLoadGoogleData, setShouldLoadGoogleData] = useState(true); // Set to true by default to auto-load
     const [isMobile, setIsMobile] = useState(false);
     
     // Check if we're on a mobile device
@@ -67,12 +67,10 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
         }
     }, [poi?.googlePlaceId, googlePlacesData, loading]);
     
-    // Only fetch Google Places data when the user explicitly requests it
+    // Automatically fetch Google Places data when component mounts
     useEffect(() => {
-        if (shouldLoadGoogleData) {
-            loadGooglePlacesData();
-        }
-    }, [shouldLoadGoogleData, loadGooglePlacesData]);
+        loadGooglePlacesData();
+    }, [loadGooglePlacesData, poi?.googlePlaceId]); // Re-run when POI changes
     
     if (!poi)
         return null;
@@ -252,46 +250,17 @@ if (googlePlacesData?.photos?.length > 0) {
                         })
                     }),
                     
-                    // Google Places data load button (only show if we have a place ID and haven't loaded data yet)
-                    poi.googlePlaceId && !googlePlacesData && !loading && !shouldLoadGoogleData && (
+                    // Loading indicator when fetching Google Places data
+                    poi.googlePlaceId && !googlePlacesData && loading && (
                         _jsx(Box, {
                             sx: {
                                 mb: 3,
                                 display: 'flex',
                                 justifyContent: 'center'
                             },
-                            children: _jsx(Box, {
-                                onClick: handleLoadGoogleData,
-                                sx: {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                    backgroundColor: 'rgba(66, 133, 244, 0.8)',
-                                    color: 'white',
-                                    py: 1,
-                                    px: 2,
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(66, 133, 244, 1)'
-                                    },
-                                    // Make button bigger and more touch-friendly on mobile
-                                    ...(isMobile && {
-                                        py: 1.5,
-                                        px: 3,
-                                        fontSize: '1.1rem'
-                                    })
-                                },
-                                children: _jsxs(_Fragment, {
-                                    children: [
-                                        _jsx(Star, { sx: { color: '#FFD700' } }),
-                                        _jsx(Typography, {
-                                            variant: isMobile ? "button" : "body2",
-                                            sx: { ml: 1 },
-                                            children: "Load Google Places Information"
-                                        })
-                                    ]
-                                })
+                            children: _jsx(CircularProgress, { 
+                                size: 30, 
+                                sx: { color: 'white' } 
                             })
                         })
                     ),

@@ -149,151 +149,39 @@ export default function PresentationMapView(props) {
         }
     }, [currentRoute]);
     
-    // Store previous hover coordinates for interpolation
-    const prevHoverCoordinatesRef = useRef(null);
-    const animationFrameRef = useRef(null);
-    
-    // Function to interpolate between two points
-    const interpolatePoints = useCallback((start, end, progress) => {
-        if (!start || !end) return end;
-        return [
-            start[0] + (end[0] - start[0]) * progress,
-            start[1] + (end[1] - start[1]) * progress
-        ];
-    }, []);
-    
-    // Update hover point with smooth animation
+    // Simple update for hover point without animation
     useEffect(() => {
         if (!mapInstance.current || !isMapReady) return;
         
-        // If no coordinates, hide the layer
-        if (!hoverCoordinates) {
+        // Update the GeoJSON source if we have coordinates
+        if (hoverCoordinates) {
+            try {
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: hoverCoordinates
+                        },
+                        properties: {}
+                    });
+                    
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                }
+            } catch (error) {
+                logger.error('PresentationMapView', 'Error updating hover point:', error);
+            }
+        } else {
+            // Hide the layer when no coordinates
             try {
                 mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
-                prevHoverCoordinatesRef.current = null;
-                
-                // Cancel any ongoing animation
-                if (animationFrameRef.current) {
-                    cancelAnimationFrame(animationFrameRef.current);
-                    animationFrameRef.current = null;
-                }
             } catch (error) {
                 // Ignore errors when hiding (might happen during initialization)
             }
-            return;
         }
-        
-        // If this is the first point or we're far from previous point, don't animate
-        if (!prevHoverCoordinatesRef.current) {
-            try {
-                const source = mapInstance.current.getSource('hover-point');
-                if (source) {
-                    source.setData({
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: hoverCoordinates
-                        },
-                        properties: {}
-                    });
-                    
-                    // Show the layer
-                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
-                    prevHoverCoordinatesRef.current = hoverCoordinates;
-                }
-            } catch (error) {
-                logger.error('PresentationMapView', 'Error updating hover point:', error);
-            }
-            return;
-        }
-        
-        // Calculate distance between points to determine if we should animate
-        const dx = hoverCoordinates[0] - prevHoverCoordinatesRef.current[0];
-        const dy = hoverCoordinates[1] - prevHoverCoordinatesRef.current[1];
-        const distanceSq = dx * dx + dy * dy;
-        
-        // If points are too far apart, just jump to the new position
-        if (distanceSq > 0.0001) { // About 1km
-            try {
-                const source = mapInstance.current.getSource('hover-point');
-                if (source) {
-                    source.setData({
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: hoverCoordinates
-                        },
-                        properties: {}
-                    });
-                    prevHoverCoordinatesRef.current = hoverCoordinates;
-                }
-            } catch (error) {
-                logger.error('PresentationMapView', 'Error updating hover point:', error);
-            }
-            return;
-        }
-        
-        // Cancel any ongoing animation
-        if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-        }
-        
-        // Animate the transition
-        const startTime = performance.now();
-        const duration = 150; // Animation duration in ms
-        const startPoint = [...prevHoverCoordinatesRef.current];
-        const endPoint = [...hoverCoordinates];
-        
-        const animate = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Use easeOutQuad for smoother deceleration
-            const easedProgress = 1 - (1 - progress) * (1 - progress);
-            
-            try {
-                const source = mapInstance.current?.getSource('hover-point');
-                if (source) {
-                    const interpolated = interpolatePoints(startPoint, endPoint, easedProgress);
-                    
-                    source.setData({
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: interpolated
-                        },
-                        properties: {}
-                    });
-                    
-                    // Show the layer
-                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
-                    
-                    // Continue animation if not complete
-                    if (progress < 1) {
-                        animationFrameRef.current = requestAnimationFrame(animate);
-                    } else {
-                        prevHoverCoordinatesRef.current = endPoint;
-                        animationFrameRef.current = null;
-                    }
-                }
-            } catch (error) {
-                // If there's an error, stop the animation
-                logger.error('PresentationMapView', 'Error during hover point animation:', error);
-                animationFrameRef.current = null;
-            }
-        };
-        
-        // Start the animation
-        animationFrameRef.current = requestAnimationFrame(animate);
-        
-        // Cleanup function to cancel animation if component unmounts
-        return () => {
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-                animationFrameRef.current = null;
-            }
-        };
-    }, [hoverCoordinates, isMapReady, interpolatePoints]);
+    }, [hoverCoordinates, isMapReady]);
     
     // Store previous route reference, current route ID, and zoom tracking
     const previousRouteRef = useRef(null);
@@ -507,27 +395,14 @@ export default function PresentationMapView(props) {
 
     // We're now using the shared utility function findClosestPointOnRoute from routeUtils.ts
     
-    // Direct marker update reference to avoid React state updates
-    const directMarkerUpdateRef = useRef({
-        active: false,
-        lastUpdate: 0
-    });
-    
-    // Throttled mousemove handler using the optimized closest point finder with direct updates
+    // Simplified throttled mousemove handler
     const throttledMouseMoveHandler = useCallback(throttle((e) => {
         // Skip trace marker functionality on mobile devices
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
-            // Hide marker and clear state
-            try {
-                if (mapInstance.current) {
-                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
-                }
-                if (setHoverCoordinatesRef.current) {
-                    setHoverCoordinatesRef.current(null);
-                }
-            } catch (error) {
-                // Ignore errors when hiding
+            // Clear hover coordinates on mobile
+            if (hoverCoordinates) {
+                setHoverCoordinates(null);
             }
             return;
         }
@@ -539,56 +414,10 @@ export default function PresentationMapView(props) {
         // Use the shared utility function to find the closest point
         const closestPoint = findClosestPointOnRoute(mouseCoords, routeCoordinatesRef.current);
         
-        // If no closest point found, hide the marker
-        if (!closestPoint) {
-            try {
-                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
-                // Also update React state for consistency
-                if (setHoverCoordinatesRef.current) {
-                    setHoverCoordinatesRef.current(null);
-                }
-            } catch (error) {
-                // Ignore errors when hiding
-            }
-            return;
-        }
+        // Simply update the state with the closest point or null
+        setHoverCoordinates(closestPoint);
         
-        try {
-            // Get the hover-point source
-            const source = mapInstance.current.getSource('hover-point');
-            if (source) {
-                // Update the source data directly
-                source.setData({
-                    type: 'Feature',
-                    geometry: {
-                        type: 'Point',
-                        coordinates: closestPoint
-                    },
-                    properties: {}
-                });
-                
-                // Show the layer if it's hidden
-                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
-                
-                // Track that we've directly updated the marker
-                directMarkerUpdateRef.current.active = true;
-                directMarkerUpdateRef.current.lastUpdate = performance.now();
-                
-                // Always update React state to keep elevation profile in sync
-                // This is necessary for components that depend on the hover coordinates
-                if (setHoverCoordinatesRef.current) {
-                    setHoverCoordinatesRef.current(closestPoint);
-                }
-                directMarkerUpdateRef.current.lastUpdate = performance.now();
-            }
-        } catch (error) {
-            // If direct update fails, fall back to React state update
-            logger.error('PresentationMapView', 'Error directly updating hover point:', error);
-            if (setHoverCoordinatesRef.current) {
-                setHoverCoordinatesRef.current(closestPoint);
-            }
-        }
-    }, 30), []); // Reduced throttle delay for smoother updates
+    }, 50), []); // Slightly increased throttle delay for stability
     
     // Function to add hover point marker to map
     const addHoverPointMarker = useCallback((map) => {

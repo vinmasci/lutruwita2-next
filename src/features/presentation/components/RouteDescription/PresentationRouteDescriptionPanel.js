@@ -199,7 +199,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                         fontSize: '0.8rem', 
                                         fontWeight: 500, 
                                         mr: 3, 
-                                        fontFamily: 'Futura' 
+                                        fontFamily: 'Lato' 
                                     },
                                     children: `Overview: ${route?.name}`
                                 }
@@ -223,7 +223,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                     padding: 2,
                                     overflowY: 'auto',
                                     color: 'white',
-                                    fontFamily: 'Futura, sans-serif',
+                                    fontFamily: 'Lato, sans-serif',
                                     '& a': {
                                         color: '#2196f3',
                                         textDecoration: 'underline'
@@ -272,7 +272,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                         color: "text.secondary",
                                                         sx: {
                                                             fontSize: '0.75rem',
-                                                            fontFamily: 'Futura',
+                                                            fontFamily: 'Lato',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: 1,
@@ -295,7 +295,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                         color: "text.secondary",
                                                         sx: {
                                                             fontSize: '0.75rem',
-                                                            fontFamily: 'Futura',
+                                                            fontFamily: 'Lato',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: 1,
@@ -318,7 +318,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                         color: "text.secondary",
                                                         sx: {
                                                             fontSize: '0.75rem',
-                                                            fontFamily: 'Futura',
+                                                            fontFamily: 'Lato',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: 1,
@@ -341,7 +341,7 @@ export const PresentationRouteDescriptionPanel = ({ route }) => {
                                                         color: "text.secondary",
                                                         sx: {
                                                             fontSize: '0.75rem',
-                                                            fontFamily: 'Futura',
+                                                            fontFamily: 'Lato',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: 1,
