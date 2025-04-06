@@ -37,7 +37,7 @@ export const findClosestPointOnRoute = (
   }
   
   // Find which grid cell the mouse is in
-  const gridSize = 0.001; // About 100m at the equator
+  const gridSize = 0.00025; // About 25m at the equator - matching the grid creation size
   const gridX = Math.floor(mouseCoords[0] / gridSize);
   const gridY = Math.floor(mouseCoords[1] / gridSize);
   
@@ -60,12 +60,12 @@ export const findClosestPointOnRoute = (
       return null;
     }
     
-    // Use a sampling approach for the fallback to maintain performance
+    // Use a more comprehensive sampling approach for the fallback
     let closestPoint: number[] | null = null;
     let minDistanceSq = Infinity;
     
-    // First pass with coarse sampling
-    const coarseSampleRate = 50;
+    // First pass with even finer sampling (reduced from 10 to 5)
+    const coarseSampleRate = 5;
     for (let i = 0; i < rawCoordinates.length; i += coarseSampleRate) {
       const coord = rawCoordinates[i];
       if (coord && coord.length >= 2) {
@@ -94,9 +94,10 @@ export const findClosestPointOnRoute = (
         }
       }
       
-      // Search more precisely around this area
-      const searchStart = Math.max(0, closestIndex - coarseSampleRate);
-      const searchEnd = Math.min(rawCoordinates.length, closestIndex + coarseSampleRate);
+      // Search more precisely around this area with an even wider window
+      // Increased from coarseSampleRate * 2 to coarseSampleRate * 4
+      const searchStart = Math.max(0, closestIndex - coarseSampleRate * 4);
+      const searchEnd = Math.min(rawCoordinates.length, closestIndex + coarseSampleRate * 4);
       
       minDistanceSq = Infinity; // Reset for second pass
       for (let i = searchStart; i < searchEnd; i++) {
@@ -184,7 +185,7 @@ export const findClosestPointOnRoute = (
 export const createRouteSpatialGrid = (coordinates: number[][]): RouteCoordinateData => {
   // Create spatial buckets for faster initial lookup
   const spatialGrid: { [key: string]: Array<{ coord: number[]; index: number }> } = {};
-  const gridSize = 0.001; // About 100m at the equator
+  const gridSize = 0.00025; // Reduced from 0.0005 to 0.00025 (about 25m at the equator) for even more precise grid
   
   coordinates.forEach((coord, index) => {
     if (coord && coord.length >= 2) {

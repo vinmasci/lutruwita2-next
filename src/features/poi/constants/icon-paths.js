@@ -51,7 +51,7 @@ export const ICON_PATHS = {
     'Plane': 'fa-solid fa-plane',
     'Ship': 'fa-solid fa-ship',
     // Event Information
-    'PlayCircle': 'fa-solid fa-circle-play',
+    'PlayCircle': 'fa-solid fa-play',
     'StopCircle': 'fa-solid fa-flag-checkered',
     'Stethoscope': 'fa-solid fa-kit-medical',
     'BatteryCharging': 'fa-solid fa-battery-half',

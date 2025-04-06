@@ -34,6 +34,8 @@ import { CircularProgress, Box, Typography, Button } from '@mui/material';
 import { useClientGpxProcessing } from '../../../gpx/hooks/useClientGpxProcessing';
 import { RouteLayer } from '../RouteLayer';
 import { normalizeRoute } from '../../utils/routeUtils';
+import { createRouteSpatialGrid } from '../../../../utils/routeUtils';
+import { throttle } from 'lodash'; // Import throttle for mousemove handler
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -45,6 +47,8 @@ function MapViewContent() {
     const currentRouteId = useRef(null);
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const hoverMarkerRef = useRef(null);
+    const routeCoordinatesRef = useRef(null); // Ref for route coordinates spatial grid
+    const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
     const { processGpx } = useClientGpxProcessing();
     const { 
         addRoute, 
@@ -63,6 +67,28 @@ function MapViewContent() {
         setChangedSections(prev => ({...prev, mapState: true}));
     }, [setChangedSections]);
     
+    // Effect to update the ref for setHoverCoordinates
+    useEffect(() => {
+        setHoverCoordinatesRef.current = setHoverCoordinates;
+    }, [setHoverCoordinates]);
+
+    // Effect to cache route coordinates and create spatial grid for optimization
+    useEffect(() => {
+        if (currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
+            const coordinates = currentRoute.geojson.features[0].geometry.coordinates;
+            
+            // Use the shared utility function to create the spatial grid
+            const spatialGrid = createRouteSpatialGrid(coordinates);
+            
+            // Store the spatial grid
+            routeCoordinatesRef.current = spatialGrid;
+            
+            console.log('[MapView] ✅ Created spatial grid for route tracer optimization');
+        } else {
+            routeCoordinatesRef.current = null; // Clear cache if no coordinates
+        }
+    }, [currentRoute]);
+
     // Initialize map using the extracted hook
     const {
         mapRef,
@@ -83,7 +109,8 @@ function MapViewContent() {
         currentRouteId,
         currentRoute,
         setHoverCoordinates,
-        hoverCoordinates
+        hoverCoordinates,
+        routeCoordinatesRef // Pass the route coordinates ref
     });
 
     // Function to add route click handler

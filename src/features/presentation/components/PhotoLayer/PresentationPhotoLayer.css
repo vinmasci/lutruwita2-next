@@ -7,3 +7,15 @@
   position: relative;
   z-index: 50; /* Lower than sidebar (100) and elevation profile (102) */
 }
+
+/* Override the negative z-index for photo markers in presentation mode */
+.presentation-photo-layer .photo-marker {
+  z-index: 60 !important; /* Higher than the layer but lower than UI elements */
+}
+
+/* Make photo markers more visible in presentation mode */
+.presentation-photo-layer .photo-marker-bubble {
+  opacity: 1; /* Fully opaque */
+  border: 2px solid white; /* White border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+}

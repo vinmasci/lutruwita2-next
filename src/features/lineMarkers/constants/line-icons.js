@@ -94,7 +94,7 @@ export const LINE_ICON_PATHS = {
   Ship: 'fa-solid fa-ship',
   
   // Event Information Icons
-  PlayCircle: 'fa-solid fa-circle-play',
+  PlayCircle: 'fa-solid fa-play',
   StopCircle: 'fa-solid fa-flag-checkered',
   Stethoscope: 'fa-solid fa-kit-medical',
   BatteryCharging: 'fa-solid fa-battery-half',

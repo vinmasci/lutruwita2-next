@@ -36,8 +36,9 @@ const getAdjustedPosition = (clusterPosition, pois, minDistance = 0.003 // Incre
     }
     return [adjustedLng, adjustedLat];
 };
-export const PhotoCluster = ({ cluster, onClick }) => {
+export const PhotoCluster = ({ cluster, onClick, isHighlighted }) => {
     const markerRef = useRef(null);
+    const markerElementRef = useRef(null);
     const { map } = useMapContext();
     const { getPOIsForRoute } = usePOIContext();
     useEffect(() => {
@@ -46,6 +47,9 @@ export const PhotoCluster = ({ cluster, onClick }) => {
         const el = document.createElement('div');
         el.className = 'photo-cluster';
         el.setAttribute('data-zoom', Math.floor(map.getZoom()).toString());
+        
+        // Store reference to the element
+        markerElementRef.current = el;
         // Update zoom attribute when map zooms
         const updateZoom = () => {
             el.setAttribute('data-zoom', Math.floor(map.getZoom()).toString());
@@ -55,6 +59,12 @@ export const PhotoCluster = ({ cluster, onClick }) => {
         container.className = 'photo-cluster-container';
         const bubble = document.createElement('div');
         bubble.className = 'photo-cluster-bubble';
+        
+        // Apply highlighted class if needed
+        if (isHighlighted) {
+            bubble.classList.add('highlighted');
+            container.classList.add('highlighted');
+        }
         // Create click handler with cleanup
         const handleClick = (e) => {
             e.stopPropagation();
@@ -131,6 +141,24 @@ export const PhotoCluster = ({ cluster, onClick }) => {
             }
             map.off('zoom', updateZoom);
         };
-    }, [map, cluster, onClick, getPOIsForRoute]);
+    }, [map, cluster, onClick, getPOIsForRoute, isHighlighted]);
+    
+    // Update highlighted state when it changes
+    useEffect(() => {
+        if (markerElementRef.current) {
+            const bubble = markerElementRef.current.querySelector('.photo-cluster-bubble');
+            const container = markerElementRef.current.querySelector('.photo-cluster-container');
+            
+            if (bubble && container) {
+                if (isHighlighted) {
+                    bubble.classList.add('highlighted');
+                    container.classList.add('highlighted');
+                } else {
+                    bubble.classList.remove('highlighted');
+                    container.classList.remove('highlighted');
+                }
+            }
+        }
+    }, [isHighlighted]);
     return null;
 };

@@ -233,7 +233,22 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         }) 
                     }),
                     
-                    // Divider after line markers
+                    // Climb Flags moved to be underneath line markers
+                    _jsx(Tooltip, { 
+                        title: "Climb Flags", 
+                        placement: "right", 
+                        children: _jsx(ListItemButton, { 
+                            onClick: toggleClimbFlagsVisibility,
+                            sx: listItemButtonStyle, 
+                            children: _jsx(ListItemIcon, { 
+                                children: _jsx(FlagTriangleRight, { 
+                                    color: isClimbFlagsVisible ? '#4caf50' : '#ff4d4f' 
+                                }) 
+                            }) 
+                        }) 
+                    }),
+                    
+                    // Divider after line markers and climb flags
                     _jsx(Divider, { 
                         sx: { 
                             my: 1, 
@@ -354,19 +369,6 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                         }) 
                     }),
                     
-                    _jsx(Tooltip, { 
-                        title: "Climb Flags", 
-                        placement: "right", 
-                        children: _jsx(ListItemButton, { 
-                            onClick: toggleClimbFlagsVisibility,
-                            sx: listItemButtonStyle, 
-                            children: _jsx(ListItemIcon, { 
-                                children: _jsx(FlagTriangleRight, { 
-                                    color: isClimbFlagsVisible ? '#4caf50' : '#ff4d4f' 
-                                }) 
-                            }) 
-                        }) 
-                    })
                 ] 
             }) 
         }),

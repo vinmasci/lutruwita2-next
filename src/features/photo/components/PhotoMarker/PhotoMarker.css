@@ -38,6 +38,23 @@
   opacity: 1; /* 60% transparent */
 }
 
+/* Highlighted marker style */
+.photo-marker-bubble.highlighted {
+  transform: scale(1.2);
+  border: 3px solid #FF9500; /* Orange border */
+  box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5); /* Glowing effect */
+  animation: pulse 1.5s infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(255, 149, 0, 0.9), 0 0 40px rgba(255, 149, 0, 0.7);
+  }
+}
+
 /* Zoom-based scaling for the entire container */
 .photo-marker[data-zoom="3"] .photo-marker-container { transform: scale(0.1); }
 .photo-marker[data-zoom="4"] .photo-marker-container { transform: scale(0.15); }
@@ -72,4 +89,10 @@
   border-top: 8px solid white;
   margin-top: -1px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Highlighted marker point */
+.photo-marker-container.highlighted .photo-marker-point {
+  border-top-color: #FF9500; /* Orange point */
+  filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7));
 }

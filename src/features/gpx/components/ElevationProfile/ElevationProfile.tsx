@@ -7,6 +7,7 @@ import { ElevationContent } from './ElevationProfile.styles';
 import { Alert, AlertTitle, AlertDescription } from "../../../../components/ui/alert";
 import { useMapContext } from '../../../map/context/MapContext';
 import { detectClimbs } from '../../utils/climbUtils';
+import { findClosestPointOnRoute, createRouteSpatialGrid } from '../../../../utils/routeUtils';
 
 // Define the Climb interface based on the return value of detectClimbs
 interface Climb {
@@ -234,75 +235,108 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
     unpavedPercentage: route.surface?.surfaceTypes?.find(t => t.type === 'trail')?.percentage || 0
   });
 
-  // Find the closest point on the route to the hover coordinates
+  // Reference to store the route spatial grid and distance map
+  const routeDataRef = useRef<{
+    spatialGrid: ReturnType<typeof createRouteSpatialGrid> | null;
+    distanceMap: Map<number, number> | null;
+    indexMap: Map<string, number> | null;
+  }>({
+    spatialGrid: null,
+    distanceMap: null,
+    indexMap: null
+  });
+
+  // Effect to create the spatial grid and distance map when the route changes
   useEffect(() => {
-    if (!hoverCoordinates || !route?.geojson?.features?.[0]?.geometry) {
+    if (!route?.geojson?.features?.[0]) {
+      routeDataRef.current = {
+        spatialGrid: null,
+        distanceMap: null,
+        indexMap: null
+      };
+      return;
+    }
+
+    const feature = route.geojson.features[0];
+    if (feature.geometry.type !== 'LineString') {
+      return;
+    }
+
+    const coordinates = feature.geometry.coordinates;
+    
+    // Create spatial grid for optimized point lookup
+    const spatialGrid = createRouteSpatialGrid(coordinates);
+    
+    // Pre-calculate cumulative distances
+    const distanceMap = new Map<number, number>();
+    distanceMap.set(0, 0); // First point is at distance 0
+    
+    let totalDistanceCalculated = 0;
+    for (let i = 1; i < coordinates.length; i++) {
+      const distance = calculateDistance(coordinates[i-1], coordinates[i]);
+      totalDistanceCalculated += distance;
+      distanceMap.set(i, totalDistanceCalculated);
+    }
+    
+    // Create a map to quickly find the index of a coordinate
+    const indexMap = new Map<string, number>();
+    coordinates.forEach((coord, index) => {
+      if (coord && coord.length >= 2) {
+        const key = `${coord[0]},${coord[1]}`;
+        indexMap.set(key, index);
+      }
+    });
+    
+    routeDataRef.current = {
+      spatialGrid,
+      distanceMap,
+      indexMap
+    };
+    
+    console.log('[ElevationProfile] ✅ Created spatial grid and distance map for elevation profile');
+  }, [route]);
+
+  // Effect to update the current profile point based on hover coordinates
+  useEffect(() => {
+    if (!hoverCoordinates || !data.length || !route?.geojson?.features?.[0] || !routeDataRef.current.spatialGrid) {
       setCurrentProfilePoint(null);
       return;
     }
 
-    try {
-      const feature = route.geojson.features[0];
-      if (feature.geometry.type !== 'LineString') {
-        setCurrentProfilePoint(null);
-        return;
+    // Use the optimized function to find the closest point
+    const closestPoint = findClosestPointOnRoute(hoverCoordinates, routeDataRef.current.spatialGrid);
+    
+    if (!closestPoint) {
+      setCurrentProfilePoint(null);
+      return;
+    }
+    
+    // Find the index of this point in the route
+    const pointKey = `${closestPoint[0]},${closestPoint[1]}`;
+    const closestIndex = routeDataRef.current.indexMap?.get(pointKey);
+    
+    if (closestIndex !== undefined) {
+      // Get the pre-calculated distance at this index
+      const distanceAlongRoute = (routeDataRef.current.distanceMap?.get(closestIndex) || 0) / 1000; // in km
+      
+      // Find the closest point in the elevation data
+      const profileData = data[0].data;
+      let closestProfilePoint = profileData[0];
+      let minProfileDistance = Math.abs(profileData[0].x - distanceAlongRoute);
+      
+      for (let i = 1; i < profileData.length; i++) {
+        const distance = Math.abs(profileData[i].x - distanceAlongRoute);
+        if (distance < minProfileDistance) {
+          minProfileDistance = distance;
+          closestProfilePoint = profileData[i];
+        }
       }
       
-      const coordinates = feature.geometry.coordinates;
-      
-      // Find the closest point on the route to the hover coordinates
-      let closestPoint: number[] | null = null;
-      let minDistance = Infinity;
-      let closestIndex = -1;
-      
-      coordinates.forEach((coord, index) => {
-        const dx = coord[0] - hoverCoordinates[0];
-        const dy = coord[1] - hoverCoordinates[1];
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestPoint = coord;
-          closestIndex = index;
-        }
-      });
-      
-      if (closestIndex >= 0 && data.length > 0 && data[0].data.length > 0) {
-        // Calculate cumulative distances using Haversine formula
-        const cumulativeDistances = [0]; // First point is at distance 0
-        let totalDistanceCalculated = 0;
-        
-        for (let i = 1; i < coordinates.length; i++) {
-          const distance = calculateDistance(coordinates[i-1], coordinates[i]);
-          totalDistanceCalculated += distance;
-          cumulativeDistances.push(totalDistanceCalculated);
-        }
-        
-        // Get the actual distance at the closest index using Haversine
-        const distanceAlongRoute = cumulativeDistances[closestIndex] / 1000; // in km
-        
-        // Find the closest point in the elevation profile data
-        const profileData = data[0].data;
-        let closestProfilePoint = profileData[0];
-        let minProfileDistance = Math.abs(profileData[0].x - distanceAlongRoute);
-        
-        for (let i = 1; i < profileData.length; i++) {
-          const distance = Math.abs(profileData[i].x - distanceAlongRoute);
-          if (distance < minProfileDistance) {
-            minProfileDistance = distance;
-            closestProfilePoint = profileData[i];
-          }
-        }
-        
-        setCurrentProfilePoint(closestProfilePoint);
-      } else {
-        setCurrentProfilePoint(null);
-      }
-    } catch (error) {
-      console.error('Error finding closest point:', error);
+      setCurrentProfilePoint(closestProfilePoint);
+    } else {
       setCurrentProfilePoint(null);
     }
-  }, [hoverCoordinates, route?.geojson, data, stats.totalDistance]);
+  }, [hoverCoordinates, data, route]);
 
   useEffect(() => {
     if (!route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation) {

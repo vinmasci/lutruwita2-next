@@ -259,7 +259,7 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
               type: 'circle',
               source: 'hover-point',
               paint: {
-                'circle-radius': 8,
+                'circle-radius': 6,
                 'circle-color': '#ff0000',
                 'circle-stroke-width': 2,
                 'circle-stroke-color': '#ffffff',
@@ -360,7 +360,7 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
               type: 'circle',
               source: 'hover-point',
               paint: {
-                'circle-radius': 8,
+                'circle-radius': 6,
                 'circle-color': '#ff0000',
                 'circle-stroke-width': 2,
                 'circle-stroke-color': '#ffffff',
