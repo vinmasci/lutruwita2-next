@@ -458,41 +458,107 @@ export const RouteProvider = ({ children, }) => {
         setChangedSections(prev => ({...prev, routes: true}));
     }, [currentLoadedState, updateRouteMetadata]);
     const deleteRoute = useCallback((routeId) => {
+        console.log('[RouteContext] Deleting route:', routeId);
+        
         // Clean up map layers first if we have access to the map
         if (map) {
-            const cleanupLayers = (routeId) => {
+            try {
                 const style = map.getStyle();
-                if (!style)
+                if (!style) {
+                    console.warn('[RouteContext] Map style not available');
                     return;
-                // Find and remove all layers for this route
-                const routeLayers = style.layers
-                    ?.filter(layer => layer.id.startsWith(routeId))
-                    .map(layer => layer.id) || [];
-                routeLayers.forEach(layerId => {
+                }
+
+                // Enhanced list of layer patterns to catch all possible route-related layers
+                const layerPatterns = [
+                    `${routeId}-main-line`,
+                    `${routeId}-main-border`,
+                    `${routeId}-hover`,
+                    `unpaved-section-layer-${routeId}`,
+                    `${routeId}-surface`,
+                    `${routeId}-unpaved-line`,
+                    `route-${routeId}`,
+                    `${routeId}-route`,
+                    `${routeId}-line`,
+                    `${routeId}-border`,
+                    `${routeId}-outline`,
+                    `${routeId}-fill`,
+                    `${routeId}-symbol`,
+                    `${routeId}-label`
+                ];
+
+                // Find all layers that match our patterns or include the routeId
+                const allLayers = style.layers
+                    .map(layer => layer.id)
+                    .filter(id => id.includes(routeId) ||
+                                 layerPatterns.some(pattern => id.includes(pattern)));
+
+                console.log('[RouteContext] Found layers to remove:', allLayers);
+
+                // Remove all layers first
+                allLayers.forEach(layerId => {
                     if (map.getLayer(layerId)) {
                         try {
+                            console.log('[RouteContext] Removing layer:', layerId);
                             map.removeLayer(layerId);
-                        }
-                        catch (error) {
-                            console.error('[RouteContext][DELETE] Error removing layer:', layerId, error);
+                        } catch (error) {
+                            console.error('[RouteContext] Error removing layer:', layerId, error);
                         }
                     }
                 });
-                // Remove associated sources
-                const routeSources = [`${routeId}-main`];
-                routeSources.forEach(sourceId => {
-                    if (map.getSource(sourceId)) {
+
+                // Enhanced list of source patterns to catch all possible route-related sources
+                const sourcePatterns = [
+                    `${routeId}-main`,
+                    `unpaved-section-${routeId}`,
+                    `${routeId}-unpaved`,
+                    `route-${routeId}`,
+                    `${routeId}-route`,
+                    `${routeId}-source`,
+                    `${routeId}-data`,
+                    `${routeId}-geojson`
+                ];
+
+                // Get all source IDs from the style
+                const allSources = Object.keys(style.sources || {})
+                    .filter(id => id.includes(routeId) ||
+                                 sourcePatterns.some(pattern => id.includes(pattern)));
+
+                console.log('[RouteContext] Found sources to remove:', allSources);
+
+                // Remove all sources after a brief delay
+                setTimeout(() => {
+                    allSources.forEach(sourceId => {
+                        if (map.getSource(sourceId)) {
+                            try {
+                                console.log('[RouteContext] Removing source:', sourceId);
+                                map.removeSource(sourceId);
+                            } catch (error) {
+                                console.error('[RouteContext] Error removing source:', sourceId, error);
+                            }
+                        }
+                    });
+                    
+                    // Force a map redraw with a slightly longer delay to ensure all cleanup is complete
+                    setTimeout(() => {
                         try {
-                            map.removeSource(sourceId);
+                            console.log('[RouteContext] Forcing map redraw after route deletion');
+                            map.resize();
+                            
+                            // Additional map refresh to ensure rendering is updated
+                            if (map.repaint) {
+                                map.repaint = true;
+                            }
+                        } catch (error) {
+                            console.error('[RouteContext] Error during map redraw:', error);
                         }
-                        catch (error) {
-                            console.error('[RouteContext][DELETE] Error removing source:', sourceId, error);
-                        }
-                    }
-                });
-            };
-            cleanupLayers(routeId);
+                    }, 200);
+                }, 100);
+            } catch (error) {
+                console.error('[RouteContext] Error cleaning up map layers:', error);
+            }
         }
+        
         setRoutes((prev) => prev.filter((route) => route.routeId !== routeId));
         setCurrentRoute((prev) => prev?.routeId === routeId ? null : prev);
         setHasUnsavedChanges(true);

@@ -397,26 +397,68 @@ function MapViewContent() {
             console.error('[MapView][DELETE] Map style or layers not available');
             return;
         }
-        // Step 1: Find all layers associated with this route
+        
+        // Normalize routeId to handle different formats
+        // Some components might use 'route-123' while others use just '123'
+        const normalizedRouteId = routeId.startsWith('route-') ? routeId : `route-${routeId}`;
+        const baseRouteId = routeId.startsWith('route-') ? routeId.substring(6) : routeId;
+        
+        // Create an array of possible ID formats to search for
+        const possibleRouteIds = [
+            routeId,
+            normalizedRouteId,
+            baseRouteId
+        ];
+        
+        console.log('[MapView][DELETE] Searching for layers with possible IDs:', possibleRouteIds);
+        
+        // Step 1: Find all layers associated with this route using all possible ID formats
         console.log('[MapView][DELETE] Finding layers for route:', routeId);
         const allLayers = style.layers
             .map(layer => layer.id)
-            .filter(id => id.includes(routeId) || // Matches any layer containing the routeId
-            id.startsWith(`unpaved-section-layer-${routeId}`) // Matches unpaved section layers
-        );
+            .filter(id => 
+                // Check if layer ID contains any of the possible route IDs
+                possibleRouteIds.some(possibleId => id.includes(possibleId)) ||
+                // Check for unpaved section layers with any possible ID format
+                possibleRouteIds.some(possibleId => id.startsWith(`unpaved-section-layer-${possibleId}`)) ||
+                possibleRouteIds.some(possibleId => id.startsWith(`unpaved-sections-layer-${possibleId}`))
+            );
+        
         console.log('[MapView][DELETE] Found map style layers:', allLayers);
-        // Add known layer patterns that might not be caught by the filter
-        const knownLayerPatterns = [
-            `${routeId}-main-border`,
-            `${routeId}-main-line`,
-            `${routeId}-hover`,
-            `${routeId}-surface`,
-            `${routeId}-unpaved-line`
-        ];
+        
+        // Add known layer patterns for all possible ID formats
+        const knownLayerPatterns = [];
+        
+        // Generate patterns for each possible ID format
+        possibleRouteIds.forEach(id => {
+            knownLayerPatterns.push(
+                `${id}-main-border`,
+                `${id}-main-line`,
+                `${id}-hover`,
+                `${id}-hover-line`,
+                `${id}-surface`,
+                `${id}-unpaved-line`,
+                `unpaved-section-layer-${id}`,
+                `unpaved-sections-layer-${id}`
+            );
+        });
+        
+        // Also check for RouteLayer.js specific naming patterns
+        possibleRouteIds.forEach(id => {
+            knownLayerPatterns.push(
+                `${id}-main-line`,
+                `${id}-main-border`,
+                `${id}-hover-line`,
+                `unpaved-sections-layer-${id}`
+            );
+        });
+        
         console.log('[MapView][DELETE] Added known layer patterns:', knownLayerPatterns);
+        
         // Combine all layer IDs and remove duplicates
         const layersToRemove = [...new Set([...allLayers, ...knownLayerPatterns])];
         console.log('[MapView][DELETE] Final layers to remove:', layersToRemove);
+        
         // Step 2: Remove all layers first
         console.log('[MapView][DELETE] Starting layer removal process');
         layersToRemove.forEach(layerId => {
@@ -434,16 +476,30 @@ function MapViewContent() {
                 console.log('[MapView][DELETE] Layer not found:', layerId);
             }
         });
-        // Step 3: Find all sources associated with this route
-        const mainSourceId = `${routeId}-main`;
-        const unpavedSourceId = `${routeId}-unpaved`;
-        const unpavedSectionPattern = `unpaved-section-${routeId}-`;
-        // Get all source IDs from the style
+        
+        // Step 3: Find all sources associated with this route using all possible ID formats
+        const sourcesToRemove = [];
+        
+        // Generate source patterns for each possible ID format
+        possibleRouteIds.forEach(id => {
+            sourcesToRemove.push(
+                `${id}-main`,
+                `${id}-unpaved`,
+                `unpaved-section-${id}`,
+                `unpaved-sections-${id}`
+            );
+        });
+        
+        // Get all source IDs from the style that match any of our patterns
         const allSources = Object.keys(style.sources || {})
-            .filter(id => id === mainSourceId ||
-            id === unpavedSourceId ||
-            id.startsWith(unpavedSectionPattern));
+            .filter(id => 
+                sourcesToRemove.includes(id) || 
+                possibleRouteIds.some(routeId => id.startsWith(`unpaved-section-${routeId}-`)) ||
+                possibleRouteIds.some(routeId => id.startsWith(`unpaved-sections-${routeId}-`))
+            );
+        
         console.log('[MapView][DELETE] Found sources to remove:', allSources);
+        
         // Step 4: Remove all sources after a brief delay to ensure layers are fully removed
         setTimeout(() => {
             console.log('[MapView][DELETE] Starting source removal process after delay');
@@ -462,18 +518,37 @@ function MapViewContent() {
                     console.log('[MapView][DELETE] Source not found:', sourceId);
                 }
             });
+            
             // Log state after source removal
             const currentStyle = map.getStyle();
             console.log('[MapView][DELETE] Remaining sources:', Object.keys(currentStyle?.sources || {}));
-        }, 100); // Small delay to ensure layers are fully removed
+            
+            // Force a map redraw after all cleanup
+            setTimeout(() => {
+                try {
+                    console.log('[MapView][DELETE] Forcing map redraw');
+                    map.resize();
+                    
+                    // Additional map refresh to ensure rendering is updated
+                    if (map.repaint) {
+                        map.repaint = true;
+                    }
+                } catch (error) {
+                    console.error('[MapView][DELETE] Error during map redraw:', error);
+                }
+            }, 200);
+        }, 200); // Increased delay to ensure layers are fully removed
+        
         // Step 5: Delete from context
         console.log('[MapView][DELETE] Calling deleteRoute with ID:', routeId);
         deleteRoute(routeId);
+        
         // Clear local reference
         if (currentRouteId.current === routeId) {
             console.log('[MapView][DELETE] Clearing current route reference:', currentRouteId.current);
             currentRouteId.current = null;
         }
+        
         // Log final state
         console.log('[MapView][DELETE] Deletion process complete for route:', routeId);
     };

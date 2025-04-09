@@ -3,7 +3,8 @@ import {
   Paper, 
   IconButton, 
   Typography, 
-  Box
+  Box,
+  CircularProgress
 } from '@mui/material';
 import { 
   Close as CloseIcon, 
@@ -18,6 +19,7 @@ import { useMapContext } from '../../../map/context/MapContext';
  * - Shows photos in a small fixed-position modal 
  * - Navigation arrows to cycle through nearby photos
  * - Map pans to the location of the current photos
+ * - Optimized for mobile performance with lazy loading
  * 
  * @param {Object} props - Component props
  * @param {Object} props.photo - The photo to display
@@ -28,80 +30,82 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   // Get map context for panning
   const { map } = useMapContext();
   
-  // Use all photos if provided, otherwise just the single photo
-  const photos = additionalPhotos || [photo];
+  // Store photo references instead of full objects to reduce memory usage
+  const photoRefs = additionalPhotos || [photo];
   
   // Use the initialIndex prop to set the initial selectedIndex
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
   const [imageError, setImageError] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
   
-  // Local state to track photos
-  const [localPhotos, setLocalPhotos] = useState(photos);
-  
-  // Update local photos when props change and update the selected index
-  useEffect(() => {
-    // Always update the photos array
-    setLocalPhotos(photos);
-    
-    // Update the selected index when initialIndex changes
-    setSelectedIndex(initialIndex);
-    
-    console.log(`Setting index to ${initialIndex} of ${photos.length} photos`);
-  }, [photos, initialIndex]);
-  
-  // Get the currently selected photo
-  const selectedPhoto = localPhotos[selectedIndex];
+  // Get the currently selected photo reference
+  const selectedPhoto = photoRefs[selectedIndex];
   
   // Call onPhotoChange when the selected photo changes
   useEffect(() => {
     if (onPhotoChange && selectedPhoto) {
       onPhotoChange(selectedPhoto);
     }
+    
+    // Reset loading and error states when photo changes
+    setIsImageLoading(true);
+    setImageError(false);
   }, [selectedPhoto, onPhotoChange]);
+  
+  // Determine if the user is on a mobile device
+  const isMobileDevice = useCallback(() => {
+    return window.innerWidth <= 768 || 
+           /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }, []);
   
   // Navigation handlers
   const handleNext = useCallback(() => {
-    const newIndex = (selectedIndex + 1) % localPhotos.length;
+    const newIndex = (selectedIndex + 1) % photoRefs.length;
     setSelectedIndex(newIndex);
-    setImageError(false); // Reset error state when changing photos
+    setImageError(false);
+    setIsImageLoading(true);
     
     // Pan the map to the new photo's location
-    const nextPhoto = localPhotos[newIndex];
+    const nextPhoto = photoRefs[newIndex];
     if (map && nextPhoto && nextPhoto.coordinates) {
+      const isMobile = isMobileDevice();
       map.easeTo({
         center: [nextPhoto.coordinates.lng, nextPhoto.coordinates.lat],
         zoom: map.getZoom(), // Maintain current zoom level
-        pitch: 60, // Keep the 60-degree pitch
-        duration: 500 // Smooth transition over 0.5 seconds
+        pitch: isMobile ? 0 : 60, // No pitch on mobile
+        duration: isMobile ? 300 : 500 // Shorter duration on mobile
       });
     }
-  }, [localPhotos, selectedIndex, map]);
+  }, [photoRefs, selectedIndex, map, isMobileDevice]);
   
   const handlePrev = useCallback(() => {
-    const newIndex = (selectedIndex - 1 + localPhotos.length) % localPhotos.length;
+    const newIndex = (selectedIndex - 1 + photoRefs.length) % photoRefs.length;
     setSelectedIndex(newIndex);
-    setImageError(false); // Reset error state when changing photos
+    setImageError(false);
+    setIsImageLoading(true);
     
     // Pan the map to the new photo's location
-    const prevPhoto = localPhotos[newIndex];
+    const prevPhoto = photoRefs[newIndex];
     if (map && prevPhoto && prevPhoto.coordinates) {
+      const isMobile = isMobileDevice();
       map.easeTo({
         center: [prevPhoto.coordinates.lng, prevPhoto.coordinates.lat],
         zoom: map.getZoom(), // Maintain current zoom level
-        pitch: 60, // Keep the 60-degree pitch
-        duration: 500 // Smooth transition over 0.5 seconds
+        pitch: isMobile ? 0 : 60, // No pitch on mobile
+        duration: isMobile ? 300 : 500 // Shorter duration on mobile
       });
     }
-  }, [localPhotos, selectedIndex, map]);
+  }, [photoRefs, selectedIndex, map, isMobileDevice]);
   
   // Pan to the initial photo when the popup opens and pitch the map
   useEffect(() => {
     if (map && selectedPhoto && selectedPhoto.coordinates) {
+      const isMobile = isMobileDevice();
       map.easeTo({
         center: [selectedPhoto.coordinates.lng, selectedPhoto.coordinates.lat],
         zoom: map.getZoom(), // Maintain current zoom level
-        pitch: 60, // Add a 60-degree pitch to angle the map
-        duration: 800 // Slightly longer transition for the pitch change
+        pitch: isMobile ? 0 : 60, // No pitch on mobile, 60-degree pitch on desktop
+        duration: isMobile ? 300 : 800 // Shorter duration on mobile
       });
     }
     
@@ -114,7 +118,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         });
       }
     };
-  }, [map, selectedPhoto]);
+  }, [map, selectedPhoto, isMobileDevice]);
   
   // Touch swipe state
   const [touchStart, setTouchStart] = useState(null);
@@ -176,21 +180,18 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     };
   }, [handleNext, handlePrev, onClose]);
   
-  // Determine if the user is on a mobile device
-  const isMobileDevice = () => {
-    return window.innerWidth <= 768 || 
-           /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  };
-  
   // Determine the best image URL to use based on device type
+  // Optimized to use smaller images on mobile
   const getBestImageUrl = (photo) => {
     const isMobile = isMobileDevice();
+    
+    if (!photo) return null;
     
     // For local photos
     if (photo.isLocal) {
       if (isMobile) {
-        // On mobile, prioritize medium images but never use thumbnails unless nothing else is available
-        return photo.mediumUrl || photo.largeUrl || photo.url || photo.thumbnailUrl || photo.tinyThumbnailUrl;
+        // On mobile, strictly prioritize smaller images
+        return photo.thumbnailUrl || photo.tinyThumbnailUrl || photo.mediumUrl || photo.url || photo.largeUrl;
       } else {
         // On desktop, prioritize large images for better quality
         return photo.largeUrl || photo.url || photo.mediumUrl || photo.thumbnailUrl || photo.tinyThumbnailUrl;
@@ -199,8 +200,8 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     
     // For Cloudinary photos
     if (isMobile) {
-      // On mobile, prioritize medium images but never use thumbnails unless nothing else is available
-      return photo.mediumUrl || photo.largeUrl || photo.url || photo.thumbnailUrl || photo.tinyThumbnailUrl;
+      // On mobile, strictly prioritize smaller images
+      return photo.thumbnailUrl || photo.tinyThumbnailUrl || photo.mediumUrl || photo.url || photo.largeUrl;
     } else {
       // On desktop, prioritize large images for better quality
       return photo.largeUrl || photo.url || photo.mediumUrl || photo.thumbnailUrl || photo.tinyThumbnailUrl;
@@ -211,6 +212,12 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   const handleImageError = () => {
     console.error('Failed to load image:', getBestImageUrl(selectedPhoto));
     setImageError(true);
+    setIsImageLoading(false);
+  };
+  
+  // Handle image load success
+  const handleImageLoad = () => {
+    setIsImageLoading(false);
   };
   
   if (!selectedPhoto) {
@@ -225,7 +232,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         top: '40%', // More higher than before
         left: '75%', // Much further to the right
         transform: 'translate(-50%, -50%)', // Center the modal with the offset
-        width: 600, // Twice as big (was 300)
+        width: isMobileDevice() ? 400 : 600, // Smaller on mobile
         maxWidth: '90vw',
         zIndex: 9999, // Very high z-index to ensure it's on top
         overflow: 'hidden',
@@ -242,7 +249,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
           justifyContent: "center",
           alignItems: "center",
           bgcolor: "black",
-          height: 400, // Twice as big (was 200)
+          height: isMobileDevice() ? 300 : 400, // Smaller on mobile
           overflow: "hidden",
           padding: 0
         }}
@@ -250,17 +257,37 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Loading indicator */}
+        {isImageLoading && !imageError && (
+          <Box 
+            sx={{
+              position: 'absolute',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '100%',
+              height: '100%',
+              zIndex: 1
+            }}
+          >
+            <CircularProgress size={40} sx={{ color: 'white' }} />
+          </Box>
+        )}
+        
         {/* Image */}
         {!imageError ? (
           <img
             src={getBestImageUrl(selectedPhoto)}
             alt={selectedPhoto.name || 'Photo'}
             onError={handleImageError}
+            onLoad={handleImageLoad}
             style={{
               height: '100%',
               width: '100%',
               objectFit: 'cover', // Fill the container while maintaining aspect ratio
-              objectPosition: 'center' // Center the image
+              objectPosition: 'center', // Center the image
+              opacity: isImageLoading ? 0.3 : 1, // Fade in when loaded
+              transition: 'opacity 0.3s ease'
             }}
           />
         ) : (
@@ -286,7 +313,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         )}
         
         {/* Navigation buttons */}
-        {localPhotos.length > 1 && (
+        {photoRefs.length > 1 && (
           <>
             <IconButton
               onClick={handlePrev}
@@ -373,7 +400,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         
         {/* Photo count (center) */}
         <Typography variant="caption" color="white">
-          {selectedIndex + 1} / {localPhotos.length}
+          {selectedIndex + 1} / {photoRefs.length}
         </Typography>
       </Box>
       

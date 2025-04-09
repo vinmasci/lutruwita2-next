@@ -46,29 +46,64 @@ export const ClimbMarkers = ({ map, route }) => {
             }
 
             const elevations = feature.properties?.coordinateProperties?.elevation;
-            const coordinates = feature.geometry.coordinates;
+            const routeCoordinates = feature.geometry.coordinates;
             const totalDistance = route.statistics.totalDistance;
 
-            if (!Array.isArray(elevations) || !Array.isArray(coordinates)) {
+            if (!Array.isArray(elevations) || !Array.isArray(routeCoordinates)) {
                 return;
             }
 
-            // Create elevation data for climb detection
-            const elevationData = [];
-            const pointCount = elevations.length;
-
-            for (let i = 0; i < pointCount; i++) {
-                const distance = (i / (pointCount - 1)) * totalDistance;
-                const elevation = elevations[i];
+            // We'll skip the old elevation data calculation and use only the ElevationProfile approach
+            
+            // Create elevation data in the same format as the ElevationProfile component
+            const elevationProfileData = [];
+            
+            // Calculate cumulative distances for each point
+            const cumulativeDistances = [0]; // First point is at distance 0
+            let totalDistanceCalculated = 0;
+            
+            // Calculate distance between two points using Haversine formula
+            const calculateDistance = (point1, point2) => {
+                const [lon1, lat1] = point1;
+                const [lon2, lat2] = point2;
                 
-                elevationData.push({
-                    distance,
-                    elevation
+                // Convert to radians
+                const toRad = (value) => value * Math.PI / 180;
+                const φ1 = toRad(lat1);
+                const φ2 = toRad(lat2);
+                const Δφ = toRad(lat2 - lat1);
+                const Δλ = toRad(lon2 - lon1);
+                
+                // Haversine formula
+                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                          Math.cos(φ1) * Math.cos(φ2) *
+                          Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                
+                // Earth's radius in meters
+                const R = 6371e3;
+                return R * c;
+            };
+            
+            // Calculate cumulative distances
+            for (let j = 1; j < routeCoordinates.length; j++) {
+                const distance = calculateDistance(routeCoordinates[j-1], routeCoordinates[j]);
+                totalDistanceCalculated += distance;
+                cumulativeDistances.push(totalDistanceCalculated);
+            }
+            
+            // Create elevation data with accurate distances - exactly like in ElevationProfile.tsx
+            for (let k = 0; k < elevations.length; k++) {
+                // Use the actual distance for this point, or interpolate if needed
+                const distanceIndex = Math.min(k, cumulativeDistances.length - 1);
+                elevationProfileData.push({
+                    distance: cumulativeDistances[distanceIndex],
+                    elevation: elevations[k]
                 });
             }
-
-            // Detect climbs
-            const climbs = detectClimbs(elevationData);
+            
+            // Detect climbs using the same data format as ElevationProfile.tsx
+            const climbs = detectClimbs(elevationProfileData);
             
             // Sort climbs by distance to get them in route order
             const sortedClimbs = [...climbs].sort((a, b) => a.startPoint.distance - b.startPoint.distance);
@@ -79,6 +114,8 @@ export const ClimbMarkers = ({ map, route }) => {
                 categoryCount[climb.category] = (categoryCount[climb.category] || 0) + 1;
                 climb.number = categoryCount[climb.category];
             });
+            
+            console.log('[ClimbMarkers] Detected climbs using elevation profile format:', sortedClimbs);
 
             // Create markers for each climb
             const newMarkers = [];
@@ -103,11 +140,11 @@ export const ClimbMarkers = ({ map, route }) => {
                 const startDistanceRatio = climb.startPoint.distance / totalDistance;
                 const endDistanceRatio = climb.endPoint.distance / totalDistance;
                 
-                const startIndex = Math.floor(startDistanceRatio * (coordinates.length - 1));
-                const endIndex = Math.floor(endDistanceRatio * (coordinates.length - 1));
+                const startIndex = Math.floor(startDistanceRatio * (routeCoordinates.length - 1));
+                const endIndex = Math.floor(endDistanceRatio * (routeCoordinates.length - 1));
                 
-                const startCoord = coordinates[startIndex];
-                const endCoord = coordinates[endIndex];
+                const startCoord = routeCoordinates[startIndex];
+                const endCoord = routeCoordinates[endIndex];
                 
                 if (!startCoord || !endCoord) {
                     return;

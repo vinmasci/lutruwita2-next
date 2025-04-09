@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import React from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
@@ -7,6 +7,7 @@ import { PhotoMarker } from '../../../photo/components/PhotoMarker/PhotoMarker';
 import { PhotoCluster } from '../../../photo/components/PhotoCluster/PhotoCluster';
 import { PhotoModal } from './PhotoModal';
 import { clusterPhotosPresentation, isCluster, getClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
+import { devLog } from '../../../../utils/conditionalLogger';
 import './PresentationPhotoLayer.css';
 
 export const PresentationPhotoLayer = () => {
@@ -276,63 +277,83 @@ export const PresentationPhotoLayer = () => {
         return clusterPhotosPresentation(validPhotos, simulatedZoom, undefined, options);
     }, [validPhotos, map, roundedZoom]);
     
+    // Debounce the selected photo cluster update to prevent flickering
+    const updateSelectedPhotoClusterRef = useRef(null);
+    
     // Update the selected photo cluster when the selected photo changes
     useEffect(() => {
-        if (selectedPhoto) {
-            console.log('Selected photo:', selectedPhoto);
-            
-            // First try to find clusters in the current zoom level
-            const containingClusters = clusteredItems.filter(item => 
-                isCluster(item) && 
-                item.properties.photos.some(photo => photo.url === selectedPhoto.url)
-            );
-            
-            console.log(`Found ${containingClusters.length} clusters containing the selected photo at current zoom`);
-            
-            // If we found a cluster containing this photo, store it
-            if (containingClusters.length > 0) {
-                setSelectedPhotoCluster(containingClusters[0]);
-                console.log(`Cluster contains ${containingClusters[0].properties.photos.length} photos`);
-            } else {
-                // If no clusters found at current zoom, try the simulated lower zoom clustering
-                const simulatedClusters = simulatedClustering.filter(item => 
+        // Clear any existing timeout
+        if (updateSelectedPhotoClusterRef.current) {
+            clearTimeout(updateSelectedPhotoClusterRef.current);
+        }
+        
+        // If no selected photo, clear the cluster immediately
+        if (!selectedPhoto) {
+            setSelectedPhotoCluster(null);
+            return;
+        }
+        
+        // Use a timeout to debounce the update (prevents flickering)
+        updateSelectedPhotoClusterRef.current = setTimeout(() => {
+            if (selectedPhoto) {
+                devLog('PresentationPhotoLayer', 'Selected photo:', selectedPhoto);
+                
+                // First try to find clusters in the current zoom level
+                const containingClusters = clusteredItems.filter(item => 
                     isCluster(item) && 
                     item.properties.photos.some(photo => photo.url === selectedPhoto.url)
                 );
                 
-                console.log(`Found ${simulatedClusters.length} clusters containing the selected photo at simulated zoom`);
+                devLog('PresentationPhotoLayer', `Found ${containingClusters.length} clusters containing the selected photo at current zoom`);
                 
-                if (simulatedClusters.length > 0) {
-                    // We found a cluster at the simulated zoom level
-                    const simulatedCluster = simulatedClusters[0];
-                    console.log(`Simulated cluster contains ${simulatedCluster.properties.photos.length} photos`);
-                    
-                    // Now find all photos in this simulated cluster
-                    const relatedPhotoUrls = simulatedCluster.properties.photos.map(p => p.url);
-                    console.log('Related photo URLs:', relatedPhotoUrls);
-                    
-                    // Find all clusters at the current zoom level that contain any of these related photos
-                    const relatedClusters = clusteredItems.filter(item => 
+                // If we found a cluster containing this photo, store it
+                if (containingClusters.length > 0) {
+                    setSelectedPhotoCluster(containingClusters[0]);
+                    devLog('PresentationPhotoLayer', `Cluster contains ${containingClusters[0].properties.photos.length} photos`);
+                } else {
+                    // If no clusters found at current zoom, try the simulated lower zoom clustering
+                    const simulatedClusters = simulatedClustering.filter(item => 
                         isCluster(item) && 
-                        item.properties.photos.some(photo => relatedPhotoUrls.includes(photo.url))
+                        item.properties.photos.some(photo => photo.url === selectedPhoto.url)
                     );
                     
-                    if (relatedClusters.length > 0) {
-                        setSelectedPhotoCluster(relatedClusters[0]);
-                        console.log(`Using related cluster with ${relatedClusters[0].properties.photos.length} photos`);
+                    devLog('PresentationPhotoLayer', `Found ${simulatedClusters.length} clusters containing the selected photo at simulated zoom`);
+                    
+                    if (simulatedClusters.length > 0) {
+                        // We found a cluster at the simulated zoom level
+                        const simulatedCluster = simulatedClusters[0];
+                        devLog('PresentationPhotoLayer', `Simulated cluster contains ${simulatedCluster.properties.photos.length} photos`);
+                        
+                        // Now find all photos in this simulated cluster
+                        const relatedPhotoUrls = simulatedCluster.properties.photos.map(p => p.url);
+                        
+                        // Find all clusters at the current zoom level that contain any of these related photos
+                        const relatedClusters = clusteredItems.filter(item => 
+                            isCluster(item) && 
+                            item.properties.photos.some(photo => relatedPhotoUrls.includes(photo.url))
+                        );
+                        
+                        if (relatedClusters.length > 0) {
+                            setSelectedPhotoCluster(relatedClusters[0]);
+                            devLog('PresentationPhotoLayer', `Using related cluster with ${relatedClusters[0].properties.photos.length} photos`);
+                        } else {
+                            devLog('PresentationPhotoLayer', 'No related clusters found at current zoom level');
+                            setSelectedPhotoCluster(null);
+                        }
                     } else {
-                        console.log('No related clusters found at current zoom level');
+                        devLog('PresentationPhotoLayer', 'No clusters found containing the selected photo at any zoom level');
                         setSelectedPhotoCluster(null);
                     }
-                } else {
-                    console.log('No clusters found containing the selected photo at any zoom level');
-                    setSelectedPhotoCluster(null);
                 }
             }
-        } else {
-            // If there's no selected photo, clear the selected cluster
-            setSelectedPhotoCluster(null);
-        }
+        }, 50); // 50ms debounce delay
+        
+        // Cleanup function to clear the timeout if the component unmounts
+        return () => {
+            if (updateSelectedPhotoClusterRef.current) {
+                clearTimeout(updateSelectedPhotoClusterRef.current);
+            }
+        };
     }, [selectedPhoto, clusteredItems, simulatedClustering]);
 
     // Get related photo URLs from simulated clustering
@@ -348,7 +369,7 @@ export const PresentationPhotoLayer = () => {
         if (simulatedCluster && isCluster(simulatedCluster)) {
             // Get all photo URLs in this simulated cluster
             const urls = new Set(simulatedCluster.properties.photos.map(photo => photo.url));
-            console.log(`Found ${urls.size} related photos that would be in the same cluster at a lower zoom level`);
+            devLog('PresentationPhotoLayer', `Found ${urls.size} related photos that would be in the same cluster at a lower zoom level`);
             return urls;
         }
         
@@ -375,18 +396,15 @@ export const PresentationPhotoLayer = () => {
             // or contains any related photos
             const shouldHighlight = isSelectedCluster || containsSelectedPhoto || containsRelatedPhoto;
             
-            // Debug log to verify cluster highlighting
+            // Debug log to verify cluster highlighting - only in development mode
             if (shouldHighlight) {
                 if (isSelectedCluster) {
-                    console.log('Highlighting cluster because it is the selected cluster');
+                    devLog('PresentationPhotoLayer', 'Highlighting cluster because it is the selected cluster');
                 }
                 if (containsSelectedPhoto) {
-                    console.log('Highlighting cluster containing selected photo:', selectedPhoto.url);
+                    devLog('PresentationPhotoLayer', 'Highlighting cluster containing selected photo:', selectedPhoto.url);
                 }
-                console.log('Cluster contains', item.properties.photos.length, 'photos');
-                
-                // Log all photo URLs in this cluster for debugging
-                console.log('Photos in this cluster:', item.properties.photos.map(p => p.url));
+                devLog('PresentationPhotoLayer', 'Cluster contains', item.properties.photos.length, 'photos');
             }
             
             return React.createElement(PhotoCluster, {
@@ -420,7 +438,7 @@ export const PresentationPhotoLayer = () => {
             
             // Debug log for related photo markers
             if (isRelatedPhoto && !isSelectedPhoto) {
-                console.log('Highlighting related photo marker:', item.properties.photo.url);
+                devLog('PresentationPhotoLayer', 'Highlighting related photo marker:', item.properties.photo.url);
             }
             
             return React.createElement(PhotoMarker, {
@@ -428,9 +446,8 @@ export const PresentationPhotoLayer = () => {
                 photo: item.properties.photo,
                 isHighlighted: isHighlighted,
                 onClick: () => {
-                    console.log('Photo marker clicked:', item.properties.photo);
-                    console.log('Marker coordinates:', item.properties.photo.coordinates);
-                    console.log('Map center:', map.getCenter());
+                    devLog('PresentationPhotoLayer', 'Photo marker clicked:', item.properties.photo);
+                    devLog('PresentationPhotoLayer', 'Marker coordinates:', item.properties.photo.coordinates);
                     setSelectedPhoto(item.properties.photo);
                     // Force the map to center on the photo with a reduced tilt angle (30 degrees instead of 60)
                     if (map && item.properties.photo.coordinates) {
@@ -451,14 +468,14 @@ export const PresentationPhotoLayer = () => {
         (() => {
             // Find the index of the selected photo in the ordered array using URL as unique identifier
             const selectedPhotoIndex = orderedPhotos.findIndex(p => p.url === selectedPhoto.url);
-            console.log('Selected photo URL:', selectedPhoto.url);
-            console.log('Selected photo index in ordered array:', selectedPhotoIndex);
+            devLog('PresentationPhotoLayer', 'Selected photo URL:', selectedPhoto.url);
+            devLog('PresentationPhotoLayer', 'Selected photo index in ordered array:', selectedPhotoIndex);
             
             return React.createElement(PhotoModal, {
                 key: `preview-${selectedPhoto.url}`,
                 photo: selectedPhoto,
                 onClose: () => {
-                    console.log('Closing photo modal');
+                    devLog('PresentationPhotoLayer', 'Closing photo modal');
                     setSelectedPhoto(null);
                 },
                 additionalPhotos: orderedPhotos,

@@ -45,166 +45,31 @@ const isValidMultiLineStringCoords = (coords) => {
     return Array.isArray(coords) && coords.length > 0 &&
         coords.every(line => isValidCoordArray(line));
 };
-// Wait for map style and vector tiles to load
-const waitForMapResources = (map) => {
-    return new Promise((resolve) => {
-        const checkResources = () => {
-            const source = map.getSource('australia-roads');
-            if (!source) {
-                console.log('[surfaceService] Waiting for source to be added...');
-                return false;
-            }
-            if (source.loaded()) {
-                console.log('[surfaceService] Vector tiles loaded');
-                return true;
-            }
-            console.log('[surfaceService] Waiting for tiles to load...');
-            return false;
-        };
-        if (checkResources()) {
-            resolve();
-        }
-        else {
-            const checkInterval = setInterval(() => {
-                if (checkResources()) {
-                    clearInterval(checkInterval);
-                    resolve();
-                }
-            }, 100);
-            setTimeout(() => {
-                clearInterval(checkInterval);
-                console.warn('[surfaceService] Timeout waiting for resources');
-                resolve();
-            }, 10000);
-        }
-    });
+// Import the vector tile service
+import { vectorTileService } from './vectorTileService';
+
+// Wait for vector tile service to be ready
+const waitForVectorTileService = async (bounds) => {
+    console.log('[surfaceService] Waiting for vector tile service to be ready...');
+    try {
+        // Load tiles for the given bounds
+        await vectorTileService.loadTilesForBounds(bounds);
+        console.log('[surfaceService] Vector tile service ready');
+        return true;
+    } catch (error) {
+        console.error('[surfaceService] Error loading vector tiles:', error);
+        return false;
+    }
 };
-// Find nearest road with sophisticated detection
-const findNearestRoad = (map, point) => {
-    const lngLat = toLngLat(point);
-    if (!lngLat) {
+// Find nearest road using vector tile service
+const findNearestRoad = (point) => {
+    if (!point || point.length !== 2) {
         console.warn('[findNearestRoad] Invalid coordinates:', point);
         return null;
     }
-    const projectedPoint = map.project(lngLat);
-    // First, do a wide scan to detect junction areas
-    const wideAreaFeatures = map.queryRenderedFeatures([
-        [projectedPoint.x - 25, projectedPoint.y - 25],
-        [projectedPoint.x + 25, projectedPoint.y + 25]
-    ], {
-        layers: [ROAD_LAYER_ID],
-        filter: ['in', 'highway', 'trunk', 'primary', 'secondary', 'residential', 'path', 'track', 'trail', 'footway', 'bridleway', 'cycleway', 'service', 'unclassified']
-    });
-    // Analyze junction complexity
-    const isComplexJunction = wideAreaFeatures.length > 1;
-    let queryBox = DEFAULT_QUERY_BOX;
-    if (isComplexJunction) {
-        // Count unique road names/refs and analyze road types
-        const uniqueRoads = new Set(wideAreaFeatures
-            .map(f => f.properties?.name || f.properties?.ref)
-            .filter(Boolean));
-        queryBox = uniqueRoads.size > 1 ? JUNCTION_QUERY_BOX : // Complex junction
-            wideAreaFeatures.length > 2 ? JUNCTION_QUERY_BOX * 0.5 : // Simple junction
-                DEFAULT_QUERY_BOX;
-    }
-    // Initial box query
-    let features = map.queryRenderedFeatures([
-        [projectedPoint.x - queryBox, projectedPoint.y - queryBox],
-        [projectedPoint.x + queryBox, projectedPoint.y + queryBox]
-    ], { layers: [ROAD_LAYER_ID] });
-    // If no features found at junction, try circular pattern
-    if (isComplexJunction && features.length === 0) {
-        for (let angle = 0; angle < 360; angle += 45) {
-            const radian = (angle * Math.PI) / 180;
-            const offsetX = Math.cos(radian) * 40;
-            const offsetY = Math.sin(radian) * 40;
-            const radialFeatures = map.queryRenderedFeatures([
-                [projectedPoint.x + offsetX - 10, projectedPoint.y + offsetY - 10],
-                [projectedPoint.x + offsetX + 10, projectedPoint.y + offsetY + 10]
-            ], { layers: [ROAD_LAYER_ID] });
-            if (radialFeatures.length > 0) {
-                features = features.concat(radialFeatures);
-                break;
-            }
-        }
-    }
-    // Convert MapboxGeoJSONFeatures to RoadFeatures and prioritize
-    if (features.length > 0) {
-        // Convert features to RoadFeatures
-        const validFeatures = features.filter(f => f.geometry?.type === 'LineString' || f.geometry?.type === 'MultiLineString');
-        const roadFeatures = validFeatures
-            .map(f => {
-            if (!f.geometry)
-                return null;
-            const isLineString = f.geometry.type === 'LineString';
-            const geometry = f.geometry;
-            let coordinates;
-            if (isLineString && isValidCoordArray(geometry.coordinates)) {
-                coordinates = geometry.coordinates;
-            }
-            else if (!isLineString && Array.isArray(geometry.coordinates) &&
-                geometry.coordinates[0] && isValidCoordArray(geometry.coordinates[0])) {
-                coordinates = geometry.coordinates[0];
-            }
-            else {
-                return null;
-            }
-            return {
-                type: 'Feature',
-                geometry: isLineString
-                    ? {
-                        type: 'LineString',
-                        coordinates: coordinates.map(coord => [coord[0], coord[1]])
-                    }
-                    : {
-                        type: 'MultiLineString',
-                        coordinates: [coordinates.map(coord => [coord[0], coord[1]])]
-                    },
-                properties: {
-                    surface: f.properties?.surface,
-                    highway: f.properties?.highway,
-                    name: f.properties?.name,
-                    ref: f.properties?.ref
-                }
-            };
-        })
-            .filter((f) => f !== null);
-        return roadFeatures.reduce((best, current) => {
-            if (!best)
-                return current;
-            // Use the closest road
-            let bestCoord = null;
-            let currentCoord = null;
-            if (best.geometry.type === 'LineString') {
-                bestCoord = best.geometry.coordinates[0];
-            }
-            else {
-                const coords = best.geometry.coordinates[0];
-                if (coords && coords.length > 0)
-                    bestCoord = coords[0];
-            }
-            if (current.geometry.type === 'LineString') {
-                currentCoord = current.geometry.coordinates[0];
-            }
-            else {
-                const coords = current.geometry.coordinates[0];
-                if (coords && coords.length > 0)
-                    currentCoord = coords[0];
-            }
-            if (!bestCoord || !currentCoord) {
-                return best;
-            }
-            const bestLngLat = toLngLat(bestCoord);
-            const currentLngLat = toLngLat(currentCoord);
-            if (!bestLngLat || !currentLngLat) {
-                return best;
-            }
-            const bestDist = map.project(bestLngLat).dist(projectedPoint);
-            const currentDist = map.project(currentLngLat).dist(projectedPoint);
-            return currentDist < bestDist ? current : best;
-        }, null);
-    }
-    return null;
+    
+    // Use the vector tile service to find the nearest road
+    return vectorTileService.findNearestRoad(point, 0.00005); // 5m search radius
 };
 // Helper function to normalize surface types to just "paved" or "unpaved"
 const normalizeSurfaceType = (surface) => {
@@ -222,8 +87,107 @@ const normalizeSurfaceType = (surface) => {
     return surface; // Keep original if not recognized
 };
 
+/**
+ * Remove "chatter" - short segments of different surface types
+ * @param {Array} processedPoints - Array of points with surface information
+ * @param {number} minSegmentLength - Minimum number of consecutive points to keep a segment
+ * @returns {Array} - Processed points with chatter removed
+ */
+export const removeChatter = (processedPoints, minSegmentLength = 5) => {
+    if (!processedPoints || processedPoints.length < minSegmentLength) {
+        return processedPoints;
+    }
+    
+    const result = [...processedPoints]; // Create a copy
+    
+    // First pass: identify segments
+    const segments = [];
+    let currentType = result[0].surface;
+    let startIndex = 0;
+    
+    for (let i = 1; i < result.length; i++) {
+        if (result[i].surface !== currentType) {
+            // End of segment
+            segments.push({
+                type: currentType,
+                start: startIndex,
+                end: i - 1,
+                length: i - startIndex
+            });
+            
+            // Start new segment
+            currentType = result[i].surface;
+            startIndex = i;
+        }
+    }
+    
+    // Add the last segment
+    segments.push({
+        type: currentType,
+        start: startIndex,
+        end: result.length - 1,
+        length: result.length - startIndex
+    });
+    
+    console.log(`[removeChatter] Identified ${segments.length} segments before processing`);
+    
+    // Second pass: remove short segments
+    for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        
+        // If this is a short segment
+        if (segment.length < minSegmentLength) {
+            // Determine what surface type to use instead
+            let replacementType;
+            
+            // If this is the first or last segment, use the adjacent segment's type
+            if (i === 0 && segments.length > 1) {
+                replacementType = segments[1].type;
+            } else if (i === segments.length - 1 && segments.length > 1) {
+                replacementType = segments[i-1].type;
+            } else if (segments.length > 2) {
+                // For middle segments, use the type of the longer adjacent segment
+                const prevSegment = segments[i-1];
+                const nextSegment = segments[i+1];
+                
+                // If both adjacent segments have the same type, use that
+                if (prevSegment.type === nextSegment.type) {
+                    replacementType = prevSegment.type;
+                } else {
+                    // Otherwise use the type of the longer adjacent segment
+                    replacementType = (prevSegment.length >= nextSegment.length) ? 
+                        prevSegment.type : nextSegment.type;
+                }
+            }
+            
+            // Apply the replacement type to all points in this segment
+            if (replacementType) {
+                console.log(`[removeChatter] Replacing segment ${i} (${segment.start}-${segment.end}, length ${segment.length}) of type '${segment.type}' with '${replacementType}'`);
+                for (let j = segment.start; j <= segment.end; j++) {
+                    result[j].surface = replacementType;
+                }
+            }
+        }
+    }
+    
+    // Count segments after processing
+    let processedSegments = 1;
+    let currentSurface = result[0].surface;
+    
+    for (let i = 1; i < result.length; i++) {
+        if (result[i].surface !== currentSurface) {
+            processedSegments++;
+            currentSurface = result[i].surface;
+        }
+    }
+    
+    console.log(`[removeChatter] Reduced to ${processedSegments} segments after processing`);
+    
+    return result;
+};
+
 // Helper function to smooth surface detection by looking at surrounding points
-const smoothSurfaceDetection = (processedPoints) => {
+export const smoothSurfaceDetection = (processedPoints) => {
     if (!processedPoints || processedPoints.length < SMOOTHING_WINDOW_SIZE) {
         return processedPoints;
     }
@@ -257,7 +221,6 @@ const smoothSurfaceDetection = (processedPoints) => {
         
         // If the percentage of unpaved points is below the threshold, convert to paved
         if (unpavedCount / windowSize < SMOOTHING_THRESHOLD) {
-            console.log(`[Surface Smoothing] Converting point at index ${i} from unpaved to paved (${unpavedCount}/${windowSize} unpaved points in window)`);
             result[i].surface = 'paved';
         }
     }
@@ -266,7 +229,7 @@ const smoothSurfaceDetection = (processedPoints) => {
 };
 
 // Helper function to apply inverse smoothing (paved to unpaved)
-const applyInverseSmoothing = (processedPoints) => {
+export const applyInverseSmoothing = (processedPoints) => {
     if (!processedPoints || processedPoints.length < SMOOTHING_WINDOW_SIZE) {
         return processedPoints;
     }
@@ -298,7 +261,6 @@ const applyInverseSmoothing = (processedPoints) => {
         
         // If the percentage of unpaved points is ABOVE the inverse threshold, convert to unpaved
         if (unpavedCount / windowSize > INVERSE_SMOOTHING_THRESHOLD) {
-            console.log(`[Surface Smoothing] Converting point at index ${i} from paved to unpaved (${unpavedCount}/${windowSize} unpaved points in window)`);
             result[i].surface = 'unpaved';
         }
     }
@@ -307,7 +269,7 @@ const applyInverseSmoothing = (processedPoints) => {
 };
 
 // Helper function to fill in gaps in surface detection
-const fillSurfaceGaps = (processedPoints) => {
+export const fillSurfaceGaps = (processedPoints) => {
     if (!processedPoints || processedPoints.length < 3) return processedPoints;
     
     const result = [...processedPoints]; // Create a copy to avoid modifying the original
@@ -340,7 +302,7 @@ const fillSurfaceGaps = (processedPoints) => {
                 // End of a section with the same category
                 // Fill in any unknown surfaces in between
                 if (i - startIndex > 1) {
-                    console.log(`[Surface Detection] Filling gap from index ${startIndex} to ${i} with surface category: ${knownCategory}`);
+                    // Fill gap with known category
                     
                     for (let j = startIndex + 1; j < i; j++) {
                         // Only fill in unknown surfaces
@@ -370,140 +332,71 @@ const fillSurfaceGaps = (processedPoints) => {
 };
 
 // Core surface detection function that processes points one at a time
-export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
+export const assignSurfacesViaNearest = async (coords, onProgress) => {
     console.log('[assignSurfacesViaNearest] Starting surface detection...');
-    if (!map) {
-        console.log('[assignSurfacesViaNearest] No map provided, returning coords unmodified');
-        return coords;
+    
+    if (!coords || coords.length === 0) {
+        console.log('[assignSurfacesViaNearest] No coordinates provided, returning empty array');
+        return [];
     }
+    
+    // Calculate bounding box for all coordinates
+    const bounds = [
+        Math.min(...coords.map(pt => pt.lon)) - 0.01, // Add buffer
+        Math.min(...coords.map(pt => pt.lat)) - 0.01,
+        Math.max(...coords.map(pt => pt.lon)) + 0.01,
+        Math.max(...coords.map(pt => pt.lat)) + 0.01
+    ];
+    
+    // Load vector tiles for the entire route
+    console.log('[assignSurfacesViaNearest] Loading vector tiles for bounds:', bounds);
+    await waitForVectorTileService(bounds);
+    
     const results = [];
-    let cachedRoads = null;
+    
     // Process one point at a time
     for (let i = 0; i < coords.length; i++) {
         const pt = coords[i];
+        
         // Update progress
         if (onProgress) {
             onProgress(i + 1, coords.length);
         }
-        // Create bounding box around point (~100m in each direction)
-        const bbox = [
-            pt.lon - 0.001,
-            pt.lat - 0.001,
-            pt.lon + 0.001,
-            pt.lat + 0.001
-        ];
-        // Set map view for this point
-        map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], {
-            padding: 50,
-            duration: 0,
-            maxZoom: 14,
-            minZoom: 12
-        });
-        // Process points in batches to allow tiles to load
-        if (i % BATCH_SIZE === 0) {
-            // Wait for map to stabilize and tiles to load
-            await new Promise((resolve) => {
-                let attempts = 0;
-                const checkTiles = async () => {
-                    // Try to find roads for the next batch of points
-                    const batchStart = i;
-                    const batchEnd = Math.min(i + BATCH_SIZE, coords.length);
-                    let foundAnyRoads = false;
-                    for (let j = batchStart; j < batchEnd; j++) {
-                        const road = findNearestRoad(map, [coords[j].lon, coords[j].lat]);
-                        if (road) {
-                            foundAnyRoads = true;
-                            break;
-                        }
-                    }
-                    if (foundAnyRoads) {
-                        resolve();
-                        return;
-                    }
-                    attempts++;
-                    if (attempts >= MAX_RETRIES) {
-                        console.warn(`[assignSurfacesViaNearest] No roads found for batch ${batchStart}-${batchEnd - 1} after ${MAX_RETRIES} attempts`);
-                        resolve();
-                        return;
-                    }
-                    setTimeout(checkTiles, RETRY_DELAY);
-                };
-                checkTiles();
-            });
-        }
-        // Find nearest road for current point
-        const road = findNearestRoad(map, [pt.lon, pt.lat]);
-        cachedRoads = road ? [road] : null;
+        
+        // Find nearest road for current point using vector tile service
+        const road = findNearestRoad([pt.lon, pt.lat]);
+        
         // Process the point
         let bestSurface = 'paved'; // Default to paved
-        let minDist = Infinity;
+        
         if (i % 100 === 0) {
             console.log(`[assignSurfacesViaNearest] Processing point #${i}, coords=(${pt.lat}, ${pt.lon})`);
         }
-        // If no roads found, use previous point's surface type if available
-        if (!cachedRoads || cachedRoads.length === 0) {
+        
+        // If no road found, use previous point's surface type if available
+        if (!road) {
             const previousPoint = results[results.length - 1];
             results.push({
                 ...pt,
                 surface: previousPoint ? previousPoint.surface : 'paved' // Default to paved when no roads found
             });
-        }
-        else {
-            // Evaluate each road
-            for (const road of cachedRoads) {
-                if (road.geometry.type !== 'LineString' &&
-                    road.geometry.type !== 'MultiLineString') {
-                    continue;
-                }
-                // Get coordinates based on geometry type
-                let lineCoords;
-                try {
-                    if (road.geometry.type === 'LineString' && isValidCoordArray(road.geometry.coordinates)) {
-                        lineCoords = road.geometry.coordinates;
-                    }
-                    else if (road.geometry.type === 'MultiLineString' &&
-                        isValidMultiLineStringCoords(road.geometry.coordinates)) {
-                        lineCoords = road.geometry.coordinates[0];
-                    }
-                    else {
-                        continue;
-                    }
-                }
-                catch (error) {
-                    console.warn('[assignSurfacesViaNearest] Invalid coordinates:', error);
-                    continue;
-                }
-                const dist = getDistanceToRoad([pt.lon, pt.lat], lineCoords);
-                // Simple distance comparison
-                if (dist < minDist) {
-                    minDist = dist;
-                    const surfaceRaw = (road.properties?.surface || '').toLowerCase();
-                    console.log(`[Surface Detection] Point at (${pt.lat}, ${pt.lon}):`, {
-                        surface: surfaceRaw,
-                        isPaved: PAVED_SURFACES.includes(surfaceRaw),
-                        isUnpaved: UNPAVED_SURFACES.includes(surfaceRaw)
-                    });
-                    if (PAVED_SURFACES.includes(surfaceRaw)) {
-                        bestSurface = 'paved';
-                    }
-                    else if (UNPAVED_SURFACES.includes(surfaceRaw)) {
-                        bestSurface = 'unpaved';
-                    }
-                    else if (['track', 'trail'].includes(road.properties?.highway)) {
-                        // Tracks and trails are almost always unpaved
-                        bestSurface = 'unpaved';
-                        console.log(`[Surface Detection] Using highway type '${road.properties?.highway}' to determine surface as unpaved`);
-                    }
-                    else {
-                        bestSurface = 'paved'; // fallback for unknown surfaces
-                    }
-                }
+        } else {
+            // Determine surface type from road properties
+            const surfaceRaw = (road.properties?.surface || '').toLowerCase();
+            
+            if (PAVED_SURFACES.includes(surfaceRaw)) {
+                bestSurface = 'paved';
+            } else if (UNPAVED_SURFACES.includes(surfaceRaw)) {
+                bestSurface = 'unpaved';
+            } else if (['track', 'trail'].includes(road.properties?.highway)) {
+                // Tracks and trails are almost always unpaved
+                bestSurface = 'unpaved';
             }
+            
             results.push({ ...pt, surface: bestSurface });
         }
-        // Clear roads cache after each point
-        cachedRoads = null;
     }
+    
     console.log('[assignSurfacesViaNearest] => Finished initial processing. Filling gaps...');
     
     // Apply gap filling to improve surface detection
@@ -519,22 +412,26 @@ export const assignSurfacesViaNearest = async (map, coords, onProgress) => {
     // Apply inverse smoothing to eliminate false negatives
     const inverseSmoothedResults = applyInverseSmoothing(smoothedResults);
     
+    console.log('[assignSurfacesViaNearest] => Applying chatter removal...');
+    
+    // Apply chatter removal to eliminate short segments
+    const chatterRemovedResults = removeChatter(inverseSmoothedResults, 5);
+    
     console.log('[assignSurfacesViaNearest] => Finished processing. Returning coords...');
-    return inverseSmoothedResults;
+    return chatterRemovedResults;
 };
 // Add surface detection overlay
 export const addSurfaceOverlay = async (map, routeFeature) => {
     console.log('[surfaceService] Starting surface detection...');
     try {
-        // Wait for resources and ensure proper zoom
-        await waitForMapResources(map);
         // Convert route coordinates to points
         const points = routeFeature.geometry.coordinates.map(coord => ({
             lon: coord[0],
             lat: coord[1]
         }));
+        
         // Process points with surface detection and gap filling
-        let processedPoints = await assignSurfacesViaNearest(map, points);
+        let processedPoints = await assignSurfacesViaNearest(points);
         // Create sections based on surface changes
         const sections = [];
         let currentSection = null;

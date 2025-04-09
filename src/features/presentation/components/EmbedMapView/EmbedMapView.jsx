@@ -440,34 +440,45 @@ export default function EmbedMapView() {
     useEffect(() => {
         if (!mapInstance.current || !isMapReady) return;
         
-        // Update the GeoJSON source if we have coordinates
-        if (hoverCoordinates) {
-            try {
-                const source = mapInstance.current.getSource('hover-point');
-                if (source) {
-                    source.setData({
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Point',
-                            coordinates: hoverCoordinates
-                        },
-                        properties: {}
-                    });
-                    
+    // Update the GeoJSON source if we have coordinates
+    if (hoverCoordinates) {
+        try {
+            // First check if the source exists
+            if (mapInstance.current.getSource('hover-point')) {
+                // Update the source data
+                mapInstance.current.getSource('hover-point').setData({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: hoverCoordinates
+                    },
+                    properties: {}
+                });
+                
+                // Check if the layer exists before trying to modify it
+                if (mapInstance.current.getLayer('hover-point')) {
                     // Show the layer
                     mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                } else {
+                    // Layer doesn't exist, log this but don't crash
+                    console.warn('[EmbedMapView] hover-point layer does not exist, cannot set visibility');
                 }
-            } catch (error) {
-                console.error('[EmbedMapView] Error updating hover point:', error);
             }
-        } else {
-            // Hide the layer when no coordinates
-            try {
-                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
-            } catch (error) {
-                // Ignore errors when hiding (might happen during initialization)
-            }
+        } catch (error) {
+            console.error('[EmbedMapView] Error updating hover point:', error);
         }
+    } else {
+        // Hide the layer when no coordinates
+        try {
+            // Only try to hide the layer if it exists
+            if (mapInstance.current.getLayer('hover-point')) {
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+            }
+        } catch (error) {
+            // Log the error but don't crash
+            console.debug('[EmbedMapView] Error hiding hover point:', error);
+        }
+    }
     }, [hoverCoordinates, isMapReady]);
 
     // Store current route ID reference

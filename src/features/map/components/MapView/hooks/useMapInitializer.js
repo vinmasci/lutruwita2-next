@@ -376,47 +376,8 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
             // Zoom change handler
           });
           
-          // Add custom roads layer
-          const tileUrl = 'https://api.maptiler.com/tiles/5dd3666f-1ce4-4df6-9146-eda62a200bcb/{z}/{x}/{y}.pbf?key=DFSAZFJXzvprKbxHrHXv';
-          map.addSource('australia-roads', {
-            type: 'vector',
-            tiles: [tileUrl],
-            minzoom: 12,
-            maxzoom: 14
-          });
-          
-          map.addLayer({
-            id: 'custom-roads',
-            type: 'line',
-            source: 'australia-roads',
-            'source-layer': 'lutruwita',
-            minzoom: 12,
-            maxzoom: 14,
-            paint: {
-              'line-opacity': 0, // Set opacity to 0 for all road types to hide them
-              'line-color': [
-                'match',
-                ['get', 'surface'],
-                ['paved', 'asphalt', 'concrete', 'compacted', 'sealed', 'bitumen', 'tar'],
-                '#888888',
-                ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                '#D35400',
-                '#888888'
-              ],
-              'line-width': [
-                'match',
-                ['get', 'surface'],
-                ['unpaved', 'gravel', 'fine', 'fine_gravel', 'dirt', 'earth'],
-                4,
-                2
-              ]
-            }
-          });
-          
-          // Add debug call after layer is added
-          map.once('idle', () => {
-            debugRoadLayer(map);
-          });
+          // Note: Vector tiles for surface detection are now loaded on-demand
+          // by the vectorTileService instead of being added as a permanent map layer
           
           setStreetsLayersLoaded(true);
           setIsMapReady(true);

@@ -143,7 +143,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             }
         }
         
-        // Force cleanup of each route individually
+        // Force cleanup of each route individually with enhanced layer/source detection
         routes.forEach(route => {
             const routeId = route.routeId || `route-${route.id}`;
             console.log('[SidebarListItems] Explicitly cleaning up route:', routeId);
@@ -151,39 +151,125 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             // If we have access to the map, try to remove all layers and sources for this route
             if (map) {
                 try {
-                    // Get all layers that might be related to this route
                     const style = map.getStyle();
-                    if (style && style.layers) {
-                        // Find all layers that contain the routeId
-                        const routeLayers = style.layers
-                            .filter(layer => layer.id.includes(routeId))
-                            .map(layer => layer.id);
-                            
-                        // Remove each layer
-                        routeLayers.forEach(layerId => {
-                            if (map.getLayer(layerId)) {
-                                try {
-                                    console.log('[SidebarListItems] Removing layer:', layerId);
-                                    map.removeLayer(layerId);
-                                } catch (error) {
-                                    console.error('[SidebarListItems] Error removing layer:', layerId, error);
-                                }
+                    if (!style || !style.layers) {
+                        console.warn('[SidebarListItems] Map style not available');
+                        return;
+                    }
+                    
+                    // Normalize routeId to handle different formats
+                    // Some components might use 'route-123' while others use just '123'
+                    const normalizedRouteId = routeId.startsWith('route-') ? routeId : `route-${routeId}`;
+                    const baseRouteId = routeId.startsWith('route-') ? routeId.substring(6) : routeId;
+                    
+                    // Create an array of possible ID formats to search for
+                    const possibleRouteIds = [
+                        routeId,
+                        normalizedRouteId,
+                        baseRouteId
+                    ];
+                    
+                    console.log('[SidebarListItems] Searching for layers with possible IDs:', possibleRouteIds);
+                    
+                    // Find all layers associated with this route using all possible ID formats
+                    const allLayers = style.layers
+                        .map(layer => layer.id)
+                        .filter(id => 
+                            // Check if layer ID contains any of the possible route IDs
+                            possibleRouteIds.some(possibleId => id.includes(possibleId)) ||
+                            // Check for unpaved section layers with any possible ID format
+                            possibleRouteIds.some(possibleId => id.startsWith(`unpaved-section-layer-${possibleId}`)) ||
+                            possibleRouteIds.some(possibleId => id.startsWith(`unpaved-sections-layer-${possibleId}`))
+                        );
+                    
+                    console.log('[SidebarListItems] Found map style layers:', allLayers);
+                    
+                    // Add known layer patterns for all possible ID formats
+                    const knownLayerPatterns = [];
+                    
+                    // Generate patterns for each possible ID format
+                    possibleRouteIds.forEach(id => {
+                        knownLayerPatterns.push(
+                            `${id}-main-border`,
+                            `${id}-main-line`,
+                            `${id}-hover`,
+                            `${id}-hover-line`,
+                            `${id}-surface`,
+                            `${id}-unpaved-line`,
+                            `unpaved-section-layer-${id}`,
+                            `unpaved-sections-layer-${id}`
+                        );
+                    });
+                    
+                    // Also check for RouteLayer.js specific naming patterns
+                    possibleRouteIds.forEach(id => {
+                        knownLayerPatterns.push(
+                            `${id}-main-line`,
+                            `${id}-main-border`,
+                            `${id}-hover-line`,
+                            `unpaved-sections-layer-${id}`
+                        );
+                    });
+                    
+                    console.log('[SidebarListItems] Added known layer patterns:', knownLayerPatterns);
+                    
+                    // Combine all layer IDs and remove duplicates
+                    const layersToRemove = [...new Set([...allLayers, ...knownLayerPatterns])];
+                    console.log('[SidebarListItems] Final layers to remove:', layersToRemove);
+                    
+                    // Remove all layers first
+                    console.log('[SidebarListItems] Starting layer removal process');
+                    layersToRemove.forEach(layerId => {
+                        if (map.getLayer(layerId)) {
+                            try {
+                                console.log('[SidebarListItems] Removing layer:', layerId);
+                                map.removeLayer(layerId);
+                                console.log('[SidebarListItems] Successfully removed layer:', layerId);
                             }
-                        });
-                        
-                        // Remove associated sources
-                        const routeSources = [`${routeId}-main`, `unpaved-section-${routeId}`];
-                        routeSources.forEach(sourceId => {
+                            catch (error) {
+                                console.error('[SidebarListItems] Error removing layer:', layerId, error);
+                            }
+                        }
+                    });
+                    
+                    // Find all sources associated with this route using all possible ID formats
+                    const sourcesToRemove = [];
+                    
+                    // Generate source patterns for each possible ID format
+                    possibleRouteIds.forEach(id => {
+                        sourcesToRemove.push(
+                            `${id}-main`,
+                            `${id}-unpaved`,
+                            `unpaved-section-${id}`,
+                            `unpaved-sections-${id}`
+                        );
+                    });
+                    
+                    // Get all source IDs from the style that match any of our patterns
+                    const allSources = Object.keys(style.sources || {})
+                        .filter(id => 
+                            sourcesToRemove.includes(id) || 
+                            possibleRouteIds.some(routeId => id.startsWith(`unpaved-section-${routeId}-`)) ||
+                            possibleRouteIds.some(routeId => id.startsWith(`unpaved-sections-${routeId}-`))
+                        );
+                    
+                    console.log('[SidebarListItems] Found sources to remove:', allSources);
+                    
+                    // Remove all sources after a brief delay to ensure layers are fully removed
+                    setTimeout(() => {
+                        allSources.forEach(sourceId => {
                             if (map.getSource(sourceId)) {
                                 try {
                                     console.log('[SidebarListItems] Removing source:', sourceId);
                                     map.removeSource(sourceId);
-                                } catch (error) {
+                                    console.log('[SidebarListItems] Successfully removed source:', sourceId);
+                                }
+                                catch (error) {
                                     console.error('[SidebarListItems] Error removing source:', sourceId, error);
                                 }
                             }
                         });
-                    }
+                    }, 200); // Increased delay to ensure layers are fully removed
                 } catch (error) {
                     console.error('[SidebarListItems] Error cleaning up map layers:', error);
                 }

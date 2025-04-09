@@ -158,13 +158,13 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                        gap: '0px', // Reduced gap to 0px
                                    },
                                  children: [
-                                      // Container for logo and title (always row)
+                                      // Container for logo and title (two-column layout)
                                       _jsxs(Box, {
                                           sx: {
                                               display: 'flex',
-                                              alignItems: 'center', // Re-added: Align logo and title vertically on their row
+                                              alignItems: 'center',
                                               justifyContent: 'center',
-                                              gap: '8px',
+                                              gap: '12px',
                                               position: 'relative',
                                         },
                                         children: [
@@ -174,7 +174,8 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                     sx: {
                                                         position: 'relative',
                                                         display: 'flex',
-                                                        alignItems: 'center'
+                                                        alignItems: 'center',
+                                                        height: '100%'
                                                     },
                                                     children: [
                                                         // Logo image
@@ -183,13 +184,10 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                             src: logoUrl,
                                                              alt: "Logo",
                                                               sx: {
-                                                                  height: 48, // Reduced height slightly
-                                                                  maxWidth: 140, // Adjusted max width
+                                                                  height: '64px', // Full height with small padding
+                                                                  maxWidth: '100px', // Adjusted max width
                                                                   objectFit: 'contain',
-                                                                  marginRight: '8px',
-                                                                  // Re-add margins for 48px logo in 72px header (72-48=24 -> 12px top/bottom)
-                                                                  marginTop: '-12px', 
-                                                                  marginBottom: '-12px' 
+                                                                  padding: '4px 0', // Small padding at top and bottom
                                                               },
                                                              onError: (e) => { /* Fallback logic */ },
                                                             onLoad: () => { /* Success */ }
@@ -218,40 +216,53 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                 })
                                             ),
 
-                                            // Title
-                                            _jsx(Typography, {
-                                                variant: "h6",
-                                                component: "div",
+                                            // Title and attribution column
+                                            _jsxs(Box, {
                                                 sx: {
-                                                    fontFamily: 'Fraunces, serif',
-                                                    fontWeight: 700,
-                                                    color: '#ffffff',
-                                                    textShadow: '2px 2px 3px rgba(0,0,0,0.8)', // Stronger, bigger shadow
-                                                    whiteSpace: 'nowrap',
-                                                    overflow: 'hidden', // Keep this, but add padding
-                                                    textOverflow: 'ellipsis',
-                                                    maxWidth: '500px', // Increased to allow more text on desktop before truncation
-                                                    padding: '5px' // Add padding to allow shadow room
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'flex-start',
+                                                    justifyContent: 'center',
                                                 },
-                                                children: title || 'Untitled Route'
+                                                children: [
+                                                    // Title
+                                                    _jsx(Typography, {
+                                                        variant: "h6",
+                                                        component: "div",
+                                                        sx: {
+                                                            fontFamily: 'Fraunces, serif',
+                                                            fontWeight: 700,
+                                                            color: '#ffffff',
+                                                            textShadow: '2px 2px 3px rgba(0,0,0,0.8)', // Stronger, bigger shadow
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden', // Keep this, but add padding
+                                                            textOverflow: 'ellipsis',
+                                                            maxWidth: '500px', // Increased to allow more text on desktop before truncation
+                                                            padding: '5px 5px 2px 5px' // Add padding to allow shadow room
+                                                        },
+                                                        children: title || 'Untitled Route'
+                                                    }),
+                                                    
+                                                    // Small line break
+                                                    _jsx(Box, { sx: { height: '2px' } }),
+                                                    
+                                                    // Username attribution (if available)
+                                                    username && (
+                                                        _jsxs(Typography, {
+                                                            variant: "body2",
+                                                            sx: {
+                                                                color: '#ffffff',
+                                                                opacity: 0.9,
+                                                                fontStyle: 'italic',
+                                                                paddingLeft: '5px'
+                                                            },
+                                                            children: ["by ", username]
+                                                        })
+                                                    )
+                                                ]
                                             })
                                         ]
                                     }),
-
-                                    // Username attribution (if available) - directly in the column flow
-                                    username && (
-                                        _jsxs(Typography, {
-                                            variant: "body2",
-                                            sx: {
-                                                color: '#ffffff',
-                                                opacity: 0.9,
-                                                fontStyle: 'italic',
-                                                textAlign: 'center',
-                                                width: '100%' // Ensure it takes full width for centering
-                                            },
-                                            children: ["by ", username]
-                                        })
-                                    ),
                                     
                                     // We don't need the countdown timer in the header since we have the floating one
                                     // type === 'event' && eventDate && (

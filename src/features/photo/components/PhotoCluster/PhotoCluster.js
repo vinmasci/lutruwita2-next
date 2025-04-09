@@ -80,7 +80,8 @@ export const PhotoCluster = ({ cluster, onClick, isHighlighted }) => {
         // Get the first photo in the cluster
         const firstPhoto = cluster.properties.photos[0];
         
-        // Use tinyThumbnailUrl if available, otherwise fall back to thumbnailUrl
+        // Always use the smallest possible thumbnail for clusters to reduce memory usage
+        // Prioritize tinyThumbnailUrl which is the smallest size
         const thumbnailUrl = firstPhoto.tinyThumbnailUrl || firstPhoto.thumbnailUrl;
         
         // Create image element
@@ -98,6 +99,8 @@ export const PhotoCluster = ({ cluster, onClick, isHighlighted }) => {
         
         // Check if the thumbnailUrl exists
         if (thumbnailUrl) {
+            // Add loading="lazy" attribute to defer loading until visible
+            preview.loading = 'lazy';
             preview.src = thumbnailUrl;
         } else {
             // No thumbnail URL, use fallback

@@ -19,7 +19,8 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
             setInitializing(false);
         }
     }, [isMapReady]);
-    // Show loading state only during actual processing, not initialization
+    // State for debug logs and loading
+    const [debugLog, setDebugLog] = useState([]);
     const isLoading = !initializing && processingLoading;
     // Don't show anything during initialization
     if (initializing) {
@@ -31,9 +32,13 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
             console.error('[Uploader] Map not ready for processing');
             return;
         }
+        
+        setDebugLog([`Processing ${file.name}...`]);
+        
         try {
-            const fileContent = await file.text();
-            const result = await processGpx(file);
+            const result = await processGpx(file, (message) => {
+                setDebugLog(prev => [...prev, message]);
+            });
             if (result) {
                 // Use normalizeRoute to ensure proper type and structure
                 const processedRoute = normalizeRoute(result);
@@ -51,31 +56,52 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
     };
     const handleFileDelete = (fileId) => {
         console.debug('[Uploader][DELETE] Starting deletion process for file:', fileId);
-        console.debug('[Uploader][DELETE] Current routes:', routes.map(r => ({
-            id: r.id,
-            routeId: r.routeId,
-            name: r.name,
-            type: r._type
-        })));
+        
         // Find the route using the routeId
         const route = routes.find(r => r.routeId === fileId);
         if (!route) {
             console.error('[Uploader][DELETE] Could not find route with id:', fileId);
             return;
         }
+        
         try {
-            // First clean up map layers
+            // First clean up map layers via the onDeleteRoute callback if provided
             if (onDeleteRoute) {
                 console.debug('[Uploader][DELETE] Calling onDeleteRoute with routeId:', fileId);
                 onDeleteRoute(fileId);
             }
-            // Brief delay to ensure map cleanup is complete
-            setTimeout(() => {
-                // Then update route context state
-                console.debug('[Uploader][DELETE] Calling deleteRoute with routeId:', fileId);
-                deleteRoute(fileId);
-                console.debug('[Uploader][DELETE] Route deletion complete for:', fileId);
-            }, 100);
+            
+            // Then update route context state to remove the route
+            console.debug('[Uploader][DELETE] Calling deleteRoute with routeId:', fileId);
+            deleteRoute(fileId);
+            
+            // Force a map redraw after deletion with a longer delay to ensure cleanup is complete
+            if (window.map) {
+                setTimeout(() => {
+                    try {
+                        console.debug('[Uploader][DELETE] Forcing map redraw after route deletion');
+                        window.map.resize();
+                        
+                        // Additional map refresh to ensure rendering is updated
+                        if (window.map.repaint) {
+                            window.map.repaint = true;
+                        }
+                        
+                        // Trigger another resize after a short delay for good measure
+                        setTimeout(() => {
+                            try {
+                                window.map.resize();
+                            } catch (error) {
+                                console.error('[Uploader][DELETE] Error on second map resize:', error);
+                            }
+                        }, 300);
+                    } catch (error) {
+                        console.error('[Uploader][DELETE] Error resizing map:', error);
+                    }
+                }, 300); // Increased delay to ensure all cleanup operations complete
+            }
+            
+            console.debug('[Uploader][DELETE] Route deletion complete for:', fileId);
         }
         catch (error) {
             console.error('[Uploader][DELETE] Error deleting route:', error);
@@ -94,6 +120,6 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
             console.error('[Uploader] Error renaming route:', error);
         }
     };
-    return (_jsx(ErrorBoundary, { fallback: _jsxs(Box, { sx: { p: 2, textAlign: 'center' }, children: [_jsx(Typography, { color: "error", gutterBottom: true, children: "Something went wrong with the GPX uploader." }), _jsx(Button, { variant: "contained", onClick: () => window.location.reload(), sx: { mt: 1 }, children: "Reload Page" })] }), children: _jsx(UploaderUI, { isLoading: isLoading, error: error, onFileAdd: handleFileAdd, onFileDelete: handleFileDelete, onFileRename: handleFileRename }) }));
+    return (_jsx(ErrorBoundary, { fallback: _jsxs(Box, { sx: { p: 2, textAlign: 'center' }, children: [_jsx(Typography, { color: "error", gutterBottom: true, children: "Something went wrong with the GPX uploader." }), _jsx(Button, { variant: "contained", onClick: () => window.location.reload(), sx: { mt: 1 }, children: "Reload Page" })] }), children: _jsx(UploaderUI, { isLoading: isLoading, error: error, debugLog: debugLog, onFileAdd: handleFileAdd, onFileDelete: handleFileDelete, onFileRename: handleFileRename }) }));
 };
 export default Uploader;

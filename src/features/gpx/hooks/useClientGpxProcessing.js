@@ -3,12 +3,12 @@ import { useMapContext } from '../../map/context/MapContext';
 import { parseGpx } from '../utils/gpxParser';
 import { normalizeRoute } from '../../map/types/route.types';
 import { v4 as uuidv4 } from 'uuid';
-import { addSurfaceOverlay } from '../services/surfaceService';
+import { assignSurfacesWithSpatialIndex, generateUnpavedSections } from '../services/spatialSurfaceService';
 export const useClientGpxProcessing = () => {
     const { map } = useMapContext(); // Get map instance for surface detection
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const processGpx = async (file) => {
+    const processGpx = async (file, onProgress) => {
         console.log('[useClientGpxProcessing] Starting GPX processing', { fileName: file.name });
         setIsLoading(true);
         setError(null);
@@ -126,30 +126,34 @@ export const useClientGpxProcessing = () => {
                     progress: 100
                 }
             });
-            // Add surface detection here
-            if (map && route.geojson.features[0]) {
-                const feature = route.geojson.features[0];
-                try {
-                    const featureWithRouteId = {
-                        ...feature,
-                        properties: {
-                            ...feature.properties,
-                            routeId: route.routeId || route.id
+            // Add surface detection using spatial indexing
+            try {
+                if (onProgress) onProgress('Detecting surface types using spatial indexing...');
+                
+                // Extract points from the route
+                const points = parsed.geometry.coordinates.map(coord => ({
+                    lon: coord[0],
+                    lat: coord[1],
+                    elevation: coord[2]
+                }));
+                
+                // Process surface types using the spatial index
+                const pointsWithSurface = await assignSurfacesWithSpatialIndex(
+                    points,
+                    (progress, total) => {
+                        if (onProgress) {
+                            const percentage = Math.round((progress / total) * 100);
+                            onProgress(`Surface detection progress: ${percentage}%`);
                         }
-                    };
-                    // Detect and save unpaved sections
-                    const sections = await addSurfaceOverlay(map, featureWithRouteId);
-                    route.unpavedSections = sections.map(section => ({
-                        startIndex: section.startIndex,
-                        endIndex: section.endIndex,
-                        coordinates: section.coordinates,
-                        surfaceType: section.surfaceType === 'unpaved' ? 'unpaved' :
-                            section.surfaceType === 'gravel' ? 'gravel' : 'trail'
-                    }));
-                }
-                catch (error) {
-                    console.error('[useClientGpxProcessing] Surface detection error:', error);
-                }
+                    }
+                );
+                
+                // Generate unpaved sections from the results
+                route.unpavedSections = generateUnpavedSections(pointsWithSurface);
+                
+                if (onProgress) onProgress('Surface detection complete');
+            } catch (error) {
+                console.error('[useClientGpxProcessing] Surface detection error:', error);
             }
             console.log('[useClientGpxProcessing] Processing complete', { routeId: route.id });
             return route;
