@@ -43,34 +43,75 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
             return;
         }
         
-        try {
-            setLoading(true);
-            setError(null);
-            logger.info('PresentationPOIViewer', 'Fetching Google Places data for ID:', placeId);
-            
-            const placeDetails = await fetchBasicPlaceDetails(placeId);
-            if (placeDetails) {
-                logger.info('PresentationPOIViewer', 'Fetched Google Places data successfully');
-                setGooglePlacesData({
-                    ...placeDetails,
-                    placeId: placeId
-                });
-            } else {
-                logger.error('PresentationPOIViewer', 'Failed to fetch Google Places data');
-                setError('Failed to fetch Google Places data');
+        // Set loading state immediately to prevent multiple attempts
+        setLoading(true);
+        
+        // Delay fetching on mobile
+        const fetchDelay = isMobile ? 800 : 0; // 800ms delay on mobile
+        
+        // Use setTimeout to delay the fetch on mobile
+        setTimeout(async () => {
+            try {
+                setError(null);
+                logger.info('PresentationPOIViewer', 'Fetching Google Places data for ID:', placeId);
+                
+                const placeDetails = await fetchBasicPlaceDetails(placeId);
+                if (placeDetails) {
+                    logger.info('PresentationPOIViewer', 'Fetched Google Places data successfully');
+                    setGooglePlacesData({
+                        ...placeDetails,
+                        placeId: placeId
+                    });
+                } else {
+                    logger.error('PresentationPOIViewer', 'Failed to fetch Google Places data');
+                    setError('Failed to fetch Google Places data');
+                }
+            } catch (err) {
+                logger.error('PresentationPOIViewer', 'Error fetching Google Places data:', err);
+                setError(err.message || 'An error occurred while fetching Google Places data');
+            } finally {
+                setLoading(false);
             }
-        } catch (err) {
-            logger.error('PresentationPOIViewer', 'Error fetching Google Places data:', err);
-            setError(err.message || 'An error occurred while fetching Google Places data');
-        } finally {
-            setLoading(false);
-        }
-    }, [poi?.googlePlaceId, googlePlacesData, loading]);
+        }, fetchDelay);
+    }, [poi?.googlePlaceId, googlePlacesData, loading, isMobile]);
     
-    // Automatically fetch Google Places data when component mounts
+    // Add state to track content loading stages
+    const [contentStage, setContentStage] = useState(0);
+    
+    // Update the content stage progressively
     useEffect(() => {
-        loadGooglePlacesData();
-    }, [loadGooglePlacesData, poi?.googlePlaceId]); // Re-run when POI changes
+        if (!isMobile) {
+            // On desktop, show everything immediately
+            setContentStage(2);
+            return;
+        }
+        
+        // On mobile, stage the content loading
+        setContentStage(0); // Start with minimal content
+        
+        // After modal animation completes, show basic content
+        const timer1 = setTimeout(() => {
+            setContentStage(1);
+        }, 300);
+        
+        // After a longer delay, show all content and load Google Places data
+        const timer2 = setTimeout(() => {
+            setContentStage(2);
+            loadGooglePlacesData(); // Only load Google Places data after initial render on mobile
+        }, 800);
+        
+        return () => {
+            clearTimeout(timer1);
+            clearTimeout(timer2);
+        };
+    }, [isMobile, loadGooglePlacesData]);
+    
+    // On desktop, load Google Places data immediately
+    useEffect(() => {
+        if (!isMobile) {
+            loadGooglePlacesData();
+        }
+    }, [loadGooglePlacesData, isMobile, poi?.googlePlaceId]); // Re-run when POI changes
     
     if (!poi)
         return null;
@@ -180,7 +221,7 @@ if (googlePlacesData?.photos?.length > 0) {
                     mb: '5%' // Add bottom margin for scroll space
                 },
                 children: [
-                    // Header with name and close button
+                    // Header with name and close button - always show (contentStage 0+)
                     _jsxs(Box, {
                         sx: { 
                             display: 'flex', 
@@ -215,8 +256,24 @@ if (googlePlacesData?.photos?.length > 0) {
                         ]
                     }),
                     
-                    // Image slider - always show regardless of photos
-                    _jsx(Box, { 
+                    // Show loading indicator on mobile during initial load
+                    isMobile && contentStage === 0 && (
+                        _jsx(Box, {
+                            sx: {
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                height: '200px'
+                            },
+                            children: _jsx(CircularProgress, { 
+                                size: 40, 
+                                sx: { color: 'white' } 
+                            })
+                        })
+                    ),
+                    
+                    // Image slider - show after initial animation (contentStage 1+)
+                    contentStage >= 1 && _jsx(Box, { 
                         sx: { 
                             height: '250px', 
                             mb: 3,
@@ -234,8 +291,8 @@ if (googlePlacesData?.photos?.length > 0) {
                         })
                     }),
 
-                    // Description
-                    _jsx(Box, { 
+                    // Description - show after initial animation (contentStage 1+)
+                    contentStage >= 1 && _jsx(Box, { 
                         sx: {
                             mb: 3,
                             p: 2,
@@ -251,7 +308,7 @@ if (googlePlacesData?.photos?.length > 0) {
                     }),
                     
                     // Loading indicator when fetching Google Places data
-                    poi.googlePlaceId && !googlePlacesData && loading && (
+                    contentStage >= 1 && poi.googlePlaceId && !googlePlacesData && loading && (
                         _jsx(Box, {
                             sx: {
                                 mb: 3,
@@ -265,8 +322,8 @@ if (googlePlacesData?.photos?.length > 0) {
                         })
                     ),
                     
-                    // Google Places information (if available or loading)
-                    showGooglePlaces && _jsxs(Box, {
+                    // Google Places information - show only after everything else (contentStage 2+)
+                    contentStage >= 2 && showGooglePlaces && _jsxs(Box, {
                         sx: {
                             mb: 3,
                             p: 2,

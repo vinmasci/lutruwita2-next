@@ -96,12 +96,13 @@ export const useRouteService = () => {
                path === '/'; // Landing page is also presentation mode
     };
     
-    // Set up a periodic token validity check only if not in presentation mode
-    if (typeof window !== 'undefined' && !isPresentationMode()) {
+    // Set up a periodic token validity check
+    if (typeof window !== 'undefined') {
         // Check token validity every 5 minutes
         const tokenCheckInterval = setInterval(() => {
-            // Double-check we're still not in presentation mode (in case URL changed)
+            // Skip token refresh in presentation mode
             if (isPresentationMode()) {
+                console.log('[routeService] Skipping token refresh in presentation mode');
                 return;
             }
             

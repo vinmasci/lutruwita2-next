@@ -52,8 +52,7 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
             bubble.addEventListener('click', handleClick);
         }
         
-        // Always use the smallest possible thumbnail for markers to reduce memory usage
-        // Prioritize tinyThumbnailUrl which is the smallest size
+        // Use tinyThumbnailUrl if available, otherwise fall back to thumbnailUrl
         const thumbnailUrl = photo.tinyThumbnailUrl || photo.thumbnailUrl;
         
         // Create image element
@@ -71,8 +70,6 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
         
         // Check if the thumbnailUrl is a data URL (local preview) or a regular URL
         if (thumbnailUrl) {
-            // Add loading="lazy" attribute to defer loading until visible
-            img.loading = 'lazy';
             img.src = thumbnailUrl;
         } else {
             // No thumbnail URL, use fallback

@@ -156,10 +156,9 @@ export default function PresentationMapView(props) {
         // Update the GeoJSON source if we have coordinates
         if (hoverCoordinates) {
             try {
-                // First check if the source exists
-                if (mapInstance.current.getSource('hover-point')) {
-                    // Update the source data
-                    mapInstance.current.getSource('hover-point').setData({
+                const source = mapInstance.current.getSource('hover-point');
+                if (source) {
+                    source.setData({
                         type: 'Feature',
                         geometry: {
                             type: 'Point',
@@ -168,17 +167,8 @@ export default function PresentationMapView(props) {
                         properties: {}
                     });
                     
-                    // Check if the layer exists before trying to modify it
-                    if (mapInstance.current.getLayer('hover-point')) {
-                        // Show the layer
-                        mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
-                    } else {
-                        // Layer doesn't exist, log this but don't crash
-                        logger.warn('PresentationMapView', 'hover-point layer does not exist, cannot set visibility');
-                    }
-                } else {
-                    // Source doesn't exist, try to recreate it
-                    addHoverPointMarker(mapInstance.current);
+                    // Show the layer
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
                 }
             } catch (error) {
                 logger.error('PresentationMapView', 'Error updating hover point:', error);
@@ -186,13 +176,9 @@ export default function PresentationMapView(props) {
         } else {
             // Hide the layer when no coordinates
             try {
-                // Only try to hide the layer if it exists
-                if (mapInstance.current.getLayer('hover-point')) {
-                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
-                }
+                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
             } catch (error) {
-                // Log the error but don't crash
-                logger.debug('PresentationMapView', 'Error hiding hover point:', error);
+                // Ignore errors when hiding (might happen during initialization)
             }
         }
     }, [hoverCoordinates, isMapReady]);

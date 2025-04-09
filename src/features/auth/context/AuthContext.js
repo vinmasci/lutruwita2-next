@@ -162,15 +162,16 @@ export const AuthProvider = function(props) {
            path === '/'; // Landing page is also presentation mode
   };
 
-  // Set up periodic token refresh only if not in presentation mode
+  // Set up periodic token refresh
   useEffect(() => {
-    // Only set up refresh if authenticated and not in presentation mode
-    if (!isAuthenticated || isPresentationMode()) return;
+    // Only set up refresh if authenticated
+    if (!isAuthenticated) return;
 
     // Check token validity every 5 minutes
     const tokenCheckInterval = setInterval(() => {
-      // Double-check we're still not in presentation mode (in case URL changed)
+      // Skip token refresh in presentation mode
       if (isPresentationMode()) {
+        console.log('[AuthContext] Skipping token refresh in presentation mode');
         return;
       }
 
