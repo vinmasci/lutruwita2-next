@@ -128,7 +128,7 @@ export const PresentationPhotoLayer = () => {
         map.easeTo({
             center: [lng, lat],
             zoom: targetZoom,
-            pitch: isMobile ? 0 : 30, // No pitch on mobile
+            pitch: isMobile ? 0 : 60, // No pitch on mobile, 60 degrees on desktop (consistent with PhotoModal)
             duration: isMobile ? 200 : 300 // Faster on mobile
         });
         // No longer opening the modal for clusters
@@ -446,7 +446,7 @@ export const PresentationPhotoLayer = () => {
                         map.easeTo({
                             center: [item.properties.photo.coordinates.lng, item.properties.photo.coordinates.lat],
                             zoom: map.getZoom(),
-                            pitch: isMobile ? 0 : 30, // No pitch on mobile
+                            pitch: isMobile ? 0 : 60, // No pitch on mobile, 60 degrees on desktop (consistent with PhotoModal)
                             duration: isMobile ? 200 : 300 // Faster on mobile
                         });
                     }
@@ -463,6 +463,25 @@ export const PresentationPhotoLayer = () => {
             console.log('Selected photo URL:', selectedPhoto.url);
             console.log('Selected photo index in ordered array:', selectedPhotoIndex);
             
+            // Check if on mobile
+            const isMobile = window.innerWidth <= 768 || 
+                /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // On mobile, only pass a subset of photos centered around the selected one
+            let photosToPass = orderedPhotos;
+            if (isMobile) {
+                // Get 5 photos centered around the selected one (2 before, selected, 2 after)
+                const startIdx = Math.max(0, selectedPhotoIndex - 2);
+                const endIdx = Math.min(orderedPhotos.length, selectedPhotoIndex + 3);
+                photosToPass = orderedPhotos.slice(startIdx, endIdx);
+                console.log(`Mobile detected: Limiting photos to ${photosToPass.length} (index range ${startIdx}-${endIdx})`);
+            }
+            
+            // Find the new index of the selected photo in the limited array
+            const newIndex = isMobile ? 
+                photosToPass.findIndex(p => p.url === selectedPhoto.url) : 
+                selectedPhotoIndex;
+            
             return React.createElement(PhotoModal, {
                 key: `preview-${selectedPhoto.url}`,
                 photo: selectedPhoto,
@@ -470,8 +489,8 @@ export const PresentationPhotoLayer = () => {
                     console.log('Closing photo modal');
                     setSelectedPhoto(null);
                 },
-                additionalPhotos: orderedPhotos,
-                initialIndex: selectedPhotoIndex,
+                additionalPhotos: photosToPass,
+                initialIndex: newIndex,
                 onPhotoChange: setSelectedPhoto
             });
         })() : null;

@@ -3,7 +3,8 @@ import {
   Paper, 
   IconButton, 
   Typography, 
-  Box
+  Box,
+  CircularProgress
 } from '@mui/material';
 import { 
   Close as CloseIcon, 
@@ -38,6 +39,11 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   // Local state to track photos
   const [localPhotos, setLocalPhotos] = useState(photos);
   
+  // State for image loading
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [loadedPhotos, setLoadedPhotos] = useState(new Set());
+  const [preloadingPhotos, setPreloadingPhotos] = useState(new Set());
+  
   // Update local photos when props change and update the selected index
   useEffect(() => {
     // Always update the photos array
@@ -58,6 +64,29 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }, []);
   
+  // Function to preload a photo
+  const preloadPhoto = useCallback((photo) => {
+    if (!photo || loadedPhotos.has(photo.url) || preloadingPhotos.has(photo.url)) {
+      return; // Skip if already loaded or preloading
+    }
+    
+    // Mark as preloading
+    setPreloadingPhotos(prev => new Set([...prev, photo.url]));
+    
+    // Create an image element to preload
+    const img = new Image();
+    img.onload = () => {
+      // Mark as loaded once complete
+      setLoadedPhotos(prev => new Set([...prev, photo.url]));
+      setPreloadingPhotos(prev => {
+        const newSet = new Set([...prev]);
+        newSet.delete(photo.url);
+        return newSet;
+      });
+    };
+    img.src = getBestImageUrl(photo);
+  }, [loadedPhotos, preloadingPhotos]);
+  
   // Call onPhotoChange when the selected photo changes
   useEffect(() => {
     if (onPhotoChange && selectedPhoto) {
@@ -65,14 +94,50 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     }
   }, [selectedPhoto, onPhotoChange]);
   
+  // Preload adjacent photos when selected photo changes
+  useEffect(() => {
+    if (!selectedPhoto) return;
+    
+    // Mark current photo as loading if not already loaded
+    setIsImageLoading(!loadedPhotos.has(selectedPhoto.url));
+    
+    // Find indices of next and previous photos
+    const currentIndex = localPhotos.findIndex(p => p.url === selectedPhoto.url);
+    const nextIndex = (currentIndex + 1) % localPhotos.length;
+    const prevIndex = (currentIndex - 1 + localPhotos.length) % localPhotos.length;
+    
+    // Preload next and previous photos
+    const nextPhoto = localPhotos[nextIndex];
+    const prevPhoto = localPhotos[prevIndex];
+    
+    // Use setTimeout to stagger the preloading (current photo gets priority)
+    setTimeout(() => {
+      if (nextPhoto) preloadPhoto(nextPhoto);
+    }, 300);
+    
+    setTimeout(() => {
+      if (prevPhoto) preloadPhoto(prevPhoto);
+    }, 600);
+    
+  }, [selectedPhoto, localPhotos, preloadPhoto, loadedPhotos]);
+  
   // Navigation handlers
   const handleNext = useCallback(() => {
     const newIndex = (selectedIndex + 1) % localPhotos.length;
     setSelectedIndex(newIndex);
     setImageError(false); // Reset error state when changing photos
     
-    // Pan the map to the new photo's location
+    // Get the next photo
     const nextPhoto = localPhotos[newIndex];
+    
+    // Check if the next photo is already loaded
+    if (nextPhoto && nextPhoto.url) {
+      setIsImageLoading(!loadedPhotos.has(nextPhoto.url));
+    } else {
+      setIsImageLoading(true); // Default to loading if we can't check
+    }
+    
+    // Pan the map to the new photo's location
     if (map && nextPhoto && nextPhoto.coordinates) {
       const isMobile = isMobileDevice();
       map.easeTo({
@@ -82,15 +147,24 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         duration: isMobile ? 300 : 500 // Faster on mobile
       });
     }
-  }, [localPhotos, selectedIndex, map, isMobileDevice]);
+  }, [localPhotos, selectedIndex, map, isMobileDevice, loadedPhotos]);
   
   const handlePrev = useCallback(() => {
     const newIndex = (selectedIndex - 1 + localPhotos.length) % localPhotos.length;
     setSelectedIndex(newIndex);
     setImageError(false); // Reset error state when changing photos
     
-    // Pan the map to the new photo's location
+    // Get the previous photo
     const prevPhoto = localPhotos[newIndex];
+    
+    // Check if the previous photo is already loaded
+    if (prevPhoto && prevPhoto.url) {
+      setIsImageLoading(!loadedPhotos.has(prevPhoto.url));
+    } else {
+      setIsImageLoading(true); // Default to loading if we can't check
+    }
+    
+    // Pan the map to the new photo's location
     if (map && prevPhoto && prevPhoto.coordinates) {
       const isMobile = isMobileDevice();
       map.easeTo({
@@ -100,31 +174,20 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         duration: isMobile ? 300 : 500 // Faster on mobile
       });
     }
-  }, [localPhotos, selectedIndex, map, isMobileDevice]);
+  }, [localPhotos, selectedIndex, map, isMobileDevice, loadedPhotos]);
   
-  // Pan to the initial photo when the popup opens and pitch the map (only on desktop)
+  // Pan to the initial photo when the popup opens and pitch the map
   useEffect(() => {
     if (map && selectedPhoto && selectedPhoto.coordinates) {
       const isMobile = isMobileDevice();
       
-      // First just center the map without changing pitch
+      // Use a single map.easeTo call with appropriate pitch based on device
       map.easeTo({
         center: [selectedPhoto.coordinates.lng, selectedPhoto.coordinates.lat],
         zoom: map.getZoom(), // Maintain current zoom level
+        pitch: isMobile ? 0 : 60, // No pitch on mobile, 60 degrees on desktop
         duration: isMobile ? 300 : 500 // Faster transition on mobile
       });
-      
-      // Then add pitch change after a delay on desktop only
-      if (!isMobile) {
-        // On desktop, apply pitch after a short delay
-        setTimeout(() => {
-          map.easeTo({
-            pitch: 60,
-            duration: 500
-          });
-        }, 100);
-      }
-      // No pitch change on mobile at all
     }
     
     // Restore pitch to 0 when component unmounts
@@ -224,9 +287,16 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     }
   };
   
+  // Handle image loading
+  const handleImageLoad = () => {
+    setIsImageLoading(false);
+    setLoadedPhotos(prev => new Set([...prev, selectedPhoto.url]));
+  };
+  
   // Handle image loading error
   const handleImageError = () => {
     console.error('Failed to load image:', getBestImageUrl(selectedPhoto));
+    setIsImageLoading(false);
     setImageError(true);
   };
   
@@ -267,19 +337,41 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Image */}
+        {/* Image with loading indicator */}
         {!imageError ? (
-          <img
-            src={getBestImageUrl(selectedPhoto)}
-            alt={selectedPhoto.name || 'Photo'}
-            onError={handleImageError}
-            style={{
-              height: '100%',
-              width: '100%',
-              objectFit: 'cover', // Fill the container while maintaining aspect ratio
-              objectPosition: 'center' // Center the image
-            }}
-          />
+          <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+            {/* Loading indicator */}
+            {isImageLoading && (
+              <Box 
+                sx={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'rgba(0,0,0,0.5)',
+                  zIndex: 1
+                }}
+              >
+                <CircularProgress size={40} sx={{ color: 'white' }} />
+              </Box>
+            )}
+            
+            {/* The image itself */}
+            <img
+              src={getBestImageUrl(selectedPhoto)}
+              alt={selectedPhoto.name || 'Photo'}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              loading="lazy"
+              style={{
+                height: '100%',
+                width: '100%',
+                objectFit: 'cover', // Fill the container while maintaining aspect ratio
+                objectPosition: 'center' // Center the image
+              }}
+            />
+          </Box>
         ) : (
           <Box 
             sx={{
