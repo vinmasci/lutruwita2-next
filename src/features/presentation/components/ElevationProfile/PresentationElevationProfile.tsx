@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { createPortal } from 'react-dom';
 import { Box, Typography } from '@mui/material';
@@ -255,20 +255,38 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
         indexMap: null
     });
 
-    // Effect to create the spatial grid and distance map when the route changes
-    useEffect(() => {
+    // Create a cache for route data to avoid recalculating for the same route
+    const routeDataCache = useRef<Map<string, {
+        spatialGrid: ReturnType<typeof createRouteSpatialGrid> | null;
+        distanceMap: Map<number, number> | null;
+        indexMap: Map<string, number> | null;
+    }>>(new Map());
+
+    // Memoize the route data creation to avoid unnecessary recalculations
+    const routeData = useMemo(() => {
         if (!route?.geojson?.features?.[0]) {
-            routeDataRef.current = {
+            return {
                 spatialGrid: null,
                 distanceMap: null,
                 indexMap: null
             };
-            return;
+        }
+
+        // Use route ID as cache key
+        const routeId = route.id || route.routeId;
+        
+        // If we have cached data for this route, use it
+        if (routeId && routeDataCache.current.has(routeId)) {
+            return routeDataCache.current.get(routeId)!;
         }
 
         const feature = route.geojson.features[0];
         if (feature.geometry.type !== 'LineString') {
-            return;
+            return {
+                spatialGrid: null,
+                distanceMap: null,
+                indexMap: null
+            };
         }
 
         const coordinates = feature.geometry.coordinates;
@@ -296,14 +314,27 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
             }
         });
         
-        routeDataRef.current = {
+        const result = {
             spatialGrid,
             distanceMap,
             indexMap
         };
         
-        console.log('[PresentationElevationProfile] ✅ Created spatial grid and distance map for elevation profile');
+        // Cache the result for this route
+        if (routeId) {
+            routeDataCache.current.set(routeId, result);
+            console.log(`[PresentationElevationProfile] ✅ Cached spatial grid and distance map for route ${routeId}`);
+        } else {
+            console.log('[PresentationElevationProfile] ✅ Created spatial grid and distance map for elevation profile (not cached - no route ID)');
+        }
+        
+        return result;
     }, [route]);
+
+    // Update the ref with the memoized data
+    useEffect(() => {
+        routeDataRef.current = routeData;
+    }, [routeData]);
 
     // Effect to update the current profile point based on hover coordinates
     useEffect(() => {

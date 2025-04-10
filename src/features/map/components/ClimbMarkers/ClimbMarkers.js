@@ -1,10 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useMapContext } from '../../context/MapContext';
 import { detectClimbs } from '../../../gpx/utils/climbUtils';
 import mapboxgl from 'mapbox-gl';
 import { PresentationClimbViewer } from '../../../../features/presentation/components/ClimbViewer/PresentationClimbViewer';
 import { reverseGeocodeForRoad } from '../../../../utils/geocoding';
 import './ClimbMarkers.css';
+
+// Cache for climb data to avoid recalculating for the same route
+const climbCache = new Map();
 
 export const ClimbMarkers = ({ map, route }) => {
     const [markers, setMarkers] = useState([]);
@@ -102,20 +105,35 @@ export const ClimbMarkers = ({ map, route }) => {
                 });
             }
             
-            // Detect climbs using the same data format as ElevationProfile.tsx
-            const climbs = detectClimbs(elevationProfileData);
+            // Use cached climbs if available for this route
+            const routeId = route.id || route.routeId;
+            let sortedClimbs;
             
-            // Sort climbs by distance to get them in route order
-            const sortedClimbs = [...climbs].sort((a, b) => a.startPoint.distance - b.startPoint.distance);
-            
-            // Assign numbers within each category
-            const categoryCount = {};
-            sortedClimbs.forEach(climb => {
-                categoryCount[climb.category] = (categoryCount[climb.category] || 0) + 1;
-                climb.number = categoryCount[climb.category];
-            });
-            
-            console.log('[ClimbMarkers] Detected climbs using elevation profile format:', sortedClimbs);
+            if (routeId && climbCache.has(routeId)) {
+                sortedClimbs = climbCache.get(routeId);
+                console.log(`[ClimbMarkers] Using cached climbs for route ${routeId}`);
+            } else {
+                // Detect climbs using the same data format as ElevationProfile.tsx
+                const climbs = detectClimbs(elevationProfileData);
+                
+                // Sort climbs by distance to get them in route order
+                sortedClimbs = [...climbs].sort((a, b) => a.startPoint.distance - b.startPoint.distance);
+                
+                // Assign numbers within each category
+                const categoryCount = {};
+                sortedClimbs.forEach(climb => {
+                    categoryCount[climb.category] = (categoryCount[climb.category] || 0) + 1;
+                    climb.number = categoryCount[climb.category];
+                });
+                
+                // Cache the results for future use
+                if (routeId) {
+                    climbCache.set(routeId, sortedClimbs);
+                    console.log(`[ClimbMarkers] Cached climbs for route ${routeId}`);
+                } else {
+                    console.log('[ClimbMarkers] Detected climbs using elevation profile format (not cached - no route ID)');
+                }
+            }
 
             // Create markers for each climb
             const newMarkers = [];

@@ -1,5 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+// Cache for route spatial grids to avoid recalculating for the same route
+const routeSpatialGridCache = new Map();
 import { throttle } from 'lodash'; // Import throttle
 import { findClosestPointOnRoute, createRouteSpatialGrid } from '../../../../utils/routeUtils';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
@@ -134,22 +136,48 @@ export default function PresentationMapView(props) {
         setHoverCoordinatesRef.current = setHoverCoordinates;
     }, [setHoverCoordinates]);
 
-    // Effect to cache route coordinates and create spatial grid for optimization
+    // Memoize route spatial grid creation to avoid unnecessary recalculations
     useEffect(() => {
-        if (currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
-            const coordinates = currentRoute.geojson.features[0].geometry.coordinates;
-            
-            // Use the shared utility function to create the spatial grid
-            const spatialGrid = createRouteSpatialGrid(coordinates);
-            
-            // Store the spatial grid
-            routeCoordinatesRef.current = spatialGrid;
-            
-            console.log('[PresentationMapView] ✅ Created spatial grid for route tracer optimization');
-        } else {
+        if (!currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
             routeCoordinatesRef.current = null; // Clear cache if no coordinates
+            return;
+        }
+        
+        // Use route ID as cache key
+        const routeId = currentRoute.id || currentRoute.routeId;
+        
+        // If we have cached data for this route, use it
+        if (routeId && routeSpatialGridCache.has(routeId)) {
+            routeCoordinatesRef.current = routeSpatialGridCache.get(routeId);
+            console.log(`[PresentationMapView] ✅ Using cached spatial grid for route ${routeId}`);
+            return;
+        }
+        
+        const coordinates = currentRoute.geojson.features[0].geometry.coordinates;
+        
+        // Use the shared utility function to create the spatial grid
+        const spatialGrid = createRouteSpatialGrid(coordinates);
+        
+        // Store the spatial grid
+        routeCoordinatesRef.current = spatialGrid;
+        
+        // Cache the result for this route
+        if (routeId) {
+            routeSpatialGridCache.set(routeId, spatialGrid);
+            console.log(`[PresentationMapView] ✅ Cached spatial grid for route ${routeId}`);
+        } else {
+            console.log('[PresentationMapView] ✅ Created spatial grid for route tracer optimization (not cached - no route ID)');
         }
     }, [currentRoute]);
+    
+    // Helper function to safely check if a layer exists
+    const layerExists = (map, layerId) => {
+        try {
+            return !!map.getLayer(layerId);
+        } catch (e) {
+            return false;
+        }
+    };
     
     // Simple update for hover point without animation
     useEffect(() => {
@@ -169,16 +197,20 @@ export default function PresentationMapView(props) {
                         properties: {}
                     });
                     
-                    // Show the layer
-                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                    // Show the layer - only if it exists
+                    if (layerExists(mapInstance.current, 'hover-point')) {
+                        mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'visible');
+                    }
                 }
             } catch (error) {
                 logger.error('PresentationMapView', 'Error updating hover point:', error);
             }
         } else {
-            // Hide the layer when no coordinates
+            // Hide the layer when no coordinates - only if it exists
             try {
-                mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+                if (layerExists(mapInstance.current, 'hover-point')) {
+                    mapInstance.current.setLayoutProperty('hover-point', 'visibility', 'none');
+                }
             } catch (error) {
                 // Ignore errors when hiding (might happen during initialization)
             }
@@ -720,7 +752,11 @@ export default function PresentationMapView(props) {
                         },
                         properties: {}
                     });
-                    map.setLayoutProperty('hover-point', 'visibility', 'visible');
+                    
+                    // Only set layout property if the layer exists
+                    if (layerExists(map, 'hover-point')) {
+                        map.setLayoutProperty('hover-point', 'visibility', 'visible');
+                    }
                 }
             } else {
                 logger.info('PresentationMapView', 'Skipping hover point layer on mobile device after style change');

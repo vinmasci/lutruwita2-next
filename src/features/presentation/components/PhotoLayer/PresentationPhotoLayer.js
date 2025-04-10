@@ -1,4 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+
+// Cache for loaded photos to avoid reloading for the same route
+const loadedPhotosCache = new Map();
 import React from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
@@ -14,13 +17,29 @@ export const PresentationPhotoLayer = () => {
     const { currentRoute } = useRouteContext();
     const { photos, loadPhotos } = usePhotoContext();
     
-    // Load photos from route state
+    // Load photos from route state with caching
     useEffect(() => {
         if (!currentRoute || currentRoute._type !== 'loaded') {
             return;
         }
+        
+        // Use route ID as cache key
+        const routeId = currentRoute.id || currentRoute.routeId;
+        
+        // If we have already loaded photos for this route, skip loading
+        if (routeId && loadedPhotosCache.has(routeId)) {
+            console.log(`[PresentationPhotoLayer] Using cached photos for route ${routeId}`);
+            return;
+        }
+        
         if (currentRoute._loadedState?.photos) {
             loadPhotos(currentRoute._loadedState.photos);
+            
+            // Cache the fact that we've loaded photos for this route
+            if (routeId) {
+                loadedPhotosCache.set(routeId, true);
+                console.log(`[PresentationPhotoLayer] Cached photo loading state for route ${routeId}`);
+            }
         }
     }, [currentRoute]); // Remove loadPhotos from deps since it's a stable context function
     

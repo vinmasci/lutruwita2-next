@@ -21,7 +21,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
     const { routes, currentRoute, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
     const { loadPOIsFromRoute, visibleCategories, toggleCategoryVisibility } = usePOIContext();
-    const { addPhoto, isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
+    const { isPhotosVisible, togglePhotosVisibility } = usePhotoContext();
     const mapOverview = getMapOverviewData();
     const { routeVisibility, toggleRouteVisibility } = useRouteState();
     const [isNestedOpen, setIsNestedOpen] = useState(true);
@@ -32,13 +32,11 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
 
     const updateRouteAndMap = (route) => {
         if (route._type === 'loaded' && route._loadedState) {
-            // Update POIs and photos from the loaded state
+            // Update POIs from the loaded state
             if (route._loadedState.pois) {
                 loadPOIsFromRoute(route._loadedState.pois);
             }
-            if (route._loadedState.photos) {
-                addPhoto(route._loadedState.photos.map(deserializePhoto));
-            }
+            // Photos will be loaded by PresentationPhotoLayer when currentRoute changes
         }
         // Just update the current route - the map view will handle fitting bounds
         setCurrentRoute(route);

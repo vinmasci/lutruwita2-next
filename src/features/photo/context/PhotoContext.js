@@ -1,5 +1,5 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { useRouteContext } from '../../map/context/RouteContext';
 import { getPhotoIdentifier } from '../../photo/utils/clustering';
 
@@ -145,20 +145,38 @@ export const PhotoProvider = ({ children }) => {
         }));
         notifyPhotoChange('update');
     };
+    // Cache for photo identifiers to avoid reloading the same photos
+    const photoIdentifiersCache = useRef(new Set());
+
     const loadPhotos = (newPhotos) => {
         console.log('[PhotoContext] Loading photos:', newPhotos ? newPhotos.length : 0);
 
         if (!newPhotos || newPhotos.length === 0) {
             console.log('[PhotoContext] No photos to load, clearing photos array');
             setPhotos([]);
+            photoIdentifiersCache.current.clear();
             return;
         }
 
-        // Log photo identifiers for debugging
-        if (newPhotos.length > 0) {
-            console.log('[PhotoContext] Loading photos with identifiers:',
-                newPhotos.map(p => getPhotoIdentifier(p.url)));
+        // Extract identifiers from new photos
+        const newPhotoIdentifiers = newPhotos.map(p => getPhotoIdentifier(p.url));
+        
+        // Check if these are the same photos we already have loaded
+        if (photos.length === newPhotos.length) {
+            // Create a set of current photo identifiers for quick lookup
+            const currentPhotoIdentifiers = new Set(photos.map(p => getPhotoIdentifier(p.url)));
+            
+            // Check if all new photos are already loaded
+            const allPhotosAlreadyLoaded = newPhotoIdentifiers.every(id => currentPhotoIdentifiers.has(id));
+            
+            if (allPhotosAlreadyLoaded) {
+                console.log('[PhotoContext] Photos already loaded, skipping');
+                return;
+            }
         }
+
+        // Log photo identifiers for debugging
+        console.log('[PhotoContext] Loading photos with identifiers:', newPhotoIdentifiers);
 
         // Convert SerializedPhoto to ProcessedPhoto and ensure caption field exists
         const processedPhotos = newPhotos.map(photo => {
@@ -177,6 +195,10 @@ export const PhotoProvider = ({ children }) => {
 
         // Replace existing photos entirely
         setPhotos(processedPhotos);
+        
+        // Update the cache with the new photo identifiers
+        photoIdentifiersCache.current = new Set(newPhotoIdentifiers);
+        
         console.log('[PhotoContext] Photos loaded successfully:', processedPhotos.length);
 
         // Don't notify RouteContext when loading photos from route

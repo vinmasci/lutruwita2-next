@@ -438,21 +438,23 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
       ) : (
         <>
         {/* Main image container - no header */}
-        <Box 
-          sx={{
-            position: "relative", 
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            bgcolor: "black",
-            height: 400, // Twice as big (was 200)
-            overflow: "hidden",
-            padding: 0
-          }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
+<Box 
+  sx={{
+    position: "relative", 
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    bgcolor: "black",
+    height: 400, // Twice as big (was 200)
+    overflow: "hidden",
+    padding: 0,
+    cursor: 'pointer' // Add pointer cursor to indicate clickability
+  }}
+  onTouchStart={handleTouchStart}
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}
+  onClick={onClose} // Add onClick handler to close the modal when clicking anywhere on the photo
+>
         {/* Image with loading indicator */}
         {!imageError ? (
           <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -609,7 +611,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
       {/* Close button in top-right corner */}
       <IconButton 
         onClick={onClose} 
-        size="small" 
+        size="medium" 
         aria-label="close"
         sx={{ 
           position: 'absolute',
@@ -617,13 +619,15 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
           right: 8,
           bgcolor: 'rgba(0,0,0,0.5)',
           color: 'white',
-          padding: 0.5,
+          padding: 1,
+          width: 40,
+          height: 40,
           '&:hover': {
             bgcolor: 'rgba(0,0,0,0.7)'
           }
         }}
       >
-        <CloseIcon fontSize="small" />
+        <CloseIcon fontSize="medium" />
       </IconButton>
     </Paper>
   );
