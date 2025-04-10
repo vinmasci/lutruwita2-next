@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import React from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
@@ -124,13 +124,14 @@ export const PresentationPhotoLayer = () => {
         const isMobile = window.innerWidth <= 768 || 
             /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
-        // Zoom to the cluster's location with more aggressive zoom and no tilt on mobile
+        // Use easeTo for cluster clicks as it provides a smoother experience
         map.easeTo({
             center: [lng, lat],
             zoom: targetZoom,
-            pitch: isMobile ? 0 : 60, // No pitch on mobile, 60 degrees on desktop (consistent with PhotoModal)
+            pitch: isMobile ? 0 : 60, // No pitch on mobile, 60 degrees on desktop
             duration: isMobile ? 200 : 300 // Faster on mobile
         });
+        
         // No longer opening the modal for clusters
         // Only individual photo markers will open the modal when clicked
     }, [map, clusteredItems]);
@@ -272,7 +273,7 @@ export const PresentationPhotoLayer = () => {
         // Apply extra aggressive clustering options
         const options = { 
             extraAggressive: true,
-            radius: 300, // Larger radius to group more photos together
+            radius: 100, // Reduced radius to make clusters tighter
             maxZoom: 14  // Higher max zoom to maintain clusters longer (reduced by 4 total)
         };
         
@@ -281,62 +282,26 @@ export const PresentationPhotoLayer = () => {
     
     // Update the selected photo cluster when the selected photo changes
     useEffect(() => {
-        if (selectedPhoto) {
-            console.log('Selected photo:', selectedPhoto);
-            
-            // First try to find clusters in the current zoom level
-            const containingClusters = clusteredItems.filter(item => 
-                isCluster(item) && 
-                item.properties.photos.some(photo => photo.url === selectedPhoto.url)
-            );
-            
-            console.log(`Found ${containingClusters.length} clusters containing the selected photo at current zoom`);
-            
-            // If we found a cluster containing this photo, store it
-            if (containingClusters.length > 0) {
-                setSelectedPhotoCluster(containingClusters[0]);
-                console.log(`Cluster contains ${containingClusters[0].properties.photos.length} photos`);
-            } else {
-                // If no clusters found at current zoom, try the simulated lower zoom clustering
-                const simulatedClusters = simulatedClustering.filter(item => 
-                    isCluster(item) && 
-                    item.properties.photos.some(photo => photo.url === selectedPhoto.url)
-                );
-                
-                console.log(`Found ${simulatedClusters.length} clusters containing the selected photo at simulated zoom`);
-                
-                if (simulatedClusters.length > 0) {
-                    // We found a cluster at the simulated zoom level
-                    const simulatedCluster = simulatedClusters[0];
-                    console.log(`Simulated cluster contains ${simulatedCluster.properties.photos.length} photos`);
-                    
-                    // Now find all photos in this simulated cluster
-                    const relatedPhotoUrls = simulatedCluster.properties.photos.map(p => p.url);
-                    console.log('Related photo URLs:', relatedPhotoUrls);
-                    
-                    // Find all clusters at the current zoom level that contain any of these related photos
-                    const relatedClusters = clusteredItems.filter(item => 
-                        isCluster(item) && 
-                        item.properties.photos.some(photo => relatedPhotoUrls.includes(photo.url))
-                    );
-                    
-                    if (relatedClusters.length > 0) {
-                        setSelectedPhotoCluster(relatedClusters[0]);
-                        console.log(`Using related cluster with ${relatedClusters[0].properties.photos.length} photos`);
-                    } else {
-                        console.log('No related clusters found at current zoom level');
-                        setSelectedPhotoCluster(null);
-                    }
-                } else {
-                    console.log('No clusters found containing the selected photo at any zoom level');
-                    setSelectedPhotoCluster(null);
-                }
-            }
-        } else {
+        if (!selectedPhoto) {
             // If there's no selected photo, clear the selected cluster
             setSelectedPhotoCluster(null);
+            return;
         }
-    }, [selectedPhoto, clusteredItems, simulatedClustering]);
+        
+        // Find clusters in the current zoom level that contain the selected photo
+        const containingClusters = clusteredItems.filter(item => 
+            isCluster(item) && 
+            item.properties.photos.some(photo => photo.url === selectedPhoto.url)
+        );
+        
+        // If we found a cluster containing this photo, store it
+        if (containingClusters.length > 0) {
+            setSelectedPhotoCluster(containingClusters[0]);
+        } else {
+            // If no direct cluster found, try to find related photos
+            setSelectedPhotoCluster(null);
+        }
+    }, [selectedPhoto, clusteredItems]);
 
     // Get related photo URLs from simulated clustering
     const relatedPhotoUrls = useMemo(() => {
@@ -350,9 +315,7 @@ export const PresentationPhotoLayer = () => {
         
         if (simulatedCluster && isCluster(simulatedCluster)) {
             // Get all photo URLs in this simulated cluster
-            const urls = new Set(simulatedCluster.properties.photos.map(photo => photo.url));
-            console.log(`Found ${urls.size} related photos that would be in the same cluster at a lower zoom level`);
-            return urls;
+            return new Set(simulatedCluster.properties.photos.map(photo => photo.url));
         }
         
         // If no cluster found, just include the selected photo
@@ -380,19 +343,7 @@ export const PresentationPhotoLayer = () => {
             // or contains any related photos
             const shouldHighlight = isSelectedCluster || containsSelectedPhoto || containsRelatedPhoto;
             
-            // Debug log to verify cluster highlighting
-            if (shouldHighlight) {
-                if (isSelectedCluster) {
-                    console.log('Highlighting cluster because it is the selected cluster');
-                }
-                if (containsSelectedPhoto) {
-                    console.log('Highlighting cluster containing selected photo:', selectedPhoto.url);
-                }
-                console.log('Cluster contains', item.properties.photos.length, 'photos');
-                
-                // Log all photo URLs in this cluster for debugging
-                console.log('Photos in this cluster:', item.properties.photos.map(p => p.url));
-            }
+            // No debug logs for cluster highlighting
             
             return React.createElement(PhotoCluster, {
                 key: `cluster-${item.properties.cluster_id}`,
@@ -423,33 +374,37 @@ export const PresentationPhotoLayer = () => {
             // Highlight the marker if it's the selected photo or a related photo
             const isHighlighted = isSelectedPhoto || isRelatedPhoto;
             
-            // Debug log for related photo markers
-            if (isRelatedPhoto && !isSelectedPhoto) {
-                console.log('Highlighting related photo marker:', item.properties.photo.url);
-            }
+            // No debug logs for related photo markers
             
             return React.createElement(PhotoMarker, {
                 key: item.properties.id,
                 photo: item.properties.photo,
                 isHighlighted: isHighlighted,
                 onClick: () => {
-                    console.log('Photo marker clicked:', item.properties.photo);
-                    console.log('Marker coordinates:', item.properties.photo.coordinates);
-                    console.log('Map center:', map.getCenter());
-                    setSelectedPhoto(item.properties.photo);
-                    // Force the map to center on the photo with a reduced tilt angle on desktop only
+                    // Detect iOS devices
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                    
+                    // No debug logs for photo marker clicks
+                    
+                    // First, pan the map to the photo's location without changing pitch
                     if (map && item.properties.photo.coordinates) {
                         // Check if on mobile
                         const isMobile = window.innerWidth <= 768 || 
                             /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                         
-                        map.easeTo({
-                            center: [item.properties.photo.coordinates.lng, item.properties.photo.coordinates.lat],
-                            zoom: map.getZoom(),
-                            pitch: isMobile ? 0 : 60, // No pitch on mobile, 60 degrees on desktop (consistent with PhotoModal)
-                            duration: isMobile ? 200 : 300 // Faster on mobile
-                        });
+                        // Use panTo instead of easeTo to avoid changing pitch
+                        map.panTo(
+                            [item.properties.photo.coordinates.lng, item.properties.photo.coordinates.lat],
+                            { duration: isMobile ? 200 : 300 } // Faster on mobile
+                        );
                     }
+                    
+                    // Then, after a delay, set the selected photo to open the modal
+                    // Use a longer delay on iOS devices to prevent crashes
+                    const delay = isIOS ? 400 : 200;
+                    setTimeout(() => {
+                        setSelectedPhoto(item.properties.photo);
+                    }, delay);
                 }
             });
         }
@@ -461,21 +416,29 @@ export const PresentationPhotoLayer = () => {
         (() => {
             // Find the index of the selected photo in the ordered array using URL as unique identifier
             const selectedPhotoIndex = orderedPhotos.findIndex(p => p.url === selectedPhoto.url);
-            console.log('Selected photo URL:', selectedPhoto.url);
-            console.log('Selected photo index in ordered array:', selectedPhotoIndex);
             
             // Check if on mobile
             const isMobile = window.innerWidth <= 768 || 
                 /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
+            // Only log on desktop
+            if (!isMobile) {
+                console.log('Selected photo URL:', selectedPhoto.url);
+                console.log('Selected photo index in ordered array:', selectedPhotoIndex);
+            }
+            
             // On mobile, only pass a subset of photos centered around the selected one
             let photosToPass = orderedPhotos;
             if (isMobile) {
-                // Get 5 photos centered around the selected one (2 before, selected, 2 after)
-                const startIdx = Math.max(0, selectedPhotoIndex - 2);
-                const endIdx = Math.min(orderedPhotos.length, selectedPhotoIndex + 3);
+                // Get 3 photos centered around the selected one (1 before, selected, 1 after)
+                const startIdx = Math.max(0, selectedPhotoIndex - 1);
+                const endIdx = Math.min(orderedPhotos.length, selectedPhotoIndex + 2);
                 photosToPass = orderedPhotos.slice(startIdx, endIdx);
-                console.log(`Mobile detected: Limiting photos to ${photosToPass.length} (index range ${startIdx}-${endIdx})`);
+                
+                // Only log on desktop
+                if (!isMobile) {
+                    console.log(`Mobile detected: Limiting photos to ${photosToPass.length} (index range ${startIdx}-${endIdx})`);
+                }
             }
             
             // Find the new index of the selected photo in the limited array
@@ -487,7 +450,10 @@ export const PresentationPhotoLayer = () => {
                 key: `preview-${selectedPhoto.url}`,
                 photo: selectedPhoto,
                 onClose: () => {
-                    console.log('Closing photo modal');
+                    // Only log on desktop
+                    if (!isMobile) {
+                        console.log('Closing photo modal');
+                    }
                     setSelectedPhoto(null);
                 },
                 additionalPhotos: photosToPass,

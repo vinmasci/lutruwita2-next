@@ -7,6 +7,8 @@ import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePlaceContext } from '../../../place/context/PlaceContext';
 import { useLineContext } from '../../../lineMarkers/context/LineContext';
+import { useAuth } from '../../../auth/context/AuthContext';
+import { useAuthModal } from '../../../auth/context/AuthModalContext.jsx';
 import { useSidebar } from './useSidebar';
 import { SidebarIcons, RefreshIcon } from './icons';
 import { SaveDialog } from './SaveDialog.jsx';
@@ -21,6 +23,8 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
     const { clearPhotos } = usePhotoContext();
     const { clearPlaces } = usePlaceContext();
     const { setIsDrawing, saveRoute, stopDrawing, lines, setLines } = useLineContext();
+    const { isAuthenticated } = useAuth();
+    const { showAuthModal } = useAuthModal();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
     const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
@@ -388,6 +392,21 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         }
     }, [isSaving, snackbarMessage]);
 
+    // Wrapper function to check authentication before performing an action
+    const withAuthCheck = (action, featureName) => {
+        return () => {
+            // Check if user is authenticated
+            if (!isAuthenticated) {
+                // If not authenticated, show auth modal
+                showAuthModal(`You need to be signed in to ${featureName || 'access this feature'}.`);
+                return;
+            }
+            
+            // If authenticated, proceed with the action
+            action();
+        };
+    };
+
     const handleItemClick = (id, onClick) => {
         setActiveItem(id === activeItem ? null : id);
         onClick();
@@ -398,40 +417,40 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             id: 'gpx',
             icon: SidebarIcons.actions.gpx,
             text: 'Add GPX',
-            onClick: () => {
+            onClick: withAuthCheck(() => {
                 onItemClick('gpx');
                 onUploadGpx();
-            }
+            }, 'add GPX files')
         },
         {
             id: 'mapOverview',
             icon: SidebarIcons.actions.mapOverview,
             text: 'Map Overview',
-            onClick: () => {
+            onClick: withAuthCheck(() => {
                 onItemClick('mapOverview');
                 onAddMapOverview();
-            }
+            }, 'add map overview')
         },
         {
             id: 'photos',
             icon: SidebarIcons.actions.photos,
             text: 'Add GPS Photo',
-            onClick: onAddPhotos
+            onClick: withAuthCheck(onAddPhotos, 'add photos')
         },
         {
             id: 'poi',
             icon: SidebarIcons.actions.poi,
             text: 'Add POI',
-            onClick: onAddPOI
+            onClick: withAuthCheck(onAddPOI, 'add points of interest')
         },
         {
             id: 'line',
             icon: SidebarIcons.actions.line,
             text: 'Add Line',
-            onClick: () => {
+            onClick: withAuthCheck(() => {
                 onItemClick('line');
                 onAddLine();
-            }
+            }, 'add lines')
         }
     ];
 
@@ -447,20 +466,20 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             id: 'load',
             icon: SidebarIcons.actions.load,
             text: 'Load GPX',
-            onClick: handleLoadClick
+            onClick: withAuthCheck(handleLoadClick, 'load saved routes')
         },
         {
             id: 'save',
             icon: SidebarIcons.actions.save,
             text: 'Save GPX',
-            onClick: handleSaveClick,
+            onClick: withAuthCheck(handleSaveClick, 'save routes'),
             disabled: routes.length === 0
         },
         {
             id: 'embed',
             icon: SidebarIcons.actions.embed,
             text: 'Embed Map',
-            onClick: handleEmbedClick,
+            onClick: withAuthCheck(handleEmbedClick, 'create embeddable maps'),
             disabled: routes.length === 0
         }
     ];

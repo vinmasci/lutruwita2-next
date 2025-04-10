@@ -1,5 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { compressJSON, decompressJSON } from '../../../utils/compression';
+import { useAuthModal } from '../../../features/auth/context/AuthModalContext.jsx';
 
 // Create a custom event for authentication state changes
 export const AUTH_EVENTS = {
@@ -10,6 +11,7 @@ export const AUTH_EVENTS = {
 
 export const useRouteService = () => {
     const { getAccessTokenSilently, user, logout, loginWithRedirect } = useAuth0();
+    const { showAuthModal } = useAuthModal();
     const userId = user?.sub;
     // Always use relative URL for serverless deployment
     const API_BASE = '/api/routes';
@@ -32,44 +34,33 @@ export const useRouteService = () => {
         handleAuthError: function(error) {
             console.error('[AuthManager] Authentication error:', error);
             
+            // Skip showing the modal in presentation mode
+            if (isPresentationMode()) {
+                console.log('[AuthManager] Suppressing auth error modal in presentation mode');
+                return false;
+            }
+            
             // Check error type to determine appropriate action
             if (error.error === 'login_required' || 
                 error.error === 'consent_required' ||
                 error.message?.includes('Login required') ||
                 error.message?.includes('consent required')) {
                 
-                // Token is invalid or expired, dispatch event
-                const event = new CustomEvent(AUTH_EVENTS.TOKEN_EXPIRED, { 
-                    detail: { error, message: 'Your session has expired. Please log in again.' } 
-                });
-                window.dispatchEvent(event);
-                
-                // Redirect to login after a short delay
-                setTimeout(() => {
-                    console.log('[AuthManager] Redirecting to login page...');
-                    loginWithRedirect({
-                        appState: { returnTo: window.location.pathname }
-                    });
-                }, 2000);
+                // Show auth modal with the error message
+                showAuthModal('Your session has expired. Please log in again.');
                 
                 return false;
             }
             
             if (error.error === 'timeout' || error.message?.includes('timeout')) {
-                // Session timeout, dispatch event
-                const event = new CustomEvent(AUTH_EVENTS.SESSION_TIMEOUT, { 
-                    detail: { error, message: 'Your session has timed out. Please log in again.' } 
-                });
-                window.dispatchEvent(event);
+                // Show auth modal with the error message
+                showAuthModal('Your session has timed out. Please log in again.');
                 
                 return false;
             }
             
             // Generic token refresh failure
-            const event = new CustomEvent(AUTH_EVENTS.TOKEN_REFRESH_FAILED, { 
-                detail: { error, message: 'Failed to refresh authentication. Please log in again.' } 
-            });
-            window.dispatchEvent(event);
+            showAuthModal('Failed to refresh authentication. Please log in again.');
             
             return false;
         },
@@ -136,10 +127,8 @@ export const useRouteService = () => {
                 return;
             }
             
-            // Show a notification to the user
-            if (window.confirm(event.detail.message)) {
-                AuthenticationManager.resetAuth();
-            }
+            // Show the auth modal with the error message
+            showAuthModal(event.detail.message);
         });
         
         window.addEventListener(AUTH_EVENTS.TOKEN_EXPIRED, (event) => {
@@ -156,10 +145,8 @@ export const useRouteService = () => {
                 return;
             }
             
-            // Show a notification to the user
-            if (window.confirm(event.detail.message)) {
-                AuthenticationManager.resetAuth();
-            }
+            // Show the auth modal with the error message
+            showAuthModal(event.detail.message);
         });
     }
     

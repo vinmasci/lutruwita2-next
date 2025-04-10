@@ -7,11 +7,11 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 // 2. SUPERCLUSTER CONFIGURATION
 // ==========================================
 // This creates the clustering engine with specific settings
-const createIndex = (radius = 150, maxZoom = 10, minPoints = 2) => {
+const createIndex = (radius = 100, maxZoom = 8, minPoints = 2) => {
     // iOS devices get even more aggressive clustering
     if (isIOS) {
-        radius = 200;
-        maxZoom = 12;
+        radius = 100;
+        maxZoom = 10; // Lower maxZoom to make clusters break apart earlier
         minPoints = 2;
     }
     
@@ -41,10 +41,10 @@ const createIndex = (radius = 150, maxZoom = 10, minPoints = 2) => {
 // ==========================================
 // This is where photos are converted to GeoJSON and clustered
 const getClusteredPhotos = (photos, zoom, options = {}) => {
-    const { radius = 150, maxZoom = 14, minPoints = 2, extraAggressive = false } = options;
+    const { radius = 100, maxZoom = 12, minPoints = 2, extraAggressive = false } = options;
     
     // Apply even more aggressive settings if requested
-    const clusterRadius = extraAggressive ? 180 : radius;
+    const clusterRadius = extraAggressive ? 100 : radius;
     const clusterMaxZoom = extraAggressive ? 12 : maxZoom;
     const clusterMinPoints = extraAggressive ? 2 : minPoints;
     // Convert photos to GeoJSON features

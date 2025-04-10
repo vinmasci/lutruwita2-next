@@ -10,6 +10,8 @@ import { ProcessingProvider } from './features/map/context';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import Auth0Callback from './features/auth/components/Auth0Callback/Auth0Callback';
 import { Auth0Provider } from '@auth0/auth0-react';
+import { AuthProvider } from './features/auth/context/AuthContext';
+import { AuthModalProvider } from './features/auth/context/AuthModalContext.jsx';
 import { LandingPage } from './features/presentation/components/LandingPage/LandingPage';
 import { RoutePresentation } from './features/presentation/components/RoutePresentation/RoutePresentation';
 
@@ -31,56 +33,62 @@ export default function App() {
         window.history.replaceState({}, document.title, '/editor');
       }}
     >
-      <BrowserRouter>
-        <ThemeProvider theme={theme}>
-          <ProcessingProvider>
-            <PhotoProvider>
-              <PlaceProvider>
-                <POIProvider>
-                  <Routes>
-                    <Route path="/callback" element={<Auth0Callback />} />
-                    <Route path="/" element={<LandingPage />} />
-                    <Route
-                      path="/editor"
-                      element={
-                        <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
-                          <MapView />
-                        </Box>
-                      }
-                    />
-                    <Route
-                      path="/preview"
-                      element={
-                        <Box
-                          sx={{
-                            height: '100vh',
-                            width: '100vw',
-                            position: 'relative',
-                            bgcolor: '#1a1a1a',
-                            color: 'white'
-                          }}
+      {/* Add our custom AuthProvider to synchronize authentication state */}
+      <AuthProvider>
+        {/* Add AuthModalProvider for authentication modals */}
+        <AuthModalProvider>
+          <BrowserRouter>
+            <ThemeProvider theme={theme}>
+              <ProcessingProvider>
+                <PhotoProvider>
+                  <PlaceProvider>
+                    <POIProvider>
+                      <Routes>
+                        <Route path="/callback" element={<Auth0Callback />} />
+                        <Route path="/" element={<LandingPage />} />
+                        <Route
+                          path="/editor"
+                          element={
+                            <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
+                              <MapView />
+                            </Box>
+                          }
+                        />
+                        <Route
+                          path="/preview"
+                          element={
+                            <Box
+                              sx={{
+                                height: '100vh',
+                                width: '100vw',
+                                position: 'relative',
+                                bgcolor: '#1a1a1a',
+                                color: 'white'
+                              }}
+                            >
+                              <Outlet />
+                            </Box>
+                          }
                         >
-                          <Outlet />
-                        </Box>
-                      }
-                    >
-                      <Route path="route/:id" element={<RoutePresentation />} />
-                    </Route>
-                    <Route path="/embed/:stateId" element={
-                      <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
-                        <React.Suspense fallback={<div>Loading...</div>}>
-                          {/* Lazy load the embed view */}
-                          {React.createElement(React.lazy(() => import('./features/presentation/components/EmbedMapView/EmbedMapView')))}
-                        </React.Suspense>
-                      </Box>
-                    } />
-                  </Routes>
-                </POIProvider>
-              </PlaceProvider>
-            </PhotoProvider>
-          </ProcessingProvider>
-        </ThemeProvider>
-      </BrowserRouter>
+                          <Route path="route/:id" element={<RoutePresentation />} />
+                        </Route>
+                        <Route path="/embed/:stateId" element={
+                          <Box sx={{ height: '100vh', width: '100vw', position: 'relative' }}>
+                            <React.Suspense fallback={<div>Loading...</div>}>
+                              {/* Lazy load the embed view */}
+                              {React.createElement(React.lazy(() => import('./features/presentation/components/EmbedMapView/EmbedMapView')))}
+                            </React.Suspense>
+                          </Box>
+                        } />
+                      </Routes>
+                    </POIProvider>
+                  </PlaceProvider>
+                </PhotoProvider>
+              </ProcessingProvider>
+            </ThemeProvider>
+          </BrowserRouter>
+        </AuthModalProvider>
+      </AuthProvider>
     </Auth0Provider>
   );
 }

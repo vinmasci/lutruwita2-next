@@ -25,6 +25,7 @@ export const AuthProvider = function(props) {
     user: auth0User,
     getAccessTokenSilently,
     loginWithRedirect,
+    loginWithPopup,
     logout
   } = useAuth0();
 
@@ -135,12 +136,26 @@ export const AuthProvider = function(props) {
         setAuthError('Your session has expired. Please log in again.');
         setIsAuthenticated(false);
         
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          console.log('[AuthContext] Redirecting to login page...');
-          loginWithRedirect({
-            appState: { returnTo: window.location.pathname }
-          });
+        // Use popup login after a short delay
+        setTimeout(async () => {
+          console.log('[AuthContext] Opening login popup...');
+          try {
+            await loginWithPopup({
+              appState: { returnTo: window.location.pathname },
+              // Configure popup window
+              popup: {
+                width: 400,
+                height: 600,
+                left: window.innerWidth / 2 - 200,
+                top: window.innerHeight / 2 - 300
+              }
+            });
+          } catch (popupError) {
+            console.error('[AuthContext] Popup login failed, falling back to redirect:', popupError);
+            loginWithRedirect({
+              appState: { returnTo: window.location.pathname }
+            });
+          }
         }, 2000);
       } else {
         setAuthError('Failed to refresh authentication. Please try again.');
@@ -208,7 +223,30 @@ export const AuthProvider = function(props) {
     authError,
     checkAuthentication,
     refreshToken,
-    login: loginWithRedirect,
+    login: async () => {
+      try {
+        // Use popup mode instead of redirect
+        await loginWithPopup({
+          appState: { returnTo: window.location.pathname },
+          // Configure popup window
+          popup: {
+            width: 400,
+            height: 600,
+            left: window.innerWidth / 2 - 200,
+            top: window.innerHeight / 2 - 300
+          }
+        });
+      } catch (error) {
+        console.error('[AuthContext] Auth0 popup login error:', error);
+        // If popup is blocked or fails, fallback to redirect
+        if (error.error === 'popup_closed_by_user' || error.error === 'login_required') {
+          console.log('[AuthContext] Popup was blocked or closed, falling back to redirect');
+          loginWithRedirect({
+            appState: { returnTo: window.location.pathname }
+          });
+        }
+      }
+    },
     logout: () => {
       // Clear any cached tokens or state
       localStorage.removeItem('auth0.is.authenticated');
