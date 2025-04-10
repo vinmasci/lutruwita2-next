@@ -21,6 +21,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import StyleControl, { MAP_STYLES } from '../StyleControl';
 import PitchControl from '../../../map/components/PitchControl/PitchControl';
 import { useRouteContext } from '../../../map/context/RouteContext';
+import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import MapHeader from '../../../map/components/MapHeader/MapHeader';
 import FloatingCountdownTimer from '../../../map/components/MapHeader/FloatingCountdownTimer';
 import { Box, CircularProgress, Typography } from '@mui/material';
@@ -45,6 +46,7 @@ export default function PresentationMapView(props) {
     const isInitializedRef = useRef(false); // Track if map has been initialized
     const [isMapReady, setIsMapReady] = useState(false);
     const { currentRoute, routes, currentLoadedState, headerSettings } = useRouteContext();
+    const { isPhotosVisible } = usePhotoContext();
     const [hoverCoordinates, setHoverCoordinates] = useState(null);
     const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
     const routeCoordinatesRef = useRef(null); // Ref for route coordinates
@@ -819,8 +821,9 @@ export default function PresentationMapView(props) {
         onPoiPlacementClick: undefined,
         setPoiPlacementClick: () => { },
         poiPlacementMode: false,
-        setPoiPlacementMode: () => { }
-    }), [isMapReady, hoverCoordinates]);
+        setPoiPlacementMode: () => { },
+        isPhotosVisible
+    }), [isMapReady, hoverCoordinates, isPhotosVisible]);
     return (_jsx(MapProvider, { value: mapContextValue, children: _jsx(LineProvider, { children: _jsxs("div", { id: "presentation-top", ref: containerRef, className: "presentation-flex-container", children: [
                 _jsx(MapHeader, { 
                     title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route', // Reverted title logic
@@ -878,7 +881,7 @@ export default function PresentationMapView(props) {
                     key: currentRoute.id || currentRoute.routeId // Ensure we have a stable key
                 }, currentRoute.id || currentRoute.routeId),
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
-                _jsx(PresentationPhotoLayer, {}),
+                mapContextValue.isPhotosVisible && _jsx(PresentationPhotoLayer, {}),
                 isLineMarkersVisible && _jsx(DirectPresentationLineLayer, { 
                   map: mapInstance.current, 
                   lines: props.lineData || [] 

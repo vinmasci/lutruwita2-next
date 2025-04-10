@@ -46,8 +46,8 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
         // Set loading state immediately to prevent multiple attempts
         setLoading(true);
         
-        // Delay fetching on mobile
-        const fetchDelay = isMobile ? 800 : 0; // 800ms delay on mobile
+        // No additional delay needed since we already delay in the isContentReady effect
+        const fetchDelay = 0; // No delay needed here anymore
         
         // Use setTimeout to delay the fetch on mobile
         setTimeout(async () => {
@@ -75,34 +75,28 @@ export const PresentationPOIViewer = ({ poi, onClose }) => {
         }, fetchDelay);
     }, [poi?.googlePlaceId, googlePlacesData, loading, isMobile]);
     
-    // Add state to track content loading stages
-    const [contentStage, setContentStage] = useState(0);
+    // Use a single state to track if content is ready to display
+    const [isContentReady, setIsContentReady] = useState(false);
     
-    // Update the content stage progressively
+    // Update content loading with a single delay
     useEffect(() => {
         if (!isMobile) {
             // On desktop, show everything immediately
-            setContentStage(2);
+            setIsContentReady(true);
             return;
         }
         
-        // On mobile, stage the content loading
-        setContentStage(0); // Start with minimal content
+        // On mobile, use a single delay for all content
+        setIsContentReady(false); // Start with loading state
         
-        // After modal animation completes, show basic content
-        const timer1 = setTimeout(() => {
-            setContentStage(1);
-        }, 300);
-        
-        // After a longer delay, show all content and load Google Places data
-        const timer2 = setTimeout(() => {
-            setContentStage(2);
-            loadGooglePlacesData(); // Only load Google Places data after initial render on mobile
-        }, 800);
+        // After a single delay, show all content and load Google Places data
+        const timer = setTimeout(() => {
+            setIsContentReady(true);
+            loadGooglePlacesData(); // Load Google Places data after the delay
+        }, 600); // Use 600ms delay as requested to prevent mobile crashes
         
         return () => {
-            clearTimeout(timer1);
-            clearTimeout(timer2);
+            clearTimeout(timer);
         };
     }, [isMobile, loadGooglePlacesData]);
     
@@ -221,7 +215,7 @@ if (googlePlacesData?.photos?.length > 0) {
                     mb: '5%' // Add bottom margin for scroll space
                 },
                 children: [
-                    // Header with name and close button - always show (contentStage 0+)
+                    // Header with name and close button - always show
                     _jsxs(Box, {
                         sx: { 
                             display: 'flex', 
@@ -257,7 +251,7 @@ if (googlePlacesData?.photos?.length > 0) {
                     }),
                     
                     // Show loading indicator on mobile during initial load
-                    isMobile && contentStage === 0 && (
+                    isMobile && !isContentReady && (
                         _jsx(Box, {
                             sx: {
                                 display: 'flex',
@@ -272,8 +266,8 @@ if (googlePlacesData?.photos?.length > 0) {
                         })
                     ),
                     
-                    // Image slider - show after initial animation (contentStage 1+)
-                    contentStage >= 1 && _jsx(Box, { 
+                    // Image slider - show after content is ready
+                    isContentReady && _jsx(Box, { 
                         sx: { 
                             height: '250px', 
                             mb: 3,
@@ -291,8 +285,8 @@ if (googlePlacesData?.photos?.length > 0) {
                         })
                     }),
 
-                    // Description - show after initial animation (contentStage 1+)
-                    contentStage >= 1 && _jsx(Box, { 
+                    // Description - show after content is ready
+                    isContentReady && _jsx(Box, { 
                         sx: {
                             mb: 3,
                             p: 2,
@@ -308,7 +302,7 @@ if (googlePlacesData?.photos?.length > 0) {
                     }),
                     
                     // Loading indicator when fetching Google Places data
-                    contentStage >= 1 && poi.googlePlaceId && !googlePlacesData && loading && (
+                    isContentReady && poi.googlePlaceId && !googlePlacesData && loading && (
                         _jsx(Box, {
                             sx: {
                                 mb: 3,
@@ -322,8 +316,8 @@ if (googlePlacesData?.photos?.length > 0) {
                         })
                     ),
                     
-                    // Google Places information - show only after everything else (contentStage 2+)
-                    contentStage >= 2 && showGooglePlaces && _jsxs(Box, {
+                    // Google Places information - show when content is ready
+                    isContentReady && showGooglePlaces && _jsxs(Box, {
                         sx: {
                             mb: 3,
                             p: 2,

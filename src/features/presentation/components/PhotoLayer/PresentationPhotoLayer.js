@@ -254,10 +254,8 @@ export const PresentationPhotoLayer = () => {
         return getOrderedPhotos(validPhotos);
     }, [validPhotos, getOrderedPhotos]);
 
-    // If photos are not visible, return null
-    if (!isPhotosVisible) {
-        return null;
-    }
+    // If photos are not visible, we'll still render the component but with no elements
+    const shouldRenderElements = isPhotosVisible;
 
     // Keep track of which cluster contains the selected photo
     const [selectedPhotoCluster, setSelectedPhotoCluster] = useState(null);
@@ -361,8 +359,10 @@ export const PresentationPhotoLayer = () => {
         return new Set([selectedPhoto.url]);
     }, [selectedPhoto, simulatedClustering]);
     
-    // Create the clustered items elements
-    const clusterElements = clusteredItems.map(item => {
+    // Create the clustered items elements, but only if photos are visible
+    let clusterElements = [];
+    if (shouldRenderElements) {
+        clusterElements = clusteredItems.map(item => {
         if (isCluster(item)) {
             // Check if this cluster is the selected photo cluster
             const isSelectedCluster = selectedPhotoCluster && 
@@ -454,6 +454,7 @@ export const PresentationPhotoLayer = () => {
             });
         }
     });
+    }
 
     // Create the photo modal element if there's a selected photo
     const photoModalElement = selectedPhoto ? 
@@ -499,6 +500,6 @@ export const PresentationPhotoLayer = () => {
     return React.createElement(
         'div',
         { className: 'presentation-photo-layer' },
-        [...clusterElements, photoModalElement]
+        shouldRenderElements ? [...clusterElements, photoModalElement] : []
     );
 };
