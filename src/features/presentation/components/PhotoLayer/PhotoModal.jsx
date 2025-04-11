@@ -39,8 +39,11 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   // Local state to track photos
   const [localPhotos, setLocalPhotos] = useState(photos);
   
-  // State for image loading
-  const [isImageLoading, setIsImageLoading] = useState(true);
+  // State for image loading - default to not loading on desktop
+  const [isImageLoading, setIsImageLoading] = useState(() => {
+    // Only start with loading state on iOS/mobile
+    return /iPad|iPhone|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  });
   const [loadedPhotos, setLoadedPhotos] = useState(new Set());
   const [preloadingPhotos, setPreloadingPhotos] = useState(new Set());
   
@@ -65,14 +68,17 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
       console.log(`Setting index to ${initialIndex} of ${photos.length} photos`);
     }
     
-    // Delay setting content ready to prevent too many operations at once
-    // Use a longer delay on iOS devices
-    const delay = isIOS() ? 600 : 300;
-    const timer = setTimeout(() => {
+    // Only use a delay for iOS devices, immediate for desktop
+    if (isIOS()) {
+      const timer = setTimeout(() => {
+        setIsContentReady(true);
+      }, 600);
+      return () => clearTimeout(timer);
+    } else {
+      // Immediate for desktop
       setIsContentReady(true);
-    }, delay);
-    
-    return () => clearTimeout(timer);
+      return undefined; // No cleanup needed
+    }
   }, [photos, initialIndex, isIOS]);
   
   // Get the currently selected photo
@@ -117,12 +123,50 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     }
   }, [selectedPhoto, onPhotoChange]);
   
+  // Track if we should show loading spinner
+  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
+  
+  // Use a ref to track loading timeout
+  const loadingTimeoutRef = useRef(null);
+  
   // Preload adjacent photos when selected photo changes
   useEffect(() => {
-    if (!selectedPhoto || !isContentReady) return;
+    if (!selectedPhoto) return;
+    
+    // Clear any existing loading timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
+    // Reset spinner visibility
+    setShowLoadingSpinner(false);
     
     // Mark current photo as loading if not already loaded
-    setIsImageLoading(!loadedPhotos.has(selectedPhoto.url));
+    const isPhotoLoaded = loadedPhotos.has(selectedPhoto.url);
+    
+    if (isIOS()) {
+      // On iOS, always show loading state immediately
+      setIsImageLoading(!isPhotoLoaded);
+      setShowLoadingSpinner(!isPhotoLoaded);
+    } else {
+      // On desktop, only set loading state if not cached
+      setIsImageLoading(!isPhotoLoaded);
+      
+      // Only show spinner on desktop if loading takes longer than 150ms
+      if (!isPhotoLoaded) {
+        loadingTimeoutRef.current = setTimeout(() => {
+          setShowLoadingSpinner(true);
+        }, 150);
+      }
+    }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
     
     // Reset preload attempts counter when selected photo changes
     preloadAttemptsRef.current = 0;
@@ -136,26 +180,40 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     const nextPhoto = localPhotos[nextIndex];
     const prevPhoto = localPhotos[prevIndex];
     
-    // Use longer timeouts on iOS to prevent overwhelming the device
+    // Check if we're on iOS
     const isIOSDevice = isIOS();
-    const baseDelay = isIOSDevice ? 800 : 400;
     
-    // Use setTimeout to stagger the preloading (current photo gets priority)
     // Only preload if we haven't exceeded the maximum number of preload attempts
     if (preloadAttemptsRef.current < 3) {
-      setTimeout(() => {
+      if (isIOSDevice) {
+        // Use timeouts on iOS to prevent overwhelming the device
+        const baseDelay = 800;
+        
+        setTimeout(() => {
+          if (nextPhoto) {
+            preloadPhoto(nextPhoto);
+            preloadAttemptsRef.current += 1;
+          }
+        }, baseDelay);
+        
+        setTimeout(() => {
+          if (prevPhoto) {
+            preloadPhoto(prevPhoto);
+            preloadAttemptsRef.current += 1;
+          }
+        }, baseDelay * 2);
+      } else {
+        // Immediate preloading for desktop
         if (nextPhoto) {
           preloadPhoto(nextPhoto);
           preloadAttemptsRef.current += 1;
         }
-      }, baseDelay);
-      
-      setTimeout(() => {
+        
         if (prevPhoto) {
           preloadPhoto(prevPhoto);
           preloadAttemptsRef.current += 1;
         }
-      }, baseDelay * 2);
+      }
     }
     
   }, [selectedPhoto, localPhotos, preloadPhoto, loadedPhotos, isContentReady, isIOS]);
@@ -176,10 +234,23 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     const nextPhoto = localPhotos[newIndex];
     
     // Check if the next photo is already loaded
-    if (nextPhoto && nextPhoto.url) {
-      setIsImageLoading(!loadedPhotos.has(nextPhoto.url));
+    const isNextPhotoLoaded = nextPhoto && nextPhoto.url && loadedPhotos.has(nextPhoto.url);
+    
+    if (isIOS()) {
+      // On iOS, always show loading state
+      setIsImageLoading(!isNextPhotoLoaded);
+      setShowLoadingSpinner(!isNextPhotoLoaded);
     } else {
-      setIsImageLoading(true); // Default to loading if we can't check
+      // On desktop, set loading state but don't show spinner immediately
+      setIsImageLoading(!isNextPhotoLoaded);
+      setShowLoadingSpinner(false);
+      
+      // Only show spinner if loading takes longer than 150ms
+      if (!isNextPhotoLoaded) {
+        loadingTimeoutRef.current = setTimeout(() => {
+          setShowLoadingSpinner(true);
+        }, 150);
+      }
     }
     
     // Pan the map to the new photo's location, but maintain current pitch
@@ -193,10 +264,15 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
       });
     }
     
-    // Reset navigation lock after a delay
-    setTimeout(() => {
+    // Only use navigation lock delay on iOS
+    if (isIOS()) {
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 800);
+    } else {
+      // Immediate reset for desktop
       isNavigatingRef.current = false;
-    }, isIOS() ? 800 : 400);
+    }
     
   }, [localPhotos, selectedIndex, map, isMobileDevice, loadedPhotos, isIOS]);
   
@@ -213,10 +289,23 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     const prevPhoto = localPhotos[newIndex];
     
     // Check if the previous photo is already loaded
-    if (prevPhoto && prevPhoto.url) {
-      setIsImageLoading(!loadedPhotos.has(prevPhoto.url));
+    const isPrevPhotoLoaded = prevPhoto && prevPhoto.url && loadedPhotos.has(prevPhoto.url);
+    
+    if (isIOS()) {
+      // On iOS, always show loading state
+      setIsImageLoading(!isPrevPhotoLoaded);
+      setShowLoadingSpinner(!isPrevPhotoLoaded);
     } else {
-      setIsImageLoading(true); // Default to loading if we can't check
+      // On desktop, set loading state but don't show spinner immediately
+      setIsImageLoading(!isPrevPhotoLoaded);
+      setShowLoadingSpinner(false);
+      
+      // Only show spinner if loading takes longer than 150ms
+      if (!isPrevPhotoLoaded) {
+        loadingTimeoutRef.current = setTimeout(() => {
+          setShowLoadingSpinner(true);
+        }, 150);
+      }
     }
     
     // Pan the map to the new photo's location, but maintain current pitch
@@ -230,10 +319,15 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
       });
     }
     
-    // Reset navigation lock after a delay
-    setTimeout(() => {
+    // Only use navigation lock delay on iOS
+    if (isIOS()) {
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 800);
+    } else {
+      // Immediate reset for desktop
       isNavigatingRef.current = false;
-    }, isIOS() ? 800 : 400);
+    }
     
   }, [localPhotos, selectedIndex, map, isMobileDevice, loadedPhotos, isIOS]);
   
@@ -325,10 +419,15 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     setTouchStart(null);
     setTouchEnd(null);
     
-    // Reset touch in progress after a delay
-    setTimeout(() => {
+    // Only use touch lock delay on iOS
+    if (isIOS()) {
+      setTimeout(() => {
+        touchInProgressRef.current = false;
+      }, 800);
+    } else {
+      // Immediate reset for desktop
       touchInProgressRef.current = false;
-    }, isIOS() ? 800 : 400);
+    }
   };
   
   // Keyboard navigation
@@ -383,14 +482,28 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   
   // Handle image loading
   const handleImageLoad = () => {
+    // Clear any loading timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
     setIsImageLoading(false);
+    setShowLoadingSpinner(false);
     setLoadedPhotos(prev => new Set([...prev, selectedPhoto.url]));
   };
   
   // Handle image loading error
   const handleImageError = () => {
+    // Clear any loading timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
     console.error('Failed to load image:', getBestImageUrl(selectedPhoto));
     setIsImageLoading(false);
+    setShowLoadingSpinner(false);
     setImageError(true);
   };
   
@@ -420,7 +533,8 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         boxShadow: '0 4px 20px rgba(0,0,0,0.5)' // More prominent shadow
       }}
     >
-      {!isContentReady ? (
+      {/* Only show loading screen on iOS or if content isn't ready yet */}
+      {(!isContentReady && isIOS()) ? (
         <Box 
           sx={{
             position: "relative", 
@@ -447,19 +561,17 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
     bgcolor: "black",
     height: 400, // Twice as big (was 200)
     overflow: "hidden",
-    padding: 0,
-    cursor: 'pointer' // Add pointer cursor to indicate clickability
+    padding: 0
   }}
   onTouchStart={handleTouchStart}
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
-  onClick={onClose} // Add onClick handler to close the modal when clicking anywhere on the photo
 >
         {/* Image with loading indicator */}
         {!imageError ? (
           <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-            {/* Loading indicator */}
-            {isImageLoading && (
+            {/* Loading indicator - only show if we've explicitly decided to show it */}
+            {isImageLoading && showLoadingSpinner && (
               <Box 
                 sx={{
                   position: 'absolute',
@@ -481,7 +593,7 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
               alt={selectedPhoto.name || 'Photo'}
               onLoad={handleImageLoad}
               onError={handleImageError}
-              loading="lazy"
+              loading={isMobileDevice() ? "lazy" : "eager"}
               style={{
                 height: '100%',
                 width: '100%',

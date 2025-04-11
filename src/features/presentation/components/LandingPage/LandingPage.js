@@ -3,13 +3,14 @@ import React, { useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import { publicRouteService } from '../../services/publicRoute.service';
+import { withPerformanceTracking, logPerformanceSummary } from '../../../../utils/performanceUtils';
 import { 
   Container, Typography, Box, Button, Grid,
   CircularProgress, Alert, Skeleton
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { RouteCard, RouteCardGrid } from './RouteCard.jsx';
 import { useRouteFilters } from './useRouteFilters.jsx';
+import LazyRouteCardGrid from './LazyRouteCardGrid';
 import LandingPageHeader from './LandingPageHeader';
 import HeroCard from './HeroCard';
 import EnhancedFilterCard from './EnhancedFilterCard';
@@ -100,7 +101,17 @@ const SkeletonGrid = () => {
   });
 };
 
+// Wrap the component with performance tracking
 export const LandingPage = () => {
+  // Log performance summary when component unmounts
+  useEffect(() => {
+    return () => {
+      // Log performance summary when component unmounts
+      setTimeout(() => {
+        logPerformanceSummary();
+      }, 500); // Delay to ensure all async operations complete
+    };
+  }, []);
   const navigate = useNavigate();
   const { loginWithRedirect } = useAuth0();
   const [allRoutes, setAllRoutes] = useState([]);
@@ -127,36 +138,45 @@ export const LandingPage = () => {
     loadMoreRoutes
   } = useRouteFilters(allRoutes);
 
-  // Fetch routes on component mount with a delay
+  // Initialize with loading state and fetch routes
   useEffect(() => {
-    // Fetch routes after a delay to prioritize page rendering
+    console.time('LandingPage-TotalLoadTime');
+    
+    // Start in loading state
+    setLoading(true);
+    
+    // Fetch routes in the background
     const fetchFeaturedRoutes = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        const routes = await publicRouteService.listRoutes();
+        console.time('FetchRoutesOperation');
+        
+        // Wrap the API call with performance tracking
+        const routes = await withPerformanceTracking(
+          publicRouteService.listRoutes,
+          'publicRouteService.listRoutes'
+        )();
+        
+        console.timeEnd('FetchRoutesOperation');
         setAllRoutes(routes);
+        
+        // Set loading to false and show route cards
+        setLoading(false);
+        setShowRouteCards(true);
+        
+        console.timeEnd('LandingPage-TotalLoadTime');
       }
       catch (error) {
         setError('Failed to load featured routes');
         console.error('Error fetching featured routes:', error);
-      }
-      finally {
         setLoading(false);
       }
     };
     
-    // Delay fetching routes to prioritize page rendering
-    const fetchTimer = setTimeout(fetchFeaturedRoutes, 200);
-    
-    // Delay showing route cards to ensure page loads first
-    const showCardsTimer = setTimeout(() => {
-      setShowRouteCards(true);
-    }, 300);
+    // Start fetching routes
+    fetchFeaturedRoutes();
     
     return () => {
-      clearTimeout(fetchTimer);
-      clearTimeout(showCardsTimer);
+      // Cleanup
     };
   }, []);
   
@@ -185,12 +205,7 @@ export const LandingPage = () => {
               }),
               
               // Loading and error states
-              loading ? _jsx(Box, {
-                display: "flex",
-                justifyContent: "center",
-                p: 4,
-                children: _jsx(CircularProgress, {})
-              }) : error ? _jsx(Alert, {
+              error ? _jsx(Alert, {
                 severity: "error",
                 sx: { maxWidth: 'sm', mx: 'auto' },
                 children: error
@@ -239,16 +254,21 @@ export const LandingPage = () => {
                     ]
                   }),
                   
-                  // Route Cards Grid with delayed loading
-                  !loading && displayedRoutes.length > 0 && showRouteCards ? 
-                    _jsx(RouteCardGrid, { routes: displayedRoutes }) : 
-                    _jsx(SkeletonGrid, {}),
+                  // Route Cards Grid with lazy loading
+                  loading ? (
+                    _jsx(Box, {
+                      sx: { display: "flex", justifyContent: "center", alignItems: "center", p: 4 },
+                      children: _jsx(CircularProgress, { size: 60 })
+                    })
+                  ) : showRouteCards ? (
+                    _jsx(LazyRouteCardGrid, { routes: displayedRoutes })
+                  ) : (
+                    _jsx(SkeletonGrid, {})
+                  ),
                   
                   // Load More Button
                   hasMore && _jsx(Box, {
-                    display: "flex",
-                    justifyContent: "center",
-                    mt: 4,
+                    sx: { display: "flex", justifyContent: "center", mt: 4 },
                     children: _jsx(Button, {
                       variant: "contained",
                       color: "primary",
