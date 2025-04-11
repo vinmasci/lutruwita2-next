@@ -1,0 +1,88 @@
+.simplified-photo-marker {
+  position: absolute;
+  transform-origin: center center;
+  user-select: none;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.simplified-photo-marker-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+.simplified-photo-marker-bubble {
+  width: 27px;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background-color: #fff; /* White background to match POI markers */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  position: relative;
+  z-index: 1;
+}
+
+/* Simple hover effect */
+.simplified-photo-marker-bubble:hover {
+  transform: scale(1.1);
+}
+
+/* Simple highlighted state */
+.simplified-photo-marker-bubble.highlighted {
+  border: 2px solid #FF9500; /* Orange border */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.simplified-photo-marker-point {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid #fff; /* Match bubble color */
+  margin-top: -1px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+/* Highlighted marker point */
+.simplified-photo-marker-container.highlighted .simplified-photo-marker-point {
+  border-top-color: #FF9500; /* Orange point */
+}
+
+/* Zoom-based scaling */
+.simplified-photo-marker[data-zoom="3"] .simplified-photo-marker-container,
+.simplified-photo-marker[data-zoom="4"] .simplified-photo-marker-container {
+  transform: scale(0.5);
+}
+
+.simplified-photo-marker[data-zoom="5"] .simplified-photo-marker-container,
+.simplified-photo-marker[data-zoom="6"] .simplified-photo-marker-container {
+  transform: scale(0.6);
+}
+
+.simplified-photo-marker[data-zoom="7"] .simplified-photo-marker-container,
+.simplified-photo-marker[data-zoom="8"] .simplified-photo-marker-container {
+  transform: scale(0.7);
+}
+
+.simplified-photo-marker[data-zoom="9"] .simplified-photo-marker-container,
+.simplified-photo-marker[data-zoom="10"] .simplified-photo-marker-container {
+  transform: scale(0.8);
+}
+
+.simplified-photo-marker[data-zoom="11"] .simplified-photo-marker-container,
+.simplified-photo-marker[data-zoom="12"] .simplified-photo-marker-container {
+  transform: scale(0.9);
+}
+
+.simplified-photo-marker[data-zoom="13"] .simplified-photo-marker-container,
+.simplified-photo-marker[data-zoom="14"] .simplified-photo-marker-container {
+  transform: scale(1.0);
+}

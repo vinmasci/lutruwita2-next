@@ -1,6 +1,6 @@
 import Supercluster from 'supercluster';
 
-// Detect mobile devices
+// Detect mobile devices - consistent with isMobileDevice in PresentationPhotoLayer.js
 const isMobile = () => window.innerWidth <= 768 || 
     /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -14,25 +14,25 @@ const isLowEndDevice = () => navigator.deviceMemory && navigator.deviceMemory <=
 // 2. SUPERCLUSTER CONFIGURATION
 // ==========================================
 // This creates the clustering engine with specific settings
-const createIndex = (radius = 100, maxZoom = 8, minPoints = 2) => {
+const createIndex = (radius = 150, maxZoom = 14, minPoints = 2) => {
     // Mobile devices get more aggressive clustering
     if (isMobile()) {
-        radius = 150; // Increase radius for more aggressive clustering
-        maxZoom = 6;  // Lower maxZoom to keep clusters longer
+        radius = 150; // Same as POI clustering
+        maxZoom = 14;  // Same as POI clustering
         minPoints = 2;
     }
     
     // Low-end devices get even more aggressive clustering
     if (isLowEndDevice()) {
         radius = 180;
-        maxZoom = 5;
+        maxZoom = 15;  // Similar to POI clustering
         minPoints = 2;
     }
     
     // iOS devices get the most aggressive clustering
     if (isIOS) {
         radius = 200; // Significantly larger radius
-        maxZoom = 5;  // Very low maxZoom to maintain clusters longer
+        maxZoom = 16;  // Same as POI clustering
         minPoints = 2;
     }
     
@@ -62,7 +62,7 @@ const createIndex = (radius = 100, maxZoom = 8, minPoints = 2) => {
 // ==========================================
 // This is where photos are converted to GeoJSON and clustered
 const getClusteredPhotos = (photos, zoom, options = {}) => {
-    const { radius = 100, maxZoom = 12, minPoints = 2, extraAggressive = false } = options;
+    const { radius = 150, maxZoom = 14, minPoints = 2, extraAggressive = false } = options;
     
     // Apply even more aggressive settings if requested or at low zoom levels
     const isLowZoom = zoom < 6;
@@ -75,14 +75,14 @@ const getClusteredPhotos = (photos, zoom, options = {}) => {
     
     // Apply extra aggressive settings if needed
     if (shouldBeExtraAggressive) {
-        // For mobile devices at low zoom, be extremely aggressive
+        // For mobile devices at low zoom, use POI-like clustering settings
         if (isMobile() && isLowZoom) {
-            clusterRadius = 200;
-            clusterMaxZoom = 4;
+            clusterRadius = 180;
+            clusterMaxZoom = 14;  // Same as POI clustering
             clusterMinPoints = 2;
         } else {
             clusterRadius = 150;
-            clusterMaxZoom = 6;
+            clusterMaxZoom = 14;  // Same as POI clustering
             clusterMinPoints = 2;
         }
     }

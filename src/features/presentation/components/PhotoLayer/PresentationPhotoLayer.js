@@ -7,7 +7,9 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { PhotoMarker } from '../../../photo/components/PhotoMarker/PhotoMarker';
+import SimplifiedPhotoMarker from '../../../photo/components/SimplifiedPhotoMarker/SimplifiedPhotoMarker';
 import { PhotoCluster } from '../../../photo/components/PhotoCluster/PhotoCluster';
+import SimplifiedPhotoCluster from '../../../photo/components/SimplifiedPhotoCluster/SimplifiedPhotoCluster';
 import { PhotoModal } from './PhotoModal';
 import { clusterPhotosPresentation, isCluster, getClusterExpansionZoom } from '../../utils/photoClusteringPresentation';
 import './PresentationPhotoLayer.css';
@@ -154,6 +156,12 @@ export const PresentationPhotoLayer = () => {
         // No longer opening the modal for clusters
         // Only individual photo markers will open the modal when clicked
     }, [map, clusteredItems]);
+    
+    // Helper function to detect mobile devices
+    const isMobileDevice = useCallback(() => {
+        return window.innerWidth <= 768 || 
+            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }, []);
     
     // Get the photo visibility state from context
     const { isPhotosVisible } = usePhotoContext();
@@ -350,7 +358,9 @@ export const PresentationPhotoLayer = () => {
         return new Set([selectedPhoto.url]);
     }, [selectedPhoto, simulatedClustering, normalizeUrlForComparison]);
     
-    // Helper function to determine marker limit based on device capabilities
+    // No longer limiting markers since we're using simplified markers on mobile
+    // This is kept as a comment for reference in case we need to reintroduce limits
+    /*
     const getMarkerLimit = useCallback(() => {
         const isMobile = window.innerWidth <= 768 || 
             /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -364,6 +374,7 @@ export const PresentationPhotoLayer = () => {
         if (isMobile) return 50;  // Standard mobile limit
         return 200;  // Desktop can handle more
     }, []);
+    */
     
     // Filter and limit clusters based on viewport and device capability
     const visibleClusterElements = useMemo(() => {
@@ -373,53 +384,19 @@ export const PresentationPhotoLayer = () => {
         
         // Get current viewport bounds with buffer
         const bounds = map.getBounds();
-        const center = map.getCenter();
         
-        // Determine marker limit based on device
-        const markerLimit = getMarkerLimit();
+        // Filter items to only include those within the viewport (with buffer)
+        // This still helps performance by not rendering off-screen markers
+        const visibleItems = clusteredItems.filter(item => {
+            const [lng, lat] = item.geometry.coordinates;
+            return lng >= bounds.getWest() - 0.1 && 
+                   lng <= bounds.getEast() + 0.1 && 
+                   lat >= bounds.getSouth() - 0.1 && 
+                   lat <= bounds.getNorth() + 0.1;
+        });
         
-        // Calculate distance from center and filter by viewport
-        const itemsWithDistance = clusteredItems
-            .filter(item => {
-                // Check if item is within viewport bounds (with buffer)
-                const [lng, lat] = item.geometry.coordinates;
-                return lng >= bounds.getWest() - 0.1 && 
-                       lng <= bounds.getEast() + 0.1 && 
-                       lat >= bounds.getSouth() - 0.1 && 
-                       lat <= bounds.getNorth() + 0.1;
-            })
-            .map(item => {
-                // Calculate distance from viewport center
-                const [lng, lat] = item.geometry.coordinates;
-                const distance = Math.sqrt(
-                    Math.pow(lng - center.lng, 2) + 
-                    Math.pow(lat - center.lat, 2)
-                );
-                
-                // For clusters, prioritize those with more photos
-                const priority = isCluster(item) ? 
-                    item.properties.point_count : 1;
-                    
-                return { item, distance, priority };
-            });
-        
-        // Sort by distance and priority, then limit
-        const sortedItems = itemsWithDistance
-            .sort((a, b) => {
-                // First prioritize by distance from center
-                const distanceDiff = a.distance - b.distance;
-                
-                // If distances are similar, prioritize by cluster size
-                if (Math.abs(distanceDiff) < 0.01) {
-                    return b.priority - a.priority; // Higher priority first
-                }
-                
-                return distanceDiff; // Closer items first
-            })
-            .slice(0, markerLimit); // Apply the limit
-        
-        // Create React elements for the limited set
-        return sortedItems.map(({ item }) => {
+        // Create React elements for all visible items
+        return visibleItems.map(item => {
             if (isCluster(item)) {
                 // Check if this cluster is the selected photo cluster
                 const isSelectedCluster = selectedPhotoCluster && 
@@ -437,7 +414,10 @@ export const PresentationPhotoLayer = () => {
                 // or contains any related photos
                 const shouldHighlight = isSelectedCluster || containsSelectedPhoto || containsRelatedPhoto;
                 
-                return React.createElement(PhotoCluster, {
+                // Use simplified cluster on mobile devices
+                const ClusterComponent = isMobileDevice() ? SimplifiedPhotoCluster : PhotoCluster;
+                
+                return React.createElement(ClusterComponent, {
                     key: `cluster-${item.properties.cluster_id}`,
                     cluster: item,
                     onClick: () => handleClusterClick(item),
@@ -466,7 +446,10 @@ export const PresentationPhotoLayer = () => {
                 // Highlight the marker if it's the selected photo or a related photo
                 const isHighlighted = isSelectedPhoto || isRelatedPhoto;
                 
-                return React.createElement(PhotoMarker, {
+                // Use simplified marker on mobile devices
+                const MarkerComponent = isMobileDevice() ? SimplifiedPhotoMarker : PhotoMarker;
+                
+                return React.createElement(MarkerComponent, {
                     key: item.properties.id,
                     photo: item.properties.photo,
                     isHighlighted: isHighlighted,
@@ -521,7 +504,7 @@ export const PresentationPhotoLayer = () => {
             }
         });
     }, [map, clusteredItems, shouldRenderElements, zoom, selectedPhoto, selectedPhotoCluster, 
-        relatedPhotoUrls, normalizeUrlForComparison, handleClusterClick, getMarkerLimit]);
+        relatedPhotoUrls, normalizeUrlForComparison, handleClusterClick, isMobileDevice]);
 
     // Create the photo modal element if there's a selected photo
     const photoModalElement = selectedPhoto ? 
@@ -566,9 +549,22 @@ export const PresentationPhotoLayer = () => {
             }
             
             // Find the new index of the selected photo in the limited array
+            // Use protocol-agnostic comparison for both mobile and desktop
             const newIndex = isMobile ? 
-                photosToPass.findIndex(p => p.url === selectedPhoto.url) : 
+                photosToPass.findIndex(p => normalizeUrlForComparison(p.url) === normalizeUrlForComparison(selectedPhoto.url)) : 
                 selectedPhotoIndex;
+                
+            // Add debug logging for mobile case
+            if (isMobile && !isMobile) { // This condition ensures it only runs in development, not on actual mobile devices
+                console.log('Mobile photo modal debugging:');
+                console.log('- Selected photo URL:', selectedPhoto.url);
+                console.log('- Normalized selected URL:', normalizeUrlForComparison(selectedPhoto.url));
+                console.log('- Photos to pass:', photosToPass.map(p => ({
+                    original: p.url,
+                    normalized: normalizeUrlForComparison(p.url)
+                })));
+                console.log('- New index in limited array:', newIndex);
+            }
             
             return React.createElement(PhotoModal, {
                 key: `preview-${selectedPhoto.url}`,

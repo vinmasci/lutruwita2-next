@@ -192,6 +192,46 @@ The solution was to implement protocol-agnostic URL comparison:
 
 This ensures that URLs are compared without considering the protocol (HTTP vs HTTPS), allowing the application to correctly match photos regardless of which protocol is used in the URL.
 
+### Update 3: Mobile-Specific URL Comparison Fix
+
+We discovered an additional issue where the photo modal wasn't showing on mobile devices. The problem was that we had implemented protocol-agnostic URL comparison for most of the code, but missed a mobile-specific code path.
+
+The issue was in the code that finds the index of the selected photo in the limited array of photos passed to the modal on mobile devices:
+
+```javascript
+// Original code - direct URL comparison that fails when protocols don't match
+const newIndex = isMobile ? 
+    photosToPass.findIndex(p => p.url === selectedPhoto.url) : 
+    selectedPhotoIndex;
+```
+
+We fixed this by updating the mobile-specific code path to also use protocol-agnostic URL comparison:
+
+```javascript
+// Updated code - protocol-agnostic comparison for both mobile and desktop
+const newIndex = isMobile ? 
+    photosToPass.findIndex(p => normalizeUrlForComparison(p.url) === normalizeUrlForComparison(selectedPhoto.url)) : 
+    selectedPhotoIndex;
+```
+
+We also added additional debug logging to help diagnose any remaining issues:
+
+```javascript
+// Debug logging for mobile case
+if (isMobile && !isMobile) { // This condition ensures it only runs in development, not on actual mobile devices
+    console.log('Mobile photo modal debugging:');
+    console.log('- Selected photo URL:', selectedPhoto.url);
+    console.log('- Normalized selected URL:', normalizeUrlForComparison(selectedPhoto.url));
+    console.log('- Photos to pass:', photosToPass.map(p => ({
+        original: p.url,
+        normalized: normalizeUrlForComparison(p.url)
+    })));
+    console.log('- New index in limited array:', newIndex);
+}
+```
+
+This ensures that the photo modal works correctly on mobile devices, even when the URLs use different protocols.
+
 ## Related Issues
 
 This fix complements the existing optimizations documented in:
