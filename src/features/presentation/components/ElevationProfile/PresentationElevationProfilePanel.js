@@ -109,7 +109,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         if (routeBoundsRef.current && map) {
             map.fitBounds(routeBoundsRef.current, {
                 padding: 200,
-                pitch: 45,
+                pitch: 75, // High pitch to look ahead
                 duration: 1000,
                 easing: (t) => {
                     // Ease out cubic - smooth deceleration
@@ -138,9 +138,26 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         // Get route coordinates
         const allCoords = route.geojson.features[0].geometry.coordinates;
         
-        // Sample coordinates for smoother animation
+        // Calculate the actual route distance
+        let totalRouteDistance = 0;
+        for (let i = 1; i < allCoords.length; i++) {
+            // Use the calculateBearing function we already have to get distance
+            const dx = allCoords[i][0] - allCoords[i-1][0];
+            const dy = allCoords[i][1] - allCoords[i-1][1];
+            // This is a simplified distance calculation in degrees
+            totalRouteDistance += Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        // Convert approximate degrees to kilometers (111.32 km per degree at the equator)
+        const distanceInKm = totalRouteDistance * 111.32;
+        
+        // Sample more points for longer routes: 10 points per km with min/max limits
+        const targetPoints = Math.min(300, Math.max(50, Math.ceil(distanceInKm * 10)));
+        
+        logger.info('Flyby', `Route length: ${distanceInKm.toFixed(2)}km, sampling ${targetPoints} points`);
+        
+        // Calculate sample rate based on route length
         const routeLength = allCoords.length;
-        const targetPoints = Math.min(100, Math.max(40, Math.floor(routeLength / 20))); 
         const sampleRate = Math.max(1, Math.floor(routeLength / targetPoints));
         
         // Sample coordinates evenly
@@ -195,7 +212,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                 // Simply zoom out to show the entire route
                 map.fitBounds(bounds, {
                     padding: 200,
-                    pitch: 45,
+                    pitch: 45, // Reduced pitch for overview
                     duration: 2500,
                     easing: (t) => {
                         // Ease out cubic - smooth deceleration
@@ -234,12 +251,46 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             const dy = nextPoint[1] - currentPoint[1];
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            // More consistent duration for smoother movement
-            const baseDuration = 400; // Faster base duration
-            const duration = Math.max(300, Math.min(600, baseDuration * (distance * 5000)));
+            // Adjust duration based on route length to maintain consistent speed
+            // Increased base duration for slower animation to allow terrain to load
+            const baseDuration = 800; // Doubled base duration for slower animation
             
-            // Keep pitch consistent to avoid bobbing
-            const pitch = 75;
+            // Scale duration inversely with total route length
+            // Longer routes = shorter durations between points, but still slower overall
+            const scaleFactor = Math.min(1.0, 10 / Math.max(1, distanceInKm));
+            const adjustedBaseDuration = baseDuration * scaleFactor;
+            
+            // Calculate final duration based on distance between points
+            // Increased min/max durations for slower animation
+            const duration = Math.max(400, Math.min(1200, adjustedBaseDuration * (distance * 5000)));
+            
+            // Dynamically adjust pitch based on elevation change
+            // Get elevation data for current and next point (if available)
+            const currentElevation = currentPoint.length > 2 ? currentPoint[2] : 0;
+            const nextElevation = nextPoint.length > 2 ? nextPoint[2] : 0;
+            
+            // Calculate elevation change
+            const elevationChange = nextElevation - currentElevation;
+            
+            // Adjust pitch based on elevation change:
+            // - When going uphill (positive change): decrease pitch (more top-down view)
+            // - When going downhill (negative change): increase pitch (more immersive view)
+            // - Use a scale factor to control sensitivity
+            const basePitch = 75; // Default pitch
+            const minPitch = 30; // Minimum pitch (most top-down) - lowered for more dramatic effect
+            const maxPitch = 80; // Maximum pitch (most immersive) - increased for more dramatic effect
+            const pitchScaleFactor = 0.5; // Increased sensitivity to elevation changes (10x more sensitive)
+            
+            // Calculate pitch adjustment (positive elevationChange = lower pitch)
+            const pitchAdjustment = -elevationChange * pitchScaleFactor;
+            
+            // Log elevation changes and pitch for debugging
+            if (Math.abs(elevationChange) > 1) {
+                logger.info('Flyby', `Elevation change: ${elevationChange.toFixed(2)}m, Pitch adjustment: ${pitchAdjustment.toFixed(2)}°`);
+            }
+            
+            // Apply adjustment and clamp to min/max range
+            const pitch = Math.max(minPitch, Math.min(maxPitch, basePitch + pitchAdjustment));
             
             // Move camera to next point with smooth parameters
             map.easeTo({
@@ -252,8 +303,9 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             });
             
             // Schedule next point with more overlap for smoother transitions
+            // Increased delay between points to allow more time for terrain to load
             currentIndex++;
-            const timeoutId = setTimeout(flyToNextPoint, duration * 0.7);
+            const timeoutId = setTimeout(flyToNextPoint, duration * 0.85);
             animationTimeoutsRef.current.push(timeoutId); // Store timeout ID for cancellation
         };
         

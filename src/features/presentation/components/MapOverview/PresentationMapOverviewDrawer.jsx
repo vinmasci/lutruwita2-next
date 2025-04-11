@@ -10,8 +10,8 @@ const PresentationMapOverviewDrawer = () => {
       display: 'flex', 
       flexDirection: 'column', 
       height: '100%',
-      backgroundColor: 'rgba(35, 35, 35, 0.8)', // Increased transparency (0.6 alpha)
-      backdropFilter: 'blur(2px)', // Reduced blur effect
+      backgroundColor: 'rgba(26, 26, 26, 0.7)', // Middle ground (70% opacity)
+      backdropFilter: 'blur(3px)', // Middle ground blur effect
       fontFamily: '"Lato", sans-serif'
     }}>
       {/* Title removed as requested */}
@@ -23,6 +23,7 @@ const PresentationMapOverviewDrawer = () => {
         py: 2,
         pb: 120,
         color: 'white',
+        backgroundColor: 'transparent', // Ensure this inner box is also transparent
         fontFamily: '"Lato", sans-serif',
         '& a': {
           color: '#2196f3',
