@@ -299,6 +299,13 @@ export const PresentationPhotoLayer = () => {
         return clusterPhotosPresentation(validPhotos, simulatedZoom, undefined, options);
     }, [validPhotos, map, roundedZoom]);
     
+    // Helper function to normalize URLs for protocol-agnostic comparison
+    const normalizeUrlForComparison = useCallback((url) => {
+        if (!url) return '';
+        // Remove protocol (http:// or https://) from the URL for comparison
+        return url.replace(/^https?:\/\//, '');
+    }, []);
+    
     // Update the selected photo cluster when the selected photo changes
     useEffect(() => {
         if (!selectedPhoto) {
@@ -308,9 +315,10 @@ export const PresentationPhotoLayer = () => {
         }
         
         // Find clusters in the current zoom level that contain the selected photo
+        const normalizedSelectedUrl = normalizeUrlForComparison(selectedPhoto.url);
         const containingClusters = clusteredItems.filter(item => 
             isCluster(item) && 
-            item.properties.photos.some(photo => photo.url === selectedPhoto.url)
+            item.properties.photos.some(photo => normalizeUrlForComparison(photo.url) === normalizedSelectedUrl)
         );
         
         // If we found a cluster containing this photo, store it
@@ -320,16 +328,17 @@ export const PresentationPhotoLayer = () => {
             // If no direct cluster found, try to find related photos
             setSelectedPhotoCluster(null);
         }
-    }, [selectedPhoto, clusteredItems]);
+    }, [selectedPhoto, clusteredItems, normalizeUrlForComparison]);
 
     // Get related photo URLs from simulated clustering
     const relatedPhotoUrls = useMemo(() => {
         if (!selectedPhoto) return new Set();
         
         // Find the simulated cluster that contains the selected photo
+        const normalizedSelectedUrl = normalizeUrlForComparison(selectedPhoto.url);
         const simulatedCluster = simulatedClustering.find(item => 
             isCluster(item) && 
-            item.properties.photos.some(photo => photo.url === selectedPhoto.url)
+            item.properties.photos.some(photo => normalizeUrlForComparison(photo.url) === normalizedSelectedUrl)
         );
         
         if (simulatedCluster && isCluster(simulatedCluster)) {
@@ -339,102 +348,189 @@ export const PresentationPhotoLayer = () => {
         
         // If no cluster found, just include the selected photo
         return new Set([selectedPhoto.url]);
-    }, [selectedPhoto, simulatedClustering]);
+    }, [selectedPhoto, simulatedClustering, normalizeUrlForComparison]);
     
-    // Create the clustered items elements, but only if photos are visible
-    let clusterElements = [];
-    if (shouldRenderElements) {
-        clusterElements = clusteredItems.map(item => {
-        if (isCluster(item)) {
-            // Check if this cluster is the selected photo cluster
-            const isSelectedCluster = selectedPhotoCluster && 
-                item.properties.cluster_id === selectedPhotoCluster.properties.cluster_id;
-                
-            // Check if this cluster contains the selected photo or any related photos
-            const containsSelectedPhoto = selectedPhoto && 
-                item.properties.photos.some(photo => photo.url === selectedPhoto.url);
-                
-            // Check if this cluster contains any related photos from the simulated clustering
-            const containsRelatedPhoto = selectedPhoto && 
-                item.properties.photos.some(photo => relatedPhotoUrls.has(photo.url));
-                
-            // Highlight the cluster if it's the selected cluster, contains the selected photo,
-            // or contains any related photos
-            const shouldHighlight = isSelectedCluster || containsSelectedPhoto || containsRelatedPhoto;
-            
-            // No debug logs for cluster highlighting
-            
-            return React.createElement(PhotoCluster, {
-                key: `cluster-${item.properties.cluster_id}`,
-                cluster: item,
-                onClick: () => handleClusterClick(item),
-                isHighlighted: shouldHighlight
-            });
-        } else {
-            // Check if this marker is the selected photo
-            const isSelectedPhoto = selectedPhoto && (
-                // Try URL match
-                (selectedPhoto.url && item.properties.photo.url && 
-                 selectedPhoto.url === item.properties.photo.url) ||
-                // Try ID match
-                (selectedPhoto.id && item.properties.photo.id && 
-                 selectedPhoto.id === item.properties.photo.id) ||
-                // Try coordinates match
-                (selectedPhoto.coordinates && item.properties.photo.coordinates &&
-                 selectedPhoto.coordinates.lat === item.properties.photo.coordinates.lat &&
-                 selectedPhoto.coordinates.lng === item.properties.photo.coordinates.lng)
-            );
-            
-            // Check if this marker is a related photo from the simulated clustering
-            const isRelatedPhoto = selectedPhoto && 
-                item.properties.photo.url && 
-                relatedPhotoUrls.has(item.properties.photo.url);
-                
-            // Highlight the marker if it's the selected photo or a related photo
-            const isHighlighted = isSelectedPhoto || isRelatedPhoto;
-            
-            // No debug logs for related photo markers
-            
-            return React.createElement(PhotoMarker, {
-                key: item.properties.id,
-                photo: item.properties.photo,
-                isHighlighted: isHighlighted,
-                onClick: () => {
-                    // Detect iOS devices
-                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                    
-                    // No debug logs for photo marker clicks
-                    
-                    // First, pan the map to the photo's location without changing pitch
-                    if (map && item.properties.photo.coordinates) {
-                        // Check if on mobile
-                        const isMobile = window.innerWidth <= 768 || 
-                            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                        
-                        // Use panTo instead of easeTo to avoid changing pitch
-                        map.panTo(
-                            [item.properties.photo.coordinates.lng, item.properties.photo.coordinates.lat],
-                            { duration: isMobile ? 200 : 300 } // Faster on mobile
-                        );
-                    }
-                    
-                    // Then, after a delay, set the selected photo to open the modal
-                    // Use a longer delay on iOS devices to prevent crashes
-                    const delay = isIOS ? 400 : 200;
-                    setTimeout(() => {
-                        setSelectedPhoto(item.properties.photo);
-                    }, delay);
-                }
-            });
+    // Helper function to determine marker limit based on device capabilities
+    const getMarkerLimit = useCallback(() => {
+        const isMobile = window.innerWidth <= 768 || 
+            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        // Check for low memory devices (if deviceMemory API is available)
+        const isLowEndDevice = navigator.deviceMemory && navigator.deviceMemory <= 4;
+        
+        if (isIOS) return 30;  // Most restrictive for iOS
+        if (isLowEndDevice) return 40;  // Restrictive for low-end Android
+        if (isMobile) return 50;  // Standard mobile limit
+        return 200;  // Desktop can handle more
+    }, []);
+    
+    // Filter and limit clusters based on viewport and device capability
+    const visibleClusterElements = useMemo(() => {
+        if (!map || !shouldRenderElements || clusteredItems.length === 0) {
+            return [];
         }
-    });
-    }
+        
+        // Get current viewport bounds with buffer
+        const bounds = map.getBounds();
+        const center = map.getCenter();
+        
+        // Determine marker limit based on device
+        const markerLimit = getMarkerLimit();
+        
+        // Calculate distance from center and filter by viewport
+        const itemsWithDistance = clusteredItems
+            .filter(item => {
+                // Check if item is within viewport bounds (with buffer)
+                const [lng, lat] = item.geometry.coordinates;
+                return lng >= bounds.getWest() - 0.1 && 
+                       lng <= bounds.getEast() + 0.1 && 
+                       lat >= bounds.getSouth() - 0.1 && 
+                       lat <= bounds.getNorth() + 0.1;
+            })
+            .map(item => {
+                // Calculate distance from viewport center
+                const [lng, lat] = item.geometry.coordinates;
+                const distance = Math.sqrt(
+                    Math.pow(lng - center.lng, 2) + 
+                    Math.pow(lat - center.lat, 2)
+                );
+                
+                // For clusters, prioritize those with more photos
+                const priority = isCluster(item) ? 
+                    item.properties.point_count : 1;
+                    
+                return { item, distance, priority };
+            });
+        
+        // Sort by distance and priority, then limit
+        const sortedItems = itemsWithDistance
+            .sort((a, b) => {
+                // First prioritize by distance from center
+                const distanceDiff = a.distance - b.distance;
+                
+                // If distances are similar, prioritize by cluster size
+                if (Math.abs(distanceDiff) < 0.01) {
+                    return b.priority - a.priority; // Higher priority first
+                }
+                
+                return distanceDiff; // Closer items first
+            })
+            .slice(0, markerLimit); // Apply the limit
+        
+        // Create React elements for the limited set
+        return sortedItems.map(({ item }) => {
+            if (isCluster(item)) {
+                // Check if this cluster is the selected photo cluster
+                const isSelectedCluster = selectedPhotoCluster && 
+                    item.properties.cluster_id === selectedPhotoCluster.properties.cluster_id;
+                    
+                // Check if this cluster contains the selected photo or any related photos
+                const containsSelectedPhoto = selectedPhoto && 
+                    item.properties.photos.some(photo => photo.url === selectedPhoto.url);
+                    
+                // Check if this cluster contains any related photos from the simulated clustering
+                const containsRelatedPhoto = selectedPhoto && 
+                    item.properties.photos.some(photo => relatedPhotoUrls.has(photo.url));
+                    
+                // Highlight the cluster if it's the selected cluster, contains the selected photo,
+                // or contains any related photos
+                const shouldHighlight = isSelectedCluster || containsSelectedPhoto || containsRelatedPhoto;
+                
+                return React.createElement(PhotoCluster, {
+                    key: `cluster-${item.properties.cluster_id}`,
+                    cluster: item,
+                    onClick: () => handleClusterClick(item),
+                    isHighlighted: shouldHighlight
+                });
+            } else {
+                // Check if this marker is the selected photo
+                const isSelectedPhoto = selectedPhoto && (
+                    // Try URL match (protocol-agnostic)
+                    (selectedPhoto.url && item.properties.photo.url && 
+                     normalizeUrlForComparison(selectedPhoto.url) === normalizeUrlForComparison(item.properties.photo.url)) ||
+                    // Try ID match
+                    (selectedPhoto.id && item.properties.photo.id && 
+                     selectedPhoto.id === item.properties.photo.id) ||
+                    // Try coordinates match
+                    (selectedPhoto.coordinates && item.properties.photo.coordinates &&
+                     selectedPhoto.coordinates.lat === item.properties.photo.coordinates.lat &&
+                     selectedPhoto.coordinates.lng === item.properties.photo.coordinates.lng)
+                );
+                
+                // Check if this marker is a related photo from the simulated clustering
+                const isRelatedPhoto = selectedPhoto && 
+                    item.properties.photo.url && 
+                    relatedPhotoUrls.has(item.properties.photo.url);
+                    
+                // Highlight the marker if it's the selected photo or a related photo
+                const isHighlighted = isSelectedPhoto || isRelatedPhoto;
+                
+                return React.createElement(PhotoMarker, {
+                    key: item.properties.id,
+                    photo: item.properties.photo,
+                    isHighlighted: isHighlighted,
+                    onClick: () => {
+                        // Detect iOS devices
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                        
+                        // First, pan the map to the photo's location without changing pitch
+                        if (map && item.properties.photo.coordinates) {
+                            // Check if on mobile
+                            const isMobile = window.innerWidth <= 768 || 
+                                /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                            
+                            // Use panTo instead of easeTo to avoid changing pitch
+                            map.panTo(
+                                [item.properties.photo.coordinates.lng, item.properties.photo.coordinates.lat],
+                                { duration: isMobile ? 200 : 300 } // Faster on mobile
+                            );
+                        }
+                        
+                        // Create a deep copy of the photo object to avoid modifying the original
+                        const photoWithHttpsUrls = { ...item.properties.photo };
+                        
+                        // Helper function to ensure HTTPS URLs
+                        const ensureHttpsUrl = (url) => {
+                            if (typeof url === 'string' && url.startsWith('http:')) {
+                                return url.replace('http:', 'https:');
+                            }
+                            return url;
+                        };
+                        
+                        // Ensure the main URL uses HTTPS
+                        if (photoWithHttpsUrls.url) {
+                            photoWithHttpsUrls.url = ensureHttpsUrl(photoWithHttpsUrls.url);
+                        }
+                        
+                        // Also check other URL properties
+                        ['thumbnailUrl', 'tinyThumbnailUrl', 'mediumUrl', 'largeUrl'].forEach(urlProp => {
+                            if (photoWithHttpsUrls[urlProp]) {
+                                photoWithHttpsUrls[urlProp] = ensureHttpsUrl(photoWithHttpsUrls[urlProp]);
+                            }
+                        });
+                        
+                        // Then, after a delay, set the selected photo to open the modal
+                        // Use a longer delay on iOS devices to prevent crashes
+                        const delay = isIOS ? 400 : 200;
+                        setTimeout(() => {
+                            setSelectedPhoto(photoWithHttpsUrls);
+                        }, delay);
+                    }
+                });
+            }
+        });
+    }, [map, clusteredItems, shouldRenderElements, zoom, selectedPhoto, selectedPhotoCluster, 
+        relatedPhotoUrls, normalizeUrlForComparison, handleClusterClick, getMarkerLimit]);
 
     // Create the photo modal element if there's a selected photo
     const photoModalElement = selectedPhoto ? 
         (() => {
             // Find the index of the selected photo in the ordered array using URL as unique identifier
-            const selectedPhotoIndex = orderedPhotos.findIndex(p => p.url === selectedPhoto.url);
+            // Use protocol-agnostic comparison to handle http vs https differences
+            const selectedPhotoIndex = orderedPhotos.findIndex(p => 
+                normalizeUrlForComparison(p.url) === normalizeUrlForComparison(selectedPhoto.url)
+            );
             
             // Check if on mobile
             const isMobile = window.innerWidth <= 768 || 
@@ -444,6 +540,15 @@ export const PresentationPhotoLayer = () => {
             if (!isMobile) {
                 console.log('Selected photo URL:', selectedPhoto.url);
                 console.log('Selected photo index in ordered array:', selectedPhotoIndex);
+                
+                // Debug log to help diagnose URL matching issues
+                if (selectedPhotoIndex === -1) {
+                    console.log('URL matching failed. Normalized selected URL:', normalizeUrlForComparison(selectedPhoto.url));
+                    console.log('First few URLs in orderedPhotos:', orderedPhotos.slice(0, 3).map(p => ({
+                        original: p.url,
+                        normalized: normalizeUrlForComparison(p.url)
+                    })));
+                }
             }
             
             // On mobile, only pass a subset of photos centered around the selected one
@@ -485,6 +590,6 @@ export const PresentationPhotoLayer = () => {
     return React.createElement(
         'div',
         { className: 'presentation-photo-layer' },
-        shouldRenderElements ? [...clusterElements, photoModalElement] : []
+        shouldRenderElements ? [...visibleClusterElements, photoModalElement] : []
     );
 };

@@ -99,7 +99,8 @@ export function generateTinyThumbnailUrl(publicId, options = {}) {
     height: options.height || 100,
     crop: 'fill',
     quality: options.quality || 60,
-    format: 'auto'
+    format: 'auto',
+    secure: true // Force HTTPS
   });
 }
 
@@ -115,7 +116,8 @@ export function generateSmallThumbnailUrl(publicId, options = {}) {
     height: options.height || 200,
     crop: 'fill',
     quality: options.quality || 70,
-    format: 'auto'
+    format: 'auto',
+    secure: true // Force HTTPS
   });
 }
 
@@ -131,7 +133,8 @@ export function generateMediumThumbnailUrl(publicId, options = {}) {
     height: options.height || 400,
     crop: 'fill',
     quality: options.quality || 75,
-    format: 'auto'
+    format: 'auto',
+    secure: true // Force HTTPS
   });
 }
 
@@ -147,7 +150,8 @@ export function generateLargeImageUrl(publicId, options = {}) {
     height: options.height || 1200,
     crop: options.crop || 'limit',
     quality: options.quality || 80,
-    format: 'auto'
+    format: 'auto',
+    secure: true // Force HTTPS
   });
 }
 
@@ -168,7 +172,24 @@ export function generateThumbnailUrl(publicId, options = {}) {
  * @returns {string} - The transformed image URL
  */
 export function generateImageUrl(publicId, transformations = {}) {
-  return cloudinary.url(publicId, transformations);
+  // Ensure secure is set to true in the transformations
+  const secureTransformations = {
+    ...transformations,
+    secure: true // Force HTTPS
+  };
+  return cloudinary.url(publicId, secureTransformations);
+}
+
+/**
+ * Utility function to ensure a URL uses HTTPS instead of HTTP
+ * @param {string} url - The URL to check and potentially convert
+ * @returns {string} - The URL with HTTPS protocol
+ */
+export function ensureHttpsUrl(url) {
+  if (typeof url === 'string' && url.startsWith('http:')) {
+    return url.replace('http:', 'https:');
+  }
+  return url;
 }
 
 /**

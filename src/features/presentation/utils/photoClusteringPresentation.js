@@ -1,17 +1,38 @@
 import Supercluster from 'supercluster';
 
+// Detect mobile devices
+const isMobile = () => window.innerWidth <= 768 || 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 // Detect iOS devices
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+// Detect low-end devices if possible
+const isLowEndDevice = () => navigator.deviceMemory && navigator.deviceMemory <= 4;
 
 // ==========================================
 // 2. SUPERCLUSTER CONFIGURATION
 // ==========================================
 // This creates the clustering engine with specific settings
 const createIndex = (radius = 100, maxZoom = 8, minPoints = 2) => {
-    // iOS devices get even more aggressive clustering
+    // Mobile devices get more aggressive clustering
+    if (isMobile()) {
+        radius = 150; // Increase radius for more aggressive clustering
+        maxZoom = 6;  // Lower maxZoom to keep clusters longer
+        minPoints = 2;
+    }
+    
+    // Low-end devices get even more aggressive clustering
+    if (isLowEndDevice()) {
+        radius = 180;
+        maxZoom = 5;
+        minPoints = 2;
+    }
+    
+    // iOS devices get the most aggressive clustering
     if (isIOS) {
-        radius = 100;
-        maxZoom = 10; // Lower maxZoom to make clusters break apart earlier
+        radius = 200; // Significantly larger radius
+        maxZoom = 5;  // Very low maxZoom to maintain clusters longer
         minPoints = 2;
     }
     
@@ -43,10 +64,28 @@ const createIndex = (radius = 100, maxZoom = 8, minPoints = 2) => {
 const getClusteredPhotos = (photos, zoom, options = {}) => {
     const { radius = 100, maxZoom = 12, minPoints = 2, extraAggressive = false } = options;
     
-    // Apply even more aggressive settings if requested
-    const clusterRadius = extraAggressive ? 100 : radius;
-    const clusterMaxZoom = extraAggressive ? 12 : maxZoom;
-    const clusterMinPoints = extraAggressive ? 2 : minPoints;
+    // Apply even more aggressive settings if requested or at low zoom levels
+    const isLowZoom = zoom < 6;
+    const shouldBeExtraAggressive = extraAggressive || isLowZoom;
+    
+    // Base settings
+    let clusterRadius = radius;
+    let clusterMaxZoom = maxZoom;
+    let clusterMinPoints = minPoints;
+    
+    // Apply extra aggressive settings if needed
+    if (shouldBeExtraAggressive) {
+        // For mobile devices at low zoom, be extremely aggressive
+        if (isMobile() && isLowZoom) {
+            clusterRadius = 200;
+            clusterMaxZoom = 4;
+            clusterMinPoints = 2;
+        } else {
+            clusterRadius = 150;
+            clusterMaxZoom = 6;
+            clusterMinPoints = 2;
+        }
+    }
     // Convert photos to GeoJSON features
     const features = photos
         .filter(p => p.coordinates && p.coordinates.lat && p.coordinates.lng)
@@ -82,14 +121,25 @@ const getClusteredPhotos = (photos, zoom, options = {}) => {
 // Main function that presentation mode uses to get clusters
 export const clusterPhotosPresentation = (photos, zoom, _mapBounds, // Ignore mapBounds parameter
     options = {}) => {
-    // Round zoom to nearest 0.5 to reduce recalculations
-    const roundedZoom = Math.floor(zoom * 2) / 2;
+    // More aggressive zoom rounding for mobile devices
+    // Round to whole numbers on mobile, 0.5 on desktop
+    const roundedZoom = isMobile() ? 
+        Math.floor(zoom) : 
+        Math.floor(zoom * 2) / 2;
     
-    // Apply iOS-specific optimizations
-    const iosOptions = isIOS ? { extraAggressive: true } : {};
+    // Apply device-specific optimizations
+    let deviceOptions = {};
     
-    // Merge provided options with iOS options
-    const mergedOptions = { ...options, ...iosOptions };
+    if (isIOS) {
+        deviceOptions = { extraAggressive: true };
+    } else if (isLowEndDevice()) {
+        deviceOptions = { extraAggressive: true };
+    } else if (isMobile()) {
+        deviceOptions = { extraAggressive: zoom < 8 }; // Only be extra aggressive at lower zooms
+    }
+    
+    // Merge provided options with device-specific options
+    const mergedOptions = { ...options, ...deviceOptions };
     
     return getClusteredPhotos(photos, roundedZoom, mergedOptions);
 };

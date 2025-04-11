@@ -455,29 +455,41 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   }, [handleNext, handlePrev, onClose]);
   
   
+  // Ensure a URL uses HTTPS instead of HTTP
+  const ensureHttpsUrl = (url) => {
+    if (typeof url === 'string' && url.startsWith('http:')) {
+      return url.replace('http:', 'https:');
+    }
+    return url;
+  };
+  
   // Determine the best image URL to use based on device type
   const getBestImageUrl = (photo) => {
     const isMobile = isMobileDevice();
     
+    let url;
     // For local photos
     if (photo.isLocal) {
       if (isMobile) {
         // On mobile, prioritize medium images but never use thumbnails unless nothing else is available
-        return photo.mediumUrl || photo.largeUrl || photo.url || photo.thumbnailUrl || photo.tinyThumbnailUrl;
+        url = photo.mediumUrl || photo.largeUrl || photo.url || photo.thumbnailUrl || photo.tinyThumbnailUrl;
       } else {
         // On desktop, prioritize large images for better quality
-        return photo.largeUrl || photo.url || photo.mediumUrl || photo.thumbnailUrl || photo.tinyThumbnailUrl;
+        url = photo.largeUrl || photo.url || photo.mediumUrl || photo.thumbnailUrl || photo.tinyThumbnailUrl;
+      }
+    } else {
+      // For Cloudinary photos
+      if (isMobile) {
+        // On mobile, prioritize medium images but never use thumbnails unless nothing else is available
+        url = photo.mediumUrl || photo.largeUrl || photo.url || photo.thumbnailUrl || photo.tinyThumbnailUrl;
+      } else {
+        // On desktop, prioritize large images for better quality
+        url = photo.largeUrl || photo.url || photo.mediumUrl || photo.thumbnailUrl || photo.tinyThumbnailUrl;
       }
     }
     
-    // For Cloudinary photos
-    if (isMobile) {
-      // On mobile, prioritize medium images but never use thumbnails unless nothing else is available
-      return photo.mediumUrl || photo.largeUrl || photo.url || photo.thumbnailUrl || photo.tinyThumbnailUrl;
-    } else {
-      // On desktop, prioritize large images for better quality
-      return photo.largeUrl || photo.url || photo.mediumUrl || photo.thumbnailUrl || photo.tinyThumbnailUrl;
-    }
+    // Ensure the URL uses HTTPS
+    return ensureHttpsUrl(url);
   };
   
   // Handle image loading

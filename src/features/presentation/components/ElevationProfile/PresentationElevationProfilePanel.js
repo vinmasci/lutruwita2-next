@@ -151,8 +151,9 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         // Convert approximate degrees to kilometers (111.32 km per degree at the equator)
         const distanceInKm = totalRouteDistance * 111.32;
         
-        // Sample more points for longer routes: 10 points per km with min/max limits
-        const targetPoints = Math.min(300, Math.max(50, Math.ceil(distanceInKm * 10)));
+        // Sample even fewer points for smoother animation: 3 points per km with min/max limits
+        // Significantly fewer points = much less jerky animation
+        const targetPoints = Math.min(120, Math.max(20, Math.ceil(distanceInKm * 3)));
         
         logger.info('Flyby', `Route length: ${distanceInKm.toFixed(2)}km, sampling ${targetPoints} points`);
         
@@ -188,10 +189,10 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         // Store the bounds for later use when stopping
         routeBoundsRef.current = bounds;
         
-        // Set initial camera position
+        // Set initial camera position - more zoomed out for better context
         map.easeTo({
             center: sampledCoords[0],
-            zoom: 15,
+            zoom: 13.5, // Reduced from 15 to provide a more zoomed out view
             pitch: 75, // High pitch to look ahead
             bearing: overallBearing, // Use the overall bearing for consistent direction
             duration: 1500,
@@ -252,17 +253,17 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             // Adjust duration based on route length to maintain consistent speed
-            // Increased base duration for slower animation to allow terrain to load
-            const baseDuration = 800; // Doubled base duration for slower animation
+            // Significantly reduced base duration for much faster animation
+            const baseDuration = 400; // Reduced from 600ms for much faster animation
             
             // Scale duration inversely with total route length
-            // Longer routes = shorter durations between points, but still slower overall
+            // Longer routes = shorter durations between points
             const scaleFactor = Math.min(1.0, 10 / Math.max(1, distanceInKm));
             const adjustedBaseDuration = baseDuration * scaleFactor;
             
             // Calculate final duration based on distance between points
-            // Increased min/max durations for slower animation
-            const duration = Math.max(400, Math.min(1200, adjustedBaseDuration * (distance * 5000)));
+            // Significantly reduced min/max durations for much faster animation
+            const duration = Math.max(200, Math.min(600, adjustedBaseDuration * (distance * 5000)));
             
             // Dynamically adjust pitch based on elevation change
             // Get elevation data for current and next point (if available)
@@ -295,6 +296,7 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             // Move camera to next point with smooth parameters
             map.easeTo({
                 center: currentPoint,
+                zoom: 13.5, // Maintain consistent zoomed out view throughout the animation
                 bearing: bearing,
                 pitch: pitch,
                 duration: duration,
@@ -302,8 +304,9 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                 essential: true
             });
             
-            // Schedule next point with more overlap for smoother transitions
-            // Increased delay between points to allow more time for terrain to load
+            // Schedule next point with higher overlap for faster transitions
+            // Higher overlap (85%) makes the animation move more quickly from point to point
+            // This creates a more continuous motion and speeds up the overall animation
             currentIndex++;
             const timeoutId = setTimeout(flyToNextPoint, duration * 0.85);
             animationTimeoutsRef.current.push(timeoutId); // Store timeout ID for cancellation
