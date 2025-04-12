@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mapbox GL JS</title>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    // Initialize map with default values
+    let map;
+    let routeSource;
+    let routeLayer;
+    let mapInitialized = false;
+    let mapStyle = 'mapbox://styles/mapbox/outdoors-v11';
+    let mapCenter = [146.8087, -41.4419]; // Tasmania center
+    let mapZoom = 7;
+    let mapBearing = 0;
+    let mapPitch = 0;
+    let showUserLocation = false;
+    let routes = [];
+
+    // Function to initialize the map
+    function initializeMap(accessToken) {
+      if (mapInitialized) return;
+      
+      mapboxgl.accessToken = accessToken;
+      
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: mapStyle,
+        center: mapCenter,
+        zoom: mapZoom,
+        bearing: mapBearing,
+        pitch: mapPitch
+      });
+      
+      // Add navigation control
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      
+      // Add user location control if enabled
+      if (showUserLocation) {
+        map.addControl(new mapboxgl.GeolocateControl({
+          positionOptions: {
+            enableHighAccuracy: true
+          },
+          trackUserLocation: true
+        }));
+      }
+      
+      // Add event listeners
+      map.on('load', () => {
+        mapInitialized = true;
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'mapReady'
+        }));
+        
+        // Add source and layer for routes
+        map.addSource('routes', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+        
+        // Add routes if available
+        if (routes.length > 0) {
+          updateRoutes(routes);
+        }
+      });
+      
+      map.on('moveend', () => {
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        const bounds = map.getBounds();
+        
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'regionDidChange',
+          center: [center.lng, center.lat],
+          zoom: zoom,
+          bounds: {
+            ne: [bounds.getNorthEast().lng, bounds.getNorthEast().lat],
+            sw: [bounds.getSouthWest().lng, bounds.getSouthWest().lat]
+          }
+        }));
+      });
+    }
+    
+    // Function to update map style
+    function updateMapStyle(style) {
+      if (!mapInitialized) {
+        mapStyle = style;
+        return;
+      }
+      
+      map.setStyle(style);
+    }
+    
+    // Function to update map center
+    function updateMapCenter(center) {
+      if (!mapInitialized) {
+        mapCenter = center;
+        return;
+      }
+      
+      map.flyTo({
+        center: center,
+        duration: 1000
+      });
+    }
+    
+    // Function to update map zoom
+    function updateMapZoom(zoom) {
+      if (!mapInitialized) {
+        mapZoom = zoom;
+        return;
+      }
+      
+      map.flyTo({
+        zoom: zoom,
+        duration: 1000
+      });
+    }
+    
+    // Function to update routes
+    function updateRoutes(routesData) {
+      routes = routesData;
+      
+      if (!mapInitialized) return;
+      
+      // Filter visible routes
+      const visibleRoutes = routesData.filter(route => route.isVisible);
+      
+      // Create features array
+      const features = [];
+      
+      visibleRoutes.forEach(route => {
+        if (route.geojson && route.geojson.features && route.geojson.features.length > 0) {
+          route.geojson.features.forEach(feature => {
+            // Add color to feature properties
+            const newFeature = { ...feature };
+            newFeature.properties = {
+              ...newFeature.properties,
+              color: route.color || '#ff4d4d'
+            };
+            features.push(newFeature);
+          });
+        }
+      });
+      
+      // Update source data
+      if (map.getSource('routes')) {
+        map.getSource('routes').setData({
+          type: 'FeatureCollection',
+          features: features
+        });
+      }
+      
+      // Add layer if it doesn't exist
+      if (!map.getLayer('route-lines')) {
+        map.addLayer({
+          id: 'route-lines',
+          type: 'line',
+          source: 'routes',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 4
+          }
+        });
+      }
+    }
+    
+    // Function to handle messages from React Native
+    function handleMessage(message) {
+      const data = JSON.parse(message);
+      
+      switch (data.type) {
+        case 'initialize':
+          initializeMap(data.accessToken);
+          break;
+        case 'updateMapStyle':
+          updateMapStyle(data.style);
+          break;
+        case 'updateMapCenter':
+          updateMapCenter(data.center);
+          break;
+        case 'updateMapZoom':
+          updateMapZoom(data.zoom);
+          break;
+        case 'updateRoutes':
+          updateRoutes(data.routes);
+          break;
+        case 'setUserLocationEnabled':
+          showUserLocation = data.enabled;
+          break;
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    }
+    
+    // Set up message handler
+    document.addEventListener('message', function(event) {
+      handleMessage(event.data);
+    });
+    
+    // For iOS
+    window.addEventListener('message', function(event) {
+      handleMessage(event.data);
+    });
+  </script>
+</body>
+</html>

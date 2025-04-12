@@ -84,8 +84,9 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
     const [internalIsFlyByActive, setInternalIsFlyByActive] = useState(false); // Internal state for fly-by functionality
     const { map } = useMapContext();
     
-    // Refs to store animation timeouts so we can cancel them
+    // Refs to store animation timeouts and animation frame so we can cancel them
     const animationTimeoutsRef = useRef([]);
+    const animationFrameRef = useRef(null);
     const routeBoundsRef = useRef(null);
     
     // Use external state and handler if provided, otherwise use internal ones
@@ -102,6 +103,12 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             clearTimeout(timeoutId);
         });
         animationTimeoutsRef.current = [];
+        
+        // Also clear any requestAnimationFrame
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
         
         logger.info('Flyby', 'Flyby stopped by user');
         
@@ -122,63 +129,34 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         setIsFlyByActive(false);
     };
 
-    // Function to start the flyby animation - improved implementation with reduced spinning
+    // Function to start the flyby animation - Ultra-smooth Tour de France style implementation
     const startFlyby = (route) => {
         if (!map || !route?.geojson?.features?.[0]?.geometry?.coordinates) {
             logger.error('Flyby', 'No map or route coordinates available');
             return;
         }
         
-        // Clear any existing timeouts
+        // Import turf functions dynamically to ensure they're available
+        const turf = window.turf || {};
+        if (!turf.along || !turf.lineString || !turf.length) {
+            logger.info('Flyby', 'Turf.js functions not available. Using fallback animation.');
+            // If turf isn't available, we'll continue with our enhanced version using manual calculations
+        }
+        
+        // Clear any existing timeouts and animation frames
         animationTimeoutsRef.current.forEach(timeoutId => {
             clearTimeout(timeoutId);
         });
         animationTimeoutsRef.current = [];
         
+        // Also clear any requestAnimationFrame
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
+        
         // Get route coordinates
         const allCoords = route.geojson.features[0].geometry.coordinates;
-        
-        // Calculate the actual route distance
-        let totalRouteDistance = 0;
-        for (let i = 1; i < allCoords.length; i++) {
-            // Use the calculateBearing function we already have to get distance
-            const dx = allCoords[i][0] - allCoords[i-1][0];
-            const dy = allCoords[i][1] - allCoords[i-1][1];
-            // This is a simplified distance calculation in degrees
-            totalRouteDistance += Math.sqrt(dx * dx + dy * dy);
-        }
-        
-        // Convert approximate degrees to kilometers (111.32 km per degree at the equator)
-        const distanceInKm = totalRouteDistance * 111.32;
-        
-        // Sample even fewer points for smoother animation: 3 points per km with min/max limits
-        // Significantly fewer points = much less jerky animation
-        const targetPoints = Math.min(120, Math.max(20, Math.ceil(distanceInKm * 3)));
-        
-        logger.info('Flyby', `Route length: ${distanceInKm.toFixed(2)}km, sampling ${targetPoints} points`);
-        
-        // Calculate sample rate based on route length
-        const routeLength = allCoords.length;
-        const sampleRate = Math.max(1, Math.floor(routeLength / targetPoints));
-        
-        // Sample coordinates evenly
-        let sampledCoords = [];
-        for (let i = 0; i < allCoords.length; i += sampleRate) {
-            sampledCoords.push(allCoords[i]);
-        }
-        
-        // Always include the last point
-        if (sampledCoords[sampledCoords.length - 1] !== allCoords[allCoords.length - 1]) {
-            sampledCoords.push(allCoords[allCoords.length - 1]);
-        }
-        
-        logger.info('Flyby', 'Starting flyby with', sampledCoords.length, 'points');
-        
-        // Calculate the overall bearing from start to end
-        const overallBearing = calculateBearing(
-            sampledCoords[0], 
-            sampledCoords[sampledCoords.length - 1]
-        );
         
         // Calculate bounds for the intro and outro animations
         const bounds = new mapboxgl.LngLatBounds();
@@ -189,12 +167,279 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
         // Store the bounds for later use when stopping
         routeBoundsRef.current = bounds;
         
-        // Set initial camera position - more zoomed out for better context
+        // Create a GeoJSON LineString from the route coordinates
+        const routeLine = {
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: allCoords
+            }
+        };
+        
+        // Calculate the total route length in kilometers
+        let routeLength;
+        if (turf.length) {
+            routeLength = turf.length(routeLine, { units: 'kilometers' });
+        } else {
+            // Manual calculation if turf isn't available
+            let totalDistance = 0;
+            for (let i = 1; i < allCoords.length; i++) {
+                const dx = allCoords[i][0] - allCoords[i-1][0];
+                const dy = allCoords[i][1] - allCoords[i-1][1];
+                // Convert approximate degrees to kilometers (111.32 km per degree at the equator)
+                totalDistance += Math.sqrt(dx * dx + dy * dy) * 111.32;
+            }
+            routeLength = totalDistance;
+        }
+        
+        logger.info('Flyby', `Route length: ${routeLength.toFixed(2)}km`);
+        
+        // Calculate the overall bearing from start to end for initial orientation
+        const overallBearing = calculateBearing(
+            allCoords[0], 
+            allCoords[allCoords.length - 1]
+        );
+        
+        // Use extremely few points to eliminate shakiness - massive spacing between points
+        // We'll aim for points every 500-1000 meters depending on route length
+        const pointSpacing = Math.max(0.5, Math.min(1.0, routeLength / 20)); // in kilometers
+        const numPoints = Math.ceil(routeLength / pointSpacing);
+        
+        logger.info('Flyby', `Creating ${numPoints} interpolated points for smooth animation`);
+        
+        // Generate evenly spaced points along the route
+        let smoothedPoints = [];
+        
+        if (turf.along) {
+            // Use turf.js for precise point interpolation if available
+            for (let i = 0; i <= numPoints; i++) {
+                const distance = (i / numPoints) * routeLength;
+                const point = turf.along(routeLine, distance, { units: 'kilometers' });
+                
+                // Extract coordinates and add elevation if available
+                const baseCoord = point.geometry.coordinates;
+                
+                // Find the closest original point to get elevation data
+                let closestOrigIndex = 0;
+                let minDist = Infinity;
+                
+                for (let j = 0; j < allCoords.length; j++) {
+                    const dx = baseCoord[0] - allCoords[j][0];
+                    const dy = baseCoord[1] - allCoords[j][1];
+                    const dist = dx * dx + dy * dy;
+                    
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestOrigIndex = j;
+                    }
+                }
+                
+                // Get elevation from closest original point if available
+                const elevation = allCoords[closestOrigIndex].length > 2 ? 
+                    allCoords[closestOrigIndex][2] : 0;
+                
+                // Add elevation to the interpolated point
+                const coordWithElevation = [...baseCoord];
+                if (elevation !== undefined) {
+                    coordWithElevation[2] = elevation;
+                }
+                
+                smoothedPoints.push(coordWithElevation);
+            }
+        } else {
+            // Manual linear interpolation if turf isn't available
+            // This is less precise but still works
+            let currentDistance = 0;
+            let targetDistance = 0;
+            
+            // Always include the first point
+            smoothedPoints.push(allCoords[0]);
+            
+            for (let i = 1; i < allCoords.length; i++) {
+                const prevPoint = allCoords[i-1];
+                const currentPoint = allCoords[i];
+                
+                // Calculate segment distance
+                const dx = currentPoint[0] - prevPoint[0];
+                const dy = currentPoint[1] - prevPoint[1];
+                const segmentDistance = Math.sqrt(dx * dx + dy * dy) * 111.32; // km
+                
+                // Add points along this segment
+                while (currentDistance + segmentDistance > targetDistance) {
+                    // How far along this segment should the point be?
+                    const ratio = (targetDistance - currentDistance) / segmentDistance;
+                    
+                    // Interpolate position
+                    const lon = prevPoint[0] + ratio * dx;
+                    const lat = prevPoint[1] + ratio * dy;
+                    
+                    // Interpolate elevation if available
+                    let elevation;
+                    if (prevPoint.length > 2 && currentPoint.length > 2) {
+                        elevation = prevPoint[2] + ratio * (currentPoint[2] - prevPoint[2]);
+                    }
+                    
+                    // Create the interpolated point
+                    const interpolatedPoint = [lon, lat];
+                    if (elevation !== undefined) {
+                        interpolatedPoint[2] = elevation;
+                    }
+                    
+                    smoothedPoints.push(interpolatedPoint);
+                    targetDistance += pointSpacing;
+                    
+                    // Break if we've gone beyond this segment
+                    if (targetDistance > currentDistance + segmentDistance) {
+                        break;
+                    }
+                }
+                
+                currentDistance += segmentDistance;
+            }
+            
+            // Always include the last point
+            if (smoothedPoints[smoothedPoints.length - 1] !== allCoords[allCoords.length - 1]) {
+                smoothedPoints.push(allCoords[allCoords.length - 1]);
+            }
+        }
+        
+        logger.info('Flyby', `Generated ${smoothedPoints.length} smooth points for animation`);
+        
+        // Pre-calculate camera parameters for each point to ensure smooth transitions
+        const cameraParams = smoothedPoints.map((point, index) => {
+            // Calculate bearing by looking ahead
+            const lookAheadIndex = Math.min(index + 10, smoothedPoints.length - 1);
+            let bearing;
+            
+            if (index >= smoothedPoints.length - 20) {
+                // Near the end, use overall bearing to avoid spinning
+                bearing = overallBearing;
+            } else {
+                bearing = calculateBearing(point, smoothedPoints[lookAheadIndex]);
+            }
+            
+            // Use a fixed pitch value to eliminate vertical movement
+            const pitch = 60; // Fixed pitch for all points
+            
+            // Calculate zoom level - slightly closer for climbs, wider for descents
+            let zoom = 14;
+            
+            if (index > 0 && index < smoothedPoints.length - 1) {
+                const prevPoint = smoothedPoints[index - 1];
+                const nextPoint = smoothedPoints[index + 1];
+                
+                if (point.length > 2 && prevPoint.length > 2 && nextPoint.length > 2) {
+                    const prevElevation = prevPoint[2] || 0;
+                    const currentElevation = point[2] || 0;
+                    const nextElevation = nextPoint[2] || 0;
+                    
+                    // Calculate average gradient
+                    const elevationChange = (nextElevation - prevElevation);
+                    
+                    // Adjust zoom based on gradient
+                    if (elevationChange > 5) {
+                        // Climbing - zoom in slightly
+                        zoom = 14.5;
+                    } else if (elevationChange < -5) {
+                        // Descending - zoom out slightly
+                        zoom = 13.5;
+                    }
+                }
+            }
+            
+            return {
+                center: point,
+                bearing,
+                pitch,
+                zoom
+            };
+        });
+        
+        // Extreme smoothing for camera parameters to create ultra-smooth movements
+        // Apply a moving average filter to bearings with a massive window
+        const smoothingWindow = 50; // Increased from 30 to 50 for ultra-smooth turns
+        
+        // First pass: Apply a large moving average window to bearings
+        for (let i = 0; i < cameraParams.length; i++) {
+            // Smooth bearing with a moving average
+            let bearingSum = 0;
+            let count = 0;
+            
+            for (let j = Math.max(0, i - smoothingWindow); j <= Math.min(cameraParams.length - 1, i + smoothingWindow); j++) {
+                // Handle bearing wraparound (0-360)
+                let bearingDiff = cameraParams[j].bearing - cameraParams[i].bearing;
+                if (bearingDiff > 180) bearingDiff -= 360;
+                if (bearingDiff < -180) bearingDiff += 360;
+                
+                bearingSum += cameraParams[i].bearing + bearingDiff;
+                count++;
+            }
+            
+            // Update with smoothed bearing
+            if (count > 0) {
+                cameraParams[i].bearing = (bearingSum / count) % 360;
+                if (cameraParams[i].bearing < 0) cameraParams[i].bearing += 360;
+            }
+        }
+        
+        // Second pass: Apply extreme exponential smoothing to virtually eliminate side-to-side movement
+        let prevBearing = cameraParams[0].bearing;
+        for (let i = 1; i < cameraParams.length; i++) {
+            // Use an extremely heavy weighting to previous bearing to minimize turning
+            const bearingBlendFactor = 0.995; // Increased to 0.995 (99.5%) for almost no turning
+            
+            // Handle bearing wraparound for smooth blending
+            let bearingDiff = cameraParams[i].bearing - prevBearing;
+            if (bearingDiff > 180) bearingDiff -= 360;
+            if (bearingDiff < -180) bearingDiff += 360;
+            
+            // Apply the blend
+            const smoothedBearing = (prevBearing + bearingDiff * (1 - bearingBlendFactor)) % 360;
+            cameraParams[i].bearing = smoothedBearing < 0 ? smoothedBearing + 360 : smoothedBearing;
+            prevBearing = cameraParams[i].bearing;
+            
+            // Only smooth zoom, pitch is now fixed
+            const alpha = 0.01; // Further reduced for even smoother transitions
+            cameraParams[i].zoom = alpha * cameraParams[i].zoom + (1 - alpha) * cameraParams[i-1].zoom;
+        }
+        
+        // Third pass: Apply another round of smoothing for extremely gradual turns
+        // This creates an almost cinematic effect with virtually no rotation
+        prevBearing = cameraParams[0].bearing;
+        for (let i = 1; i < cameraParams.length; i++) {
+            // Use an even higher blend factor for the third pass
+            const bearingBlendFactor = 0.998; // Increased to 0.998 (99.8%) for virtually no turning
+            
+            // Handle bearing wraparound for smooth blending
+            let bearingDiff = cameraParams[i].bearing - prevBearing;
+            if (bearingDiff > 180) bearingDiff -= 360;
+            if (bearingDiff < -180) bearingDiff += 360;
+            
+            // Apply the blend
+            const smoothedBearing = (prevBearing + bearingDiff * (1 - bearingBlendFactor)) % 360;
+            cameraParams[i].bearing = smoothedBearing < 0 ? smoothedBearing + 360 : smoothedBearing;
+            prevBearing = cameraParams[i].bearing;
+        }
+        
+        // Set up animation state
+        const animationState = {
+            startTime: null,
+            // Use a consistent speed per kilometer (500ms per km) - extremely fast
+            // This ensures the perceived speed is the same for all routes
+            duration: routeLength * 500, 
+            cameraParams,
+            smoothedPoints
+        };
+        
+        // Store animation state in a ref for access in animation loop
+        const animationStateRef = { current: animationState };
+        
+        // Set initial camera position
         map.easeTo({
-            center: sampledCoords[0],
-            zoom: 13.5, // Reduced from 15 to provide a more zoomed out view
-            pitch: 75, // High pitch to look ahead
-            bearing: overallBearing, // Use the overall bearing for consistent direction
+            center: smoothedPoints[0],
+            zoom: cameraParams[0].zoom,
+            pitch: cameraParams[0].pitch,
+            bearing: cameraParams[0].bearing,
             duration: 1500,
             easing: (t) => {
                 // Cubic easing for smoother acceleration
@@ -202,119 +447,92 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
             }
         });
         
-        // Animate through points
-        let currentIndex = 1;
-        let prevBearing = overallBearing;
-        
-        const flyToNextPoint = () => {
-            if (currentIndex >= sampledCoords.length) {
-                logger.info('Flyby', 'Flyby complete');
+        // Wait for initial positioning to complete
+        const initialTimeoutId = setTimeout(() => {
+            // Start the animation loop
+            const animate = (timestamp) => {
+                // Initialize start time on first frame
+                if (!animationStateRef.current.startTime) {
+                    animationStateRef.current.startTime = timestamp;
+                }
                 
-                // Simply zoom out to show the entire route
-                map.fitBounds(bounds, {
-                    padding: 200,
-                    pitch: 45, // Reduced pitch for overview
-                    duration: 2500,
-                    easing: (t) => {
-                        // Ease out cubic - smooth deceleration
-                        return 1 - Math.pow(1 - t, 3);
-                    }
+                // Calculate progress (0 to 1)
+                const elapsed = timestamp - animationStateRef.current.startTime;
+                const progress = Math.min(1, elapsed / animationStateRef.current.duration);
+                
+                // Calculate the exact position along the path
+                const exactIndex = progress * (smoothedPoints.length - 1);
+                
+                // If we've reached the end, finish the animation
+                if (progress >= 1) {
+                    logger.info('Flyby', 'Flyby complete');
+                    
+                    // Zoom out to show the entire route
+                    map.fitBounds(bounds, {
+                        padding: 200,
+                        pitch: 45,
+                        duration: 2500,
+                        easing: (t) => {
+                            // Ease out cubic - smooth deceleration
+                            return 1 - Math.pow(1 - t, 3);
+                        }
+                    });
+                    
+                    setIsFlyByActive(false);
+                    return;
+                }
+                
+                // Interpolate between the two nearest points
+                const lowerIndex = Math.floor(exactIndex);
+                const upperIndex = Math.min(smoothedPoints.length - 1, lowerIndex + 1);
+                const fraction = exactIndex - lowerIndex;
+                
+                // Get the camera parameters for the two points
+                const lowerParams = cameraParams[lowerIndex];
+                const upperParams = cameraParams[upperIndex];
+                
+                // Interpolate camera parameters
+                const interpolatedParams = {
+                    center: [
+                        lowerParams.center[0] + fraction * (upperParams.center[0] - lowerParams.center[0]),
+                        lowerParams.center[1] + fraction * (upperParams.center[1] - lowerParams.center[1])
+                    ],
+                    zoom: lowerParams.zoom + fraction * (upperParams.zoom - lowerParams.zoom),
+                    pitch: lowerParams.pitch + fraction * (upperParams.pitch - lowerParams.pitch)
+                };
+                
+                // Handle bearing interpolation specially to avoid spinning
+                let bearingDiff = upperParams.bearing - lowerParams.bearing;
+                // Adjust for bearing wraparound
+                if (bearingDiff > 180) bearingDiff -= 360;
+                if (bearingDiff < -180) bearingDiff += 360;
+                
+                interpolatedParams.bearing = (lowerParams.bearing + fraction * bearingDiff) % 360;
+                if (interpolatedParams.bearing < 0) interpolatedParams.bearing += 360;
+                
+                // Use easeTo with a much longer duration for ultra-smooth transitions between frames
+                map.easeTo({
+                    center: interpolatedParams.center,
+                    zoom: interpolatedParams.zoom,
+                    pitch: interpolatedParams.pitch,
+                    bearing: interpolatedParams.bearing,
+                    duration: 200, // Much longer duration for ultra-smooth transitions
+                    easing: t => t // Linear easing for consistent motion
                 });
                 
-                setIsFlyByActive(false); // Reset the button state when animation completes
-                return;
-            }
+                // Camera shake removed completely as requested
+                
+                // Continue animation
+                animationFrameRef.current = requestAnimationFrame(animate);
+            };
             
-            const currentPoint = sampledCoords[currentIndex];
+            // Start the animation loop
+            animationFrameRef.current = requestAnimationFrame(animate);
             
-            // Look ahead for bearing calculation
-            const lookAheadIndex = Math.min(currentIndex + 5, sampledCoords.length - 1);
-            
-            // Calculate bearing to look-ahead point
-            let targetBearing;
-            
-            // If we're near the end, use the overall bearing to avoid spinning
-            if (currentIndex > sampledCoords.length - 10) {
-                targetBearing = overallBearing;
-            } else {
-                targetBearing = calculateBearing(currentPoint, sampledCoords[lookAheadIndex]);
-            }
-            
-            // Smooth bearing changes with very heavy weighting to previous bearing
-            // This creates much less spinning
-            const bearingBlendFactor = 0.9; // Very high value = minimal turning
-            const bearing = prevBearing * bearingBlendFactor + targetBearing * (1 - bearingBlendFactor);
-            prevBearing = bearing; // Save for next iteration
-            
-            // Calculate distance to next point to adjust speed
-            const nextPoint = sampledCoords[Math.min(currentIndex + 1, sampledCoords.length - 1)];
-            const dx = nextPoint[0] - currentPoint[0];
-            const dy = nextPoint[1] - currentPoint[1];
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // Adjust duration based on route length to maintain consistent speed
-            // Significantly reduced base duration for much faster animation
-            const baseDuration = 400; // Reduced from 600ms for much faster animation
-            
-            // Scale duration inversely with total route length
-            // Longer routes = shorter durations between points
-            const scaleFactor = Math.min(1.0, 10 / Math.max(1, distanceInKm));
-            const adjustedBaseDuration = baseDuration * scaleFactor;
-            
-            // Calculate final duration based on distance between points
-            // Significantly reduced min/max durations for much faster animation
-            const duration = Math.max(200, Math.min(600, adjustedBaseDuration * (distance * 5000)));
-            
-            // Dynamically adjust pitch based on elevation change
-            // Get elevation data for current and next point (if available)
-            const currentElevation = currentPoint.length > 2 ? currentPoint[2] : 0;
-            const nextElevation = nextPoint.length > 2 ? nextPoint[2] : 0;
-            
-            // Calculate elevation change
-            const elevationChange = nextElevation - currentElevation;
-            
-            // Adjust pitch based on elevation change:
-            // - When going uphill (positive change): decrease pitch (more top-down view)
-            // - When going downhill (negative change): increase pitch (more immersive view)
-            // - Use a scale factor to control sensitivity
-            const basePitch = 75; // Default pitch
-            const minPitch = 30; // Minimum pitch (most top-down) - lowered for more dramatic effect
-            const maxPitch = 80; // Maximum pitch (most immersive) - increased for more dramatic effect
-            const pitchScaleFactor = 0.5; // Increased sensitivity to elevation changes (10x more sensitive)
-            
-            // Calculate pitch adjustment (positive elevationChange = lower pitch)
-            const pitchAdjustment = -elevationChange * pitchScaleFactor;
-            
-            // Log elevation changes and pitch for debugging
-            if (Math.abs(elevationChange) > 1) {
-                logger.info('Flyby', `Elevation change: ${elevationChange.toFixed(2)}m, Pitch adjustment: ${pitchAdjustment.toFixed(2)}°`);
-            }
-            
-            // Apply adjustment and clamp to min/max range
-            const pitch = Math.max(minPitch, Math.min(maxPitch, basePitch + pitchAdjustment));
-            
-            // Move camera to next point with smooth parameters
-            map.easeTo({
-                center: currentPoint,
-                zoom: 13.5, // Maintain consistent zoomed out view throughout the animation
-                bearing: bearing,
-                pitch: pitch,
-                duration: duration,
-                easing: (t) => t, // Linear easing for more consistent speed
-                essential: true
-            });
-            
-            // Schedule next point with higher overlap for faster transitions
-            // Higher overlap (85%) makes the animation move more quickly from point to point
-            // This creates a more continuous motion and speeds up the overall animation
-            currentIndex++;
-            const timeoutId = setTimeout(flyToNextPoint, duration * 0.85);
-            animationTimeoutsRef.current.push(timeoutId); // Store timeout ID for cancellation
-        };
+        }, 1500);
         
-        // Start animation after initial positioning
-        const initialTimeoutId = setTimeout(flyToNextPoint, 1500);
-        animationTimeoutsRef.current.push(initialTimeoutId); // Store timeout ID for cancellation
+        // Store timeout ID for cancellation
+        animationTimeoutsRef.current.push(initialTimeoutId);
     };
 
     // Function to handle fly-by button click

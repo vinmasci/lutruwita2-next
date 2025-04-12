@@ -46,12 +46,34 @@
   animation: pulse 1.5s infinite alternate;
 }
 
+/* Manually placed photo style */
+.photo-marker-bubble.manually-placed {
+  border: 3px solid #3498db; /* Blue border */
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), 0 0 30px rgba(52, 152, 219, 0.5); /* Blue glow */
+}
+
+/* Highlighted and manually placed */
+.photo-marker-bubble.highlighted.manually-placed {
+  border: 3px solid #3498db; /* Keep blue border */
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), 0 0 30px rgba(52, 152, 219, 0.5); /* Blue glow */
+  animation: blue-pulse 1.5s infinite alternate;
+}
+
 @keyframes pulse {
   from {
     box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5);
   }
   to {
     box-shadow: 0 0 20px rgba(255, 149, 0, 0.9), 0 0 40px rgba(255, 149, 0, 0.7);
+  }
+}
+
+@keyframes blue-pulse {
+  from {
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), 0 0 30px rgba(52, 152, 219, 0.5);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.9), 0 0 40px rgba(52, 152, 219, 0.7);
   }
 }
 
@@ -95,4 +117,21 @@
 .photo-marker-container.highlighted .photo-marker-point {
   border-top-color: #FF9500; /* Orange point */
   filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7));
+}
+
+/* Manually placed marker point */
+.photo-marker-container.manually-placed .photo-marker-point {
+  border-top-color: #3498db; /* Blue point */
+  filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
+}
+
+/* Highlighted and manually placed marker point */
+.photo-marker-container.highlighted.manually-placed .photo-marker-point {
+  border-top-color: #3498db; /* Blue point */
+  filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
+}
+
+/* Draggable marker cursor */
+.photo-marker.draggable .photo-marker-bubble {
+  cursor: move; /* Show move cursor for draggable markers */
 }

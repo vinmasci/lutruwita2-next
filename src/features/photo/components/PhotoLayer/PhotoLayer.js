@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
 import { useRouteContext } from '../../../map/context/RouteContext';
@@ -12,7 +12,8 @@ import './PhotoLayer.css';
 export const PhotoLayer = () => {
     const { map } = useMapContext();
     const { currentRoute } = useRouteContext();
-    const { photos } = usePhotoContext();
+    const { photos, addPhoto, updatePhotoPosition } = usePhotoContext();
+    const mapContainerRef = useRef(null);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [selectedCluster, setSelectedCluster] = useState(null);
     const [zoom, setZoom] = useState(null);
@@ -279,6 +280,108 @@ export const PhotoLayer = () => {
         if (!selectedPhoto || !cluster.properties.photos) return false;
         return cluster.properties.photos.some(photo => photo.url === selectedPhoto.url);
     }, [selectedPhoto]);
+
+    // Set up drop handler for dragging photos from the sidebar
+    useEffect(() => {
+        if (!map) return;
+        
+        // Get the map container element
+        const mapContainer = map.getContainer();
+        if (!mapContainer) return;
+        
+        // Store the reference to the map container
+        mapContainerRef.current = mapContainer;
+        
+        // Handle drop event
+        const handleDrop = (e) => {
+            e.preventDefault();
+            console.log('[PhotoLayer] Drop event detected');
+            
+            try {
+                // Get the drop coordinates
+                const mapBounds = mapContainer.getBoundingClientRect();
+                const x = e.clientX - mapBounds.left;
+                const y = e.clientY - mapBounds.top;
+                
+                // Convert screen coordinates to map coordinates
+                const point = map.unproject([x, y]);
+                const lngLat = { lng: point.lng, lat: point.lat };
+                
+                console.log('[PhotoLayer] Drop coordinates:', lngLat);
+                console.log('[PhotoLayer] Available data types:', e.dataTransfer.types);
+                
+                // First try to get the simple text data (photo ID)
+                let photoId = e.dataTransfer.getData('text/plain');
+                
+                // If that fails, try to get the JSON data
+                if (!photoId) {
+                    try {
+                        const dragData = e.dataTransfer.getData('application/json');
+                        if (dragData) {
+                            const data = JSON.parse(dragData);
+                            if (data.type === 'non-gps-photo' && data.photoId) {
+                                photoId = data.photoId;
+                            }
+                        }
+                    } catch (jsonError) {
+                        console.error('[PhotoLayer] Error parsing JSON drag data:', jsonError);
+                    }
+                }
+                
+                console.log('[PhotoLayer] Extracted photo ID:', photoId);
+                
+                if (photoId) {
+                    // Find the photo in the sidebar
+                    const photo = photos.find(p => p.id === photoId);
+                    console.log('[PhotoLayer] Found photo:', photo);
+                    
+                    if (photo) {
+                        // Create a copy of the photo with the new coordinates and isManuallyPlaced flag
+                        const photoWithCoordinates = {
+                            ...photo,
+                            coordinates: lngLat,
+                            isManuallyPlaced: true,
+                            hasGps: true // Now it has coordinates (even though they're manually set)
+                        };
+                        
+                        console.log('[PhotoLayer] Adding photo with coordinates:', photoWithCoordinates);
+                        
+                        // Add the photo to the map
+                        addPhoto([photoWithCoordinates]);
+                        
+                        // Dispatch a custom event to notify the PhotoUploader component
+                        // that this photo has been dropped on the map and should be removed from the sidebar
+                        const dropEvent = new CustomEvent('photo-dropped-on-map', {
+                            detail: {
+                                photoId: photoId
+                            }
+                        });
+                        window.dispatchEvent(dropEvent);
+                        
+                        console.log('[PhotoLayer] Dispatched photo-dropped-on-map event');
+                    }
+                }
+            } catch (error) {
+                console.error('[PhotoLayer] Error handling drop:', error);
+            }
+        };
+        
+        // Handle dragover event to allow dropping
+        const handleDragOver = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        };
+        
+        // Add event listeners
+        mapContainer.addEventListener('drop', handleDrop);
+        mapContainer.addEventListener('dragover', handleDragOver);
+        
+        // Clean up event listeners
+        return () => {
+            mapContainer.removeEventListener('drop', handleDrop);
+            mapContainer.removeEventListener('dragover', handleDragOver);
+        };
+    }, [map, photos, addPhoto]);
 
     return (_jsxs("div", { className: "photo-layer", children: [
         clusteredItems.map(item => 

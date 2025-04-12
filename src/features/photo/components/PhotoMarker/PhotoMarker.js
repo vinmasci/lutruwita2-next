@@ -1,12 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './PhotoMarker.css';
 import mapboxgl from 'mapbox-gl';
 import { useMapContext } from '../../../map/context/MapContext';
+import { usePhotoContext } from '../../context/PhotoContext';
 
 export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
     const markerRef = useRef(null);
     const markerElementRef = useRef(null);
     const { map } = useMapContext();
+    const { updatePhotoPosition } = usePhotoContext();
+    const [isDragging, setIsDragging] = useState(false);
+    
+    // Determine if this marker should be draggable
+    const isDraggable = photo.isManuallyPlaced;
 
     useEffect(() => {
         if (!map || !photo.coordinates ||
@@ -40,6 +46,12 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
         if (isHighlighted) {
             bubble.classList.add('highlighted');
             container.classList.add('highlighted');
+        }
+        
+        // Apply manually placed class if needed
+        if (photo.isManuallyPlaced) {
+            bubble.classList.add('manually-placed');
+            container.classList.add('manually-placed');
         }
 
         // Create click handler with cleanup
@@ -89,10 +101,37 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
         // Create and add marker
         const marker = new mapboxgl.Marker({
             element: el,
-            anchor: 'center'
+            anchor: 'center',
+            draggable: isDraggable // Make the marker draggable if it's manually placed
         })
             .setLngLat([photo.coordinates.lng, photo.coordinates.lat])
             .addTo(map);
+            
+        // Add draggable class if needed
+        if (isDraggable) {
+            el.classList.add('draggable');
+        }
+        
+        // Add drag event handlers if draggable
+        if (isDraggable) {
+            marker.on('dragstart', () => {
+                setIsDragging(true);
+                console.log('[PhotoMarker] Started dragging photo:', photo.url);
+            });
+            
+            marker.on('dragend', () => {
+                const newPosition = marker.getLngLat();
+                console.log('[PhotoMarker] Finished dragging photo to:', newPosition);
+                
+                // Update the photo's position in the context
+                updatePhotoPosition(photo.url, {
+                    lng: newPosition.lng,
+                    lat: newPosition.lat
+                });
+                
+                setIsDragging(false);
+            });
+        }
 
         markerRef.current = marker;
 
@@ -106,7 +145,7 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
             }
             map.off('zoom', updateZoom);
         };
-    }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.name, onClick, isHighlighted]);
+    }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.name, photo.isManuallyPlaced, onClick, isHighlighted, updatePhotoPosition, isDraggable]);
 
     // Update highlighted state when it changes
     useEffect(() => {
@@ -115,6 +154,7 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
             const container = markerElementRef.current.querySelector('.photo-marker-container');
             
             if (bubble && container) {
+                // Handle highlighted state
                 if (isHighlighted) {
                     bubble.classList.add('highlighted');
                     container.classList.add('highlighted');
@@ -122,9 +162,18 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
                     bubble.classList.remove('highlighted');
                     container.classList.remove('highlighted');
                 }
+                
+                // Handle manually placed state
+                if (photo.isManuallyPlaced) {
+                    bubble.classList.add('manually-placed');
+                    container.classList.add('manually-placed');
+                } else {
+                    bubble.classList.remove('manually-placed');
+                    container.classList.remove('manually-placed');
+                }
             }
         }
-    }, [isHighlighted]);
+    }, [isHighlighted, photo.isManuallyPlaced]);
 
     // Debug log to check which markers are highlighted
     useEffect(() => {

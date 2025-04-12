@@ -21,6 +21,7 @@ import { getIconDefinition } from '../../../poi/constants/poi-icons';
 import POIDetailsDrawer from '../../../poi/components/POIDetailsDrawer/POIDetailsDrawer';
 import MapboxPOIMarker from '../../../poi/components/MapboxPOIMarker';
 import POIDragPreview from '../../../poi/components/POIDragPreview/POIDragPreview';
+import PhotoDragPreview from '../../../photo/components/PhotoDragPreview/PhotoDragPreview';
 import DraggablePOILayer from '../../../poi/components/DraggablePOILayer/DraggablePOILayer.jsx';
 import { ClimbMarkers } from '../ClimbMarkers/ClimbMarkers';
 import LineLayer from '../../../lineMarkers/components/LineLayer/LineLayer.jsx';
@@ -687,15 +688,31 @@ function MapViewContent() {
         onSave: updateHeaderSettings
     };
 
-    // Create the POIDragPreview component props if dragPreview exists
-    const poiDragPreviewProps = dragPreview ? {
-        icon: dragPreview.icon,
-        category: dragPreview.category,
-        onPlace: (coordinates) => {
-            handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
-            setDragPreview(null);
+    // Create the drag preview props based on the type of dragPreview
+    let dragPreviewComponent = null;
+    if (dragPreview) {
+        if (dragPreview.type === 'poi') {
+            // POI drag preview
+            dragPreviewComponent = React.createElement(POIDragPreview, {
+                icon: dragPreview.icon,
+                category: dragPreview.category,
+                onPlace: (coordinates) => {
+                    handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
+                    setDragPreview(null);
+                }
+            });
+        } else if (dragPreview.type === 'photo') {
+            // Photo drag preview
+            dragPreviewComponent = React.createElement(PhotoDragPreview, {
+                photo: dragPreview.photo,
+                initialPosition: dragPreview.initialPosition,
+                onPlace: () => {
+                    // Clear the drag preview when the photo is placed
+                    setDragPreview(null);
+                }
+            });
         }
-    } : null;
+    }
 
     // Create the MapboxPOIMarker component props if selectedPOIDetails exists
     const mapboxPOIMarkerProps = selectedPOIDetails ? {
@@ -781,8 +798,8 @@ function MapViewContent() {
                 React.createElement(HeaderCustomization, headerCustomizationProps)
             ),
             
-            // POI drag preview
-            dragPreview && React.createElement(POIDragPreview, poiDragPreviewProps),
+            // Drag preview (POI or Photo)
+            dragPreviewComponent,
             
             // Selected POI details marker
             selectedPOIDetails && React.createElement(MapboxPOIMarker, mapboxPOIMarkerProps),

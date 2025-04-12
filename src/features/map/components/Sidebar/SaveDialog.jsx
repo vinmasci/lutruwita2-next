@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, CircularProgress, Box, Typography } from '@mui/material';
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, CircularProgress, Box, Typography, LinearProgress } from '@mui/material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -12,6 +12,54 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
         isPublic: initialValues?.isPublic || false,
         eventDate: initialValues?.eventDate ? dayjs(initialValues.eventDate) : null
     });
+    
+    // Progress indicator state
+    const [progress, setProgress] = useState(0);
+    const [progressStage, setProgressStage] = useState('');
+    const progressInterval = useRef(null);
+    
+    // Simulate progress when saving starts/stops
+    useEffect(() => {
+        if (isSaving) {
+            // Reset progress when saving starts
+            setProgress(0);
+            setProgressStage('Processing route data');
+            
+            // Simulate progress updates
+            progressInterval.current = setInterval(() => {
+                setProgress(prev => {
+                    const newProgress = prev + (Math.random() * 2);
+                    
+                    // Update stage based on progress
+                    if (newProgress > 25 && newProgress <= 50 && progressStage !== 'Uploading photos') {
+                        setProgressStage('Uploading photos');
+                    } else if (newProgress > 50 && newProgress <= 75 && progressStage !== 'Generating map tiles') {
+                        setProgressStage('Generating map tiles');
+                    } else if (newProgress > 75 && newProgress < 95 && progressStage !== 'Finalizing') {
+                        setProgressStage('Finalizing');
+                    }
+                    
+                    return newProgress > 95 ? 95 : newProgress;
+                });
+            }, 300);
+            
+            return () => {
+                if (progressInterval.current) {
+                    clearInterval(progressInterval.current);
+                }
+            };
+        } else {
+            // Clear interval when saving stops
+            if (progressInterval.current) {
+                clearInterval(progressInterval.current);
+                progressInterval.current = null;
+            }
+            
+            // Reset progress when saving is complete
+            setProgress(0);
+            setProgressStage('');
+        }
+    }, [isSaving]);
 
     // Reset form when dialog opens/closes
     useEffect(() => {
@@ -167,14 +215,43 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
                     Cancel
                 </Button>
                 {isSaving ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, padding: '0 8px' }}>
-                        <CircularProgress
-                            variant="indeterminate"
-                            size={32}
-                            sx={{ color: '#90caf9' }}
-                        />
-                        <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 'medium' }}>
-                            Saving...
+                    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0 8px' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <CircularProgress
+                                variant="indeterminate"
+                                size={24}
+                                sx={{ color: '#90caf9' }}
+                            />
+                            <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 'medium' }}>
+                                Rendering files...
+                            </Typography>
+                        </Box>
+                        
+                        <Box sx={{ width: '100%', mb: 1 }}>
+                            <LinearProgress 
+                                variant="determinate" 
+                                value={progress} 
+                                sx={{ 
+                                    height: 8, 
+                                    borderRadius: 4,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    '& .MuiLinearProgress-bar': {
+                                        backgroundColor: '#90caf9',
+                                        borderRadius: 4
+                                    }
+                                }}
+                            />
+                        </Box>
+                        
+                        <Typography 
+                            variant="caption" 
+                            sx={{ 
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                alignSelf: 'flex-start',
+                                mb: 1
+                            }}
+                        >
+                            {progressStage} ({Math.round(progress)}%)
                         </Typography>
                     </Box>
                 ) : (

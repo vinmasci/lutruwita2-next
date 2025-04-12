@@ -70,26 +70,16 @@ export const EditableMapOverviewPanel = () => {
     }
   }, [editorContent, mapOverview?.description, updateDescription]);
 
-  // Handle manual save
-  const handleSave = async () => {
+  // Handle manual save - only updates local state and shows success message
+  const handleSave = () => {
     setIsSaving(true);
     setSaveError(null);
     
     try {
-      // Update the local state first
+      // Update the local state
       updateDescription(editorContent);
       
-      // Get the current route name, type, and public status from the loaded state
-      const name = currentLoadedState?.name || 'Untitled Route';
-      const type = currentLoadedState?.type || 'bikepacking';
-      const isPublic = currentLoadedState?.isPublic || false;
-      
-      // Get line data from the line context if available
-      const lineData = lineContext?.getLines ? lineContext.getLines() : [];
-      
-      // Trigger the actual save operation with only the changed sections
-      await saveCurrentState(name, type, isPublic, lineData);
-      
+      // Show success message
       setShowSaveSuccess(true);
     } catch (error) {
       console.error('[EditableMapOverviewPanel] Error saving map overview:', error);

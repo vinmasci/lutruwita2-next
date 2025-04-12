@@ -54,10 +54,11 @@ export const PhotoProvider = ({ children }) => {
             );
         }
         
-        // Ensure all new photos have a caption field
+        // Ensure all new photos have a caption field and preserve isManuallyPlaced flag
         const photosWithCaption = newPhotos.map(photo => ({
             ...photo,
-            caption: photo.caption || '' // Ensure caption exists
+            caption: photo.caption || '', // Ensure caption exists
+            isManuallyPlaced: photo.isManuallyPlaced || false // Preserve or initialize isManuallyPlaced flag
         }));
         
         console.log('[PhotoContext] Adding photos with captions:', photosWithCaption.length);
@@ -167,6 +168,32 @@ export const PhotoProvider = ({ children }) => {
         }));
         notifyPhotoChange('update');
     };
+
+    // Update the position of a photo (for manually placed/draggable photos)
+    const updatePhotoPosition = (photoUrl, newCoordinates) => {
+        const identifier = getPhotoIdentifier(photoUrl);
+        if (!identifier) {
+            console.error('[PhotoContext] Failed to get identifier for photo position update, aborting');
+            return;
+        }
+        
+        console.log('[PhotoContext] Updating photo position with identifier:', identifier);
+        console.log('[PhotoContext] New coordinates:', newCoordinates);
+        
+        setPhotos(prev => prev.map(p => {
+            const photoId = getPhotoIdentifier(p.url);
+            if (photoId === identifier) {
+                return { 
+                    ...p, 
+                    coordinates: newCoordinates,
+                    // Ensure the photo is marked as manually placed if it's being repositioned
+                    isManuallyPlaced: true
+                };
+            }
+            return p;
+        }));
+        notifyPhotoChange('update');
+    };
     // Cache for photo identifiers to avoid reloading the same photos
     const photoIdentifiersCache = useRef(new Set());
 
@@ -243,7 +270,9 @@ export const PhotoProvider = ({ children }) => {
                 ...photo,
                 // CRITICAL: Preserve the original caption if it exists
                 caption: hasCaption ? photo.caption : '',
-                dateAdded: new Date(photo.dateAdded || Date.now())
+                dateAdded: new Date(photo.dateAdded || Date.now()),
+                // Preserve isManuallyPlaced flag if it exists, otherwise initialize to false
+                isManuallyPlaced: photo.isManuallyPlaced || false
             };
             
             return processedPhoto;
@@ -277,6 +306,7 @@ export const PhotoProvider = ({ children }) => {
             addPhoto, 
             deletePhoto, 
             updatePhoto, 
+            updatePhotoPosition, // Expose the new function
             loadPhotos, 
             clearPhotos,
             isPhotosVisible,

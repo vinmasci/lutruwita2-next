@@ -434,7 +434,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         {
             id: 'photos',
             icon: SidebarIcons.actions.photos,
-            text: 'Add GPS Photo',
+            text: 'Add Photos',
             onClick: withAuthCheck(onAddPhotos, 'add photos')
         },
         {
