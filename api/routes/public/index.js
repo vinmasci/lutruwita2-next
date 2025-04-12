@@ -15,7 +15,8 @@ const photoSchema = new mongoose.Schema({
     lng: { type: Number }
   },
   rotation: Number,
-  altitude: Number
+  altitude: Number,
+  caption: String // Added caption field to schema
 });
 
 // POI base schema - for points of interest along routes

@@ -682,26 +682,39 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
         </Box>
         
         {/* Caption display */}
-        {selectedPhoto.caption && selectedPhoto.caption.trim() !== '' && (
-          <Box 
-            sx={{
-              p: 1.5, 
-              bgcolor: "rgba(0,0,0,0.5)",
-              borderTop: "1px solid rgba(255,255,255,0.1)"
-            }}
-          >
-            <Typography 
-              variant="body2" 
-              color="white"
-              sx={{ 
-                fontStyle: 'normal',
-                opacity: 1
-              }}
-            >
-              {selectedPhoto.caption}
-            </Typography>
-          </Box>
-        )}
+        {(() => {
+          // Check if caption exists, is a string, and is not empty after trimming
+          const hasValidCaption = 
+            selectedPhoto.caption !== undefined && 
+            selectedPhoto.caption !== null && 
+            typeof selectedPhoto.caption === 'string' && 
+            selectedPhoto.caption.trim() !== '';
+          
+          if (hasValidCaption) {
+            return (
+              <Box 
+                sx={{
+                  p: 1.5, 
+                  bgcolor: "rgba(0,0,0,0.5)",
+                  borderTop: "1px solid rgba(255,255,255,0.1)"
+                }}
+              >
+                <Typography 
+                  variant="body2" 
+                  color="white"
+                  sx={{ 
+                    fontStyle: 'normal',
+                    opacity: 1
+                  }}
+                >
+                  {selectedPhoto.caption}
+                </Typography>
+              </Box>
+            );
+          } else {
+            return null;
+          }
+        })()}
         
         {/* Footer with photo count and route info */}
         <Box 

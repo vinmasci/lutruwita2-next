@@ -43,6 +43,17 @@ export const PhotoProvider = ({ children }) => {
         }
     }, [routeContext]);
     const addPhoto = (newPhotos) => {
+        // Log the first few photos to see if they have captions
+        if (newPhotos.length > 0) {
+            console.log('[PhotoContext] First few photos before adding captions:', 
+                newPhotos.slice(0, 3).map(p => ({
+                    url: p.url ? p.url.substring(0, 30) + '...' : 'no-url',
+                    caption: p.caption,
+                    hasCaption: p.caption !== undefined
+                }))
+            );
+        }
+        
         // Ensure all new photos have a caption field
         const photosWithCaption = newPhotos.map(photo => ({
             ...photo,
@@ -50,6 +61,17 @@ export const PhotoProvider = ({ children }) => {
         }));
         
         console.log('[PhotoContext] Adding photos with captions:', photosWithCaption.length);
+        
+        // Log the first few processed photos to see if captions were added
+        if (photosWithCaption.length > 0) {
+            console.log('[PhotoContext] First few photos after adding captions:', 
+                photosWithCaption.slice(0, 3).map(p => ({
+                    url: p.url ? p.url.substring(0, 30) + '...' : 'no-url',
+                    caption: p.caption,
+                    hasCaption: p.caption !== undefined
+                }))
+            );
+        }
         
         setPhotos(prev => [...prev, ...photosWithCaption]);
         notifyPhotoChange('add');
@@ -148,49 +170,83 @@ export const PhotoProvider = ({ children }) => {
     // Cache for photo identifiers to avoid reloading the same photos
     const photoIdentifiersCache = useRef(new Set());
 
-    const loadPhotos = (newPhotos) => {
-        console.log('[PhotoContext] Loading photos:', newPhotos ? newPhotos.length : 0);
+    // Helper function to normalize URLs for protocol-agnostic comparison
+    const normalizeUrl = (url) => {
+        if (!url) return '';
+        // Remove protocol (http:// or https://) from the URL for comparison
+        return url.replace(/^https?:\/\//, '');
+    };
 
+    // Helper function to ensure HTTPS URLs
+    const ensureHttpsUrl = (url) => {
+        if (typeof url === 'string' && url.startsWith('http:')) {
+            return url.replace('http:', 'https:');
+        }
+        return url;
+    };
+
+    const loadPhotos = (newPhotos) => {
         if (!newPhotos || newPhotos.length === 0) {
-            console.log('[PhotoContext] No photos to load, clearing photos array');
             setPhotos([]);
             photoIdentifiersCache.current.clear();
             return;
         }
 
-        // Extract identifiers from new photos
-        const newPhotoIdentifiers = newPhotos.map(p => getPhotoIdentifier(p.url));
-        
-        // Check if these are the same photos we already have loaded
-        if (photos.length === newPhotos.length) {
-            // Create a set of current photo identifiers for quick lookup
-            const currentPhotoIdentifiers = new Set(photos.map(p => getPhotoIdentifier(p.url)));
+        // CRITICAL FIX: PRESERVE CAPTIONS DURING PROCESSING
+        // First, create a deep copy of all photos to ensure we don't lose any properties
+        const photosCopy = newPhotos.map(photo => {
+            // Create a complete copy of the photo object
+            const photoCopy = { ...photo };
             
-            // Check if all new photos are already loaded
-            const allPhotosAlreadyLoaded = newPhotoIdentifiers.every(id => currentPhotoIdentifiers.has(id));
-            
-            if (allPhotosAlreadyLoaded) {
-                console.log('[PhotoContext] Photos already loaded, skipping');
-                return;
+            // Explicitly preserve caption if it exists
+            if (photo.caption !== undefined && photo.caption !== null) {
+                photoCopy.caption = photo.caption;
             }
-        }
+            
+            return photoCopy;
+        });
 
-        // Log photo identifiers for debugging
-        console.log('[PhotoContext] Loading photos with identifiers:', newPhotoIdentifiers);
+        // Now ensure all URLs use HTTPS
+        const photosWithHttps = photosCopy.map(photo => {
+            // Create a new object to avoid modifying the original
+            const photoWithHttps = { ...photo };
+            
+            // Only modify the URL properties
+            if (photoWithHttps.url) {
+                photoWithHttps.url = ensureHttpsUrl(photoWithHttps.url);
+            }
+            if (photoWithHttps.thumbnailUrl) {
+                photoWithHttps.thumbnailUrl = ensureHttpsUrl(photoWithHttps.thumbnailUrl);
+            }
+            
+            // Verify caption is still preserved after URL conversion
+            if (photo.caption !== undefined && photo.caption !== null) {
+                if (photoWithHttps.caption !== photo.caption) {
+                    // Force restore the caption
+                    photoWithHttps.caption = photo.caption;
+                }
+            }
+            
+            return photoWithHttps;
+        });
+
+        // Extract identifiers from new photos using normalized URLs
+        const newPhotoIdentifiers = photosWithHttps.map(p => getPhotoIdentifier(normalizeUrl(p.url)));
 
         // Convert SerializedPhoto to ProcessedPhoto and ensure caption field exists
-        const processedPhotos = newPhotos.map(photo => {
-            // Ensure caption field exists, initialize as empty string if it doesn't
-            const hasCaption = photo.caption !== undefined;
-            if (!hasCaption) {
-                console.log('[PhotoContext] Adding missing caption field to photo:', getPhotoIdentifier(photo.url));
-            }
+        const processedPhotos = photosWithHttps.map(photo => {
+            // IMPORTANT: Check if caption exists and is not null
+            const hasCaption = photo.caption !== undefined && photo.caption !== null;
             
-            return {
+            // Create a new object with all properties from the original photo
+            const processedPhoto = {
                 ...photo,
-                caption: photo.caption || '', // Ensure caption exists
+                // CRITICAL: Preserve the original caption if it exists
+                caption: hasCaption ? photo.caption : '',
                 dateAdded: new Date(photo.dateAdded || Date.now())
             };
+            
+            return processedPhoto;
         });
 
         // Replace existing photos entirely
@@ -198,8 +254,6 @@ export const PhotoProvider = ({ children }) => {
         
         // Update the cache with the new photo identifiers
         photoIdentifiersCache.current = new Set(newPhotoIdentifiers);
-        
-        console.log('[PhotoContext] Photos loaded successfully:', processedPhotos.length);
 
         // Don't notify RouteContext when loading photos from route
         // as this is not a user-initiated change

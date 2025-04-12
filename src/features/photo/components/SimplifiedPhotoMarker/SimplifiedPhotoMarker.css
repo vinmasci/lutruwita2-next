@@ -37,7 +37,7 @@
 
 /* Simple highlighted state */
 .simplified-photo-marker-bubble.highlighted {
-  border: 2px solid #FF9500; /* Orange border */
+  border: 2px solid #FFFFFF; /* White border */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
@@ -53,7 +53,7 @@
 
 /* Highlighted marker point */
 .simplified-photo-marker-container.highlighted .simplified-photo-marker-point {
-  border-top-color: #FF9500; /* Orange point */
+  border-top-color: #FFFFFF; /* White point */
 }
 
 /* Zoom-based scaling */

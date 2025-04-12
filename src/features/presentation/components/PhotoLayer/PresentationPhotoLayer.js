@@ -1,7 +1,19 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 
 // Cache for loaded photos to avoid reloading for the same route
+// Using a version number to allow for cache invalidation when needed
+const CACHE_VERSION = 3; // Increment this to invalidate all caches
 const loadedPhotosCache = new Map();
+
+// Function to clear the entire photo cache
+export const clearPhotoCache = () => {
+  console.log('[PresentationPhotoLayer] Clearing entire photo cache');
+  loadedPhotosCache.clear();
+};
+
+// Force clear the cache on module load
+clearPhotoCache();
+
 import React from 'react';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
@@ -25,23 +37,19 @@ export const PresentationPhotoLayer = () => {
             return;
         }
         
-        // Use route ID as cache key
-        const routeId = currentRoute.id || currentRoute.routeId;
-        
-        // If we have already loaded photos for this route, skip loading
-        if (routeId && loadedPhotosCache.has(routeId)) {
-            console.log(`[PresentationPhotoLayer] Using cached photos for route ${routeId}`);
-            return;
-        }
+        // IMPORTANT: ALWAYS FORCE RELOAD PHOTOS TO FIX CAPTION ISSUES
+        // This bypasses the cache completely
         
         if (currentRoute._loadedState?.photos) {
-            loadPhotos(currentRoute._loadedState.photos);
+            // Make a deep copy of the photos to ensure we preserve all properties
+            const photosCopy = currentRoute._loadedState.photos.map(photo => ({
+                ...photo,
+                // Explicitly preserve caption if it exists
+                caption: photo.caption !== undefined && photo.caption !== null ? photo.caption : undefined
+            }));
             
-            // Cache the fact that we've loaded photos for this route
-            if (routeId) {
-                loadedPhotosCache.set(routeId, true);
-                console.log(`[PresentationPhotoLayer] Cached photo loading state for route ${routeId}`);
-            }
+            // Load the copied photos
+            loadPhotos(photosCopy);
         }
     }, [currentRoute]); // Remove loadPhotos from deps since it's a stable context function
     
@@ -471,7 +479,14 @@ export const PresentationPhotoLayer = () => {
                         }
                         
                         // Create a deep copy of the photo object to avoid modifying the original
-                        const photoWithHttpsUrls = { ...item.properties.photo };
+                        // Explicitly preserve all properties including caption
+                        const photoWithHttpsUrls = { 
+                            ...item.properties.photo,
+                            // Only use empty string if caption is actually undefined or null
+                            caption: item.properties.photo.caption !== undefined && 
+                                    item.properties.photo.caption !== null ? 
+                                    item.properties.photo.caption : '' 
+                        };
                         
                         // Helper function to ensure HTTPS URLs
                         const ensureHttpsUrl = (url) => {
@@ -519,66 +534,39 @@ export const PresentationPhotoLayer = () => {
             const isMobile = window.innerWidth <= 768 || 
                 /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Only log on desktop
-            if (!isMobile) {
-                console.log('Selected photo URL:', selectedPhoto.url);
-                console.log('Selected photo index in ordered array:', selectedPhotoIndex);
-                
-                // Debug log to help diagnose URL matching issues
-                if (selectedPhotoIndex === -1) {
-                    console.log('URL matching failed. Normalized selected URL:', normalizeUrlForComparison(selectedPhoto.url));
-                    console.log('First few URLs in orderedPhotos:', orderedPhotos.slice(0, 3).map(p => ({
-                        original: p.url,
-                        normalized: normalizeUrlForComparison(p.url)
-                    })));
-                }
-            }
-            
-            // On mobile, only pass a subset of photos centered around the selected one
-            let photosToPass = orderedPhotos;
-            if (isMobile) {
-                // Get 3 photos centered around the selected one (1 before, selected, 1 after)
-                const startIdx = Math.max(0, selectedPhotoIndex - 1);
-                const endIdx = Math.min(orderedPhotos.length, selectedPhotoIndex + 2);
-                photosToPass = orderedPhotos.slice(startIdx, endIdx);
-                
-                // Only log on desktop
-                if (!isMobile) {
-                    console.log(`Mobile detected: Limiting photos to ${photosToPass.length} (index range ${startIdx}-${endIdx})`);
-                }
-            }
+            // Pass all photos to allow full navigation
+            // We used to limit this to 3 photos on mobile, but that prevented full navigation
+            const photosToPass = orderedPhotos;
             
             // Find the new index of the selected photo in the limited array
             // Use protocol-agnostic comparison for both mobile and desktop
             const newIndex = isMobile ? 
                 photosToPass.findIndex(p => normalizeUrlForComparison(p.url) === normalizeUrlForComparison(selectedPhoto.url)) : 
                 selectedPhotoIndex;
-                
-            // Add debug logging for mobile case
-            if (isMobile && !isMobile) { // This condition ensures it only runs in development, not on actual mobile devices
-                console.log('Mobile photo modal debugging:');
-                console.log('- Selected photo URL:', selectedPhoto.url);
-                console.log('- Normalized selected URL:', normalizeUrlForComparison(selectedPhoto.url));
-                console.log('- Photos to pass:', photosToPass.map(p => ({
-                    original: p.url,
-                    normalized: normalizeUrlForComparison(p.url)
-                })));
-                console.log('- New index in limited array:', newIndex);
-            }
+            
+            // Ensure all photos have a caption field before passing to PhotoModal
+            const photosWithCaptions = photosToPass.map(p => ({
+                ...p,
+                caption: p.caption !== undefined ? p.caption : '' // Preserve existing caption or use empty string
+            }));
+            
+            // Create a stable reference for the selected photo to prevent infinite loops
+            const stableSelectedPhoto = {
+                ...selectedPhoto,
+                caption: selectedPhoto.caption !== undefined ? selectedPhoto.caption : '' // Ensure caption exists
+            };
             
             return React.createElement(PhotoModal, {
                 key: `preview-${selectedPhoto.url}`,
-                photo: selectedPhoto,
+                photo: stableSelectedPhoto,
                 onClose: () => {
-                    // Only log on desktop
-                    if (!isMobile) {
-                        console.log('Closing photo modal');
-                    }
                     setSelectedPhoto(null);
                 },
-                additionalPhotos: photosToPass,
+                additionalPhotos: photosWithCaptions,
                 initialIndex: newIndex,
-                onPhotoChange: setSelectedPhoto
+                // Don't pass onPhotoChange to avoid infinite loops
+                // The modal will still work correctly without this callback
+                // onPhotoChange: setSelectedPhoto
             });
         })() : null;
 
