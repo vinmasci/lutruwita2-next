@@ -22,6 +22,7 @@ const PhotoUploaderUI = ({ isLoading, error, photos, selectedPhotos, onFileAdd, 
     const photosWithoutGps = photos.filter(p => !p.hasGps);
     
     return (_jsxs(Box, { sx: { padding: '24px 16px', width: '100%' }, children: [
+        
         // Dropzone
         _jsxs(Paper, { 
             ...getRootProps(), 

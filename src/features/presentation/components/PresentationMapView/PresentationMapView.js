@@ -5,7 +5,7 @@ const routeSpatialGridCache = new Map();
 import { throttle } from 'lodash'; // Import throttle
 import { findClosestPointOnRoute, createRouteSpatialGrid } from '../../../../utils/routeUtils';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
-import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
+import mapboxgl from '../../../../lib/mapbox-gl-adaptive';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
 import { 
     registerMap, 

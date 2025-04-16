@@ -1,12 +1,13 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
-import { List, ListItem, ListItemButton, ListItemIcon, Tooltip, Divider, Snackbar, Alert } from '@mui/material';
+import { List, ListItem, ListItemButton, ListItemIcon, Tooltip, Divider, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { useRouteContext } from '../../context/RouteContext';
 import { useMapContext } from '../../context/MapContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePlaceContext } from '../../../place/context/PlaceContext';
 import { useLineContext } from '../../../lineMarkers/context/LineContext';
+import { useMapOverview } from '../../../presentation/context/MapOverviewContext';
 import { useAuth } from '../../../auth/context/AuthContext';
 import { useAuthModal } from '../../../auth/context/AuthModalContext.jsx';
 import { useSidebar } from './useSidebar';
@@ -17,12 +18,13 @@ import { EmbedDialog } from './EmbedDialog.jsx';
 import { removeAllMapboxMarkers } from '../../utils/mapCleanup';
 
 export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine, onAddMapOverview, onItemClick }) => {
-    const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork } = useRouteContext();
+    const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork, setChangedSections } = useRouteContext();
     const { map } = useMapContext();
-    const { clearPOIs, setPoiMode } = usePOIContext();
-    const { clearPhotos } = usePhotoContext();
+    const { clearPOIs, setPoiMode, clearPOIChanges } = usePOIContext();
+    const { clearPhotos, clearPhotoChanges } = usePhotoContext();
     const { clearPlaces } = usePlaceContext();
-    const { setIsDrawing, saveRoute, stopDrawing, lines, setLines } = useLineContext();
+    const { setIsDrawing, saveRoute, stopDrawing, lines, setLines, clearLineChanges } = useLineContext();
+    const { clearMapOverviewChanges } = useMapOverview();
     const { isAuthenticated } = useAuth();
     const { showAuthModal } = useAuthModal();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -33,6 +35,7 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info');
     const [activeItem, setActiveItem] = useState(null);
+    const [clearConfirmDialogOpen, setClearConfirmDialogOpen] = useState(false);
 
     const handleEmbedClick = () => {
         console.log('Embed map clicked');
@@ -80,6 +83,13 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             console.warn('No routes to clear');
             return;
         }
+        
+        // Show confirmation dialog instead of immediately clearing
+        setClearConfirmDialogOpen(true);
+    };
+    
+    const performClearMap = () => {
+        console.log('Performing map clear');
         
         // Show confirmation snackbar
         setSnackbarMessage('Map cleared');
@@ -304,6 +314,31 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         clearPlaces(); // Clear places
         setPoiMode('none'); // Reset POI mode
         
+        // Clear change tracking in all contexts to ensure CommitChangesButton is reset
+        if (typeof clearPhotoChanges === 'function') {
+            console.log('[SidebarListItems] Clearing photo changes');
+            clearPhotoChanges();
+        }
+        
+        if (typeof clearPOIChanges === 'function') {
+            console.log('[SidebarListItems] Clearing POI changes');
+            clearPOIChanges();
+        }
+        
+        if (typeof clearLineChanges === 'function') {
+            console.log('[SidebarListItems] Clearing line changes');
+            clearLineChanges();
+        }
+        
+        if (typeof clearMapOverviewChanges === 'function') {
+            console.log('[SidebarListItems] Clearing map overview changes');
+            clearMapOverviewChanges();
+        }
+        
+        // Reset the changedSections state in RouteContext to ensure the CommitChangesButton is reset
+        setChangedSections({});
+        console.log('[SidebarListItems] Reset changedSections in RouteContext');
+        
         // Force a refresh of the map by triggering a style reload
         refreshMapStyle();
         
@@ -469,13 +504,6 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             onClick: withAuthCheck(handleLoadClick, 'load saved routes')
         },
         {
-            id: 'save',
-            icon: SidebarIcons.actions.save,
-            text: 'Save GPX',
-            onClick: withAuthCheck(handleSaveClick, 'save routes'),
-            disabled: routes.length === 0
-        },
-        {
             id: 'embed',
             icon: SidebarIcons.actions.embed,
             text: 'Embed Map',
@@ -597,6 +625,44 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             _jsx(EmbedDialog, {
                 open: embedDialogOpen,
                 onClose: () => setEmbedDialogOpen(false)
+            }),
+            // Confirmation dialog for clearing the map
+            _jsx(Dialog, {
+                open: clearConfirmDialogOpen,
+                onClose: () => setClearConfirmDialogOpen(false),
+                "aria-labelledby": "clear-map-dialog-title",
+                children: _jsxs(_Fragment, {
+                    children: [
+                        _jsx(DialogTitle, { 
+                            id: "clear-map-dialog-title",
+                            children: "Clear Map"
+                        }),
+                        _jsx(DialogContent, {
+                            children: _jsx(DialogContentText, {
+                                children: "Are you sure you want to clear the map? This action cannot be undone."
+                            })
+                        }),
+                        _jsx(DialogActions, {
+                            children: _jsxs(_Fragment, {
+                                children: [
+                                    _jsx(Button, {
+                                        onClick: () => setClearConfirmDialogOpen(false),
+                                        children: "No"
+                                    }),
+                                    _jsx(Button, {
+                                        onClick: () => {
+                                            setClearConfirmDialogOpen(false);
+                                            performClearMap();
+                                        },
+                                        color: "primary",
+                                        variant: "contained",
+                                        children: "Yes"
+                                    })
+                                ]
+                            })
+                        })
+                    ]
+                })
             })
         ] 
     }));

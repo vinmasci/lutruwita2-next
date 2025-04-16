@@ -19,6 +19,9 @@ export const LineProvider = ({ children }) => {
   const [currentLine, setCurrentLine] = useState(null);
   const [isDrawingInitialized, setIsDrawingInitialized] = useState(false);
   
+  // Track line changes locally if routeContext is not available
+  const [localLineChanges, setLocalLineChanges] = useState(false);
+  
   // Get access to the RouteContext to notify it of line changes
   let routeContext;
   try {
@@ -30,9 +33,53 @@ export const LineProvider = ({ children }) => {
   
   // Function to notify RouteContext of line changes
   const notifyLineChange = useCallback(() => {
+    logger.debug('LineContext', 'notifyLineChange called, routeContext available:', !!routeContext);
+    
+    // Always set local changes flag
+    setLocalLineChanges(true);
+    
     if (routeContext) {
       // Mark lines as changed in the RouteContext
-      routeContext.setChangedSections(prev => ({...prev, lines: true}));
+      logger.debug('LineContext', 'Setting lines flag in changedSections');
+      try {
+        routeContext.setChangedSections(prev => {
+          const newState = {...prev, lines: true};
+          logger.debug('LineContext', 'New changedSections state:', newState);
+          return newState;
+        });
+      } catch (error) {
+        logger.error('LineContext', 'Error setting changedSections:', error);
+      }
+    } else {
+      logger.warn('LineContext', 'routeContext not available or missing setChangedSections, tracking changes locally');
+    }
+  }, [routeContext]);
+  
+  // Expose whether there are line changes
+  const hasLineChanges = useCallback(() => {
+    // Check local changes first
+    if (localLineChanges) return true;
+    
+    // If routeContext is available, check its changedSections
+    if (routeContext && routeContext.changedSectionsRef && routeContext.changedSectionsRef.current) {
+      return !!routeContext.changedSectionsRef.current.lines;
+    }
+    
+    return false;
+  }, [localLineChanges, routeContext]);
+  
+  // Clear line changes
+  const clearLineChanges = useCallback(() => {
+    logger.debug('LineContext', 'Clearing line changes');
+    setLocalLineChanges(false);
+    
+    // Also clear in routeContext if available
+    if (routeContext && routeContext.setChangedSections) {
+      routeContext.setChangedSections(prev => {
+        const newState = {...prev};
+        delete newState.lines;
+        return newState;
+      });
     }
   }, [routeContext]);
   
@@ -279,7 +326,11 @@ export const LineProvider = ({ children }) => {
           );
           // Notify RouteContext of line changes
           notifyLineChange();
-        }, [notifyLineChange])
+        }, [notifyLineChange]),
+        // Explicitly expose change tracking functions
+        hasLineChanges,
+        clearLineChanges,
+        localLineChanges
       }}
     >
       {children}

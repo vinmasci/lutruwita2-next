@@ -61,7 +61,12 @@ export const subscribeToMapOverviewChanges = (listener) => {
 export const markMapOverviewChanged = () => {
   // This will be set by the RouteContext
   if (window.__markMapOverviewChanged) {
+    console.log('[mapOverviewStore] Marking map overview as changed via window.__markMapOverviewChanged');
     window.__markMapOverviewChanged();
+  } else {
+    console.log('[mapOverviewStore] window.__markMapOverviewChanged not available, changes will be tracked locally in MapOverviewContext');
+    // When RouteContext is not available, changes will be tracked locally in MapOverviewContext
+    // No need to do anything here as the MapOverviewContext will handle it
   }
 };
 

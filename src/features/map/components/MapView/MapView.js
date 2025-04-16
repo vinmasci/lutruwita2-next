@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { SaveDialog } from '../Sidebar/SaveDialog';
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMapInitializer } from './hooks/useMapInitializer';
@@ -14,6 +15,7 @@ import { MapProvider } from '../../context/MapContext';
 import { RouteProvider, useRouteContext } from '../../context/RouteContext';
 import MapHeader from '../MapHeader/MapHeader';
 import HeaderCustomization from '../HeaderCustomization/HeaderCustomization';
+import FloatingCountdownTimer from '../MapHeader/FloatingCountdownTimer';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { PhotoLayer } from '../../../photo/components/PhotoLayer/PhotoLayer';
 import { POIViewer } from '../../../poi/components/POIViewer/POIViewer';
@@ -27,7 +29,10 @@ import { ClimbMarkers } from '../ClimbMarkers/ClimbMarkers';
 import LineLayer from '../../../lineMarkers/components/LineLayer/LineLayer.jsx';
 import DirectLineLayer from '../../../lineMarkers/components/LineLayer/DirectLineLayer.jsx';
 import { LineProvider, useLineContext } from '../../../lineMarkers/context/LineContext.jsx';
-import { MapOverviewProvider } from '../../../presentation/context/MapOverviewContext.jsx';
+import { MapOverviewProvider, useMapOverview } from '../../../presentation/context/MapOverviewContext.jsx';
+import { usePhotoContext } from '../../../photo/context/PhotoContext';
+import { usePhotoService } from '../../../photo/services/photoService';
+import CommitChangesButton from '../CommitChangesButton/CommitChangesButton';
 import './MapView.css';
 import './photo-fix.css'; // Nuclear option to force photos behind UI components
 import { Sidebar } from '../Sidebar';
@@ -42,15 +47,8 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 function MapViewContent() {
     const containerRef = useRef(null); // Add a ref for the container
-    const { pois, updatePOIPosition, addPOI, updatePOI, poiMode, setPoiMode } = usePOIContext();
-    const { isDrawing } = useLineContext();
-    const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
-    const currentRouteId = useRef(null);
-    const [hoverCoordinates, setHoverCoordinates] = useState(null);
-    const hoverMarkerRef = useRef(null);
-    const routeCoordinatesRef = useRef(null); // Ref for route coordinates spatial grid
-    const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
-    const { processGpx } = useClientGpxProcessing();
+    
+    // Get RouteContext first so it's available to POIContext
     const { 
         addRoute, 
         deleteRoute, 
@@ -60,8 +58,63 @@ function MapViewContent() {
         headerSettings,
         updateHeaderSettings,
         setChangedSections,
-        loadedLineData
+        changedSections,
+        changedSectionsRef, // Get the ref directly
+        saveCurrentState,
+        loadedLineData,
+        currentLoadedPersistentId
     } = useRouteContext();
+    
+    // Now get POIContext after RouteContext is initialized
+    const { 
+        pois, 
+        updatePOIPosition, 
+        addPOI, 
+        updatePOI, 
+        poiMode, 
+        setPoiMode, 
+        getPOIsForRoute,
+        hasPOIChanges, // Get the function to check for POI changes
+        clearPOIChanges, // Get the function to clear POI changes
+        localPOIChanges // Get the local POI changes state directly
+    } = usePOIContext();
+    const { 
+        isDrawing,
+        hasLineChanges,
+        clearLineChanges,
+        localLineChanges,
+        lines
+    } = useLineContext();
+    const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
+    const currentRouteId = useRef(null);
+    const [hoverCoordinates, setHoverCoordinates] = useState(null);
+    const hoverMarkerRef = useRef(null);
+    const routeCoordinatesRef = useRef(null); // Ref for route coordinates spatial grid
+    const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
+    const { processGpx } = useClientGpxProcessing();
+    
+    // State for commit changes button and save dialog
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+    
+    // Get contexts for tracking changes
+    const { 
+        changedPhotos, 
+        getChangedPhotos, 
+        clearPhotoChanges,
+        updatePhoto
+    } = usePhotoContext();
+    
+    // Get map overview context for tracking changes
+    const {
+        hasMapOverviewChanges,
+        clearMapOverviewChanges,
+        localMapOverviewChanges
+    } = useMapOverview();
+    
+    // Get photo service at component level
+    const photoService = usePhotoService();
     
     // Function to notify RouteContext of map state changes
     const notifyMapStateChange = useCallback(() => {
@@ -142,7 +195,13 @@ function MapViewContent() {
                 addRouteClickHandler(map, routeId);
             }
         });
-    }, [isMapReady, routes, addRouteClickHandler]);
+        
+        // Mark routes as changed when they're loaded
+        if (routes.length > 0 && setChangedSections) {
+            console.log('[MapView] Marking routes as changed after loading');
+            setChangedSections(prev => ({...prev, routes: true}));
+        }
+    }, [isMapReady, routes, addRouteClickHandler, setChangedSections]);
 
     // Update hover point when coordinates change - using GeoJSON source
     useEffect(() => {
@@ -238,6 +297,9 @@ function MapViewContent() {
             addRoute(normalizedRoute);
             // Set as current route
             setCurrentRoute(normalizedRoute);
+            // Explicitly mark routes as changed after uploading GPX
+            console.log('[MapView] Marking routes as changed after GPX upload');
+            setChangedSections(prev => ({...prev, routes: true}));
             setIsGpxDrawerOpen(false);
         }
         catch (error) {
@@ -640,6 +702,369 @@ function MapViewContent() {
         onDeleteRoute: handleDeleteRoute
     };
 
+    // Calculate total number of changes
+    const getTotalChangeCount = useCallback(() => {
+        // Count photo changes
+        const photoChangeCount = changedPhotos ? changedPhotos.size : 0;
+        
+        // Use the ref directly to get the most up-to-date changes
+        const currentChangedSections = changedSectionsRef.current || {};
+        
+        // Count route changes (check if any route-related sections have changed)
+        const routeChangeCount = Object.keys(currentChangedSections).filter(key => 
+            ['routes', 'mapState', 'description', 'metadata', 'mapOverview'].includes(key)
+        ).length;
+        
+        // Check for local POI changes - first check if we can access localPOIChanges directly
+        let hasLocalPOIChanges = false;
+        
+        // Try multiple approaches to detect POI changes
+        if (typeof hasPOIChanges === 'function') {
+            // Method 1: Use the hasPOIChanges function if available
+            try {
+                hasLocalPOIChanges = hasPOIChanges();
+                console.log('[MapView] POI changes detected via hasPOIChanges():', hasLocalPOIChanges);
+            } catch (error) {
+                console.error('[MapView] Error calling hasPOIChanges():', error);
+            }
+        } else if (localPOIChanges !== undefined) {
+            // Method 2: Use the localPOIChanges state directly if exposed
+            hasLocalPOIChanges = localPOIChanges;
+            console.log('[MapView] POI changes detected via localPOIChanges state:', hasLocalPOIChanges);
+        }
+        
+        // Check for local Line changes
+        let hasLocalLineChanges = false;
+        
+        // Try multiple approaches to detect line changes
+        if (typeof hasLineChanges === 'function') {
+            // Method 1: Use the hasLineChanges function if available
+            try {
+                hasLocalLineChanges = hasLineChanges();
+                console.log('[MapView] Line changes detected via hasLineChanges():', hasLocalLineChanges);
+            } catch (error) {
+                console.error('[MapView] Error calling hasLineChanges():', error);
+            }
+        } else if (localLineChanges !== undefined) {
+            // Method 2: Use the localLineChanges state directly if exposed
+            hasLocalLineChanges = localLineChanges;
+            console.log('[MapView] Line changes detected via localLineChanges state:', hasLocalLineChanges);
+        }
+        
+        // Check for local Map Overview changes
+        let hasLocalMapOverviewChanges = false;
+        
+        // Try multiple approaches to detect Map Overview changes
+        if (typeof hasMapOverviewChanges === 'function') {
+            // Method 1: Use the hasMapOverviewChanges function if available
+            try {
+                hasLocalMapOverviewChanges = hasMapOverviewChanges();
+                console.log('[MapView] Map Overview changes detected via hasMapOverviewChanges():', hasLocalMapOverviewChanges);
+            } catch (error) {
+                console.error('[MapView] Error calling hasMapOverviewChanges():', error);
+            }
+        } else if (localMapOverviewChanges !== undefined) {
+            // Method 2: Use the localMapOverviewChanges state directly if exposed
+            hasLocalMapOverviewChanges = localMapOverviewChanges;
+            console.log('[MapView] Map Overview changes detected via localMapOverviewChanges state:', hasLocalMapOverviewChanges);
+        }
+        
+        // Count POI changes - check both the changedSections and the local POI changes
+        // This ensures we catch POI changes even if they're only tracked locally in POIContext
+        const poiChangeCount = (currentChangedSections.pois || hasLocalPOIChanges) ? 1 : 0;
+        
+        // Count Line changes - check both the changedSections and the local Line changes
+        const lineChangeCount = (currentChangedSections.lines || hasLocalLineChanges) ? 1 : 0;
+        
+        // Count Map Overview changes - check both the changedSections and the local Map Overview changes
+        const mapOverviewChangeCount = (currentChangedSections.mapOverview || hasLocalMapOverviewChanges) ? 1 : 0;
+        
+        // Calculate total changes
+        const totalCount = photoChangeCount + routeChangeCount + poiChangeCount + lineChangeCount + mapOverviewChangeCount;
+        
+        // Debug logging for change tracking
+        console.log('[MapView] getTotalChangeCount:', {
+            photoChangeCount,
+            routeChangeCount,
+            poiChangeCount,
+            lineChangeCount,
+            mapOverviewChangeCount,
+            totalCount,
+            changedSections: Object.keys(currentChangedSections),
+            changedSectionsRef: currentChangedSections,
+            changedPhotosSize: changedPhotos ? changedPhotos.size : 0,
+            hasLocalPOIChanges,
+            hasPOIChangesAvailable: typeof hasPOIChanges === 'function',
+            localPOIChangesAvailable: localPOIChanges !== undefined,
+            hasLocalLineChanges,
+            hasLineChangesAvailable: typeof hasLineChanges === 'function',
+            localLineChangesAvailable: localLineChanges !== undefined,
+            hasLocalMapOverviewChanges,
+            hasMapOverviewChangesAvailable: typeof hasMapOverviewChanges === 'function',
+            localMapOverviewChangesAvailable: localMapOverviewChanges !== undefined
+        });
+        
+        // Force changes to be detected if we have routes but no changes are tracked
+        if (totalCount === 0 && routes.length > 0) {
+            console.log('[MapView] Routes exist but no changes detected, checking if we need to force route changes');
+            
+            // Only log this, don't force changes here as it would cause an infinite loop
+            // The actual forcing happens in handleCommitChanges
+        }
+        
+        return totalCount;
+    }, [changedPhotos, changedSectionsRef, routes, hasPOIChanges]);
+    
+    // Debug effect to log change counts
+    useEffect(() => {
+        const photoCount = changedPhotos ? changedPhotos.size : 0;
+        
+        // Use the ref directly to get the most up-to-date changes
+        const currentChangedSections = changedSectionsRef.current || {};
+        
+        const routeCount = Object.keys(currentChangedSections).filter(key => 
+            ['routes', 'mapState', 'description', 'metadata', 'mapOverview'].includes(key)
+        ).length;
+        
+        // Check for local POI changes - try multiple approaches
+        let hasLocalPOIChanges = false;
+        
+        if (typeof hasPOIChanges === 'function') {
+            // Method 1: Use the hasPOIChanges function if available
+            try {
+                hasLocalPOIChanges = hasPOIChanges();
+            } catch (error) {
+                console.error('[MapView] Error calling hasPOIChanges() in debug effect:', error);
+            }
+        } else if (localPOIChanges !== undefined) {
+            // Method 2: Use the localPOIChanges state directly if exposed
+            hasLocalPOIChanges = localPOIChanges;
+        }
+        
+        // Check for local Line changes - try multiple approaches
+        let hasLocalLineChanges = false;
+        
+        if (typeof hasLineChanges === 'function') {
+            // Method 1: Use the hasLineChanges function if available
+            try {
+                hasLocalLineChanges = hasLineChanges();
+            } catch (error) {
+                console.error('[MapView] Error calling hasLineChanges() in debug effect:', error);
+            }
+        } else if (localLineChanges !== undefined) {
+            // Method 2: Use the localLineChanges state directly if exposed
+            hasLocalLineChanges = localLineChanges;
+        }
+        
+        // Check for local Map Overview changes - try multiple approaches
+        let hasLocalMapOverviewChanges = false;
+        
+        if (typeof hasMapOverviewChanges === 'function') {
+            // Method 1: Use the hasMapOverviewChanges function if available
+            try {
+                hasLocalMapOverviewChanges = hasMapOverviewChanges();
+            } catch (error) {
+                console.error('[MapView] Error calling hasMapOverviewChanges() in debug effect:', error);
+            }
+        } else if (localMapOverviewChanges !== undefined) {
+            // Method 2: Use the localMapOverviewChanges state directly if exposed
+            hasLocalMapOverviewChanges = localMapOverviewChanges;
+        }
+        
+        // Count POI changes - check both the changedSections and the local POI changes
+        const poiCount = (currentChangedSections.pois || hasLocalPOIChanges) ? 1 : 0;
+        
+        // Count Line changes - check both the changedSections and the local Line changes
+        const lineCount = (currentChangedSections.lines || hasLocalLineChanges) ? 1 : 0;
+        
+        // Count Map Overview changes - check both the changedSections and the local Map Overview changes
+        const mapOverviewCount = (currentChangedSections.mapOverview || hasLocalMapOverviewChanges) ? 1 : 0;
+        
+        // Calculate total count
+        const totalCount = photoCount + routeCount + poiCount + lineCount + mapOverviewCount;
+        
+        console.log('[MapView] Change counts:', {
+            photoCount,
+            routeCount,
+            poiCount,
+            lineCount,
+            mapOverviewCount,
+            totalCount,
+            changedSections: Object.keys(currentChangedSections),
+            changedSectionsRef: currentChangedSections,
+            hasLocalPOIChanges,
+            hasPOIChangesAvailable: typeof hasPOIChanges === 'function',
+            localPOIChangesAvailable: localPOIChanges !== undefined,
+            hasLocalLineChanges,
+            hasLineChangesAvailable: typeof hasLineChanges === 'function',
+            localLineChangesAvailable: localLineChanges !== undefined,
+            hasLocalMapOverviewChanges,
+            hasMapOverviewChangesAvailable: typeof hasMapOverviewChanges === 'function',
+            localMapOverviewChangesAvailable: localMapOverviewChanges !== undefined
+        });
+    }, [changedPhotos, changedSectionsRef, hasPOIChanges, localPOIChanges, hasLineChanges, localLineChanges, hasMapOverviewChanges, localMapOverviewChanges]);
+    
+    // Handle commit changes - opens the save dialog
+    const handleCommitChanges = () => {
+        const totalChanges = getTotalChangeCount();
+        
+        // Force changes to be detected if we have routes
+        if (totalChanges === 0 && routes.length > 0) {
+            console.log('[MapView] No changes detected but routes exist, forcing route changes');
+            setChangedSections(prev => ({...prev, routes: true}));
+            
+            // Wait a moment for the state to update, then call this function again
+            setTimeout(() => {
+                console.log('[MapView] Re-triggering commit after forcing route changes');
+                handleCommitChanges();
+            }, 100);
+            return; // Return and let the timeout trigger the commit again
+        }
+        
+        if (totalChanges === 0) {
+            console.log('[MapView] No changes to commit');
+            return;
+        }
+        
+        // Open the save dialog instead of directly saving
+        setIsSaveDialogOpen(true);
+    };
+    
+    // Handle save dialog submit
+    const handleSaveDialogSubmit = async (formData) => {
+        setIsUploading(true);
+        setUploadProgress(0);
+        
+        try {
+            // Check if we have photo changes
+            if (changedPhotos.size > 0) {
+                // Get photos that need to be uploaded
+                const photosToUpload = getChangedPhotos();
+                
+                if (photosToUpload.length > 0) {
+                    console.log('[MapView] Committing changes for photos:', photosToUpload.length);
+                    
+                    // Upload photos in parallel with progress tracking
+                    let completedUploads = 0;
+                    
+                    await Promise.all(photosToUpload.map(async (photo) => {
+                        try {
+                            // Skip photos that are already uploaded
+                            if (!photo.isLocal) {
+                                completedUploads++;
+                                const newProgress = (completedUploads / photosToUpload.length) * 50; // Photos are 50% of progress
+                                setUploadProgress(newProgress);
+                                return;
+                            }
+                            
+                            // Upload to Cloudinary
+                            const result = await photoService.uploadPhotoWithProgress(
+                                photo._originalFile,
+                                (progress) => {
+                                    // Update overall progress (photos are 50% of total progress)
+                                    const photoProgress = progress.percent || 0;
+                                    const newProgress = ((completedUploads + (photoProgress / 100)) / photosToUpload.length) * 50;
+                                    setUploadProgress(newProgress);
+                                }
+                            );
+                            
+                            // Update photo with Cloudinary URLs
+                            updatePhoto(photo.url, {
+                                url: result.url,
+                                tinyThumbnailUrl: result.tinyThumbnailUrl,
+                                thumbnailUrl: result.thumbnailUrl,
+                                mediumUrl: result.mediumUrl,
+                                largeUrl: result.largeUrl,
+                                publicId: result.publicId,
+                                isLocal: false,
+                                _originalFile: undefined,
+                                _blobs: undefined
+                            });
+                            
+                            completedUploads++;
+                        } catch (error) {
+                            console.error(`[MapView] Failed to upload photo:`, error);
+                            // Continue with other photos
+                            completedUploads++;
+                        }
+                    }));
+                    
+                    // Clear tracked photo changes
+                    clearPhotoChanges();
+                }
+            }
+            
+            // Check if we have route changes - use the ref directly
+            const currentChangedSections = changedSectionsRef.current || {};
+            const hasRouteChanges = Object.keys(currentChangedSections).length > 0;
+            
+            if (hasRouteChanges) {
+                console.log('[MapView] Committing route changes');
+                
+                // Set progress to 50% before saving route (photos were first 50%)
+                setUploadProgress(50);
+                
+                // Get lines data from LineContext if available
+                let linesToSave = loadedLineData || [];
+                
+                // Get the lines from the LineContext
+                console.log('[MapView] Line context is available, checking for lines');
+                
+                // We already have access to the LineContext at the top level
+                if (hasLineChanges && hasLineChanges()) {
+                    console.log('[MapView] Line changes detected, using lines from context');
+                    
+                    // Use the lines state that we already have access to from the top level
+                    if (lines && lines.length > 0) {
+                        console.log('[MapView] Using lines from LineContext:', lines.length);
+                        linesToSave = lines;
+                    } else {
+                        console.log('[MapView] No lines found in LineContext, using loadedLineData:', loadedLineData ? loadedLineData.length : 0);
+                    }
+                }
+                
+                // Log the lines data for debugging
+                console.log('[MapView] Lines data being saved:', JSON.stringify(linesToSave));
+                
+                // Save the current state with the form data
+                await saveCurrentState(
+                    formData.name,
+                    formData.type,
+                    formData.isPublic,
+                    linesToSave,
+                    formData.eventDate
+                );
+                
+                // Set progress to 100% after route save
+                setUploadProgress(100);
+                
+                // Clear POI changes after saving
+                if (typeof clearPOIChanges === 'function') {
+                    clearPOIChanges();
+                }
+                
+                // Clear Line changes after saving
+                if (typeof clearLineChanges === 'function') {
+                    clearLineChanges();
+                }
+                
+                // Clear Map Overview changes after saving
+                if (typeof clearMapOverviewChanges === 'function') {
+                    clearMapOverviewChanges();
+                }
+            }
+            
+            console.log('[MapView] All changes committed successfully');
+            
+            // Close the save dialog
+            setIsSaveDialogOpen(false);
+        } catch (error) {
+            console.error('[MapView] Error committing changes:', error);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     // Create the map layers div
     const mapLayersProps = {
         className: "map-layers"
@@ -675,7 +1100,7 @@ function MapViewContent() {
         style: {
             position: 'absolute',
             top: '75px',
-            right: '70px',
+            left: '70px', // Changed from right to left
             zIndex: 1000
         }
     };
@@ -708,6 +1133,16 @@ function MapViewContent() {
                 initialPosition: dragPreview.initialPosition,
                 onPlace: () => {
                     // Clear the drag preview when the photo is placed
+                    setDragPreview(null);
+                }
+            });
+        } else if (dragPreview.type === 'draggable') {
+            // Draggable POI preview (from POIDrawer)
+            dragPreviewComponent = React.createElement(POIDragPreview, {
+                icon: dragPreview.icon,
+                category: dragPreview.category,
+                onPlace: (coordinates) => {
+                    handlePOICreation(dragPreview.icon, dragPreview.category, coordinates);
                     setDragPreview(null);
                 }
             });
@@ -798,6 +1233,14 @@ function MapViewContent() {
                 React.createElement(HeaderCustomization, headerCustomizationProps)
             ),
             
+            // Floating Countdown Timer for event routes
+            isMapReady && currentRoute && 
+            (currentRoute?._loadedState?.type === 'event' || currentRoute?.type === 'event') && 
+            (currentRoute?._loadedState?.eventDate || currentRoute?.eventDate) && 
+            React.createElement(FloatingCountdownTimer, { 
+                eventDate: currentRoute?._loadedState?.eventDate || currentRoute?.eventDate 
+            }),
+            
             // Drag preview (POI or Photo)
             dragPreviewComponent,
             
@@ -833,7 +1276,33 @@ function MapViewContent() {
             selectedPOIDetails && React.createElement(POIDetailsDrawer, poiDetailsDrawerProps),
             
             // Selected POI viewer
-            selectedPOI && React.createElement(POIViewer, poiViewerProps)
+            selectedPOI && React.createElement(POIViewer, poiViewerProps),
+            
+            // Commit Changes Button
+            React.createElement(CommitChangesButton, {
+                isVisible: getTotalChangeCount() > 0,
+                isUploading: isUploading,
+                uploadProgress: uploadProgress,
+                onClick: handleCommitChanges,
+                changeCount: getTotalChangeCount(),
+                position: 'bottom-right'
+            }),
+            
+            // Save Dialog with progress feedback
+            React.createElement(SaveDialog, {
+                open: isSaveDialogOpen,
+                onClose: () => setIsSaveDialogOpen(false),
+                onSave: handleSaveDialogSubmit,
+                initialValues: {
+                    name: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
+                    type: currentRoute?._loadedState?.type || currentRoute?.type || 'tourism',
+                    isPublic: true,
+                    eventDate: currentRoute?._loadedState?.eventDate || currentRoute?.eventDate
+                },
+                isEditing: !!currentLoadedPersistentId,
+                isSaving: isUploading,
+                progress: uploadProgress
+            })
         ])
     );
 }

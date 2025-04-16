@@ -11,7 +11,7 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
     console.log('[Uploader] Component initializing');
     const { processGpx, isLoading: processingLoading, error } = useClientGpxProcessing();
     const { isMapReady } = useMapContext();
-    const { addRoute, deleteRoute, setCurrentRoute, routes, updateRoute } = useRouteContext();
+    const { addRoute, deleteRoute, setCurrentRoute, routes, updateRoute, setChangedSections } = useRouteContext();
     const [initializing, setInitializing] = useState(true);
     useEffect(() => {
         // Only set initializing to false once map is ready
@@ -47,6 +47,10 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
                 if (!routes.length) {
                     setCurrentRoute(processedRoute);
                 }
+                // Explicitly mark routes as changed after GPX upload
+                console.log('[Uploader] Explicitly marking routes as changed after GPX upload');
+                setChangedSections(prev => ({...prev, routes: true}));
+                
                 onUploadComplete(processedRoute);
             }
         }
@@ -74,6 +78,10 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
             // Then update route context state to remove the route
             console.debug('[Uploader][DELETE] Calling deleteRoute with routeId:', fileId);
             deleteRoute(fileId);
+            
+            // Explicitly mark routes as changed after deletion
+            console.log('[Uploader][DELETE] Explicitly marking routes as changed after deletion');
+            setChangedSections(prev => ({...prev, routes: true}));
             
             // Force a map redraw after deletion with a longer delay to ensure cleanup is complete
             if (window.map) {
@@ -115,6 +123,10 @@ const Uploader = ({ onUploadComplete, onDeleteRoute }) => {
         try {
             // Simply update the name for this route
             updateRoute(fileId, { name: newName });
+            
+            // Explicitly mark routes as changed after rename
+            console.log('[Uploader] Explicitly marking routes as changed after rename');
+            setChangedSections(prev => ({...prev, routes: true}));
         }
         catch (error) {
             console.error('[Uploader] Error renaming route:', error);

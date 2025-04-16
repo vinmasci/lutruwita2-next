@@ -52,6 +52,9 @@ export const RichTextEditor = ({ value, onChange, onEditorReady, placeholder = '
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
+                // Exclude heading and hardBreak from StarterKit since we're adding them separately
+                heading: false,
+                hardBreak: false,
                 bulletList: {
                     keepMarks: true,
                     keepAttributes: false

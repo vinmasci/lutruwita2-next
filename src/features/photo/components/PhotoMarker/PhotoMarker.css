@@ -52,6 +52,34 @@
   box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), 0 0 30px rgba(52, 152, 219, 0.5); /* Blue glow */
 }
 
+/* Unsaved changes style */
+.photo-marker-bubble.unsaved-changes {
+  border: 3px solid #f39c12; /* Amber/orange border */
+  box-shadow: 0 0 15px rgba(243, 156, 18, 0.7), 0 0 30px rgba(243, 156, 18, 0.5); /* Amber glow */
+  animation: amber-pulse 1.5s infinite alternate;
+  z-index: 1500 !important; /* Higher z-index to appear above the commit button */
+}
+
+/* Container for unsaved changes should also have higher z-index */
+.photo-marker-container.unsaved-changes {
+  z-index: 1500 !important;
+}
+
+/* Unsaved changes and manually placed */
+.photo-marker-bubble.unsaved-changes.manually-placed {
+  border: 3px solid #f39c12; /* Amber border takes precedence */
+  box-shadow: 0 0 15px rgba(243, 156, 18, 0.7), 0 0 30px rgba(243, 156, 18, 0.5); /* Amber glow */
+  animation: amber-pulse 1.5s infinite alternate;
+}
+
+/* Unsaved changes and highlighted */
+.photo-marker-bubble.unsaved-changes.highlighted {
+  border: 3px solid #f39c12; /* Amber border takes precedence */
+  box-shadow: 0 0 15px rgba(243, 156, 18, 0.7), 0 0 30px rgba(243, 156, 18, 0.5); /* Amber glow */
+  animation: amber-pulse 1.5s infinite alternate;
+  transform: scale(1.2); /* Keep the highlighted scale */
+}
+
 /* Highlighted and manually placed */
 .photo-marker-bubble.highlighted.manually-placed {
   border: 3px solid #3498db; /* Keep blue border */
@@ -74,6 +102,15 @@
   }
   to {
     box-shadow: 0 0 20px rgba(52, 152, 219, 0.9), 0 0 40px rgba(52, 152, 219, 0.7);
+  }
+}
+
+@keyframes amber-pulse {
+  from {
+    box-shadow: 0 0 15px rgba(243, 156, 18, 0.7), 0 0 30px rgba(243, 156, 18, 0.5);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(243, 156, 18, 0.9), 0 0 40px rgba(243, 156, 18, 0.7);
   }
 }
 
@@ -125,13 +162,43 @@
   filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
 }
 
+/* Unsaved changes marker point */
+.photo-marker-container.unsaved-changes .photo-marker-point {
+  border-top-color: #f39c12; /* Amber point */
+  filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+}
+
 /* Highlighted and manually placed marker point */
 .photo-marker-container.highlighted.manually-placed .photo-marker-point {
   border-top-color: #3498db; /* Blue point */
   filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
 }
 
+/* Unsaved changes marker point with other states */
+.photo-marker-container.unsaved-changes.manually-placed .photo-marker-point,
+.photo-marker-container.unsaved-changes.highlighted .photo-marker-point,
+.photo-marker-container.unsaved-changes.highlighted.manually-placed .photo-marker-point {
+  border-top-color: #f39c12; /* Amber point takes precedence */
+  filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+}
+
 /* Draggable marker cursor */
 .photo-marker.draggable .photo-marker-bubble {
   cursor: move; /* Show move cursor for draggable markers */
+  position: relative;
+}
+
+/* Add a subtle drag handle indicator to show the photo is draggable */
+.photo-marker.draggable .photo-marker-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  border: 1px solid #4AA4DE;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+  z-index: 2;
 }

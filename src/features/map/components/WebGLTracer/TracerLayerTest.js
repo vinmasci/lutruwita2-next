@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
+import mapboxgl from '../../../../lib/mapbox-gl-adaptive';
 import TracerLayer from './TracerLayer';
 import logger from '../../../../utils/logger';
 

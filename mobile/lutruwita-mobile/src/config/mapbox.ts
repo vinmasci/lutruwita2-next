@@ -21,7 +21,7 @@ export const MAP_STYLES = {
   STREET: 'mapbox://styles/mapbox/streets-v11',
   OUTDOORS: 'mapbox://styles/mapbox/outdoors-v11',
   SATELLITE: 'mapbox://styles/mapbox/satellite-v9',
-  SATELLITE_STREETS: 'mapbox://styles/mapbox/satellite-streets-v11',
+  SATELLITE_STREETS: 'mapbox://styles/mapbox/satellite-streets-v12',
   DARK: 'mapbox://styles/mapbox/dark-v10',
   LIGHT: 'mapbox://styles/mapbox/light-v10',
 };

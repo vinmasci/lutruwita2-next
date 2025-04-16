@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import mapboxgl from '../../../../../lib/mapbox-gl-no-indoor';
+import mapboxgl from '../../../../../lib/mapbox-gl-adaptive';
 import { setMapInstance } from '../../../utils/mapOperationsQueue';
 import { setupMapScaleListener } from '../../../utils/mapScaleUtils';
 import { safelyRemoveMap } from '../../../utils/mapCleanup';
@@ -290,53 +290,63 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
       // Function to initialize map components after style is loaded
       const initializeMapAfterStyleLoad = () => {
         try {
-          // Check if mapbox-dem source already exists before adding it
-          if (!map.getSource('mapbox-dem')) {
-            map.addSource('mapbox-dem', {
-              type: 'raster-dem',
-              url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-              tileSize: 512,
-              maxzoom: 14
+          // Check if terrain is supported before trying to use it
+          if (mapboxgl.supportsTerrain !== false) {
+            // Check if mapbox-dem source already exists before adding it
+            if (!map.getSource('mapbox-dem')) {
+              map.addSource('mapbox-dem', {
+                type: 'raster-dem',
+                url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                tileSize: 512,
+                maxzoom: 14
+              });
+            }
+            
+            // Check if device is mobile
+            const isMobile = window.innerWidth <= 768 || mapboxgl.isMobileVersion;
+            console.log('[MapView] Setting terrain with device detection:', { 
+              isMobile, 
+              width: window.innerWidth,
+              projection: map.getProjection()?.name || 'mercator',
+              supportsTerrain: mapboxgl.supportsTerrain !== false
             });
+            
+            // Set terrain configuration with device-specific exaggeration
+            map.setTerrain({
+              source: 'mapbox-dem',
+              exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
+            });
+          } else {
+            console.log('[MapView] Terrain not supported in this Mapbox version, skipping');
           }
           
-          // Check if device is mobile
-          const isMobile = window.innerWidth <= 768;
-          console.log('[MapView] Setting terrain with device detection:', { 
-            isMobile, 
-            width: window.innerWidth,
-            projection: map.getProjection().name
-          });
-          
-          // Set terrain configuration with device-specific exaggeration
-          map.setTerrain({
-            source: 'mapbox-dem',
-            exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
-          });
-          
-          // Add 3D buildings layer
-          map.addLayer({
-            'id': '3d-buildings',
-            'source': 'composite',
-            'source-layer': 'building',
-            'filter': ['==', 'extrude', 'true'],
-            'type': 'fill-extrusion',
-            'minzoom': 15,
-            'paint': {
-              'fill-extrusion-color': '#aaa',
-              'fill-extrusion-height': [
-                'interpolate', ['linear'], ['zoom'],
-                15, 0,
-                15.05, ['get', 'height']
-              ],
-              'fill-extrusion-base': [
-                'interpolate', ['linear'], ['zoom'],
-                15, 0,
-                15.05, ['get', 'min_height']
-              ],
-              'fill-extrusion-opacity': 0.6
-            }
-          });
+          // Add 3D buildings layer if supported
+          if (mapboxgl.supports3DBuildings !== false && !mapboxgl.isMobileVersion) {
+            map.addLayer({
+              'id': '3d-buildings',
+              'source': 'composite',
+              'source-layer': 'building',
+              'filter': ['==', 'extrude', 'true'],
+              'type': 'fill-extrusion',
+              'minzoom': 15,
+              'paint': {
+                'fill-extrusion-color': '#aaa',
+                'fill-extrusion-height': [
+                  'interpolate', ['linear'], ['zoom'],
+                  15, 0,
+                  15.05, ['get', 'height']
+                ],
+                'fill-extrusion-base': [
+                  'interpolate', ['linear'], ['zoom'],
+                  15, 0,
+                  15.05, ['get', 'min_height']
+                ],
+                'fill-extrusion-opacity': 0.6
+              }
+            });
+          } else {
+            console.log('[MapView] 3D buildings not supported or disabled for mobile, skipping');
+          }
           
           // Add hover point source and layer if they don't exist
           if (!map.getSource('hover-point')) {

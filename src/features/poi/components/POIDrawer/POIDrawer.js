@@ -184,13 +184,24 @@ const POIDrawer = ({ isOpen, onClose }) => {
         
         console.log('[POIDrawer] Drag preview set, waiting for drop event');
     };
+    // Use a ref to store the latest draggablePoiData without causing re-renders
+    const draggablePoiDataRef = React.useRef(draggablePoiData);
+    
+    // Update the ref whenever draggablePoiData changes
+    useEffect(() => {
+        draggablePoiDataRef.current = draggablePoiData;
+    }, [draggablePoiData]);
+    
     // Handle when a draggable POI is dropped on the map
+    // This effect should only run once when the component mounts
     useEffect(() => {
         const handleDrop = (e) => {
             console.log('[POIDrawer] POI drop event received:', e.detail);
             
             const { lat, lng } = e.detail;
-            const lastPoi = draggablePoiData[draggablePoiData.length - 1];
+            // Use the ref to access the latest draggablePoiData
+            const currentDraggablePoiData = draggablePoiDataRef.current;
+            const lastPoi = currentDraggablePoiData[currentDraggablePoiData.length - 1];
             
             console.log('[POIDrawer] Last POI in draggable data:', lastPoi);
             
@@ -224,7 +235,7 @@ const POIDrawer = ({ isOpen, onClose }) => {
             console.log('[POIDrawer] Removing poi-dropped event listener');
             window.removeEventListener('poi-dropped', handleDrop);
         };
-    }, [draggablePoiData]);
+    }, []); // Empty dependency array ensures this only runs once on mount
     const handleIconBack = () => {
         setState(prev => ({
             ...prev,

@@ -99,7 +99,9 @@ export interface RouteMap {
 }
 
 // API base URL - use environment variable for API URL
-const API_BASE = `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/api/routes`;
+const API_BASE = process.env.EXPO_PUBLIC_API_URL?.endsWith('/api')
+  ? `${process.env.EXPO_PUBLIC_API_URL}/routes`
+  : `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/api/routes`;
 
 /**
  * List public routes with optional type filter
@@ -109,7 +111,11 @@ const API_BASE = `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/
 export const listPublicRoutes = async (type?: string): Promise<RouteMap[]> => {
   try {
     const queryParams = type ? `?type=${type}` : '';
-    const response = await fetch(`${API_BASE}/public${queryParams}`, {
+    const url = `${API_BASE}/public${queryParams}`;
+    console.log('Fetching routes from URL:', url);
+    
+    // No timeout - allow request to complete no matter how long it takes
+    const response = await fetch(url, {
       headers: {
         'Accept': 'application/json'
       }
@@ -117,51 +123,171 @@ export const listPublicRoutes = async (type?: string): Promise<RouteMap[]> => {
     
     if (!response.ok) {
       console.error(`API response not OK: ${response.status} ${response.statusText}`);
-      throw new Error('Failed to fetch public routes');
+      // Log the response body for debugging
+      const responseText = await response.text();
+      console.error('Response body:', responseText);
+      throw new Error(`Failed to fetch public routes: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
+    // Get the response as text first for debugging
+    const responseText = await response.text();
     
-    if (!data.routes) {
+    // Try to parse the JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      const parseError = error as Error;
+      console.error('JSON parse error:', parseError);
+      console.error('Response that failed to parse:', responseText);
+      throw new Error(`JSON parse error: ${parseError.message}`);
+    }
+    
+    if (!data || !data.routes) {
+      console.log('No routes found in response, returning empty array');
       return [];
     }
     
+    console.log(`Found ${data.routes.length} routes`);
     return data.routes;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error listing public routes:', error);
-    throw error;
+    // Return empty array instead of mock data
+    return [];
   }
 };
+
+// Cache for route requests to prevent duplicate API calls
+const routeCache: Record<string, {
+  data: RouteMap;
+  timestamp: number;
+}> = {};
+
+// Cache expiration time (5 minutes)
+const CACHE_EXPIRATION = 5 * 60 * 1000;
+
+// In-flight requests tracking to prevent duplicate simultaneous requests
+const inFlightRequests: Record<string, Promise<RouteMap>> = {};
 
 /**
  * Load a specific route by its persistent ID
  * @param persistentId The persistent ID of the route
+ * @param forceRefresh Whether to bypass the cache and force a fresh request
  * @returns The route map data
  */
-export const loadPublicRoute = async (persistentId: string): Promise<RouteMap> => {
-  try {
-    const response = await fetch(`${API_BASE}/public/${persistentId}`, {
-      headers: {
-        'Accept': 'application/json'
+export const loadPublicRoute = async (persistentId: string, forceRefresh = false): Promise<RouteMap> => {
+  // Check cache first if not forcing refresh
+  if (!forceRefresh && routeCache[persistentId]) {
+    const cachedData = routeCache[persistentId];
+    const now = Date.now();
+    
+    // Return cached data if it's still valid
+    if (now - cachedData.timestamp < CACHE_EXPIRATION) {
+      console.log(`Using cached data for route ${persistentId}`);
+      return cachedData.data;
+    } else {
+      // Cache expired, remove it
+      console.log(`Cache expired for route ${persistentId}`);
+      delete routeCache[persistentId];
+    }
+  }
+  
+  // Check if there's already a request in flight for this route
+  if (persistentId in inFlightRequests) {
+    console.log(`Request already in flight for route ${persistentId}, reusing promise`);
+    return inFlightRequests[persistentId];
+  }
+  
+  // Create a new request promise
+  const requestPromise = (async () => {
+    const maxRetries = 2;
+    let retryCount = 0;
+    let lastError: Error | null = null;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        const url = `${API_BASE}/public/${persistentId}`;
+        console.log(`Fetching route from URL: ${url} (Attempt ${retryCount + 1}/${maxRetries + 1})`);
+        
+        // No timeout - allow request to complete no matter how long it takes
+        const response = await fetch(url, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.error(`API response not OK: ${response.status} ${response.statusText}`);
+          // Log the response body for debugging
+          const responseText = await response.text();
+          console.error('Response body:', responseText);
+          throw new Error(`Failed to load public route: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get the response as text first for debugging
+        const responseText = await response.text();
+        
+        // Try to parse the JSON
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (error) {
+          const parseError = error as Error;
+          console.error('JSON parse error:', parseError);
+          console.error('Response that failed to parse:', responseText);
+          throw new Error(`JSON parse error: ${parseError.message}`);
+        }
+        
+        if (!data) {
+          console.error('API returned null or undefined data');
+          throw new Error('API returned empty data');
+        }
+        
+        // Cache the successful response
+        routeCache[persistentId] = {
+          data,
+          timestamp: Date.now()
+        };
+        
+        return data;
+      } catch (error: unknown) {
+        lastError = error as Error;
+        console.error(`Error loading public route (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+        
+        // Only retry on network errors or 5xx server errors
+        if (error instanceof Error && error.message.includes('Failed to fetch')) {
+          retryCount++;
+          if (retryCount <= maxRetries) {
+            // Exponential backoff: 1s, 2s, 4s, etc.
+            const backoffTime = Math.pow(2, retryCount - 1) * 1000;
+            console.log(`Retrying in ${backoffTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, backoffTime));
+          }
+        } else {
+          // Don't retry on other types of errors
+          break;
+        }
       }
-    });
-    
-    if (!response.ok) {
-      console.error(`API response not OK: ${response.status} ${response.statusText}`);
-      throw new Error(`Failed to load public route: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
-    
-    if (!data) {
-      console.error('API returned null or undefined data');
-      throw new Error('API returned empty data');
+    // If we get here, all retries failed
+    if (lastError) {
+      throw lastError;
+    } else {
+      throw new Error('Failed to load route after multiple attempts');
     }
-    
-    return data;
-  } catch (error) {
-    console.error('Error loading public route:', error);
-    throw error;
+  })();
+  
+  // Store the promise in the in-flight requests
+  inFlightRequests[persistentId] = requestPromise;
+  
+  try {
+    // Wait for the request to complete
+    const result = await requestPromise;
+    return result;
+  } finally {
+    // Remove from in-flight requests when done (whether successful or not)
+    delete inFlightRequests[persistentId];
   }
 };
 

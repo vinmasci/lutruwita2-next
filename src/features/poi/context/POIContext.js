@@ -114,10 +114,56 @@ export const POIProvider = ({ children }) => {
         routeContext = null;
     }
     
+    // Track POI changes locally if routeContext is not available
+    const [localPOIChanges, setLocalPOIChanges] = useState(false);
+    
     // Function to notify RouteContext of POI changes
     const notifyPOIChange = useCallback(() => {
-        if (routeContext) {
-            routeContext.setChangedSections(prev => ({...prev, pois: true}));
+        console.log('[POIContext] notifyPOIChange called, routeContext available:', !!routeContext);
+        
+        // Always set local changes flag
+        setLocalPOIChanges(true);
+        
+        if (routeContext && routeContext.setChangedSections) {
+            console.log('[POIContext] Setting pois flag in changedSections');
+            try {
+                routeContext.setChangedSections(prev => {
+                    const newState = {...prev, pois: true};
+                    console.log('[POIContext] New changedSections state:', newState);
+                    return newState;
+                });
+            } catch (error) {
+                console.error('[POIContext] Error setting changedSections:', error);
+            }
+        } else {
+            console.warn('[POIContext] routeContext not available or missing setChangedSections, tracking changes locally');
+        }
+    }, [routeContext]);
+    
+    // Expose whether there are POI changes
+    const hasPOIChanges = useCallback(() => {
+        // Check local changes first
+        if (localPOIChanges) return true;
+        
+        // If routeContext is available, check its changedSections
+        if (routeContext && routeContext.changedSectionsRef && routeContext.changedSectionsRef.current) {
+            return !!routeContext.changedSectionsRef.current.pois;
+        }
+        
+        return false;
+    }, [localPOIChanges, routeContext]);
+    
+    // Clear POI changes
+    const clearPOIChanges = useCallback(() => {
+        setLocalPOIChanges(false);
+        
+        // Also clear in routeContext if available
+        if (routeContext && routeContext.setChangedSections) {
+            routeContext.setChangedSections(prev => {
+                const newState = {...prev};
+                delete newState.pois;
+                return newState;
+            });
         }
     }, [routeContext]);
     // Search for places by name and coordinates
@@ -502,7 +548,11 @@ export const POIProvider = ({ children }) => {
             toggleCategoryVisibility,
             getVisiblePOIs,
             processGooglePlacesLink, // Expose the function to process Google Places links
-            searchPlaces // Expose the function to search for places
+            searchPlaces, // Expose the function to search for places
+            // Explicitly expose change tracking functions
+            hasPOIChanges,
+            clearPOIChanges,
+            localPOIChanges
         }, children: children }));
 };
 // Custom hook for using POI context

@@ -284,12 +284,21 @@ export const RouteProvider = ({ children, }) => {
       const updatedPhotos = [...photosToUpload];
 
       for (const photo of localPhotos) {
-        if (!photo._blobs?.large) continue;
+        // Use the compressed original file if available, otherwise fall back to the blob
+        const fileToUpload = photo._originalFile || photo._blobs?.large;
+        if (!fileToUpload) {
+          console.warn(`[RouteContext] No file to upload for photo ${photo.id}, skipping`);
+          continue;
+        }
 
         try {
-          // Create a File object from the blob
-          const fileObject = new File([photo._blobs.large], photo.name, { type: 'image/jpeg' });
+          // Create a File object if needed (if it's a blob and not already a File)
+          const fileObject = photo._originalFile instanceof File 
+            ? photo._originalFile 
+            : new File([fileToUpload], photo.name, { type: 'image/jpeg' });
 
+          console.log(`[RouteContext] Uploading photo ${photo.id} to Cloudinary (${(fileObject.size/1024/1024).toFixed(2)}MB)`);
+          
           // Use the photoService directly to upload
           const result = await photoService.uploadPhoto(fileObject);
 
@@ -305,7 +314,8 @@ export const RouteProvider = ({ children, }) => {
               largeUrl: result.largeUrl,
               publicId: result.publicId,
               isLocal: false,
-              _blobs: undefined
+              _blobs: undefined,
+              _originalFile: undefined // Remove the original file to free memory
             };
           }
         } catch (error) {
@@ -1417,6 +1427,9 @@ export const RouteProvider = ({ children, }) => {
                         setHasUnsavedChanges(true);
                         setChangedSections(prev => ({...prev, headerSettings: true}));
                     },
+                    // Expose changedSections and ref for debugging
+                    changedSections,
+                    changedSectionsRef,
                 }, children: children })] }));
 };
 export const useRouteContext = () => {

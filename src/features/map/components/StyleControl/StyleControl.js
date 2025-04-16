@@ -91,27 +91,39 @@ class StyleControl {
     }
     // Wait for style to load
     this.map.once('style.load', () => {
-      // Re-add terrain source
-      if (!this.map?.getSource('mapbox-dem')) {
-        this.map?.addSource('mapbox-dem', {
-          type: 'raster-dem',
-          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-          tileSize: 512,
-          maxzoom: 14
-        });
-      }
-      // Re-apply terrain settings with device-specific exaggeration
-      const isMobile = window.innerWidth <= 768;
-      logger.info('StyleControl', 'Re-applying terrain with device detection:', { 
+      // Check if terrain is supported before trying to use it
+      const mapboxgl = this.map.constructor;
+      const supportsTerrain = mapboxgl.supportsTerrain !== false;
+      const isMobile = window.innerWidth <= 768 || mapboxgl.isMobileVersion;
+      
+      logger.info('StyleControl', 'Style loaded, checking feature support:', { 
         isMobile, 
+        supportsTerrain,
         width: window.innerWidth,
-        projection: this.map?.getProjection()?.name
+        projection: this.map?.getProjection()?.name || 'mercator'
       });
       
-      this.map?.setTerrain({
-        source: 'mapbox-dem',
-        exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
-      });
+      if (supportsTerrain) {
+        // Re-add terrain source
+        if (!this.map?.getSource('mapbox-dem')) {
+          this.map?.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512,
+            maxzoom: 14
+          });
+        }
+        
+        // Re-apply terrain settings with device-specific exaggeration
+        logger.info('StyleControl', 'Re-applying terrain with device detection');
+        
+        this.map?.setTerrain({
+          source: 'mapbox-dem',
+          exaggeration: isMobile ? 1.0 : 1.5 // Less exaggeration on mobile for better performance
+        });
+      } else {
+        logger.info('StyleControl', 'Terrain not supported in this Mapbox version, skipping');
+      }
       // Re-add custom roads layer
       if (!this.map?.getSource('australia-roads')) {
         const tileUrl = 'https://api.maptiler.com/tiles/5dd3666f-1ce4-4df6-9146-eda62a200bcb/{z}/{x}/{y}.pbf?key=DFSAZFJXzvprKbxHrHXv';

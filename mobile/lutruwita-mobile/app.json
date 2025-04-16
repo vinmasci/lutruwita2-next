@@ -6,6 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "jsEngine": "hermes",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -33,7 +35,11 @@
         "@rnmapbox/maps",
         {
           "RNMapboxMapsImpl": "mapbox",
-          "RNMapboxMapsDownloadToken": "${EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN}"
+          "RNMapboxMapsDownloadToken": "pk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY20xY3B1ZmdzMHp5eDJwcHBtMmptOG8zOSJ9.Ayn_YEjOCCqujIYhY9PiiA",
+          "RNMapboxMapsAccessToken": "pk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY20xY3B1ZmdzMHp5eDJwcHBtMmptOG8zOSJ9.Ayn_YEjOCCqujIYhY9PiiA",
+          "RNMapboxMapsPackageImportPath": "import MapboxMaps",
+          "RNMapboxMapsIOSDeploymentTarget": "15.1",
+          "RNMapboxMapsInstallMethod": "spm"
         }
       ]
     ],

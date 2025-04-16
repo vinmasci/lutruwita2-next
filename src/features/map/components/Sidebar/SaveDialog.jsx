@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
-export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, isSaving = false }) => {
+export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, isSaving = false, progress: externalProgress }) => {
     const [formData, setFormData] = useState({
         name: initialValues?.name || '',
         type: initialValues?.type || 'tourism',
@@ -18,9 +18,28 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
     const [progressStage, setProgressStage] = useState('');
     const progressInterval = useRef(null);
     
-    // Simulate progress when saving starts/stops
+    // Update progress when external progress changes
     useEffect(() => {
-        if (isSaving) {
+        if (externalProgress !== undefined) {
+            setProgress(externalProgress);
+            
+            // Update stage based on progress
+            if (externalProgress <= 25) {
+                setProgressStage('Processing route data');
+            } else if (externalProgress > 25 && externalProgress <= 50) {
+                setProgressStage('Uploading photos');
+            } else if (externalProgress > 50 && externalProgress <= 75) {
+                setProgressStage('Generating map tiles');
+            } else if (externalProgress > 75) {
+                setProgressStage('Finalizing');
+            }
+        }
+    }, [externalProgress]);
+
+    // Simulate progress when saving starts/stops and no external progress is provided
+    useEffect(() => {
+        // Only simulate progress if external progress is not provided
+        if (isSaving && externalProgress === undefined) {
             // Reset progress when saving starts
             setProgress(0);
             setProgressStage('Processing route data');
@@ -48,7 +67,7 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
                     clearInterval(progressInterval.current);
                 }
             };
-        } else {
+        } else if (!isSaving) {
             // Clear interval when saving stops
             if (progressInterval.current) {
                 clearInterval(progressInterval.current);
@@ -59,7 +78,7 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
             setProgress(0);
             setProgressStage('');
         }
-    }, [isSaving]);
+    }, [isSaving, externalProgress, progressStage]);
 
     // Reset form when dialog opens/closes
     useEffect(() => {

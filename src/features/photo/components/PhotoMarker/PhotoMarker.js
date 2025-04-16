@@ -3,16 +3,22 @@ import './PhotoMarker.css';
 import mapboxgl from 'mapbox-gl';
 import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
+import { getPhotoIdentifier } from '../../utils/clustering';
 
 export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
     const markerRef = useRef(null);
     const markerElementRef = useRef(null);
     const { map } = useMapContext();
-    const { updatePhotoPosition } = usePhotoContext();
+    const { updatePhotoPosition, changedPhotos } = usePhotoContext();
     const [isDragging, setIsDragging] = useState(false);
     
-    // Determine if this marker should be draggable
-    const isDraggable = photo.isManuallyPlaced;
+    // Check if this photo has unsaved changes
+    const photoId = getPhotoIdentifier(photo.url);
+    const hasUnsavedChanges = photoId && changedPhotos.has(photoId);
+    
+    // Make all photos draggable in creation mode
+    // Previously only manually placed photos were draggable
+    const isDraggable = true; // Allow all photos to be draggable
 
     useEffect(() => {
         if (!map || !photo.coordinates ||
@@ -52,6 +58,12 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
         if (photo.isManuallyPlaced) {
             bubble.classList.add('manually-placed');
             container.classList.add('manually-placed');
+        }
+        
+        // Apply unsaved changes class if needed
+        if (hasUnsavedChanges) {
+            bubble.classList.add('unsaved-changes');
+            container.classList.add('unsaved-changes');
         }
 
         // Create click handler with cleanup
@@ -145,7 +157,7 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
             }
             map.off('zoom', updateZoom);
         };
-    }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.name, photo.isManuallyPlaced, onClick, isHighlighted, updatePhotoPosition, isDraggable]);
+    }, [map, photo.coordinates?.lng, photo.coordinates?.lat, photo.id, photo.name, photo.isManuallyPlaced, onClick, isHighlighted, updatePhotoPosition, isDraggable, hasUnsavedChanges]);
 
     // Update highlighted state when it changes
     useEffect(() => {
@@ -171,9 +183,18 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
                     bubble.classList.remove('manually-placed');
                     container.classList.remove('manually-placed');
                 }
+                
+                // Handle unsaved changes state
+                if (hasUnsavedChanges) {
+                    bubble.classList.add('unsaved-changes');
+                    container.classList.add('unsaved-changes');
+                } else {
+                    bubble.classList.remove('unsaved-changes');
+                    container.classList.remove('unsaved-changes');
+                }
             }
         }
-    }, [isHighlighted, photo.isManuallyPlaced]);
+    }, [isHighlighted, photo.isManuallyPlaced, hasUnsavedChanges]);
 
     // Debug log to check which markers are highlighted
     useEffect(() => {

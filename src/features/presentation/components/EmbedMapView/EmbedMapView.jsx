@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
+import mapboxgl from '../../../../lib/mapbox-gl-adaptive';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { safelyRemoveMap } from '../../../map/utils/mapCleanup';
 import useEmbedRouteProcessing from './hooks/useEmbedRouteProcessing';

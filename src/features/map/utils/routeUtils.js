@@ -51,6 +51,9 @@ export const normalizeRoute = (route) => {
             coordinates: section.coordinates,
             surfaceType: isValidSurfaceType(section.surfaceType) ? section.surfaceType : 'unpaved'
         })) || [];
+        
+        // Ensure type, eventDate, and isPublic are properly copied from the top-level route object
+        // This fixes the issue where the save modal doesn't remember these values
         return {
             ...defaultRoute,
             ...firstRoute,
@@ -62,6 +65,10 @@ export const normalizeRoute = (route) => {
             gpxData: firstRoute.gpxData || defaultRoute.gpxData,
             rawGpx: firstRoute.rawGpx || defaultRoute.rawGpx,
             geojson: firstRoute.geojson || defaultRoute.geojson,
+            // Explicitly copy these fields from the top-level route object
+            type: route.type || firstRoute.type || 'tourism',
+            isPublic: route.isPublic !== undefined ? route.isPublic : (firstRoute.isPublic !== undefined ? firstRoute.isPublic : true),
+            eventDate: route.eventDate || firstRoute.eventDate || null,
             statistics: {
                 ...defaultRoute.statistics,
                 ...firstRoute.statistics
@@ -93,6 +100,10 @@ export const normalizeRoute = (route) => {
             gpxData: route.gpxData || defaultRoute.gpxData,
             rawGpx: route.rawGpx || defaultRoute.rawGpx,
             geojson: route.geojson || defaultRoute.geojson,
+            // Ensure type, isPublic, and eventDate are explicitly set for fresh routes as well
+            type: route.type || 'tourism',
+            isPublic: route.isPublic !== undefined ? route.isPublic : true,
+            eventDate: route.eventDate || null,
             statistics: {
                 ...defaultRoute.statistics,
                 ...route.statistics

@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useTheme } from '../../theme';
-import { useMap } from '../../context/MapContext';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useRoute } from '../../context/RouteContext';
-import WebMapView from './WebMapView';
-import { 
-  DEFAULT_CENTER, 
+import FallbackMapPreview from './FallbackMapPreview';
+import {
+  DEFAULT_CENTER,
   DEFAULT_ZOOM
 } from '../../config/mapbox';
 
@@ -16,6 +14,7 @@ export interface MapViewProps {
   showUserLocation?: boolean;
   onMapReady?: () => void;
   onRegionDidChange?: (region: any) => void;
+  onError?: (error: Error) => void; // Add error handler prop
   children?: React.ReactNode;
   routeId?: string; // Optional route ID to display a specific route
 }
@@ -28,10 +27,12 @@ const MapView: React.FC<MapViewProps> = ({
   showUserLocation = false,
   onMapReady,
   onRegionDidChange,
+  onError,
   children,
   routeId,
 }) => {
   const { routeState } = useRoute();
+  const [mapError, setMapError] = useState<Error | null>(null);
   
   // Get the route to display
   const routeToDisplay = routeId 
@@ -42,15 +43,49 @@ const MapView: React.FC<MapViewProps> = ({
   const centerToUse = routeToDisplay?.mapState?.center || initialCenter;
   const zoomToUse = routeToDisplay?.mapState?.zoom || initialZoom;
 
+  // Handle map errors
+  const handleMapError = (error: Error) => {
+    console.error('Map error in wrapper component:', error);
+    setMapError(error);
+    
+    // Call the onError callback if provided
+    if (onError) {
+      onError(error);
+    }
+  };
+
+  // Retry loading the map
+  const retryMapLoad = () => {
+    setMapError(null);
+  };
+
+  // If there's an error, show error UI with retry button
+  if (mapError) {
+    return (
+      <View style={[styles.container, styles.errorContainer, style]}>
+        <Text style={styles.errorTitle}>Map Loading Error</Text>
+        <Text style={styles.errorMessage}>{mapError.message}</Text>
+        <Text style={styles.errorHint}>
+          This could be due to network issues or problems with the map configuration.
+        </Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={retryMapLoad}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, style]}>
-      <WebMapView
-        initialCenter={centerToUse}
-        initialZoom={zoomToUse}
+      <FallbackMapPreview
+        center={centerToUse}
+        zoom={zoomToUse}
         style={styles.map}
-        showUserLocation={showUserLocation}
         onMapReady={onMapReady}
-        onRegionDidChange={onRegionDidChange}
+        onError={handleMapError}
         routes={routeToDisplay?.routes || []}
       />
       {children}
@@ -64,6 +99,40 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  errorContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#dc3545',
+  },
+  errorMessage: {
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorHint: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

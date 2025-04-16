@@ -12,6 +12,12 @@ import logger from '../utils/logger';
 // Log that we're using the custom no-indoor version
 logger.info('mapbox-gl-no-indoor', 'Using custom Mapbox GL without indoor plugin');
 
+// Add feature detection helpers - full version supports all features
+mapboxgl.supportsGlobe = true;
+mapboxgl.supportsTerrain = true;
+mapboxgl.supports3DBuildings = true;
+mapboxgl.supportsCustomLayers = true;
+
 // Check if the IndoorManager exists and remove it
 if (mapboxgl.IndoorManager) {
   try {

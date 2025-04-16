@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Animated, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { 
@@ -11,7 +11,8 @@ import {
   FAB,
   Surface,
   Divider,
-  Chip
+  Chip,
+  Banner
 } from 'react-native-paper';
 import { useTheme } from '../theme';
 import MapView from '../components/map/MapView';
@@ -29,6 +30,8 @@ const MapScreen = ({ route, navigation }: any) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
   const [showControls, setShowControls] = useState(true);
+  const [mapError, setMapError] = useState<Error | null>(null);
+  const [mapKey, setMapKey] = useState<number>(0); // Used to force map remount on retry
   
   // Animation values
   const infoSlideAnim = useRef(new Animated.Value(0)).current;
@@ -39,6 +42,11 @@ const MapScreen = ({ route, navigation }: any) => {
   // Load the route when the component mounts
   useEffect(() => {
     const fetchRoute = async () => {
+      // Skip if already loading or if we already have this route loaded
+      if (isLoading || (routeState.selectedRoute && routeState.selectedRoute.persistentId === mapId)) {
+        return;
+      }
+      
       setIsLoading(true);
       try {
         await loadRoute(mapId);
@@ -50,7 +58,7 @@ const MapScreen = ({ route, navigation }: any) => {
     };
     
     fetchRoute();
-  }, [mapId, loadRoute]);
+  }, [mapId, loadRoute, isLoading, routeState.selectedRoute]);
   
   // Get the selected route from the route context
   const mapDetails = routeState.selectedRoute;
@@ -92,6 +100,18 @@ const MapScreen = ({ route, navigation }: any) => {
     return `${Math.round(meters)} m`;
   };
   
+  // Handle map errors
+  const handleMapError = useCallback((error: Error) => {
+    console.error('Map error in MapScreen:', error);
+    setMapError(error);
+  }, []);
+  
+  // Retry loading the map
+  const retryMap = useCallback(() => {
+    setMapError(null);
+    setMapKey(prev => prev + 1); // Change key to force remount
+  }, []);
+  
   // Show loading indicator while fetching route data
   if (isLoading) {
     return (
@@ -122,14 +142,33 @@ const MapScreen = ({ route, navigation }: any) => {
     <View style={[styles.container, { backgroundColor: paperTheme.colors.background }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       
+      {/* Map Error Banner */}
+      {mapError && (
+        <Banner
+          visible={true}
+          icon="map-marker-alert"
+          actions={[
+            {
+              label: 'Retry',
+              onPress: retryMap,
+            },
+          ]}
+          style={styles.errorBanner}
+        >
+          Map loading error: {mapError.message}
+        </Banner>
+      )}
+      
       {/* Full-screen Map */}
       <View style={styles.mapFullContainer}>
         <MapView 
+          key={`map-${mapKey}`} // Force remount on retry
           initialCenter={mapDetails.mapState?.center || [146.8087, -41.4419]}
           initialZoom={mapDetails.mapState?.zoom || 9}
           showUserLocation={true}
           style={styles.mapFull}
           routeId={mapDetails.persistentId}
+          onError={handleMapError}
         />
       </View>
       
@@ -270,12 +309,12 @@ const MapScreen = ({ route, navigation }: any) => {
         </Surface>
       </Animated.View>
       
-      {/* Download FAB */}
-      <FAB
+      {/* Download FAB - disabled for now */}
+      {/* <FAB
         icon="download"
         style={[styles.fab, { backgroundColor: paperTheme.colors.primary }]}
         onPress={() => console.log('Download for offline use')}
-      />
+      /> */}
     </View>
   );
 };
@@ -283,6 +322,13 @@ const MapScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  errorBanner: {
+    position: 'absolute',
+    top: 56, // Below the app bar
+    left: 0,
+    right: 0,
+    zIndex: 15, // Above other UI elements
   },
   appbar: {
     position: 'absolute',

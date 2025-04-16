@@ -530,6 +530,75 @@ export const usePhotoService = () => {
     }
   };
 
+  /**
+   * Compresses an original photo to reduce file size while maintaining quality
+   * @param {File} file - The image file to compress
+   * @param {number} maxSizeMB - Maximum target size in MB (default: 5)
+   * @returns {Promise<File>} - A promise that resolves to a compressed File object
+   */
+  const compressOriginalPhoto = async (file, maxSizeMB = 5) => {
+    // Skip small files that don't need compression
+    if (file.size <= maxSizeMB * 1024 * 1024) {
+      console.log(`[photoService] File ${file.name} already under ${maxSizeMB}MB, skipping compression`);
+      return file;
+    }
+    
+    console.log(`[photoService] Compressing ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)...`);
+    
+    // Create image bitmap
+    const bitmap = await createImageBitmap(file);
+    
+    // Calculate dimensions - reduce if extremely large
+    let width = bitmap.width;
+    let height = bitmap.height;
+    const MAX_DIMENSION = 3000; // Cap at 3000px on longest side
+    
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      if (width > height) {
+        height = Math.round(height * (MAX_DIMENSION / width));
+        width = MAX_DIMENSION;
+      } else {
+        width = Math.round(width * (MAX_DIMENSION / height));
+        height = MAX_DIMENSION;
+      }
+      console.log(`[photoService] Resized dimensions to ${width}x${height}`);
+    }
+    
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    
+    // Draw image to canvas
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    
+    // Start with higher quality
+    let quality = 0.92;
+    let blob = await new Promise(resolve => {
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    });
+    
+    // If still too large, reduce quality until under target size
+    // but don't go below 0.7 to maintain good quality
+    while (blob.size > maxSizeMB * 1024 * 1024 && quality > 0.7) {
+      quality -= 0.05; // Smaller steps for finer control
+      blob = await new Promise(resolve => {
+        canvas.toBlob(resolve, 'image/jpeg', quality);
+      });
+    }
+    
+    // Create new file object
+    const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+    
+    console.log(`[photoService] Compressed ${file.name} from ${(file.size/1024/1024).toFixed(2)}MB to ${(compressedFile.size/1024/1024).toFixed(2)}MB (quality: ${quality.toFixed(2)})`);
+    
+    // Clean up
+    bitmap.close();
+    
+    return compressedFile;
+  };
+
   return {
     uploadPhoto: (file) => uploadPhotoWithRetry(file),
     uploadPhotoWithProgress: uploadPhotoWithRetry,
@@ -541,6 +610,7 @@ export const usePhotoService = () => {
     fetchImage,
     createLocalImagePreview,
     resizeImageToMultipleSizes,
-    revokeBlobUrls
+    revokeBlobUrls,
+    compressOriginalPhoto
   };
 };

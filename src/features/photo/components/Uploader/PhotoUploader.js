@@ -41,12 +41,17 @@ const PhotoUploader = ({ onUploadComplete, onDeletePhoto, onAddToMap }) => {
                 // Create a unique ID for this photo
                 const photoId = `photo-${Date.now()}-${Math.random()}`;
                 
-                // Extract GPS data
+                // Compress the original file first (target 5MB max size)
+                console.log(`[PhotoUploader] Compressing ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)...`);
+                const compressedFile = await photoService.compressOriginalPhoto(file, 5);
+                console.log(`[PhotoUploader] Compression complete: ${(compressedFile.size/1024/1024).toFixed(2)}MB`);
+                
+                // Extract GPS data from original file (before compression to ensure EXIF data is preserved)
                 const exif = await exifr.parse(file, { gps: true });
                 const hasGps = Boolean(exif?.latitude && exif?.longitude);
                 
-                // Resize the image to multiple sizes
-                const resizedImages = await photoService.resizeImageToMultipleSizes(file);
+                // Resize the compressed image to multiple sizes for UI display
+                const resizedImages = await photoService.resizeImageToMultipleSizes(compressedFile);
                 
                 // Add to local state with pending status and resized images
                 const initialPhoto = {
@@ -57,7 +62,9 @@ const PhotoUploader = ({ onUploadComplete, onDeletePhoto, onAddToMap }) => {
                     thumbnailUrl: resizedImages.thumbnail,
                     mediumUrl: resizedImages.medium,
                     url: resizedImages.large, // Use large as the main URL
-                    // Store the blobs for later cleanup and upload
+                    // Store the compressed original file for Cloudinary upload
+                    _originalFile: compressedFile,
+                    // Store the blobs for later cleanup and UI display
                     _blobs: {
                         tiny: resizedImages.tinyBlob,
                         thumbnail: resizedImages.thumbnailBlob,

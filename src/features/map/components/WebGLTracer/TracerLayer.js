@@ -1,4 +1,4 @@
-import mapboxgl from '../../../../lib/mapbox-gl-no-indoor';
+import mapboxgl from '../../../../lib/mapbox-gl-adaptive';
 import logger from '../../../../utils/logger';
 
 /**

@@ -14,7 +14,8 @@ install! 'cocoapods',
 prepare_react_native_project!
 
 # @generated begin @rnmapbox/maps-rnmapboxmapsimpl - expo prebuild (DO NOT MODIFY) sync-4f4226cc423f8396e32c4af6491c268fb70b36b7
-$RNMapboxMapsDownloadToken = 'pk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY20xY3B1ZmdzMHp5eDJwcHBtMmptOG8zOSJ9.Ayn_YEjOCCqujIYhY9PiiA'
+# Using Secret Token (sk.) for Mapbox downloads - Cline
+$RNMapboxMapsDownloadToken = 'sk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY205ZjcyNDRoMHcybjJqb2Fsd2p4NTFzZyJ9.RypRAeS61ChnzZJRSViOpg'
 $RNMapboxMapsImpl = 'mapbox'
 # @generated end @rnmapbox/maps-rnmapboxmapsimpl
 target 'LutruwitaMobile' do

@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Card, Text, Chip, useTheme } from 'react-native-paper';
 import { RouteMap } from '../../services/routeService';
-import { Route, Mountain, MoreHorizontal } from 'lucide-react-native';
+import { Route, Mountain, MoreHorizontal, Map } from 'lucide-react-native';
+import FallbackMapPreview from '../map/FallbackMapPreview';
 
 interface RouteCardProps {
   route: RouteMap;
@@ -14,6 +15,8 @@ interface RouteCardProps {
  */
 const RouteCard: React.FC<RouteCardProps> = ({ route, onPress }) => {
   const theme = useTheme();
+  const [isMapLoading, setIsMapLoading] = useState(true);
+  const [mapError, setMapError] = useState(false);
   
   // Format description from metadata
   const getRouteDescription = () => {
@@ -60,10 +63,27 @@ const RouteCard: React.FC<RouteCardProps> = ({ route, onPress }) => {
       onPress={() => onPress(route.persistentId)}
     >
       {/* Map Preview */}
-      <Card.Cover 
-        source={{ uri: `https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+f74e4e(${route.mapState.center[0]},${route.mapState.center[1]})/${route.mapState.center[0]},${route.mapState.center[1]},${route.mapState.zoom},0/400x200?access_token=pk.eyJ1IjoibHV0cnV3aXRhIiwiYSI6ImNsZnRqcWRlZzAyaXgzcG8wdWN0Z2hoZW0ifQ.GJUrfLPj8d3vLXy5qf0xrA` }} 
-        style={styles.mapPreview}
-      />
+          {mapError ? (
+        <View style={[styles.mapPreview, styles.mapFallback]}>
+          <Map size={32} color={theme.colors.primary} />
+          <Text style={styles.mapFallbackText}>Map preview unavailable</Text>
+        </View>
+      ) : (
+        <View style={styles.mapPreview}>
+          {isMapLoading && (
+            <View style={[styles.mapLoading]}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+          )}
+          <FallbackMapPreview
+            center={route.mapState.center}
+            zoom={route.mapState.zoom}
+            routes={route.routes}
+            onMapReady={() => setIsMapLoading(false)}
+            style={isMapLoading ? styles.hiddenImage : undefined}
+          />
+        </View>
+      )}
       
       {/* Premium Badge */}
       {isPremium() && (
@@ -135,6 +155,29 @@ const styles = StyleSheet.create({
     height: 150,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
+  },
+  mapFallback: {
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapFallbackText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  mapLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hiddenImage: {
+    opacity: 0,
   },
   premiumChip: {
     position: 'absolute',

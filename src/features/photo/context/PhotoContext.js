@@ -14,6 +14,7 @@ export const usePhotoContext = () => {
 export const PhotoProvider = ({ children }) => {
     const [photos, setPhotos] = useState([]);
     const [isPhotosVisible, setIsPhotosVisible] = useState(true);
+    const [changedPhotos, setChangedPhotos] = useState(new Set());
     
     // Get access to the RouteContext to notify it of photo changes
     let routeContext;
@@ -23,6 +24,30 @@ export const PhotoProvider = ({ children }) => {
         // This is expected when the PhotoProvider is used outside of a RouteProvider
         routeContext = null;
     }
+    
+    // Track photo changes
+    const trackPhotoChange = useCallback((photoId) => {
+        console.log(`[PhotoContext] Tracking change for photo: ${photoId}`);
+        setChangedPhotos(prev => {
+            const newSet = new Set(prev);
+            newSet.add(photoId);
+            return newSet;
+        });
+    }, []);
+    
+    // Clear tracked changes after commit
+    const clearPhotoChanges = useCallback(() => {
+        console.log('[PhotoContext] Clearing tracked photo changes');
+        setChangedPhotos(new Set());
+    }, []);
+    
+    // Get photos that have changes
+    const getChangedPhotos = useCallback(() => {
+        return photos.filter(photo => {
+            const photoId = getPhotoIdentifier(photo.url);
+            return changedPhotos.has(photoId);
+        });
+    }, [photos, changedPhotos]);
     
     // Function to notify RouteContext of photo changes
     const notifyPhotoChange = useCallback((changeType = 'update') => {
@@ -75,6 +100,15 @@ export const PhotoProvider = ({ children }) => {
         }
         
         setPhotos(prev => [...prev, ...photosWithCaption]);
+        
+        // Track changes for each new photo
+        photosWithCaption.forEach(photo => {
+            const photoId = getPhotoIdentifier(photo.url);
+            if (photoId) {
+                trackPhotoChange(photoId);
+            }
+        });
+        
         notifyPhotoChange('add');
     };
     const deletePhoto = (photoUrl) => {
@@ -139,6 +173,15 @@ export const PhotoProvider = ({ children }) => {
         //     }
         // }, 0);
 
+        // Remove the photo from tracked changes if it was being tracked
+        if (identifier && changedPhotos.has(identifier)) {
+            setChangedPhotos(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(identifier);
+                return newSet;
+            });
+        }
+        
         // Ensure we mark this as a deletion in the RouteContext
         // console.log('[PhotoContext] Notifying RouteContext of photo deletion');
         notifyPhotoChange('delete');
@@ -166,6 +209,10 @@ export const PhotoProvider = ({ children }) => {
             }
             return p;
         }));
+        
+        // Track this photo as changed
+        trackPhotoChange(identifier);
+        
         notifyPhotoChange('update');
     };
 
@@ -192,6 +239,10 @@ export const PhotoProvider = ({ children }) => {
             }
             return p;
         }));
+        
+        // Track this photo as changed
+        trackPhotoChange(identifier);
+        
         notifyPhotoChange('update');
     };
     // Cache for photo identifiers to avoid reloading the same photos
@@ -291,6 +342,8 @@ export const PhotoProvider = ({ children }) => {
     const clearPhotos = () => {
         // Clear all photos by setting to an empty array
         setPhotos([]);
+        // Clear all tracked changes
+        clearPhotoChanges();
         notifyPhotoChange('clear');
         // console.log('[PhotoContext] All photos cleared');
     };
@@ -306,11 +359,16 @@ export const PhotoProvider = ({ children }) => {
             addPhoto, 
             deletePhoto, 
             updatePhoto, 
-            updatePhotoPosition, // Expose the new function
+            updatePhotoPosition,
             loadPhotos, 
             clearPhotos,
             isPhotosVisible,
-            togglePhotosVisibility
+            togglePhotosVisibility,
+            // Expose change tracking functions
+            changedPhotos,
+            trackPhotoChange,
+            clearPhotoChanges,
+            getChangedPhotos
         }, 
         children: children 
     }));
