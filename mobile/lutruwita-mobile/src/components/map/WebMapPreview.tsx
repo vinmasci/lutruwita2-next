@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ActivityIndicator, Platform, Image } from 'reac
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../../theme';
 import { MAPBOX_ACCESS_TOKEN, MAP_STYLES } from '../../config/mapbox';
+import { ensureCorrectCoordinateOrder } from '../../utils/coordinateUtils';
 
 // Only import these on native platforms
 let Asset: any;
@@ -226,9 +227,9 @@ const WebMapPreview: React.FC<WebMapPreviewProps> = ({
       console.log('[WebMapPreview] Initializing map...');
       
       // Set the map style based on the theme
-      const mapStyle = isDark 
+      const mapStyle = isDark
         ? MAP_STYLES.DARK
-        : MAP_STYLES.SATELLITE_STREETS;
+        : MAP_STYLES.STREET; // Changed from SATELLITE_STREETS
       
       console.log('[WebMapPreview] Using map style:', mapStyle);
       
@@ -256,9 +257,10 @@ const WebMapPreview: React.FC<WebMapPreviewProps> = ({
       
       // Set initial center
       if (center) {
+        const correctedCenter = ensureCorrectCoordinateOrder(center);
         const centerMessage = {
           type: 'updateMapCenter',
-          center: center,
+          center: correctedCenter,
         };
         
         webViewRef.current.injectJavaScript(`

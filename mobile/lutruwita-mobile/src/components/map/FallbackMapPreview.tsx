@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Image, Text } from 'react-native';
-import MapPreview from './MapPreview';
-import WebMapPreview from './WebMapPreview';
-import { MAPBOX_ACCESS_TOKEN } from '../../config/mapbox';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+// Import the clean static map component
+import CleanStaticMap from './CleanStaticMap';
 
 interface FallbackMapPreviewProps {
   center: [number, number]; // [longitude, latitude]
@@ -10,133 +9,30 @@ interface FallbackMapPreviewProps {
   routes?: any[];
   style?: object;
   onMapReady?: () => void;
-  onError?: (error: Error) => void;
+  boundingBox?: [[number, number], [number, number]]; // Optional bounding box
 }
 
 /**
- * Map preview component with fallback to WebView-based map
- * This component tries to use the native MapPreview first,
- * and if that fails, falls back to the WebMapPreview
+ * Map preview component that renders a clean static map image.
  */
 const FallbackMapPreview: React.FC<FallbackMapPreviewProps> = ({
   center,
   zoom,
-  routes = [],
+  routes,
   style,
   onMapReady,
-  onError,
+  boundingBox,
 }) => {
-  const [useNativeMap, setUseNativeMap] = useState(true);
-  const [nativeMapError, setNativeMapError] = useState<Error | null>(null);
-  const [webMapError, setWebMapError] = useState<Error | null>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const [staticMapError, setStaticMapError] = useState<Error | null>(null);
-
-  // Log component mount
-  useEffect(() => {
-    console.log('[FallbackMapPreview] Component mounted, trying native map first');
-  }, []);
-
-  // Handle native map error
-  const handleNativeMapError = (error: Error) => {
-    console.warn('[FallbackMapPreview] Native map error, falling back to WebView map:', error);
-    setNativeMapError(error);
-    setUseNativeMap(false);
-  };
-
-  // Handle map ready
-  const handleMapReady = () => {
-    console.log('[FallbackMapPreview] Map ready');
-    setMapReady(true);
-    if (onMapReady) {
-      onMapReady();
-    }
-  };
-
-  // Handle web map error
-  const handleWebMapError = (error: Error) => {
-    console.error('[FallbackMapPreview] Web map error:', error);
-    // Set the web map error state
-    setWebMapError(error);
-    
-    // Call the onError callback if provided
-    if (onError) {
-      onError(error);
-    }
-  };
-  
-  // Handle static map error
-  const handleStaticMapError = () => {
-    console.error('[FallbackMapPreview] Static map error');
-    setStaticMapError(new Error('Failed to load static map image'));
-    
-    // Call the onError callback if provided
-    if (onError) {
-      onError(new Error('All map fallbacks failed'));
-    }
-  };
-
-  // Generate static map URL
-  const getStaticMapUrl = () => {
-    // Default width and height for the static map
-    const width = 600;
-    const height = 400;
-    
-    // Create a static map URL from Mapbox Static Images API
-    return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/static/pin-s+f74e4e(${center[0]},${center[1]})/${center[0]},${center[1]},${zoom},0/${width}x${height}?access_token=${MAPBOX_ACCESS_TOKEN}`;
-  };
-
-  // If both native and WebView maps fail, show static map
-  if (nativeMapError && webMapError) {
-    // If static map also failed, show error message
-    if (staticMapError) {
-      return (
-        <View style={[styles.container, styles.errorContainer, style]}>
-          <Text style={styles.errorText}>Map preview unavailable</Text>
-          <Text style={styles.errorDetail}>All map fallbacks failed</Text>
-        </View>
-      );
-    }
-    
-    // Show static map image
-    return (
-      <View style={[styles.container, style]}>
-        <Image
-          source={{ uri: getStaticMapUrl() }}
-          style={styles.map}
-          onError={handleStaticMapError}
-          onLoad={() => {
-            console.log('[FallbackMapPreview] Static map loaded successfully');
-            handleMapReady();
-          }}
-        />
-      </View>
-    );
-  }
-
-  // Show native or WebView map
+  // Render the clean static map component with the provided props
   return (
-    <View style={[styles.container, style]}>
-      {useNativeMap ? (
-        <MapPreview
-          center={center}
-          zoom={zoom}
-          routes={routes}
-          style={styles.map}
-          onMapReady={handleMapReady}
-          onError={handleNativeMapError}
-        />
-      ) : (
-        <WebMapPreview
-          center={center}
-          zoom={zoom}
-          routes={routes}
-          style={styles.map}
-          onMapReady={handleMapReady}
-          onError={handleWebMapError}
-        />
-      )}
-    </View>
+    <CleanStaticMap
+      center={center}
+      zoom={zoom}
+      routes={routes}
+      style={style}
+      onMapReady={onMapReady}
+      boundingBox={boundingBox}
+    />
   );
 };
 

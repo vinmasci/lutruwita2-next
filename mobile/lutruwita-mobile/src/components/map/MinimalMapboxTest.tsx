@@ -1,78 +1,85 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import MapboxGL from '@rnmapbox/maps';
+import { View, Text, StyleSheet, SafeAreaView, Image, ActivityIndicator } from 'react-native'; // Added Image, ActivityIndicator
+// Removed MapboxGL import as we are not using the interactive map
 import { MAPBOX_ACCESS_TOKEN } from '../../config/mapbox';
+import { ensureCorrectCoordinateOrder } from '../../utils/coordinateUtils';
 
-// Log available MapboxGL components
-console.log('[MinimalMapboxTest] Available MapboxGL components:', Object.keys(MapboxGL));
+// Removed MapboxGL initialization
 
-// Initialize Mapbox
-MapboxGL.setAccessToken(MAPBOX_ACCESS_TOKEN);
+// Define props interface
+interface MinimalStaticMapTestProps {
+  style?: object;
+  onMapReady?: () => void;
+}
 
-const MinimalMapboxTest = () => {
-  const [mapReady, setMapReady] = useState(false);
+const MinimalStaticMapTest: React.FC<MinimalStaticMapTestProps> = ({ style, onMapReady }) => { // Accept props
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  // Log when component mounts
+  // Log when component mounts and generate static image URL
   useEffect(() => {
-    console.log('[MinimalMapboxTest] Component mounted');
-    console.log('[MinimalMapboxTest] MapboxGL.StyleURL:', MapboxGL.StyleURL);
-    
-    // Check if required components exist
-    if (!MapboxGL.MapView) {
-      setError('MapboxGL.MapView is not available');
-      console.error('[MinimalMapboxTest] MapboxGL.MapView is not available');
+    console.log('[MinimalStaticMapTest] Component mounted');
+    if (!MAPBOX_ACCESS_TOKEN) {
+      setError('Mapbox Access Token is missing!');
+      console.error('[MinimalStaticMapTest] Mapbox Access Token is missing!');
+      return;
     }
-    
-    if (!MapboxGL.Camera) {
-      setError('MapboxGL.Camera is not available');
-      console.error('[MinimalMapboxTest] MapboxGL.Camera is not available');
-    }
+
+    const centerCoordinate: [number, number] = [146.8087, -41.4419]; // Tasmania
+    const correctedCoordinate = ensureCorrectCoordinateOrder(centerCoordinate);
+    const zoomLevel = 8; // Adjusted zoom for static image
+    const width = 600; // Example width
+    const height = 400; // Example height
+    const style = 'streets-v11'; // Basic street style
+
+    const staticImageUrl = `https://api.mapbox.com/styles/v1/mapbox/${style}/static/${correctedCoordinate[0]},${correctedCoordinate[1]},${zoomLevel},0/${width}x${height}?access_token=${MAPBOX_ACCESS_TOKEN}`;
+    console.log('[MinimalStaticMapTest] Generated Static Image URL:', staticImageUrl);
+    setImageUrl(staticImageUrl);
   }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Minimal Mapbox Test</Text>
-        <Text style={styles.subtitle}>Status: {mapReady ? 'Map Ready ✅' : 'Loading...'}</Text>
+        <Text style={styles.title}>Minimal Static Map Test</Text>
+        <Text style={styles.subtitle}>Status: {imageLoaded ? 'Image Loaded ✅' : (error ? 'Error ❌' : 'Loading...')}</Text>
         {error && <Text style={styles.error}>Error: {error}</Text>}
       </View>
-      
+
       <View style={styles.mapContainer}>
-        {!error ? (
-          <>
-            <Text style={styles.mapLabel}>Map should appear below:</Text>
-            <MapboxGL.MapView 
-              style={styles.map}
-              styleURL={MapboxGL.StyleURL.Street}
-              onDidFinishLoadingMap={() => {
-                console.log('[MinimalMapboxTest] Map finished loading');
-                setMapReady(true);
-              }}
-              onDidFailLoadingMap={() => {
-                console.log('[MinimalMapboxTest] Map failed to load');
-                setError('Map failed to load');
-              }}
-              logoEnabled={true}
-              attributionEnabled={true}
-              compassEnabled={true}
-            >
-              <MapboxGL.Camera
-                zoomLevel={10}
-                centerCoordinate={[146.8087, -41.4419]} // Tasmania
-              />
-            </MapboxGL.MapView>
-          </>
+        <Text style={styles.mapLabel}>Static map image should appear below:</Text>
+        {imageUrl && !error ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.map}
+            onLoad={() => {
+              console.log('[MinimalStaticMapTest] Static image loaded successfully');
+              setImageLoaded(true);
+              if (onMapReady) { // Call onMapReady if provided
+                onMapReady();
+              }
+            }}
+            onError={(e) => {
+              console.error('[MinimalStaticMapTest] Failed to load static image:', e.nativeEvent.error);
+              setError(`Failed to load static image: ${e.nativeEvent.error}`);
+              setImageLoaded(false); // Ensure loaded state is false on error
+            }}
+            resizeMode="cover" // Adjust as needed
+          />
         ) : (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={styles.loadingOrErrorContainer}>
+            {error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <ActivityIndicator size="large" />
+            )}
           </View>
         )}
       </View>
-      
+
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Using only MapView and Camera components
+          Testing Mapbox Static Images API
         </Text>
       </View>
     </SafeAreaView>
@@ -120,7 +127,13 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  errorContainer: {
+  loadingOrErrorContainer: { // Add the missing style definition
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorContainer: { // Keep original errorContainer style if needed elsewhere, or remove if truly replaced
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -144,4 +157,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MinimalMapboxTest;
+export default MinimalStaticMapTest; // Correct the export name

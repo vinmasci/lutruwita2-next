@@ -4,6 +4,7 @@ import MapboxGL from '@rnmapbox/maps';
 import { MAPBOX_ACCESS_TOKEN, MAP_STYLES } from '../../config/mapbox';
 import { useTheme } from '../../theme';
 import { Map, AlertTriangle } from 'lucide-react-native';
+import { ensureCorrectCoordinateOrder, ensureCorrectBoundingBox } from '../../utils/coordinateUtils';
 
 console.log('[MapPreview] Module loaded');
 
@@ -16,6 +17,7 @@ interface MapPreviewProps {
   style?: object;
   onMapReady?: () => void;
   onError?: (error: Error) => void;
+  boundingBox?: [[number, number], [number, number]]; // Optional bounding box
 }
 
 const MapPreview: React.FC<MapPreviewProps> = ({
@@ -25,6 +27,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
   style,
   onMapReady,
   onError,
+  boundingBox,
 }) => {
   const { isDark } = useTheme();
   const mapRef = useRef<MapboxGL.MapView>(null);
@@ -51,7 +54,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
           handleMapError(new Error('Mapbox access token is missing'));
           return; // Don't proceed if token is missing
         }
-        
+
         // Disable telemetry
         if (typeof MapboxGL.setTelemetryEnabled === 'function') {
           MapboxGL.setTelemetryEnabled(false);
@@ -59,7 +62,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
         } else {
           console.warn('[MapPreview] setTelemetryEnabled is not a function');
         }
-        
+
         console.log('[MapPreview] Mapbox initialized successfully');
         isMapboxInitialized.current = true;
       } catch (error) {
@@ -84,7 +87,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
         console.warn('[MapPreview] Map loading timeout - map did not become ready within 10 seconds');
         handleMapError(new Error('Map loading timeout'));
       }
-    }, 60000); // Increased timeout to 60 seconds
+    }, 120000); // Increased timeout to 120 seconds
 
     // Cleanup timeout on unmount
     return () => {
@@ -99,23 +102,23 @@ const MapPreview: React.FC<MapPreviewProps> = ({
   useEffect(() => {
     if (routes && routes.length > 0) {
       console.log('[MapPreview] Validating route data for', routes.length, 'routes');
-      
+
       routes.forEach((route, index) => {
         if (!route) {
           console.warn(`[MapPreview] Route at index ${index} is null or undefined`);
           return;
         }
-        
+
         if (!route.geojson) {
           console.warn(`[MapPreview] Route at index ${index} has no geojson data`);
           return;
         }
-        
+
         if (!route.geojson.features || !Array.isArray(route.geojson.features) || route.geojson.features.length === 0) {
           console.warn(`[MapPreview] Route at index ${index} has invalid or empty features array`);
           return;
         }
-        
+
         console.log(`[MapPreview] Route ${index} validation passed:`, {
           id: route.routeId || `index-${index}`,
           featuresCount: route.geojson.features.length,
@@ -130,23 +133,23 @@ const MapPreview: React.FC<MapPreviewProps> = ({
   // Set the map style based on the theme
   const mapStyle = isDark
     ? MAP_STYLES.DARK
-    : MAP_STYLES.SATELLITE_STREETS;
+    : MAP_STYLES.STREET; // Changed from SATELLITE_STREETS
 
   console.log('[MapPreview] Using map style:', mapStyle);
 
   // Handle map ready event
   const handleMapReady = useCallback(() => {
     console.log('[MapPreview] Map ready event fired');
-    
+
     // Clear the timeout since the map is ready
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    
+
     setIsMapReady(true);
     setIsLoading(false);
-    
+
     if (onMapReady) {
       onMapReady();
     }
@@ -154,21 +157,40 @@ const MapPreview: React.FC<MapPreviewProps> = ({
 
   // Fly to initial center and zoom when map is ready
   useEffect(() => {
-    if (isMapReady && cameraRef.current && center && zoom) {
+    if (isMapReady && cameraRef.current) {
       try {
-        console.log('[MapPreview] Setting camera to center:', center, 'zoom:', zoom);
-        cameraRef.current.setCamera({
-          centerCoordinate: center,
-          zoomLevel: zoom,
-          animationDuration: 0 // No animation for initial position
-        });
+        // If we have a bounding box, use it to fit the camera
+        if (boundingBox) {
+          const correctedBoundingBox = ensureCorrectBoundingBox(boundingBox);
+          console.log('[MapPreview] Using bounding box for camera:', correctedBoundingBox);
+          
+          cameraRef.current.fitBounds(
+            correctedBoundingBox[0],
+            correctedBoundingBox[1],
+            100, // padding
+            0 // No animation for initial position
+          );
+        } 
+        // Otherwise use center and zoom
+        else if (center && zoom) {
+          // Ensure coordinates are in the correct order
+          const correctedCenter = ensureCorrectCoordinateOrder(center);
+          console.log('[MapPreview] Setting camera to center:', correctedCenter, 'zoom:', zoom);
+          
+          cameraRef.current.setCamera({
+            centerCoordinate: correctedCenter,
+            zoomLevel: zoom,
+            animationDuration: 0 // No animation for initial position
+          });
+        }
+        
         console.log('[MapPreview] Camera set successfully');
       } catch (err) {
         console.error('[MapPreview] Error setting camera:', err);
         handleMapError(new Error(`Error setting camera: ${err instanceof Error ? err.message : String(err)}`));
       }
     }
-  }, [isMapReady, center, zoom]);
+  }, [isMapReady, center, zoom, boundingBox]);
 
   // Track when route rendering is attempted
   useEffect(() => {
@@ -183,7 +205,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
     console.error('[MapPreview] Map error:', err);
     setError(err);
     setIsLoading(false);
-    
+
     if (onError) {
       onError(err);
     }
@@ -244,55 +266,52 @@ const MapPreview: React.FC<MapPreviewProps> = ({
         onDidFinishRenderingFrame={(fully: boolean) => {
           console.log('[MapPreview] Map did finish rendering frame, fully rendered:', fully);
         }}
-        compassEnabled={false}
-        attributionEnabled={false}
-        logoEnabled={false}
-        scrollEnabled={false}
-        pitchEnabled={false}
-        rotateEnabled={false}
-        zoomEnabled={false}
+        compassEnabled={true}  // Enabled
+        attributionEnabled={true} // Enabled
+        logoEnabled={true}     // Enabled
+        scrollEnabled={true}   // Enabled
+        pitchEnabled={true}    // Enabled
+        rotateEnabled={true}   // Enabled
+        zoomEnabled={true}     // Enabled
       >
         <MapboxGL.Camera
           ref={cameraRef}
           defaultSettings={{
-            centerCoordinate: center,
+            centerCoordinate: ensureCorrectCoordinateOrder(center),
             zoomLevel: zoom,
           }}
           animationDuration={0}
+          maxZoomLevel={16}
+          minZoomLevel={5}
         />
 
-        {/* Routes */}
-        {routes.map((route, index) => (
-          route.geojson && route.geojson.features && (
-            <MapboxGL.ShapeSource
-              key={`route-source-${route.routeId || index}`}
-              id={`route-source-${route.routeId || index}`}
-              shape={route.geojson}
-            >
-              {/* Border line */}
-              <MapboxGL.LineLayer
-                id={`route-border-${route.routeId || index}`}
+        {/* Routes - Completely commented out for debugging */}
+        {/* {routes && routes.length > 0 && routes[0].geojson && routes[0].geojson.features && (
+          <MapboxGL.ShapeSource
+            key={`route-source-${routes[0].routeId || 0}`}
+            id={`route-source-${routes[0].routeId || 0}`}
+            shape={routes[0].geojson}
+          >
+            <MapboxGL.LineLayer
+              id={`route-border-${routes[0].routeId || 0}`}
                 style={{
                   lineColor: '#ffffff',
                   lineWidth: 4,
                   lineCap: 'round',
                   lineJoin: 'round'
                 }}
-              />
-              
-              {/* Main line */}
-              <MapboxGL.LineLayer
-                id={`route-line-${route.routeId || index}`}
-                style={{
-                  lineColor: route.color || '#ff4d4d',
-                  lineWidth: 3,
-                  lineCap: 'round',
-                  lineJoin: 'round'
-                }}
-              />
-            </MapboxGL.ShapeSource>
-          )
-        ))}
+            />
+            <MapboxGL.LineLayer
+              id={`route-line-${routes[0].routeId || 0}`}
+              style={{
+                lineColor: routes[0].color || '#ff4d4d',
+                lineWidth: 3,
+                lineCap: 'round',
+                lineJoin: 'round'
+              }}
+            />
+          </MapboxGL.ShapeSource>
+        )} */}
       </MapboxGL.MapView>
     </View>
   );

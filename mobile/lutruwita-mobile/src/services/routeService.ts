@@ -3,6 +3,7 @@
  * 
  * This service handles fetching routes and maps from the API.
  * It provides methods to list public routes and load specific routes.
+ * It now supports loading pre-processed data from Cloudinary for better performance.
  */
 
 // Define types for route data
@@ -37,6 +38,14 @@ export interface RouteStatus {
   };
 }
 
+export interface UnpavedSection {
+  startIndex: number;
+  endIndex: number;
+  coordinates: [number, number][];
+  surfaceType: string;
+  _id: string;
+}
+
 export interface RouteData {
   order: number;
   routeId: string;
@@ -47,6 +56,7 @@ export interface RouteData {
   statistics: RouteStatistics;
   status: RouteStatus;
   metadata?: RouteMetadata;
+  unpavedSections?: UnpavedSection[]; // Array of unpaved sections
 }
 
 export interface MapState {
@@ -96,12 +106,18 @@ export interface RouteMap {
     id?: string;
     name: string;
   };
+  embedUrl?: string; // URL to pre-processed data in Cloudinary
+  boundingBox?: [[number, number], [number, number]]; // [[minLng, minLat], [maxLng, maxLat]]
 }
 
 // API base URL - use environment variable for API URL
-const API_BASE = process.env.EXPO_PUBLIC_API_URL?.endsWith('/api')
-  ? `${process.env.EXPO_PUBLIC_API_URL}/routes`
-  : `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/api/routes`;
+// Simplify the URL construction to avoid potential issues
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+console.log('Raw API URL from env:', API_URL);
+
+// Always use the format: baseURL/api/routes
+const API_BASE = `${API_URL}/api/routes`;
+console.log('Constructed API_BASE:', API_BASE);
 
 /**
  * List public routes with optional type filter
@@ -113,34 +129,73 @@ export const listPublicRoutes = async (type?: string): Promise<RouteMap[]> => {
     const queryParams = type ? `?type=${type}` : '';
     const url = `${API_BASE}/public${queryParams}`;
     console.log('Fetching routes from URL:', url);
-    
-    // No timeout - allow request to complete no matter how long it takes
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json'
-      }
+    console.log('API_BASE value:', API_BASE);
+    console.log('Environment variables:', {
+      EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+      EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN?.substring(0, 10) + '...',
     });
     
-    if (!response.ok) {
-      console.error(`API response not OK: ${response.status} ${response.statusText}`);
-      // Log the response body for debugging
-      const responseText = await response.text();
-      console.error('Response body:', responseText);
-      throw new Error(`Failed to fetch public routes: ${response.status} ${response.statusText}`);
-    }
+    // Log request details
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
+    console.log('Request headers:', headers);
     
-    // Get the response as text first for debugging
-    const responseText = await response.text();
+    // Declare data variable outside the try-catch block
+    let data: any = null;
     
-    // Try to parse the JSON
-    let data;
     try {
-      data = JSON.parse(responseText);
-    } catch (error) {
-      const parseError = error as Error;
-      console.error('JSON parse error:', parseError);
-      console.error('Response that failed to parse:', responseText);
-      throw new Error(`JSON parse error: ${parseError.message}`);
+      // No timeout - allow request to complete no matter how long it takes
+      console.log('Starting fetch request...');
+      const response = await fetch(url, {
+        headers,
+        method: 'GET'
+      });
+      
+      console.log('Fetch response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: JSON.stringify(Object.fromEntries([...response.headers.entries()])),
+        ok: response.ok,
+        type: response.type,
+        url: response.url
+      });
+      
+      if (!response.ok) {
+        console.error(`API response not OK: ${response.status} ${response.statusText}`);
+        // Log the response body for debugging
+        const responseText = await response.text();
+        console.error('Error response body:', responseText);
+        throw new Error(`Failed to fetch public routes: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get the response as text first for debugging
+      const responseText = await response.text();
+      console.log('Response text length:', responseText.length);
+      console.log('Response text preview:', responseText.substring(0, 200) + '...');
+      
+      // Try to parse the JSON
+      try {
+        data = JSON.parse(responseText);
+        console.log('JSON parsed successfully');
+      } catch (error) {
+        const parseError = error as Error;
+        console.error('JSON parse error:', parseError);
+        console.error('Response that failed to parse:', responseText);
+        throw new Error(`JSON parse error: ${parseError.message}`);
+      }
+    } catch (fetchError: unknown) {
+      const error = fetchError as Error;
+      // Log the entire error object for more details
+      console.error('-----------------------------------------');
+      console.error('Fetch Error Object:', JSON.stringify(fetchError, null, 2));
+      console.error('-----------------------------------------');
+      console.error('Fetch error details:', error); // Keep original log
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      throw error; // Re-throw the original error object
     }
     
     if (!data || !data.routes) {
@@ -151,8 +206,12 @@ export const listPublicRoutes = async (type?: string): Promise<RouteMap[]> => {
     console.log(`Found ${data.routes.length} routes`);
     return data.routes;
   } catch (error: unknown) {
+    // Also log the detailed error here if it propagates
+    console.error('-----------------------------------------');
+    console.error('Error listing public routes (outer catch):', JSON.stringify(error, null, 2));
+    console.error('-----------------------------------------');
     console.error('Error listing public routes:', error);
-    // Return empty array instead of mock data
+    // Return empty array instead of mock data in case of error
     return [];
   }
 };
@@ -168,6 +227,32 @@ const CACHE_EXPIRATION = 5 * 60 * 1000;
 
 // In-flight requests tracking to prevent duplicate simultaneous requests
 const inFlightRequests: Record<string, Promise<RouteMap>> = {};
+
+/**
+ * Helper function to calculate the bounding box from route coordinates
+ * @param coordinates Array of [longitude, latitude] coordinates
+ * @returns Bounding box as [[minLng, minLat], [maxLng, maxLat]]
+ */
+export const calculateBoundingBox = (coordinates: [number, number][]): [[number, number], [number, number]] => {
+  if (!coordinates || coordinates.length === 0) {
+    // Default to Tasmania if no coordinates
+    return [[145.0, -43.0], [148.0, -40.0]];
+  }
+
+  let minLng = coordinates[0][0];
+  let maxLng = coordinates[0][0];
+  let minLat = coordinates[0][1];
+  let maxLat = coordinates[0][1];
+
+  coordinates.forEach(coord => {
+    minLng = Math.min(minLng, coord[0]);
+    maxLng = Math.max(maxLng, coord[0]);
+    minLat = Math.min(minLat, coord[1]);
+    maxLat = Math.max(maxLat, coord[1]);
+  });
+
+  return [[minLng, minLat], [maxLng, maxLat]];
+};
 
 /**
  * Load a specific route by its persistent ID
@@ -206,10 +291,117 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
     
     while (retryCount <= maxRetries) {
       try {
-        const url = `${API_BASE}/public/${persistentId}`;
-        console.log(`Fetching route from URL: ${url} (Attempt ${retryCount + 1}/${maxRetries + 1})`);
+        // First, get the route metadata to check for embedUrl
+        const metadataUrl = `${API_BASE}/embed/${persistentId}`;
+        console.log(`Fetching route metadata from URL: ${metadataUrl} (Attempt ${retryCount + 1}/${maxRetries + 1})`);
         
-        // No timeout - allow request to complete no matter how long it takes
+        const metadataResponse = await fetch(metadataUrl, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!metadataResponse.ok) {
+          console.error(`API metadata response not OK: ${metadataResponse.status} ${metadataResponse.statusText}`);
+          // Log the response body for debugging
+          const responseText = await metadataResponse.text();
+          console.error('Metadata response body:', responseText);
+          throw new Error(`Failed to load route metadata: ${metadataResponse.status} ${metadataResponse.statusText}`);
+        }
+        
+        // Parse the metadata response
+        const metadataText = await metadataResponse.text();
+        let metadata;
+        
+        try {
+          metadata = JSON.parse(metadataText);
+          console.log('Metadata JSON parsed successfully');
+        } catch (error) {
+          const parseError = error as Error;
+          console.error('Metadata JSON parse error:', parseError);
+          console.error('Response that failed to parse:', metadataText);
+          throw new Error(`Metadata JSON parse error: ${parseError.message}`);
+        }
+        
+        // Check if we have an embedUrl in the metadata
+        if (metadata && metadata.embedUrl) {
+          console.log(`Found embedUrl in metadata: ${metadata.embedUrl}`);
+          
+          try {
+            // Add a timestamp parameter to force a fresh version
+            const cloudinaryUrl = `${metadata.embedUrl}?t=${Date.now()}`;
+            console.log(`Fetching pre-processed data from Cloudinary: ${cloudinaryUrl}`);
+            
+            // Fetch the data from Cloudinary
+            const cloudinaryResponse = await fetch(cloudinaryUrl);
+            
+            if (cloudinaryResponse.ok) {
+              // Parse the Cloudinary response
+              const cloudinaryText = await cloudinaryResponse.text();
+              let cloudinaryData;
+              
+              try {
+                cloudinaryData = JSON.parse(cloudinaryText);
+                console.log('Cloudinary JSON parsed successfully');
+              } catch (error) {
+                const parseError = error as Error;
+                console.error('Cloudinary JSON parse error:', parseError);
+                // Don't log the full response as it might be very large
+                console.error('Cloudinary response parse error, falling back to API');
+                // Fall through to API fallback
+                throw new Error(`Cloudinary JSON parse error: ${parseError.message}`);
+              }
+              
+              // Process the Cloudinary data
+              console.log(`Successfully loaded pre-processed data from Cloudinary: ${cloudinaryData.name || 'Unnamed'}`);
+              
+              // Ensure the data has the required structure
+              const processedData = {
+                ...cloudinaryData,
+                // Make sure embedUrl is included
+                embedUrl: metadata.embedUrl
+              };
+              
+              // Calculate bounding box for the route if it has coordinates
+              if (processedData.routes && processedData.routes.length > 0) {
+                const firstRoute = processedData.routes[0];
+                if (firstRoute.geojson && 
+                    firstRoute.geojson.features && 
+                    firstRoute.geojson.features.length > 0 &&
+                    firstRoute.geojson.features[0].geometry &&
+                    firstRoute.geojson.features[0].geometry.coordinates) {
+                  
+                  const coordinates = firstRoute.geojson.features[0].geometry.coordinates;
+                  const boundingBox = calculateBoundingBox(coordinates);
+                  
+                  // Add bounding box to the route data
+                  processedData.boundingBox = boundingBox;
+                  console.log('Added bounding box to route data:', boundingBox);
+                }
+              }
+              
+              // Cache the successful response
+              routeCache[persistentId] = {
+                data: processedData,
+                timestamp: Date.now()
+              };
+              
+              return processedData;
+            } else {
+              console.error(`Cloudinary response not OK: ${cloudinaryResponse.status} ${cloudinaryResponse.statusText}`);
+              // Fall through to API fallback
+            }
+          } catch (cloudinaryError) {
+            console.error('Error loading from Cloudinary:', cloudinaryError);
+            console.log('Falling back to API...');
+            // Fall through to API fallback
+          }
+        }
+        
+        // Fallback to direct API request if Cloudinary approach fails
+        const url = `${API_BASE}/public/${persistentId}`;
+        console.log(`Falling back to direct API request: ${url}`);
+        
         const response = await fetch(url, {
           headers: {
             'Accept': 'application/json'
@@ -241,6 +433,24 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
         if (!data) {
           console.error('API returned null or undefined data');
           throw new Error('API returned empty data');
+        }
+        
+        // Calculate bounding box for the route if it has coordinates
+        if (data.routes && data.routes.length > 0) {
+          const firstRoute = data.routes[0];
+          if (firstRoute.geojson && 
+              firstRoute.geojson.features && 
+              firstRoute.geojson.features.length > 0 &&
+              firstRoute.geojson.features[0].geometry &&
+              firstRoute.geojson.features[0].geometry.coordinates) {
+            
+            const coordinates = firstRoute.geojson.features[0].geometry.coordinates;
+            const boundingBox = calculateBoundingBox(coordinates);
+            
+            // Add bounding box to the route data
+            data.boundingBox = boundingBox;
+            console.log('Added bounding box to route data:', boundingBox);
+          }
         }
         
         // Cache the successful response

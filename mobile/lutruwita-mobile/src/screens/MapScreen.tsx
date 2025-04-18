@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions, Animated, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, Dimensions, TouchableOpacity, SafeAreaView } from 'react-native';
+import POIMarker from '../components/map/POIMarker';
 import { StatusBar } from 'expo-status-bar';
 import { 
   Text, 
-  Button, 
-  IconButton,
-  Appbar,
-  useTheme as usePaperTheme,
   ActivityIndicator,
-  FAB,
-  Surface,
-  Divider,
-  Chip,
-  Banner
+  useTheme as usePaperTheme
 } from 'react-native-paper';
 import { useTheme } from '../theme';
-import MapView from '../components/map/MapView';
-import { useMap } from '../context/MapContext';
 import { useRoute } from '../context/RouteContext';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MapboxGL from '@rnmapbox/maps';
+import { MAPBOX_ACCESS_TOKEN } from '../config/mapbox';
+import { ArrowLeft, Layers, Mountain } from 'lucide-react-native';
+import { ensureCorrectCoordinateOrder, ensureCorrectBoundingBox } from '../utils/coordinateUtils';
+import { UnpavedSection } from '../services/routeService';
+import { MAP_STYLES } from '../config/mapbox';
+
+// Initialize Mapbox
+MapboxGL.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 // Get screen dimensions
 const { width, height } = Dimensions.get('window');
@@ -28,14 +27,11 @@ const MapScreen = ({ route, navigation }: any) => {
   const paperTheme = usePaperTheme();
   const { routeState, loadRoute } = useRoute();
   const [isLoading, setIsLoading] = useState(false);
-  const [showInfo, setShowInfo] = useState(true);
-  const [showControls, setShowControls] = useState(true);
   const [mapError, setMapError] = useState<Error | null>(null);
   const [mapKey, setMapKey] = useState<number>(0); // Used to force map remount on retry
-  
-  // Animation values
-  const infoSlideAnim = useRef(new Animated.Value(0)).current;
-  const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
+  const [mapReady, setMapReady] = useState(false);
+  const [currentMapStyle, setCurrentMapStyle] = useState(MAP_STYLES.SATELLITE_STREETS);
+  const [is3DMode, setIs3DMode] = useState(false);
   
   const { mapId } = route.params;
   
@@ -62,43 +58,6 @@ const MapScreen = ({ route, navigation }: any) => {
   
   // Get the selected route from the route context
   const mapDetails = routeState.selectedRoute;
-  
-  // Toggle info panel with animation
-  const toggleInfo = () => {
-    const newShowInfo = !showInfo;
-    setShowInfo(newShowInfo);
-    
-    Animated.timing(infoSlideAnim, {
-      toValue: newShowInfo ? 0 : -300,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-  
-  // Toggle map controls with animation
-  const toggleControls = () => {
-    const newShowControls = !showControls;
-    setShowControls(newShowControls);
-    
-    Animated.timing(controlsOpacityAnim, {
-      toValue: newShowControls ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-  
-  // Format distance for display
-  const formatDistance = (meters: number) => {
-    if (meters >= 1000) {
-      return `${(meters / 1000).toFixed(1)} km`;
-    }
-    return `${Math.round(meters)} m`;
-  };
-  
-  // Format elevation for display
-  const formatElevation = (meters: number) => {
-    return `${Math.round(meters)} m`;
-  };
   
   // Handle map errors
   const handleMapError = useCallback((error: Error) => {
@@ -127,217 +86,250 @@ const MapScreen = ({ route, navigation }: any) => {
     return (
       <View style={[styles.container, { backgroundColor: paperTheme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: paperTheme.colors.error }}>Map not found</Text>
-        <Button 
-          mode="contained" 
+        <TouchableOpacity 
+          style={styles.errorBackButton}
           onPress={() => navigation.goBack()}
-          style={{ marginTop: 16 }}
         >
-          Go Back
-        </Button>
+          <Text style={styles.errorBackButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: paperTheme.colors.background }]}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      
-      {/* Map Error Banner */}
-      {mapError && (
-        <Banner
-          visible={true}
-          icon="map-marker-alert"
-          actions={[
-            {
-              label: 'Retry',
-              onPress: retryMap,
-            },
-          ]}
-          style={styles.errorBanner}
-        >
-          Map loading error: {mapError.message}
-        </Banner>
-      )}
       
       {/* Full-screen Map */}
       <View style={styles.mapFullContainer}>
-        <MapView 
+        <MapboxGL.MapView 
           key={`map-${mapKey}`} // Force remount on retry
-          initialCenter={mapDetails.mapState?.center || [146.8087, -41.4419]}
-          initialZoom={mapDetails.mapState?.zoom || 9}
-          showUserLocation={true}
           style={styles.mapFull}
-          routeId={mapDetails.persistentId}
-          onError={handleMapError}
-        />
+          styleURL={currentMapStyle}
+          onDidFinishLoadingMap={() => {
+            console.log('[MapScreen] Map finished loading');
+            setMapReady(true);
+          }}
+          onDidFailLoadingMap={() => {
+            console.error('[MapScreen] Map failed to load');
+            handleMapError(new Error('Map failed to load'));
+          }}
+          compassEnabled={true}
+          attributionEnabled={true}
+          logoEnabled={true}
+          scrollEnabled={true}
+          pitchEnabled={is3DMode}
+          rotateEnabled={true}
+          zoomEnabled={true}
+        >
+          {/* Terrain source and configuration */}
+          <MapboxGL.RasterDemSource
+            id="mapbox-dem"
+            url="mapbox://mapbox.mapbox-terrain-dem-v1"
+            tileSize={512}
+            maxZoomLevel={14}
+          />
+          
+          {/* Terrain with exaggeration when 3D mode is enabled */}
+          {is3DMode && (
+            <MapboxGL.Terrain
+              sourceID="mapbox-dem"
+              style={{
+                exaggeration: 1.5 // Fixed exaggeration value
+              }}
+            />
+          )}
+          {/* Use the bounding box for initial camera position if available */}
+          {mapDetails.boundingBox ? (
+            <MapboxGL.Camera
+              ref={(ref) => {
+                if (ref && mapReady && mapDetails.boundingBox) {
+                  // Use the bounding box to fit the camera with corrected coordinates
+                  const correctedBoundingBox = ensureCorrectBoundingBox(mapDetails.boundingBox);
+                  console.log('[MapScreen] Using corrected bounding box:', correctedBoundingBox);
+                  
+                  ref.fitBounds(
+                    correctedBoundingBox[0],
+                    correctedBoundingBox[1],
+                    100, // padding
+                    0 // No animation for initial positioning
+                  );
+                }
+              }}
+              pitch={is3DMode ? 60 : 0}
+              animationDuration={0}
+              maxZoomLevel={16}
+              minZoomLevel={5}
+            />
+          ) : (
+            // Fallback to center coordinate if no bounding box is available
+            <MapboxGL.Camera
+              zoomLevel={mapDetails.mapState?.zoom || 9}
+              centerCoordinate={
+                mapDetails.mapState?.center 
+                  ? ensureCorrectCoordinateOrder(mapDetails.mapState.center) 
+                  : ensureCorrectCoordinateOrder([146.8087, -41.4419])
+              }
+              pitch={is3DMode ? 60 : 0}
+              animationDuration={0}
+            />
+          )}
+          
+          {/* Display all routes */}
+          {mapDetails.routes && mapDetails.routes.length > 0 && (
+            <>
+              {/* Map over all routes */}
+              {mapDetails.routes.map((routeData, routeIndex) => (
+                routeData.geojson && (
+                  <React.Fragment key={`route-fragment-${routeData.routeId || routeIndex}`}>
+                    {/* Main route */}
+                    <MapboxGL.ShapeSource
+                      id={`route-source-${routeData.routeId || routeIndex}`}
+                      shape={routeData.geojson}
+                    >
+                      {/* Border line (white outline) */}
+                      <MapboxGL.LineLayer
+                        id={`route-border-${routeData.routeId || routeIndex}`}
+                        style={{
+                          lineColor: '#ffffff',
+                          lineWidth: 6,
+                          lineCap: 'round',
+                          lineJoin: 'round'
+                        }}
+                      />
+                      {/* Main route line */}
+                      <MapboxGL.LineLayer
+                        id={`route-line-${routeData.routeId || routeIndex}`}
+                        style={{
+                          lineColor: routeData.color || '#ff4d4d',
+                          lineWidth: 4,
+                          lineCap: 'round',
+                          lineJoin: 'round'
+                        }}
+                      />
+                    </MapboxGL.ShapeSource>
+                    
+                    {/* Unpaved/Gravel sections for this route */}
+                    {routeData.unpavedSections && routeData.unpavedSections.map((section: UnpavedSection, index: number) => (
+                      <MapboxGL.ShapeSource
+                        key={`unpaved-source-${routeData.routeId || routeIndex}-${index}`}
+                        id={`unpaved-source-${routeData.routeId || routeIndex}-${index}`}
+                        shape={{
+                          type: 'Feature',
+                          properties: {},
+                          geometry: {
+                            type: 'LineString',
+                            coordinates: section.coordinates
+                          }
+                        }}
+                      >
+                        {/* White dots/dashes for gravel sections */}
+                        <MapboxGL.LineLayer
+                          id={`unpaved-line-${routeData.routeId || routeIndex}-${index}`}
+                          style={{
+                            lineColor: '#ffffff',
+                            lineWidth: 2,
+                            lineCap: 'round',
+                            lineJoin: 'round',
+                            lineDasharray: [1, 3], // Small white dots with larger gaps
+                            lineOpacity: 1
+                          }}
+                        />
+                      </MapboxGL.ShapeSource>
+                    ))}
+                  </React.Fragment>
+                )
+              ))}
+            </>
+          )}
+          
+          {/* Display POIs - Basic Implementation */}
+          {mapDetails.pois && mapDetails.pois.draggable && mapDetails.pois.draggable.length > 0 && (
+            <>
+              {/* Render draggable POIs */}
+              {mapDetails.pois.draggable.map((poi) => (
+                <MapboxGL.PointAnnotation
+                  key={`poi-${poi.id}`}
+                  id={`poi-${poi.id}`}
+                  coordinate={ensureCorrectCoordinateOrder(poi.coordinates)}
+                  title={poi.name}
+                >
+                  <POIMarker poi={poi} />
+                </MapboxGL.PointAnnotation>
+              ))}
+            </>
+          )}
+        </MapboxGL.MapView>
       </View>
       
-      {/* Header Bar */}
-      <Appbar style={styles.appbar}>
-        <Appbar.BackAction onPress={() => navigation.goBack()} />
-        <Appbar.Content title={mapDetails.name} />
-        <Appbar.Action icon="information" onPress={toggleInfo} />
-        <Appbar.Action icon="map-legend" onPress={toggleControls} />
-      </Appbar>
+      {/* Map Status */}
+      {!mapReady && !mapError && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={styles.loadingText}>Loading map...</Text>
+        </View>
+      )}
       
-      {/* Info Panel - Animated */}
-      <Animated.View 
-        style={[
-          styles.infoPanel,
-          { 
-            backgroundColor: paperTheme.colors.surface,
-            transform: [{ translateY: infoSlideAnim }]
+      {/* 3D Toggle Button */}
+      <TouchableOpacity 
+        style={[styles.backButton, { bottom: 148 }]}
+        onPress={() => {
+          // Simply toggle between 2D and 3D mode
+          setIs3DMode(!is3DMode);
+        }}
+      >
+        <Mountain 
+          size={24} 
+          color={is3DMode ? "#ff9500" : "#fff"} 
+        />
+      </TouchableOpacity>
+      
+      {/* Map Style Toggle Button */}
+      <TouchableOpacity 
+        style={[styles.backButton, { bottom: 90 }]}
+        onPress={() => {
+          // Cycle through satellite streets, outdoors, light, dark
+          if (currentMapStyle === MAP_STYLES.SATELLITE_STREETS) {
+            setCurrentMapStyle(MAP_STYLES.OUTDOORS);
+          } else if (currentMapStyle === MAP_STYLES.OUTDOORS) {
+            setCurrentMapStyle(MAP_STYLES.LIGHT);
+          } else if (currentMapStyle === MAP_STYLES.LIGHT) {
+            setCurrentMapStyle(MAP_STYLES.DARK);
+          } else {
+            setCurrentMapStyle(MAP_STYLES.SATELLITE_STREETS);
           }
-        ]}
+        }}
       >
-        <Surface style={styles.infoContent}>
-          <Text style={styles.infoTitle}>{mapDetails.name}</Text>
-          
-          {/* Route Type */}
-          {mapDetails.type && (
-            <Chip 
-              style={[styles.typeChip, { backgroundColor: paperTheme.colors.primary }]}
-              textStyle={{ color: '#fff' }}
-            >
-              {mapDetails.type.charAt(0).toUpperCase() + mapDetails.type.slice(1)}
-            </Chip>
-          )}
-          
-          <Divider style={styles.divider} />
-          
-          {/* Route Stats */}
-          <View style={styles.statsContainer}>
-            {/* Distance */}
-            {mapDetails.metadata?.totalDistance && (
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="map-marker-distance" size={24} color={paperTheme.colors.primary} />
-                <View style={styles.statTextContainer}>
-                  <Text style={styles.statLabel}>Distance</Text>
-                  <Text style={styles.statValue}>{mapDetails.metadata.totalDistance} km</Text>
-                </View>
-              </View>
-            )}
-            
-            {/* Elevation */}
-            {mapDetails.metadata?.totalAscent && (
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="elevation-rise" size={24} color={paperTheme.colors.primary} />
-                <View style={styles.statTextContainer}>
-                  <Text style={styles.statLabel}>Elevation Gain</Text>
-                  <Text style={styles.statValue}>{mapDetails.metadata.totalAscent} m</Text>
-                </View>
-              </View>
-            )}
-            
-            {/* Surface */}
-            {mapDetails.metadata?.unpavedPercentage !== undefined && (
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="road-variant" size={24} color={paperTheme.colors.primary} />
-                <View style={styles.statTextContainer}>
-                  <Text style={styles.statLabel}>Unpaved</Text>
-                  <Text style={styles.statValue}>{mapDetails.metadata.unpavedPercentage}%</Text>
-                </View>
-              </View>
-            )}
-            
-            {/* Loop/Point-to-Point */}
-            {mapDetails.metadata?.isLoop !== undefined && (
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons 
-                  name={mapDetails.metadata.isLoop ? "sync" : "ray-start-end"} 
-                  size={24} 
-                  color={paperTheme.colors.primary} 
-                />
-                <View style={styles.statTextContainer}>
-                  <Text style={styles.statLabel}>Type</Text>
-                  <Text style={styles.statValue}>{mapDetails.metadata.isLoop ? 'Loop' : 'Point-to-Point'}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-          
-          {/* Location */}
-          {mapDetails.metadata?.state && (
-            <View style={styles.locationContainer}>
-              <MaterialCommunityIcons name="map-marker" size={20} color={paperTheme.colors.primary} />
-              <Text style={styles.locationText}>
-                {mapDetails.metadata.state}, Australia
-              </Text>
-            </View>
-          )}
-          
-          {/* Creator */}
-          {mapDetails.createdBy?.name && (
-            <View style={styles.creatorContainer}>
-              <MaterialCommunityIcons name="account" size={20} color={paperTheme.colors.primary} />
-              <Text style={styles.creatorText}>
-                Created by {mapDetails.createdBy.name}
-              </Text>
-            </View>
-          )}
-        </Surface>
-      </Animated.View>
+        <Layers size={24} color="#fff" />
+      </TouchableOpacity>
       
-      {/* Map Controls - Animated */}
-      <Animated.View 
-        style={[
-          styles.mapControls,
-          { opacity: controlsOpacityAnim }
-        ]}
+      {/* Back Button */}
+      <TouchableOpacity 
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
       >
-        <Surface style={styles.controlsPanel}>
-          <IconButton
-            icon="compass"
-            size={24}
-            onPress={() => console.log('Reset orientation')}
-          />
-          <IconButton
-            icon="crosshairs-gps"
-            size={24}
-            onPress={() => console.log('Show user location')}
-          />
-          <IconButton
-            icon="map"
-            size={24}
-            onPress={() => console.log('Change map style')}
-          />
-          <IconButton
-            icon="layers"
-            size={24}
-            onPress={() => console.log('Toggle layers')}
-          />
-        </Surface>
-      </Animated.View>
+        <ArrowLeft size={24} color="#fff" />
+      </TouchableOpacity>
       
-      {/* Download FAB - disabled for now */}
-      {/* <FAB
-        icon="download"
-        style={[styles.fab, { backgroundColor: paperTheme.colors.primary }]}
-        onPress={() => console.log('Download for offline use')}
-      /> */}
-    </View>
+      {/* Error Message */}
+      {mapError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Map error: {mapError.message}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={retryMap}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  errorBanner: {
-    position: 'absolute',
-    top: 56, // Below the app bar
-    left: 0,
-    right: 0,
-    zIndex: 15, // Above other UI elements
-  },
-  appbar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    zIndex: 10,
-    elevation: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   mapFullContainer: {
     position: 'absolute',
@@ -349,85 +341,74 @@ const styles = StyleSheet.create({
   mapFull: {
     flex: 1,
   },
-  infoPanel: {
+  loadingOverlay: {
     position: 'absolute',
-    top: 56, // Below the app bar
+    top: 0,
     left: 0,
     right: 0,
-    zIndex: 5,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-  },
-  infoContent: {
-    padding: 16,
-  },
-  infoTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  typeChip: {
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  divider: {
-    marginVertical: 8,
-  },
-  statsContainer: {
-    marginVertical: 8,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statTextContainer: {
-    marginLeft: 12,
-  },
-  statLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  locationText: {
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  creatorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  creatorText: {
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  mapControls: {
-    position: 'absolute',
-    top: 80,
-    right: 16,
-    zIndex: 5,
-  },
-  controlsPanel: {
-    borderRadius: 8,
-    padding: 8,
-    elevation: 4,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
     bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    bottom: 32,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  errorContainer: {
+    position: 'absolute',
+    bottom: 90,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 59, 48, 0.9)',
+    padding: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#fff',
+    flex: 1,
+    marginRight: 8,
+  },
+  retryButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#ff3b30',
+    fontWeight: 'bold',
+  },
+  errorBackButton: {
+    marginTop: 16,
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  errorBackButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 
