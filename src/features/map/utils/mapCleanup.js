@@ -177,16 +177,64 @@ export const safelyRemoveMap = async (map, setMapInstance = null) => {
   const isPresentationMode = window.location.pathname.includes('/presentation/');
   const isEmbedMode = window.location.pathname.includes('/embed/');
   
-  // Skip cleanup in presentation and embed modes
+  // In presentation and embed modes, do minimal cleanup instead of skipping entirely
   if (isPresentationMode || isEmbedMode) {
-    logger.info('mapCleanup', `Skipping map cleanup in ${isPresentationMode ? 'presentation' : 'embed'} mode`);
+    logger.info('mapCleanup', `Performing minimal cleanup in ${isPresentationMode ? 'presentation' : 'embed'} mode`);
     
-    // Just clear the map instance reference if a setter was provided
-    if (typeof setMapInstance === 'function') {
-      setMapInstance(null);
+    try {
+      // Remove event listeners to prevent memory leaks
+      try {
+        // Common event types to clean up
+        const eventTypes = [
+          'load', 'idle', 'error', 'data', 'styledata', 'sourcedata', 'dataloading',
+          'styledataloading', 'sourcedataloading', 'styleimagemissing', 'resize',
+          'webglcontextlost', 'webglcontextrestored', 'remove', 'mousedown', 'mouseup',
+          'mouseover', 'mouseout', 'mousemove', 'click', 'dblclick', 'contextmenu',
+          'touchstart', 'touchend', 'touchcancel', 'touchmove', 'movestart', 'move',
+          'moveend', 'dragstart', 'drag', 'dragend', 'zoomstart', 'zoom', 'zoomend',
+          'rotatestart', 'rotate', 'rotateend', 'pitchstart', 'pitch', 'pitchend',
+          'boxzoomstart', 'boxzoomend', 'boxzoomcancel', 'wheel'
+        ];
+        
+        // Remove all event listeners
+        eventTypes.forEach(eventType => {
+          try {
+            // Remove all listeners for this event type
+            map.off(eventType);
+          } catch (error) {
+            logger.warn('mapCleanup', `Error removing ${eventType} listeners:`, error);
+          }
+        });
+        
+        logger.info('mapCleanup', 'Removed event listeners');
+      } catch (error) {
+        logger.warn('mapCleanup', 'Error removing event listeners:', error);
+      }
+      
+      // Clear any pending animations or timers
+      try {
+        map.stop();
+        logger.info('mapCleanup', 'Stopped all animations');
+      } catch (error) {
+        logger.warn('mapCleanup', 'Error stopping animations:', error);
+      }
+      
+      // Just clear the map instance reference if a setter was provided
+      if (typeof setMapInstance === 'function') {
+        setMapInstance(null);
+      }
+      
+      return Promise.resolve();
+    } catch (error) {
+      logger.error('mapCleanup', 'Error during minimal cleanup:', error);
+      
+      // Clear the map instance reference if a setter was provided
+      if (typeof setMapInstance === 'function') {
+        setMapInstance(null);
+      }
+      
+      return Promise.resolve();
     }
-    
-    return Promise.resolve();
   }
   
   logger.info('mapCleanup', 'Safely removing map instance');

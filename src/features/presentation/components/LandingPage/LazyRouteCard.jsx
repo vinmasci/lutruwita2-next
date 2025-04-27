@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RouteCard } from './RouteCard.jsx';
-import { Box, Skeleton, Grid, CircularProgress } from '@mui/material';
+import { Box, Skeleton, Grid, CircularProgress, Typography } from '@mui/material';
 
 /**
  * LazyRouteCard component that only renders the actual RouteCard
@@ -9,40 +9,56 @@ import { Box, Skeleton, Grid, CircularProgress } from '@mui/material';
 const LazyRouteCard = ({ route, threshold = 0.1 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const cardRef = useRef(null);
   
   // Set up the Intersection Observer to detect when the card is about to enter the viewport
   useEffect(() => {
-    // Skip if already loaded
-    if (isLoaded) return;
-    
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // When the card becomes visible, set isVisible to true
-        if (entry.isIntersecting) {
-          console.log(`[LazyRouteCard] Card ${route.id || route.persistentId} is now visible`);
-          setIsVisible(true);
-          
-          // Once we've detected visibility, we can disconnect the observer
-          observer.disconnect();
-        }
-      },
-      {
-        // Root is the viewport by default
-        rootMargin: '200px', // Start loading when within 200px of viewport
-        threshold: threshold // Trigger when this percentage of the element is visible
+    // Skip if already loaded or if we're not in a browser environment
+    if (isLoaded || typeof window === 'undefined' || !window.IntersectionObserver) {
+      // If IntersectionObserver is not available, just show the card
+      if (typeof window === 'undefined' || !window.IntersectionObserver) {
+        setIsVisible(true);
+        setIsLoaded(true);
       }
-    );
-    
-    // Start observing the card element
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
+      return;
     }
     
-    // Clean up the observer when the component unmounts
-    return () => {
-      observer.disconnect();
-    };
+    try {
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          // When the card becomes visible, set isVisible to true
+          if (entry.isIntersecting) {
+            // Avoid excessive logging
+            // console.log(`[LazyRouteCard] Card ${route.id || route.persistentId} is now visible`);
+            setIsVisible(true);
+            
+            // Once we've detected visibility, we can disconnect the observer
+            observer.disconnect();
+          }
+        },
+        {
+          // Root is the viewport by default
+          rootMargin: '200px', // Start loading when within 200px of viewport
+          threshold: threshold // Trigger when this percentage of the element is visible
+        }
+      );
+      
+      // Start observing the card element
+      if (cardRef.current) {
+        observer.observe(cardRef.current);
+      }
+      
+      // Clean up the observer when the component unmounts
+      return () => {
+        observer.disconnect();
+      };
+    } catch (error) {
+      console.error('[LazyRouteCard] Error setting up IntersectionObserver:', error);
+      // Fallback: just show the card
+      setIsVisible(true);
+      setIsLoaded(true);
+    }
   }, [route.id, route.persistentId, threshold, isLoaded]);
   
   // When the card becomes visible, mark it as loaded after a short delay
@@ -131,11 +147,42 @@ const LazyRouteCard = ({ route, threshold = 0.1 }) => {
   }
   
   // Once loaded, render the actual RouteCard with full width
-  return (
-    <Box sx={{ width: '100%', height: '100%', display: 'flex', flexGrow: 1 }}>
-      <RouteCard route={route} />
-    </Box>
-  );
+  if (isLoaded) {
+    try {
+      return (
+        <Box sx={{ width: '100%', height: '100%', display: 'flex', flexGrow: 1 }}>
+          <RouteCard route={route} />
+        </Box>
+      );
+    } catch (error) {
+      console.error('[LazyRouteCard] Error rendering RouteCard:', error);
+      setHasError(true);
+    }
+  }
+
+  // If there was an error rendering the RouteCard, show a fallback
+  if (hasError) {
+    return (
+      <Box 
+        sx={{ 
+          height: '100%', 
+          borderRadius: 1, 
+          overflow: 'hidden',
+          boxShadow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          bgcolor: 'background.paper',
+          p: 2,
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Typography variant="body2" color="error">
+          Error loading route
+        </Typography>
+      </Box>
+    );
+  }
 };
 
 export default LazyRouteCard;

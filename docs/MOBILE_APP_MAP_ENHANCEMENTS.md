@@ -51,6 +51,13 @@ The enhancements described in this document leverage the Cloudinary data structu
 
 ### 5. POI Markers Implementation
 
+- **Mapbox Maki Icons**: POI markers now use Mapbox Maki SVG icons based on their category:
+  - Transportation: rail-metro, bus, car, bicycle, airport, ferry icons
+  - Accommodation: lodging, campsite, shelter icons
+  - Food & Drink: restaurant, cafe, beer, grocery, shop icons
+  - Natural Features: mountain, park, viewpoint icons
+  - Town Services: toilet, hospital, telephone, information icons
+  - Road Information: barrier, communications-tower icons
 - **Category-Based Coloring**: POI markers are displayed with colors based on their category:
   - Transportation: Blue (#4A89F3)
   - Accommodation: Orange (#FF9800)
@@ -58,8 +65,8 @@ The enhancements described in this document leverage the Cloudinary data structu
   - Natural Features: Light Green (#8BC34A)
   - Town Services: Purple (#9C27B0)
   - Road Information: Red (#F44336)
-- **Current Status**: The markers and category-based colors are working correctly, but the icons are not yet displaying properly
-- **Implementation**: Uses the POI data from Cloudinary to display markers at the correct coordinates
+- **Icon Styling**: Icons include a white halo effect to make them stand out against any map background
+- **Implementation**: Uses the POI data from Cloudinary to display markers at the correct coordinates with appropriate icons
 
 ## Technical Implementation
 
@@ -171,6 +178,54 @@ The enhancements described in this document leverage the Cloudinary data structu
 >
   <Layers size={24} color="#fff" />
 </TouchableOpacity>
+```
+
+### POI Markers with Maki Icons
+
+```typescript
+// POI markers using Mapbox Maki icons
+<MapboxGL.ShapeSource
+  id="poi-source"
+  shape={{
+    type: 'FeatureCollection',
+    features: mapDetails.pois.draggable.map((poi) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: ensureCorrectCoordinateOrder(poi.coordinates)
+      },
+      properties: {
+        id: poi.id,
+        name: poi.name,
+        description: poi.description || '',
+        category: poi.category,
+        icon: mapPoiIconToMaki(poi.icon), // Map our icon names to Maki icon names
+        color: getPoiColor(poi.category, poi.style?.color)
+      }
+    }))
+  }}
+>
+  <MapboxGL.SymbolLayer
+    id="poi-symbols"
+    style={{
+      iconImage: '{icon}', // Use the icon property from the feature
+      iconSize: 1.5,
+      iconAllowOverlap: true,
+      iconColor: ['get', 'color'], // Color the icon based on the category
+      iconHaloColor: '#FFFFFF', // Add a white halo around the icon
+      iconHaloWidth: 1, // Width of the halo
+      iconHaloBlur: 1, // Slight blur on the halo
+      textField: '{name}',
+      textSize: 12,
+      textOffset: [0, -1.5], // Position text above the icon
+      textAnchor: 'bottom',
+      textColor: '#FFFFFF',
+      textHaloColor: '#000000',
+      textHaloWidth: 1,
+      textOptional: false
+    }}
+  />
+</MapboxGL.ShapeSource>
 ```
 
 ## Benefits

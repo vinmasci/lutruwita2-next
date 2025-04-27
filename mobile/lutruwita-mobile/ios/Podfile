@@ -13,9 +13,10 @@ install! 'cocoapods',
 
 prepare_react_native_project!
 
-# @generated begin @rnmapbox/maps-rnmapboxmapsimpl - expo prebuild (DO NOT MODIFY) sync-4f4226cc423f8396e32c4af6491c268fb70b36b7
+# @generated begin @rnmapbox/maps-rnmapboxmapsimpl - expo prebuild (DO NOT MODIFY) sync-1cebff78f86623b08811d166f303fe316baaf95a
 $RNMapboxMapsDownloadToken = 'sk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY205ZjcyNDRoMHcybjJqb2Fsd2p4NTFzZyJ9.RypRAeS61ChnzZJRSViOpg'
 $RNMapboxMapsImpl = 'mapbox'
+$RNMapboxMapsVersion = '11.11.0'
 # @generated end @rnmapbox/maps-rnmapboxmapsimpl
 target 'LutruwitaMobile' do
   use_expo_modules!

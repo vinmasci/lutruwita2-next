@@ -513,11 +513,12 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                             updateRouteAndMap(route);
                                         },
                                         children: _jsx(ListItemText, { 
-                                            primary: _jsxs("div", {
+                                            primary: _jsxs("span", {
                                                 style: { display: 'flex', alignItems: 'center', gap: '10px', minWidth: '0' },
                                                 children: [
-                                                    _jsx("div", {
+                                                    _jsx("span", {
                                                         style: {
+                                                            display: 'inline-block',
                                                             width: '8px',
                                                             height: '16px',
                                                             backgroundColor: route.color || '#f44336', // Use route color or default red
@@ -537,7 +538,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                                     whiteSpace: 'normal'
                                                 }
                                             },
-                                        secondary: _jsxs("div", {
+                                        secondary: _jsxs("span", {
                                             style: { 
                                                 display: 'flex',
                                                 flexDirection: 'column',
@@ -546,7 +547,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                                 marginTop: '5px'
                                             },
                                             children: [
-                                                _jsxs("div", {
+                                                _jsxs("span", {
                                                     style: { display: 'flex', alignItems: 'center', gap: '8px' },
                                                     children: [
                                                         _jsx("i", { 
@@ -559,7 +560,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                                         })
                                                     ]
                                                 }),
-                                                _jsxs("div", {
+                                                _jsxs("span", {
                                                     style: { display: 'flex', alignItems: 'center', gap: '5px' },
                                                     children: [
                                                         _jsx("i", { 
@@ -582,7 +583,7 @@ export const PresentationSidebar = ({ isOpen, isDistanceMarkersVisible, toggleDi
                                                         })
                                                     ]
                                                 }),
-                                                _jsxs("div", {
+                                                _jsxs("span", {
                                                     style: { display: 'flex', alignItems: 'center', gap: '11px' },
                                                     children: [
                                                         _jsx("i", { 

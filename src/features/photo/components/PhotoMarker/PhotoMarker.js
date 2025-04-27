@@ -5,7 +5,8 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
 import { getPhotoIdentifier } from '../../utils/clustering';
 
-export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
+// Add isEditable prop, default to false for safety (non-editable by default)
+export const PhotoMarker = ({ photo, onClick, isHighlighted, isEditable = false }) => {
     const markerRef = useRef(null);
     const markerElementRef = useRef(null);
     const { map } = useMapContext();
@@ -16,9 +17,8 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted }) => {
     const photoId = getPhotoIdentifier(photo.url);
     const hasUnsavedChanges = photoId && changedPhotos.has(photoId);
     
-    // Make all photos draggable in creation mode
-    // Previously only manually placed photos were draggable
-    const isDraggable = true; // Allow all photos to be draggable
+    // Determine if the marker should be draggable based on the isEditable prop
+    const isDraggable = isEditable === true;
 
     useEffect(() => {
         if (!map || !photo.coordinates ||

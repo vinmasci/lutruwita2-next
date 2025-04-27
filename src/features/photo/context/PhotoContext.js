@@ -27,7 +27,7 @@ export const PhotoProvider = ({ children }) => {
     
     // Track photo changes
     const trackPhotoChange = useCallback((photoId) => {
-        console.log(`[PhotoContext] Tracking change for photo: ${photoId}`);
+        // console.log(`[PhotoContext] Tracking change for photo: ${photoId}`);
         setChangedPhotos(prev => {
             const newSet = new Set(prev);
             newSet.add(photoId);

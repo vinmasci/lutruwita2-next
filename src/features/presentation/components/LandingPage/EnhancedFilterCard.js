@@ -28,16 +28,18 @@ const FilterChip = styled(Chip)({
 });
 
 // Navigation chips for filter categories
-const CategoryChip = styled(Chip)(({ theme, active }) => ({
+const CategoryChip = styled(Chip, {
+  shouldForwardProp: (prop) => prop !== '$active'
+})(({ theme, $active }) => ({
   height: '28px',
   fontSize: '0.75rem',
   margin: '3px',
-  fontWeight: active ? 'bold' : 'normal',
-  backgroundColor: active ? theme.palette.info.main : 'transparent',
-  color: active ? 'white' : theme.palette.text.primary,
-  border: active ? 'none' : `1px solid rgba(255, 255, 255, 0.23)`,
+  fontWeight: $active ? 'bold' : 'normal',
+  backgroundColor: $active ? theme.palette.info.main : 'transparent',
+  color: $active ? 'white' : theme.palette.text.primary,
+  border: $active ? 'none' : `1px solid rgba(255, 255, 255, 0.23)`,
   '&:hover': {
-    backgroundColor: active ? theme.palette.info.main : 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: $active ? theme.palette.info.main : 'rgba(255, 255, 255, 0.05)',
   }
 }));
 
@@ -134,7 +136,7 @@ const EnhancedFilterCard = ({
           sx: { display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 },
           children: categories.map(category => _jsx(CategoryChip, {
             label: category.label,
-            active: activeCategory === category.id,
+            $active: activeCategory === category.id,
             onClick: () => setActiveCategory(category.id),
             disabled: category.disabled
           }, category.id))

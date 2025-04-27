@@ -57,6 +57,7 @@ export interface RouteData {
   status: RouteStatus;
   metadata?: RouteMetadata;
   unpavedSections?: UnpavedSection[]; // Array of unpaved sections
+  description?: string; // Route description text
 }
 
 export interface MapState {

@@ -140,7 +140,8 @@ export const ImageSlider = React.memo(({
   photos = [],
   maxPhotos = 10,
   staticMapUrl,
-  simplifiedMode = false // New prop for simplified mode
+  simplifiedMode = false, // New prop for simplified mode
+  preserveOrder = false // New prop to preserve the original order of photos
 }) => {
   // Simplified state for the simplified mode
   const [loadedImages, setLoadedImages] = useState({});
@@ -193,9 +194,15 @@ export const ImageSlider = React.memo(({
       setShuffledPhotoList([]);
       return;
     }
-    const shuffled = [...photos].sort(() => 0.5 - Math.random());
-    setShuffledPhotoList(shuffled.slice(0, maxPhotos));
-  }, [photos, hasPhotos, maxPhotos]);
+    
+    // If preserveOrder is true, don't shuffle the photos
+    if (preserveOrder) {
+      setShuffledPhotoList(photos.slice(0, maxPhotos));
+    } else {
+      const shuffled = [...photos].sort(() => 0.5 - Math.random());
+      setShuffledPhotoList(shuffled.slice(0, maxPhotos));
+    }
+  }, [photos, hasPhotos, maxPhotos, preserveOrder]);
 
   // Process photos using the shuffled list - memoized
   // In simplified mode, we don't generate thumbnails to reduce complexity

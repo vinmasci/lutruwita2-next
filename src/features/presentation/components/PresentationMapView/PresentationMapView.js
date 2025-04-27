@@ -2,6 +2,8 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 // Cache for route spatial grids to avoid recalculating for the same route
 const routeSpatialGridCache = new Map();
+// Module-level cache to store initialized maps across component remounts
+const initializedMaps = new Map();
 import { throttle } from 'lodash'; // Import throttle
 import { findClosestPointOnRoute, createRouteSpatialGrid } from '../../../../utils/routeUtils';
 import useUnifiedRouteProcessing from '../../../map/hooks/useUnifiedRouteProcessing';
@@ -507,6 +509,26 @@ export default function PresentationMapView(props) {
         // Generate a stable ID for this map instance based on the route ID
         const mapId = `map-${currentRoute?.persistentId || currentRoute?.routeId}`;
         
+        // Check if this map is already in our module-level cache
+        if (initializedMaps.has(mapId)) {
+            console.log(`[PresentationMapView] ⏭️ Map with ID ${mapId} already in module cache, reusing instance`);
+            
+            // Get the existing map instance from the cache
+            const existingMap = initializedMaps.get(mapId);
+            
+            // Update local refs and state
+            mapInstance.current = existingMap;
+            isInitializedRef.current = true;
+            setIsMapReady(true);
+            
+            // Also register in the global registry if not already there
+            if (!isMapRegistered(mapId)) {
+                registerMap(mapId, existingMap);
+            }
+            
+            return;
+        }
+        
         // Check if map is already registered in the global registry
         if (isMapRegistered(mapId)) {
             console.log(`[PresentationMapView] ⏭️ Map with ID ${mapId} already registered, reusing instance`);
@@ -518,6 +540,9 @@ export default function PresentationMapView(props) {
             mapInstance.current = existingMap;
             isInitializedRef.current = true;
             setIsMapReady(true);
+            
+            // Also add to our module-level cache
+            initializedMaps.set(mapId, existingMap);
             
             return;
         }
@@ -532,30 +557,33 @@ export default function PresentationMapView(props) {
                 isInitializedRef.current = true; // Mark as initialized
                 setIsMapReady(true); // Assume it's ready if it exists
                 
-                // Register this map in the global registry
+                // Register this map in the global registry and module cache
                 registerMap(mapId, mapInstance.current);
+                initializedMaps.set(mapId, mapInstance.current);
             }
             return;
         }
         
-        // Create a cancellation token for this initialization
-        const cancellationToken = createCancellationToken(mapId);
-        
-        // Set initialization status
-        setInitializationStatus(mapId, 'initializing');
-        
-        console.log(`[PresentationMapView] 🚀 Map initialization starting for ID: ${mapId}`);
-        console.time(`mapInitialization-${mapId}`);
-        
-        if (!mapRef.current) {
-            console.log('[PresentationMapView] ⚠️ Map ref not available, aborting initialization');
-            setInitializationStatus(mapId, 'failed');
-            removeCancellationToken(mapId);
-            return;
-        }
-            
         // Flag to track if component is mounted
         let isMounted = true;
+        
+        // Add a delay before initialization to allow other components to stabilize
+        const initializationTimeout = setTimeout(() => {
+            // Create a cancellation token for this initialization
+            const cancellationToken = createCancellationToken(mapId);
+            
+            // Set initialization status
+            setInitializationStatus(mapId, 'initializing');
+            
+            console.log(`[PresentationMapView] 🚀 Map initialization starting for ID: ${mapId}`);
+            console.time(`mapInitialization-${mapId}`);
+            
+            if (!mapRef.current) {
+                console.log('[PresentationMapView] ⚠️ Map ref not available, aborting initialization');
+                setInitializationStatus(mapId, 'failed');
+                removeCancellationToken(mapId);
+                return;
+            }
             
         // Check if device is mobile
         const initialIsMobile = window.innerWidth <= 768;
@@ -718,8 +746,9 @@ export default function PresentationMapView(props) {
                 logger.error('PresentationMapView', 'Error setting up terrain:', error);
             }
             
-            // Register the map in the global registry
+            // Register the map in the global registry and module-level cache
             registerMap(mapId, map);
+            initializedMaps.set(mapId, map);
             setInitializationStatus(mapId, 'initialized');
             
             setIsMapReady(true);
@@ -816,13 +845,19 @@ export default function PresentationMapView(props) {
             removeCancellationToken(mapId);
         }
         
+        }, 300); // Add a 300ms delay to allow other components to stabilize
+        
         return () => {
+            // Clear the initialization timeout if component unmounts
+            clearTimeout(initializationTimeout);
+            
             // Mark component as unmounted
             isMounted = false;
             
             // Cancel any ongoing initialization
-            if (cancellationToken) {
-                cancellationToken.cancel();
+            const token = getCancellationToken(mapId);
+            if (token) {
+                token.cancel();
             }
             
             // In presentation mode, we intentionally skip map cleanup to avoid errors

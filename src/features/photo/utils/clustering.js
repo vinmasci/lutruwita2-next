@@ -31,7 +31,7 @@ export const getPhotoIdentifier = (url) => {
     // Try to extract the version number from Cloudinary URL
     const versionMatch = url.match(/\/v(\d+)\//);
     if (versionMatch && versionMatch[1]) {
-        logger.debug('Clustering', `Extracted version identifier: ${versionMatch[1]} from URL`);
+        // logger.debug('Clustering', `Extracted version identifier: ${versionMatch[1]} from URL`);
         return versionMatch[1]; // Return the version number
     }
     

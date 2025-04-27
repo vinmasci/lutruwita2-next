@@ -32,24 +32,55 @@ import {
   Search,
   Wine,
   Store,
-  ShoppingCart
+  ShoppingCart,
+  // New icon imports
+  WifiOff,
+  Waves,
+  Binoculars,
+  Milestone,
+  TrainTrack,
+  Pizza,
+  // Additional icons from web app
+  Ban,
+  Construction,
+  ArrowUpRight,
+  Flag,
+  Play,
+  StopCircle,
+  Wrench,
+  ShowerHead,
+  Fuel,
+  Mail,
+  Signpost,
+  // Icons based on user's feedback
+  DoorClosed,
+  LockKeyhole,
+  Battery,
+  BriefcaseMedical,
+  // New icons for user's latest request
+  Worm,
+  Banana
 } from 'lucide-react-native';
 
 // Category to color mapping
 const getCategoryColor = (category: string): string => {
   switch (category) {
     case 'transportation':
-      return '#4A89F3'; // Blue
+      return '#38ada9'; // Teal (was #4A89F3)
     case 'accommodation':
-      return '#FF9800'; // Orange
-    case 'food-drink':
-      return '#4CAF50'; // Green
-    case 'natural-features':
-      return '#8BC34A'; // Light Green
-    case 'town-services':
       return '#9C27B0'; // Purple
+    case 'food-drink':
+      return '#f7b731'; // Yellow (was #ff7f50)
+    case 'natural-features':
+      return '#4CAF50'; // Green
+    case 'town-services':
+      return '#0a3d62'; // Dark blue (was #546E7A)
+    case 'event-information':
+      return '#0a3d62'; // Dark blue (was #546E7A)
     case 'road-information':
       return '#F44336'; // Red
+    case 'trail-information':
+      return '#F44336'; // Red (for hazards)
     default:
       return '#3478F6'; // Default Blue
   }
@@ -73,6 +104,8 @@ const getIconComponent = (iconName: string) => {
       return Plane;
     case 'Ship':
       return Ship;
+    case 'RailTrail':
+      return TrainTrack;
       
     // Accommodation
     case 'Tent':
@@ -97,6 +130,8 @@ const getIconComponent = (iconName: string) => {
       return ShoppingCart;
     case 'Droplet':
       return Droplet;
+    case 'Pizza':
+      return Pizza;
       
     // Natural Features
     case 'Mountain':
@@ -105,7 +140,13 @@ const getIconComponent = (iconName: string) => {
     case 'Trees':
       return Trees;
     case 'Binoculars':
-      return Search;
+      return Binoculars;
+    case 'WaterCrossing':
+      return Waves;
+    case 'Swimming':
+      return Waves; // Using Waves for Swimming (waves-ladder)
+    case 'MountainBikePark':
+      return Signpost; // Using Signpost for MountainBikePark (signpost-big)
       
     // Town Services
     case 'Toilet':
@@ -116,22 +157,58 @@ const getIconComponent = (iconName: string) => {
       return Phone;
     case 'Info':
       return Info;
+    case 'ShowerHead':
+      return ShowerHead;
+    case 'Fuel':
+      return Fuel;
+    case 'Mail':
+      return Mail;
       
     // Road Information
     case 'TrafficCone':
       return AlertTriangle;
+    case 'RoughSurface':
+    case 'ChevronsRightLeft':
+      return Banana; // Using Banana for Rough Surface (was Trash2)
+    case 'Octagon':
+      return Construction; // Using Construction for Road Closed
+    case 'AlertOctagon':
+      return Ban; // Using Ban for Private Road
+    case 'Lock':
+      return LockKeyhole; // Using LockKeyhole for Gate Locked (door-closed-locked)
+    case 'Unlock':
+      return DoorClosed; // Using DoorClosed for Gate Unlocked (door-closed)
+    case 'Construction':
+      return Construction;
+    case 'ArrowUpRight':
+      return ArrowUpRight;
+    case 'HeavyTraffic':
+      return Car; // Using Car for HeavyTraffic
+    case 'AudioWaveform':
+      return Worm; // Using Worm for Single Track (was MoreHorizontal)
       
-    // Other
-    case 'Camera':
-      return Camera;
-    case 'Landmark':
-      return Landmark;
-    case 'Building':
-      return Building;
-    case 'Music':
-      return Music;
-    case 'Ticket':
-      return Ticket;
+    // Trail Information
+    case 'RemoteArea':
+      return WifiOff; // Using WifiOff for Remote Area
+    case 'Trailhead':
+    case 'Route':
+      return Milestone;
+    case 'HikeABike':
+      return Bike;
+      
+    // Event Information
+    case 'PlayCircle':
+      return Play; // Using Play for Start
+    case 'StopCircle':
+      return StopCircle; // Using StopCircle for Finish (circle-stop)
+    case 'Stethoscope':
+      return BriefcaseMedical; // Using BriefcaseMedical for Aid Station (briefcase-medical)
+    case 'BatteryCharging':
+      return Battery; // Using Battery for Rest Stop (battery-medium)
+    case 'Wrench':
+      return Wrench; // Using Wrench for Bike Hub
+    case 'Flag':
+      return Flag; // Using Flag for Checkpoint
   }
   
   // If no exact match, try lowercase
@@ -168,6 +245,8 @@ const getIconComponent = (iconName: string) => {
     case 'railway':
     case 'trainstation':
       return Train;
+    case 'railtrail':
+      return TrainTrack;
     case 'plane':
     case 'airport':
       return Plane;
@@ -189,10 +268,20 @@ const getIconComponent = (iconName: string) => {
     case 'lake':
     case 'droplet':
       return Droplet;
+    case 'watercrossing':
+    case 'waves':
+      return Waves;
+    case 'swimming':
+    case 'swim':
+    case 'wateraccess':
+    case 'waves-ladder':
+      return Waves; // Using Waves for Swimming (waves-ladder)
     case 'camera':
     case 'photo':
-    case 'viewpoint':
       return Camera;
+    case 'viewpoint':
+    case 'binoculars':
+      return Binoculars;
     case 'info':
     case 'information':
       return Info;
@@ -201,11 +290,54 @@ const getIconComponent = (iconName: string) => {
     case 'danger':
     case 'trafficcone':
       return AlertTriangle;
+    case 'roughsurface':
+    case 'rough':
+    case 'chevronsrightleft':
+    case 'bacon':
+    case 'bin':
+      return Banana; // Using Banana for Rough Surface (was Trash2)
+    case 'roadclosed':
+    case 'octagon':
+      return Construction; // Using Construction for Road Closed
+    case 'privateroad':
+    case 'alertoctagon':
+      return Ban; // Using Ban for Private Road
+    case 'lockedgate':
+    case 'door-closed-locked':
+      return LockKeyhole; // Using LockKeyhole for Gate Locked (door-closed-locked)
+    case 'gate':
+    case 'unlock':
+    case 'door-closed':
+      return DoorClosed; // Using DoorClosed for Gate Unlocked (door-closed)
+    case 'construction':
+    case 'roadwork':
+    case 'roadconstruction':
+      return Construction;
+    case 'arrowupright':
+    case 'steep':
+    case 'gradient':
+      return ArrowUpRight;
+    case 'heavytraffic':
+    case 'traffic':
+      return Car; // Using Car for HeavyTraffic
+    case 'singletrack':
+    case 'audiowaveform':
+    case 'ellipsis':
+      return Worm; // Using Worm for Single Track (was MoreHorizontal)
     case 'landmark':
     case 'monument':
     case 'attraction':
-    case 'binoculars':
-      return Search;
+      return Landmark;
+    case 'trailhead':
+    case 'trail':
+    case 'route':
+    case 'path':
+    case 'milestone':
+      return Milestone;
+    case 'hikeabike':
+    case 'hike':
+    case 'carry':
+      return Bike;
     case 'building':
     case 'structure':
       return Building;
@@ -219,6 +351,58 @@ const getIconComponent = (iconName: string) => {
       return Beer;
     case 'wine':
       return Wine;
+    case 'pizza':
+    case 'roadhouse':
+    case 'fastfood':
+      return Pizza;
+    case 'start':
+    case 'play':
+    case 'playcircle':
+      return Play; // Using Play for Start
+    case 'finish':
+    case 'circle-stop':
+    case 'stopcircle':
+      return StopCircle; // Using StopCircle for Finish (circle-stop)
+    case 'aid':
+    case 'aidstation':
+    case 'medical':
+    case 'briefcase-medical':
+    case 'stethoscope':
+      return BriefcaseMedical; // Using BriefcaseMedical for Aid Station (briefcase-medical)
+    case 'rest':
+    case 'reststop':
+    case 'battery-medium':
+    case 'batterycharging':
+      return Battery; // Using Battery for Rest Stop (battery-medium)
+    case 'repair':
+    case 'bikehub':
+    case 'wrench':
+      return Wrench; // Using Wrench for Bike Hub
+    case 'checkpoint':
+    case 'flag':
+      return Flag; // Using Flag for Checkpoint
+    case 'shower':
+    case 'shower-head':
+    case 'showerhead':
+      return ShowerHead; // Using ShowerHead
+    case 'servicestation':
+    case 'gas':
+    case 'petrol':
+    case 'fuel':
+      return Fuel; // Using Fuel
+    case 'postoffice':
+    case 'post':
+    case 'mail':
+      return Mail; // Using Mail
+    case 'mountainbikepark':
+    case 'bikepark':
+    case 'biketrails':
+    case 'signpost-big':
+    case 'signpost':
+    case 'motor-racing-helmet':
+    case 'helmet':
+    case 'hardhat':
+      return Signpost; // Using Signpost for MountainBikePark (signpost-big)
     case 'music':
     case 'event':
     case 'concert':
@@ -231,13 +415,19 @@ const getIconComponent = (iconName: string) => {
     case 'wc':
       return Toilet;
     case 'firstaid':
-    case 'medical':
     case 'hospital':
       return Heart;
     case 'phone':
     case 'telephone':
     case 'emergency':
       return Phone;
+    case 'remotearea':
+    case 'remote':
+    case 'phoneoff':
+    case 'nosignal':
+    case 'wifi-off':
+    case 'wifioff':
+      return WifiOff; // Using WifiOff for Remote Area
     default:
       return MapPin;
   }
@@ -254,20 +444,32 @@ const POIMarker: React.FC<POIMarkerProps> = ({ poi }) => {
   // Use category color or POI's color if available, otherwise use a default color
   const markerColor = poi.style?.color || getCategoryColor(poi.category) || '#3478F6';
   
-  // Use the POI's size if available, otherwise use a default size
-  const markerSize = poi.style?.size || 24;
+  // Use the POI's size if available, otherwise use a default size (slightly smaller)
+  const markerSize = poi.style?.size || 20;
   
+  // Special case for water crossing and drinking water POIs
+  let finalColor = markerColor;
+  if (poi.icon && (
+    poi.icon.toLowerCase() === 'watercrossing' || 
+    poi.icon.toLowerCase() === 'droplet' || 
+    poi.icon.toLowerCase() === 'water' || 
+    poi.icon.toLowerCase() === 'waves' || 
+    poi.icon.toLowerCase() === 'drinking-water'
+  )) {
+    finalColor = '#6a89cc'; // Light blue for water-related POIs
+  }
+
   return (
     <View style={[
       styles.markerContainer,
       {
-        width: markerSize + 12, // Add some padding
-        height: markerSize + 12,
-        borderRadius: (markerSize + 12) / 2,
-        backgroundColor: markerColor,
+        width: markerSize + 8, // Reduced padding (was +12)
+        height: markerSize + 8, // Reduced padding (was +12)
+        borderRadius: 8, // Square with rounded corners instead of fully circular
+        backgroundColor: finalColor,
       }
     ]}>
-      <IconComponent size={markerSize * 0.75} color="#FFFFFF" strokeWidth={2.5} />
+      <IconComponent size={markerSize * 0.75} color="#FFFFFF" strokeWidth={1.5} />
     </View>
   );
 };
@@ -276,7 +478,7 @@ const styles = StyleSheet.create({
   markerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2.5,
+    borderWidth: 0,
     borderColor: '#FFFFFF',
     elevation: 5,
     shadowColor: '#000',

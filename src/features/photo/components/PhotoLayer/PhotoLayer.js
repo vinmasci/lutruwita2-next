@@ -78,16 +78,32 @@ export const PhotoLayer = () => {
         });
     }, [photos, normalizeCoordinates]);
     
-    // Function to get nearby photos for the lightbox, organized by route and km position
-    const getOrderedPhotos = useCallback((allPhotos) => {
-        if (!allPhotos || allPhotos.length === 0) {
-            return [];
-        }
-        
-        // Get the current routes from context
-        const routes = currentRoute?._loadedState?.routes || [];
-        
-        // Function to find which route a photo belongs to and its position along that route
+     // Function to get nearby photos for the lightbox, organized by route and km position
+     const getOrderedPhotos = useCallback((allPhotos) => {
+         if (!allPhotos || allPhotos.length === 0) {
+             return [];
+         }
+ 
+         // --- MODIFIED LOGIC START ---
+         let routesToUse = [];
+         // Prioritize using routes from _loadedState if available (likely in presentation/loaded mode)
+         if (currentRoute?._loadedState?.routes?.length > 0) {
+             console.log('[PhotoLayer] Using routes from _loadedState for ordering.');
+             routesToUse = currentRoute._loadedState.routes;
+         } 
+         // Fallback: If _loadedState isn't ready, try using the currentRoute directly
+         // (assuming it's a single route object with geojson in creation mode)
+         else if (currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
+             console.log('[PhotoLayer] _loadedState not available, using currentRoute.geojson for ordering.');
+             // Wrap the single currentRoute in an array to match the expected structure
+             routesToUse = [currentRoute]; 
+         } else {
+             console.warn('[PhotoLayer] No suitable route data found (_loadedState or currentRoute.geojson) for photo ordering. Returning photos unsorted.');
+             return allPhotos; // Return unsorted if no route data found
+         }
+         // --- MODIFIED LOGIC END ---
+ 
+         // Function to find which route a photo belongs to and its position along that route
         const getPhotoRouteInfo = (photo) => {
             if (!photo.coordinates) return { routeIndex: Infinity, distanceAlongRoute: Infinity };
             
@@ -119,14 +135,17 @@ export const PhotoLayer = () => {
                 // Earth's radius in meters
                 const R = 6371e3;
                 return R * c;
-            };
-            
-            // Check each route to find the closest one to this photo
-            routes.forEach((route, routeIndex) => {
-                if (!route.geojson?.features?.[0]?.geometry?.coordinates) return;
-                
-                const routeCoords = route.geojson.features[0].geometry.coordinates;
-                
+             };
+             
+             // Check each route to find the closest one to this photo
+             routesToUse.forEach((route, routeIndex) => { // Use routesToUse here
+                 if (!route.geojson?.features?.[0]?.geometry?.coordinates) {
+                     console.warn(`[PhotoLayer] Route at index ${routeIndex} missing coordinates for ordering.`);
+                     return; // Skip this route if it has no coordinates
+                 }
+                 
+                 const routeCoords = route.geojson.features[0].geometry.coordinates;
+                 
                 // Find the closest point on this route to the photo
                 let minDistance = Infinity;
                 let closestPointIndex = -1;
@@ -184,18 +203,18 @@ export const PhotoLayer = () => {
             
             // Then sort by distance along route (from start to end)
             return a.distanceAlongRoute - b.distanceAlongRoute;
-        });
-        
-        return sortedPhotos;
-    }, [currentRoute]);
-    
-    // Memoize the ordered photos to avoid recalculating on every render
-    const orderedPhotos = useMemo(() => {
-        return getOrderedPhotos(validPhotos);
-    }, [validPhotos, getOrderedPhotos]);
-    // Use rounded zoom level to reduce recalculations
-    const roundedZoom = useMemo(() => {
-        if (zoom === null) return null;
+         });
+         
+         return sortedPhotos;
+     }, [currentRoute]);
+     
+     // Memoize the ordered photos to avoid recalculating on every render
+     const orderedPhotos = useMemo(() => {
+         return getOrderedPhotos(validPhotos);
+     }, [validPhotos, getOrderedPhotos]);
+     // Use rounded zoom level to reduce recalculations
+     const roundedZoom = useMemo(() => {
+         if (zoom === null) return null;
         return Math.floor(zoom * 2) / 2; // Round to nearest 0.5
     }, [zoom]);
     
@@ -268,14 +287,14 @@ export const PhotoLayer = () => {
             });
         }
     }, [findPhotoCluster, getPhotoIdentifier, zoom, map]);
-
-    // Find the index of the selected photo in the ordered array
-    const selectedPhotoIndex = useMemo(() => {
-        if (!selectedPhoto || !orderedPhotos.length) return 0;
-        return orderedPhotos.findIndex(p => p.url === selectedPhoto.url);
-    }, [selectedPhoto, orderedPhotos]);
-
-    // Check if a cluster contains the selected photo
+ 
+     // Find the index of the selected photo in the ordered array
+     const selectedPhotoIndex = useMemo(() => {
+         if (!selectedPhoto || !orderedPhotos.length) return 0;
+         return orderedPhotos.findIndex(p => p.url === selectedPhoto.url);
+     }, [selectedPhoto, orderedPhotos]);
+ 
+     // Check if a cluster contains the selected photo
     const isClusterContainingSelectedPhoto = useCallback((cluster) => {
         if (!selectedPhoto || !cluster.properties.photos) return false;
         return cluster.properties.photos.some(photo => photo.url === selectedPhoto.url);
@@ -391,13 +410,14 @@ export const PhotoLayer = () => {
                     onClick: () => handleClusterClick(item),
                     isHighlighted: selectedPhoto && isClusterContainingSelectedPhoto(item)
                   }, `cluster-${item.properties.cluster_id}`)) 
-                : (_jsx(PhotoMarker, { 
-                    photo: item.properties.photo, 
-                    onClick: () => handlePhotoClick(item.properties.photo),
-                    isHighlighted: selectedPhoto && selectedPhoto.url === item.properties.photo.url
-                  }, item.properties.id))
-        ), 
-        selectedPhoto && (_jsx(PhotoModal, { 
+                 : (_jsx(PhotoMarker, {
+                     photo: item.properties.photo,
+                     onClick: () => handlePhotoClick(item.properties.photo),
+                     isHighlighted: selectedPhoto && selectedPhoto.url === item.properties.photo.url,
+                     isEditable: true // Explicitly enable editing/dragging in this layer
+                   }, item.properties.id))
+         ),
+         selectedPhoto && (_jsx(PhotoModal, {
             photo: selectedPhoto, 
             onClose: () => {
                 setSelectedPhoto(null);
@@ -416,8 +436,23 @@ export const PhotoLayer = () => {
             onDelete: (photoIdOrUrl) => {
                 // Handle deletion if needed
                 setSelectedPhoto(null);
-                setSelectedCluster(null);
-            }
-        }, `preview-${selectedPhoto.id || selectedPhoto.url}`))
-    ] }));
-};
+                 setSelectedCluster(null);
+                 // Restore pitch to 0 when closing the modal
+                 if (map) {
+                     map.easeTo({
+                         pitch: 0,
+                         duration: 500
+                     });
+                 }
+             }, 
+             additionalPhotos: orderedPhotos,
+             initialIndex: selectedPhotoIndex,
+             onPhotoChange: setSelectedPhoto,
+             onDelete: (photoIdOrUrl) => {
+                 // Handle deletion if needed
+                 setSelectedPhoto(null);
+                 setSelectedCluster(null);
+             }
+         }, `preview-${selectedPhoto.id || selectedPhoto.url}`))
+     ] }));
+ };

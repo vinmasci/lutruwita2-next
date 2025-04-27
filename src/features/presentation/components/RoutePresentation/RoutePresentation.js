@@ -264,6 +264,7 @@ export const RoutePresentation = () => {
                         backgroundColor: 'rgba(0,0,0,0.7)',
                         zIndex: 10
                     },
+                    key: "loading-overlay",
                     children: _jsx(CircularProgress, {})
                 })
             ),
@@ -284,6 +285,7 @@ export const RoutePresentation = () => {
                         zIndex: 10,
                         p: 2 // Add padding for the alert
                     },
+                    key: "error-overlay",
                     children: _jsx(Alert, {
                         severity: "error",
                         sx: { maxWidth: 'sm' },
@@ -291,6 +293,6 @@ export const RoutePresentation = () => {
                     })
                 })
             )
-        ] })
+        ].filter(Boolean) }) // Filter out null children
     }) }));
 };

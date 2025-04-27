@@ -24,7 +24,9 @@ export const StyledDrawer = styled(Drawer)({
         }
     }
 });
-export const NestedDrawer = styled(Drawer)(({ theme, customWidth }) => {
+export const NestedDrawer = styled(Drawer, {
+    shouldForwardProp: (prop) => prop !== 'customWidth'
+})(({ theme, customWidth }) => {
     return {
         width: customWidth || (theme.breakpoints.values.sm ? '264px' : '100%'),
         flexShrink: 0,

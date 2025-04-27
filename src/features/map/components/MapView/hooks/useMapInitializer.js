@@ -229,13 +229,14 @@ export const useMapInitializer = ({ notifyMapStateChange, containerRef }) => {
       // Make sure the map instance is set in the queue again after load
       setMapInstance(map);
       
-      // Add styledata event handler to re-add hover point when style changes
-      map.on('styledata', () => {
-        // Reduced logging - only log in development mode
-        if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
-          console.log('[MapView] Style changed, checking if hover-point needs to be re-added');
-        }
-        
+       // Add styledata event handler to re-add hover point when style changes
+       map.on('styledata', () => {
+         // Reduced logging - only log in development mode
+         // Use import.meta.env for Vite environment variables
+         if (import.meta.env.MODE === 'development' && import.meta.env.VITE_DEBUG_LOGGING === 'true') {
+           console.log('[MapView] Style changed, checking if hover-point needs to be re-added');
+         }
+         
         // Check if the hover-point source exists
         if (!map.getSource('hover-point')) {
           console.log('[MapView] Re-adding hover-point source and layer after style change');

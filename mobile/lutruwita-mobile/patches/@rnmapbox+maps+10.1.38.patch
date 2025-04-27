@@ -1,0 +1,13 @@
+diff --git a/node_modules/@rnmapbox/maps/ios/RNMBX/RNMBXModule.swift b/node_modules/@rnmapbox/maps/ios/RNMBX/RNMBXModule.swift
+index 1234567..7654321 100644
+--- a/node_modules/@rnmapbox/maps/ios/RNMBX/RNMBXModule.swift
++++ b/node_modules/@rnmapbox/maps/ios/RNMBX/RNMBXModule.swift
+@@ -1,7 +1,7 @@
+ import Foundation
+ 
+ #if canImport(MapboxMobileEvents)
+-import MapboxMobileEvents
++// import MapboxMobileEvents commented out for SDK v11 compatibility
+ #endif
+ 
+ @objc(RNMBXModule)

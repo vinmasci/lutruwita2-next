@@ -16,14 +16,14 @@ export const DEFAULT_CENTER: [number, number] = [146.8087, -41.4419];
 // Default zoom level
 export const DEFAULT_ZOOM = 7;
 
-// Map style URLs
+// Map style URLs - Updated to latest versions
 export const MAP_STYLES = {
-  STREET: 'mapbox://styles/mapbox/streets-v11',
-  OUTDOORS: 'mapbox://styles/mapbox/outdoors-v11',
+  STREET: 'mapbox://styles/mapbox/streets-v12',
+  OUTDOORS: 'mapbox://styles/mapbox/outdoors-v12',
   SATELLITE: 'mapbox://styles/mapbox/satellite-v9',
   SATELLITE_STREETS: 'mapbox://styles/mapbox/satellite-streets-v12',
-  DARK: 'mapbox://styles/mapbox/dark-v10',
-  LIGHT: 'mapbox://styles/mapbox/light-v10',
+  DARK: 'mapbox://styles/mapbox/dark-v11',
+  LIGHT: 'mapbox://styles/mapbox/light-v11',
 };
 
 // Map configuration
