@@ -62,3 +62,7 @@ docs/DEPLOYMENT.md
 .vercel
 .env*.local
 node_modules
+
+# Service account credentials
+api/config/serviceAccountKey.json
+*serviceAccountKey*.json
