@@ -703,11 +703,11 @@ export const PresentationElevationProfilePanel = ({ route, header, isFlyByActive
                     }
                 },
                 children: activeTab === 'elevation' 
-                    ? route && _jsx(PresentationElevationProfile, { route: route, key: "elevation" })
+                    ? route && _jsx(PresentationElevationProfile, { route: route }, "elevation")
                     : activeTab === 'description'
-                    ? route && _jsx(PresentationRouteDescriptionPanel, { route: route, key: "description" })
+                    ? route && _jsx(PresentationRouteDescriptionPanel, { route: route }, "description")
                     : activeTab === 'weather'
-                    ? route && _jsx(PresentationWeatherProfilePanel, { route: route, key: "weather" })
+                    ? route && _jsx(PresentationWeatherProfilePanel, { route: route }, "weather")
                     : null
             })
         ] 

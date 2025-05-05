@@ -41,6 +41,33 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+/* Presentation mode highlighted state */
+.presentation-photo-layer .simplified-photo-marker-bubble.highlighted,
+.simplified-photo-marker-bubble.highlighted.presentation-mode {
+  transform: scale(1.2) !important;
+  border: 3px solid #FF9500 !important; /* Orange border */
+  box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5) !important; /* Glowing effect */
+  animation: pulse 1.5s infinite alternate !important;
+}
+
+/* Presentation mode non-highlighted state */
+.presentation-photo-layer .simplified-photo-marker-bubble:not(.highlighted),
+.simplified-photo-marker-bubble.presentation-mode:not(.highlighted) {
+  transform: none !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  animation: none !important;
+}
+
+@keyframes pulse {
+  from {
+    box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(255, 149, 0, 0.9), 0 0 40px rgba(255, 149, 0, 0.7);
+  }
+}
+
 .simplified-photo-marker-point {
   width: 0;
   height: 0;
@@ -54,6 +81,20 @@
 /* Highlighted marker point */
 .simplified-photo-marker-container.highlighted .simplified-photo-marker-point {
   border-top-color: #FFFFFF; /* White point */
+}
+
+/* Presentation mode highlighted marker point */
+.presentation-photo-layer .simplified-photo-marker-container.highlighted .simplified-photo-marker-point,
+.simplified-photo-marker-container.highlighted.presentation-mode .simplified-photo-marker-point {
+  border-top-color: #FF9500 !important; /* Orange point */
+  filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7)) !important;
+}
+
+/* Presentation mode non-highlighted marker point */
+.presentation-photo-layer .simplified-photo-marker-container:not(.highlighted) .simplified-photo-marker-point,
+.simplified-photo-marker-container.presentation-mode:not(.highlighted) .simplified-photo-marker-point {
+  border-top-color: white !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2)) !important;
 }
 
 /* Zoom-based scaling */

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapbox Mapbox Imtgcest</title>
+  <s>
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    .test-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .image-container {
+      margin: 20px 0;
+     1dsplay {
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      word-break: break-word;
+      margin: 10px 0;
+    }
+    .success {
+      color: green;
+     fcess Token</h2>
+    <p>Access token: <span id="access-token">pk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY20xY3B1ZmdzMHp5eDJwcHBtMmptOG8zOSJ9.Ayn_YEjOCCqujIYhY9PiiA</span></p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 1: Basic Centered Tasmania Map</h2>
+    <div class="url-display" id="url1"></div>
+    <div class="image-container">
+      <img id="image1" alt="Tasmania map" onload="imageLoaded('image1')" onerror="imageError('image1')">
+    </div>
+    <p>Status: <span id="status1">Loading...</span></p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Tasmania Path Overlay</h2>
+    <div class="url-display" id="url2"></div>
+    const height = 400;
+    const center = [146.8087, -41.4419];
+    const zoom = 8;
+
+    //Mapbox  Path oImegy
+    const tasmaniaPath = 'path-5+00ff00-0.8(146.5,-41.6,146.8,-41.5,147.0,-41.3,147.1,-41.2)';
+    
+    // Alternative path format to try
+    const tasmaniaPathAlt = 'path-5+00ff00-0.8+00ff00-0.1(146.5,-41.6,146.8,-41.5,147.0,-41.3,147.1,-41.2)';
+    
+    // Encoded path (URL-encoded)
+    const tasmaniaPathEncoded = encodeURIComponent('path-5+00ff00-0.8(146.5,-41.6,146.8,-41.5,147.0,-41.3,147.1,-41.2)');
+1: Basic Cenred Tasmania Map
+    // Test 1: Curledasplayurl1
+    c1iv class =ima `-cohtaintt">
+      <img id="impg:1apaot="Tx.mania mapm leload=simag1Loaded('image1')" o/maror="impgoError('image1')">
+x   </div>
+    <p>/outus:ovspan id="ssatus1">Laaditg...</spani</p>c/${center[0]},${center[1]},${zoom},0/${width}x${height}?access_token=${accessToken}`;
+    document.getElementById('url1').textContent = url1;
+    document.getElementById('image1').src = url1;
+
+    // TTsst 2: Tasmati:pPithaOverlpyth overlay
+    constclassrl`rl-dihpsayp.sd=/uol2">/outdoors-v11/static/${tasmaniaPathAlt}/auto/${width}x${height}?access_token=${accessToken}`;
+    document.getElementById('url2').textContent = url2;
+    document.ged('im2age2').Tasmcn=auplth;onoadimageLoade('mge2')"oerror="imageErrr('imag2')
+    
+    /p>StTt3 :< o e sTatu32nst adint...esipm ionp
+    test3Section.innerHTML = `
+      <h2>Test 3: Direct Path Syntax</h2>
+      <div class="url-display" id="url3">${url3}</div>
+   <cois  id="image3" alt="Tasmania path direct" onload="imageLoaded('image3  </div>
+  <uc:ns<pwia h = 600;d="status3">Loading...</span></p>
+    `;high400;
+  docmnsn ctnapdo=e[146.8087y -41.4419];Id('image3').src = url3;
+csiazimo=l8;mentById('status' + id.slice(-1)).innerHTML = '<span class="success">Loaded successfully!</span>';
+
+//Pahovrlynagrronr
+cumecgnsasmaaPh='path-5+00ff00-0.8(pboxglLngLaB)';//Alterti pah frmattotnst tasmanaPthAl='path-5+00ff00-0.8+00ff00-0.1(146.5,-41.6,,147.1,-41.2)';Ecoddath (URL-encoded)tasiPhEcodd=ncdURIConn('pah5+00ff00-0.8(46.5-4.6,15,147.0,-41.147.1,-41.2')Ts1:Cerecnsl1=`himpx.m/ys/v1/mbox/tsv1sc/${n[0]}$ct[1]$zm}0/${h}x${gh?cc_k$sTkmngElmBId(l1).xC = ul1;ume.gEB(mag1).=1;//Ts:Mpw avrlayul2`hp://pipxm/yls/v1//ts-v11/sti/${anaPahAlt}/at/$with}x${heht?aess_ke=${accTokn}`;2ul2dcumeeEemeById('mag2')cu2A3:Mwh cdvul3`mpboxstyles/x/ud-v11/i/ph-5+00ff00-08146.5,-41.6,146.8,-41.5,147.0,-41.3,147.1,-41.2/o/$wih}x${hgh}?ss_ke=accToknCrT3s3Seco3SctclasNam-sc3ScHTML = `<h2>Test3:Dict PhSx</2><divla="url-dsply"id"ur3">$url3}</div><divlss="ge-c"><imgid="imag3"l="Taani h dc"oload="iLoadd'i3'"oneo="imEro('imag3')"></d><p>Sts<d"u3">L</span></p>`;cmnbody.ppenChil3ScicmgElmnBId(mag3).= 3;fcmagLded(d){cmgEmenBId(s+.s(-1))nrHTML=<sl"">Lcsfll!</>;}fn imE({cmet.gtElB(tts'+id.sc(1)).HTML='<ss="ero">Flld!</p>'}
+</p>
+</y</hml>

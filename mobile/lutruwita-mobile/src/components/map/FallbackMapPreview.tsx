@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 // Import the clean static map component
 import CleanStaticMap from './CleanStaticMap';
@@ -62,4 +62,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FallbackMapPreview;
+export default memo(FallbackMapPreview);

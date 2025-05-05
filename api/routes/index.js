@@ -4,6 +4,328 @@ import { connectToDatabase } from '../lib/db.js';
 import { deleteFile, uploadJsonData } from '../lib/cloudinary.js';
 import { getCache, setCache, deleteCache } from '../lib/redis.js';
 import { decompressData, isCompressedData } from '../lib/compression.js';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+// Firebase integration is optional
+// We'll check if firebase-admin is installed before trying to use it
+let admin;
+let db;
+let firebaseAvailable = false;
+
+// Initialize Firebase Admin SDK
+const initializeFirebase = async () => {
+  try {
+    // Try to import firebase-admin using dynamic import
+    const firebaseAdmin = await import('firebase-admin');
+    
+    // With dynamic imports, we need to access the default export
+    admin = firebaseAdmin.default;
+    console.log('[API] Firebase Admin SDK imported successfully');
+    
+    // Initialize Firebase Admin SDK if not already initialized
+    if (!admin.apps?.length) {
+      try {
+        console.log('[API] Initializing Firebase Admin SDK...');
+        
+        // Load service account key file
+        try {
+          const path = await import('path');
+          const fs = await import('fs');
+          const { fileURLToPath } = await import('url');
+          
+          // Get the directory name
+          const __filename = fileURLToPath(import.meta.url);
+          const __dirname = path.dirname(__filename);
+          
+          // Path to service account key file
+          const serviceAccountPath = path.resolve(__dirname, '../../api/config/serviceAccountKey.json');
+          console.log(`[API] Looking for service account key at: ${serviceAccountPath}`);
+          
+          // Check if the file exists
+          if (fs.existsSync(serviceAccountPath)) {
+            console.log('[API] Service account key file found');
+            
+            // Read and parse the service account key file
+            const serviceAccountKey = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+            
+            // Initialize Firebase with the service account key
+            admin.initializeApp({
+              credential: admin.credential.cert(serviceAccountKey)
+            });
+            
+            console.log('[API] Firebase initialized with service account key');
+          } else {
+            console.log('[API] Service account key file not found, falling back to environment variables');
+            
+            // Get Firebase configuration from environment variables with fallbacks
+            const projectId = process.env.FIREBASE_PROJECT_ID || 'cyatrails';
+            const projectNumber = process.env.FIREBASE_PROJECT_NUMBER || '79924943942';
+            const apiKey = process.env.FIREBASE_API_KEY || 'AIzaSyDMPCfqbTIiT3vFE1QZRZXkUuX1Nc85XxI';
+            
+            console.log(`[API] Using Firebase project ID: ${projectId}`);
+            console.log(`[API] Using Firebase project number: ${projectNumber || 'Not provided'}`);
+            console.log(`[API] Firebase API key configured: ${apiKey ? 'Yes' : 'No'}`);
+            
+            // Initialize with explicit project ID
+            admin.initializeApp({
+              projectId: projectId
+            });
+          }
+        } catch (error) {
+          console.error('[API] Error loading service account key:', error);
+          
+          // Fallback to environment variables
+          const projectId = process.env.FIREBASE_PROJECT_ID || 'cyatrails';
+          console.log(`[API] Falling back to environment variables with project ID: ${projectId}`);
+          
+          // Initialize with explicit project ID
+          admin.initializeApp({
+            projectId: projectId
+          });
+        }
+        
+        console.log('[API] Firebase Admin SDK initialized successfully');
+        
+        // Get Firestore instance
+        db = admin.firestore();
+        console.log('[API] Firestore instance created');
+        
+        // Test Firestore connection
+        try {
+          await db.collection('test').doc('test').set({ test: true });
+          console.log('[API] Firestore connection test successful');
+          firebaseAvailable = true;
+        } catch (firestoreError) {
+          console.error('[API] Firestore connection test failed:', firestoreError);
+          console.error('[API] Error details:', firestoreError.message);
+          firebaseAvailable = false;
+        }
+      } catch (initError) {
+        console.error('[API] Error initializing Firebase Admin SDK:', initError);
+        console.error('[API] Error details:', initError.message);
+        if (initError.code) {
+          console.error('[API] Error code:', initError.code);
+        }
+      }
+    } else {
+      // Firebase is already initialized
+      console.log('[API] Firebase Admin SDK already initialized');
+      db = admin.firestore();
+      firebaseAvailable = true;
+    }
+  } catch (importError) {
+    console.log('[API] Firebase Admin SDK not available, skipping Firebase integration');
+    console.log('[API] Error details:', importError.message);
+  }
+  
+  // Log Firebase availability
+  console.log('[API] Firebase available:', firebaseAvailable);
+  return firebaseAvailable;
+};
+
+// Initialize Firebase
+await initializeFirebase();
+
+/**
+ * Helper function to convert MongoDB ObjectId to string
+ * This version uses a non-recursive approach to avoid stack overflow
+ * @param {*} data - The data to process
+ * @returns {*} - The processed data with ObjectId converted to string
+ */
+const convertObjectIdToString = (data) => {
+  // Simple case: null or undefined
+  if (data === null || data === undefined) {
+    return data;
+  }
+  
+  // Simple case: primitive values
+  if (typeof data !== 'object') {
+    return data;
+  }
+  
+  // Handle ObjectId directly
+  if (data && typeof data === 'object' && data._bsontype === 'ObjectID' && typeof data.toString === 'function') {
+    return data.toString();
+  }
+  
+  // Use JSON.stringify and JSON.parse to create a deep copy and break circular references
+  try {
+    // Custom replacer function for JSON.stringify
+    const replacer = (key, value) => {
+      // Handle ObjectId
+      if (value && typeof value === 'object' && value._bsontype === 'ObjectID' && typeof value.toString === 'function') {
+        return value.toString();
+      }
+      
+      // Handle Date objects
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      
+      // Handle other special types if needed
+      
+      return value;
+    };
+    
+    // Use JSON.stringify with replacer to convert ObjectId to string
+    const jsonString = JSON.stringify(data, replacer);
+    
+    // Parse back to object
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('[API] Error converting ObjectId to string:', error);
+    
+    // Fallback to a simpler approach if JSON.stringify fails
+    // This might happen if there are circular references
+    
+    // For arrays, create a new array with converted values
+    if (Array.isArray(data)) {
+      return data.map(item => {
+        if (item && typeof item === 'object' && item._bsontype === 'ObjectID' && typeof item.toString === 'function') {
+          return item.toString();
+        }
+        return item;
+      });
+    }
+    
+    // For objects, create a new object with converted values
+    if (typeof data === 'object') {
+      const result = {};
+      for (const key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          const value = data[key];
+          if (value && typeof value === 'object' && value._bsontype === 'ObjectID' && typeof value.toString === 'function') {
+            result[key] = value.toString();
+          } else {
+            result[key] = value;
+          }
+        }
+      }
+      return result;
+    }
+    
+    // If all else fails, return the original data
+    return data;
+  }
+};
+
+/**
+ * Check if a value is valid for Firestore
+ * @param {*} value - The value to check
+ * @param {string} path - The current path in the object (for logging)
+ * @returns {boolean} - True if valid, false otherwise
+ */
+const isValidForFirestore = (value, path = '') => {
+  // Check for null or undefined (valid)
+  if (value === null || value === undefined) {
+    return true;
+  }
+  
+  // Check for primitive types (valid)
+  if (typeof value !== 'object') {
+    return true;
+  }
+  
+  // Check for arrays (valid if all elements are valid)
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      if (!isValidForFirestore(value[i], `${path}[${i}]`)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  // Check for Date objects (valid)
+  if (value instanceof Date) {
+    return true;
+  }
+  
+  // Check for Firestore FieldValue (valid)
+  if (admin.firestore && value instanceof admin.firestore.FieldValue) {
+    return true;
+  }
+  
+  // Check for custom objects with prototypes
+  if (value.constructor && value.constructor.name !== 'Object') {
+    console.log(`[API] Invalid value at ${path}: ${value.constructor.name} is not a valid Firestore type`);
+    return false;
+  }
+  
+  // Check all properties of the object
+  for (const key in value) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) {
+      if (!isValidForFirestore(value[key], `${path}.${key}`)) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
+};
+
+/**
+ * Save optimized route data to Firebase
+ * @param {string} routeId - The persistent ID of the route
+ * @param {Object} optimizedData - The optimized route data to save
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ */
+const saveOptimizedRouteDataToFirebase = async (routeId, optimizedData) => {
+  // Skip if Firebase is not available
+  if (!firebaseAvailable) {
+    console.log('[API] Firebase not available, skipping Firebase save');
+    return false;
+  }
+  
+  try {
+    console.log(`[API] Saving optimized data to Firebase for route: ${routeId}`);
+    console.log(`[API] Data size: ${JSON.stringify(optimizedData).length} bytes`);
+    
+    // Log collection and document info
+    console.log(`[API] Firestore collection: optimizedRoutes, document ID: ${routeId}`);
+    
+    // Convert any MongoDB ObjectId to string
+    const processedData = convertObjectIdToString(optimizedData);
+    console.log('[API] Processed data for Firebase compatibility');
+    
+    // Always use the stringified version to avoid Firestore limitations
+    console.log('[API] Saving data as a stringified JSON to avoid Firestore limitations');
+    
+    // Create the document data with stringified JSON
+    const docData = {
+      dataString: JSON.stringify(processedData),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      version: 1 // Initial version
+    };
+    
+    // Save to Firestore
+    await db.collection('optimizedRoutes').doc(routeId).set(docData);
+    
+    console.log(`[API] Successfully saved optimized data to Firebase for route: ${routeId}`);
+    
+    // Verify the data was saved
+    const docRef = db.collection('optimizedRoutes').doc(routeId);
+    const docSnapshot = await docRef.get();
+    
+    if (docSnapshot.exists) {
+      console.log(`[API] Verified data was saved to Firebase for route: ${routeId}`);
+      return true;
+    } else {
+      console.error(`[API] Data was not saved to Firebase for route: ${routeId}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[API] Error saving optimized data to Firebase:`, error);
+    console.error(`[API] Error details:`, error.message);
+    if (error.code) {
+      console.error(`[API] Error code:`, error.code);
+    }
+    return false;
+  }
+};
 
 // Define Route schema to match the original structure
 const RouteSchema = new mongoose.Schema({
@@ -18,6 +340,8 @@ const RouteSchema = new mongoose.Schema({
   eventDate: { type: Date }, // Date field for event type routes
   publicId: { type: String, index: true, sparse: true },
   embedUrl: { type: String }, // URL to the pre-processed embed data in Cloudinary
+  staticMapUrl: { type: String }, // URL to the pre-generated static map image in Cloudinary
+  staticMapPublicId: { type: String }, // Public ID of the static map image in Cloudinary
   
   // Header settings
   headerSettings: {
@@ -218,6 +542,10 @@ async function handleCreateRoute(req, res) {
       description,
       lastViewed: new Date(),
       
+      // Static map URL and public ID
+      staticMapUrl: req.body.staticMapUrl,
+      staticMapPublicId: req.body.staticMapPublicId,
+      
       // Header settings
       headerSettings: req.body.headerSettings || {
         color: '#000000',
@@ -300,6 +628,8 @@ async function handleCreateRoute(req, res) {
           description: route.description, // Include the top-level description field
           headerSettings: route.headerSettings, // Include the header settings
           mapOverview: route.mapOverview || { description: '' }, // Include the map overview
+          staticMapUrl: route.staticMapUrl, // Include the static map URL
+          staticMapPublicId: route.staticMapPublicId, // Include the static map public ID
           _type: 'loaded',
           _loadedState: {
             name: route.name,
@@ -309,7 +639,9 @@ async function handleCreateRoute(req, res) {
             lines: route.lines || [], // Include lines in _loadedState too
             photos: route.photos || [],
             headerSettings: route.headerSettings, // Include header settings in _loadedState too
-            mapOverview: route.mapOverview || { description: '' } // Include map overview in _loadedState too
+            mapOverview: route.mapOverview || { description: '' }, // Include map overview in _loadedState too
+            staticMapUrl: route.staticMapUrl, // Include the static map URL in _loadedState
+            staticMapPublicId: route.staticMapPublicId // Include the static map public ID in _loadedState
           }
       };
       
@@ -324,6 +656,24 @@ async function handleCreateRoute(req, res) {
       await route.save();
       
       console.log(`[API] Embed data uploaded successfully: ${result.url}`);
+      
+      // Try to save to Firebase if available
+      if (firebaseAvailable) {
+        try {
+          console.log(`[API] Attempting to save optimized data to Firebase for route: ${route.persistentId}`);
+          const firebaseSaveResult = await saveOptimizedRouteDataToFirebase(route.persistentId, embedData);
+          console.log(`[API] Firebase save result: ${firebaseSaveResult ? 'Success' : 'Failed'}`);
+        } catch (firebaseError) {
+          console.error(`[API] Error saving to Firebase, but continuing:`, firebaseError);
+          console.error(`[API] Error details:`, firebaseError.message);
+          if (firebaseError.code) {
+            console.error(`[API] Error code:`, firebaseError.code);
+          }
+          // Continue even if Firebase save fails
+        }
+      } else {
+        console.log(`[API] Firebase not available, skipping Firebase save for route: ${route.persistentId}`);
+      }
     } catch (embedError) {
       console.error(`[API] Error generating embed data:`, embedError);
       // Continue even if embed data generation fails
@@ -382,7 +732,7 @@ async function handleUpdateRoute(req, res) {
     const { 
       name, description, isPublic, type, data, metadata, 
       mapState, routes: routeSegments, pois, photos, viewCount, lastViewed,
-      headerSettings, eventDate // Add eventDate here
+      headerSettings, eventDate, staticMapUrl, staticMapPublicId // Add staticMapUrl and staticMapPublicId
     } = req.body;
     
     // Update basic fields
@@ -469,6 +819,17 @@ async function handleUpdateRoute(req, res) {
       route.photos = photos;
     }
     
+    // Update static map URL and public ID if provided
+    if (staticMapUrl !== undefined) {
+      route.staticMapUrl = staticMapUrl;
+      console.log(`[API] Updated static map URL: ${staticMapUrl}`);
+    }
+    
+    if (staticMapPublicId !== undefined) {
+      route.staticMapPublicId = staticMapPublicId;
+      console.log(`[API] Updated static map public ID: ${staticMapPublicId}`);
+    }
+    
     // Update data and metadata
     if (data) {
       route.data = {
@@ -527,6 +888,8 @@ async function handleUpdateRoute(req, res) {
         description: route.description, // Include the top-level description field
         headerSettings: route.headerSettings, // Include the header settings
         mapOverview: route.mapOverview || { description: '' }, // Include the map overview
+        staticMapUrl: route.staticMapUrl, // Include the static map URL
+        staticMapPublicId: route.staticMapPublicId, // Include the static map public ID
         _type: 'loaded',
         _loadedState: {
           name: route.name,
@@ -536,7 +899,9 @@ async function handleUpdateRoute(req, res) {
           lines: route.lines || [], // Include lines in _loadedState too
           photos: route.photos || [],
           headerSettings: route.headerSettings, // Include header settings in _loadedState too
-          mapOverview: route.mapOverview || { description: '' } // Include map overview in _loadedState too
+          mapOverview: route.mapOverview || { description: '' }, // Include map overview in _loadedState too
+          staticMapUrl: route.staticMapUrl, // Include the static map URL in _loadedState
+          staticMapPublicId: route.staticMapPublicId // Include the static map public ID in _loadedState
         }
       };
       
@@ -558,6 +923,24 @@ async function handleUpdateRoute(req, res) {
       }
       
       console.log(`[API] Updated embed data uploaded successfully: ${result.url}`);
+      
+      // Try to save to Firebase if available
+      if (firebaseAvailable) {
+        try {
+          console.log(`[API] Attempting to save optimized data to Firebase for route: ${route.persistentId}`);
+          const firebaseSaveResult = await saveOptimizedRouteDataToFirebase(route.persistentId, embedData);
+          console.log(`[API] Firebase save result: ${firebaseSaveResult ? 'Success' : 'Failed'}`);
+        } catch (firebaseError) {
+          console.error(`[API] Error saving to Firebase, but continuing:`, firebaseError);
+          console.error(`[API] Error details:`, firebaseError.message);
+          if (firebaseError.code) {
+            console.error(`[API] Error code:`, firebaseError.code);
+          }
+          // Continue even if Firebase save fails
+        }
+      } else {
+        console.log(`[API] Firebase not available, skipping Firebase save for route: ${route.persistentId}`);
+      }
     } catch (embedError) {
       console.error(`[API] Error generating updated embed data:`, embedError);
       // Continue even if embed data generation fails
@@ -1399,6 +1782,14 @@ async function handlePartialUpdate(req, res) {
             route.routes[0].description = updateFields.description;
           }
         }
+        else if (field === 'staticMapUrl') {
+          route.staticMapUrl = updateFields.staticMapUrl;
+          console.log(`[API] Updated static map URL: ${updateFields.staticMapUrl}`);
+        }
+        else if (field === 'staticMapPublicId') {
+          route.staticMapPublicId = updateFields.staticMapPublicId;
+          console.log(`[API] Updated static map public ID: ${updateFields.staticMapPublicId}`);
+        }
         else {
           route[field] = updateFields[field];
           console.log(`[API] Updated field ${field}`);
@@ -1415,8 +1806,9 @@ async function handlePartialUpdate(req, res) {
     
     // Update embed data if needed (only for specific fields that affect the embed)
     const embedAffectingFields = [
-      'name', 'routes', 'mapState', 'pois', 'lines', 
-      'photos', 'description', 'headerSettings', 'mapOverview'
+      'name', 'routes', 'mapState', 'pois', 'lines',
+      'photos', 'description', 'headerSettings', 'mapOverview',
+      'staticMapUrl', 'staticMapPublicId' // Add static map fields to trigger embed update
     ];
     
     const needsEmbedUpdate = Object.keys(updateFields)
@@ -1450,6 +1842,8 @@ async function handlePartialUpdate(req, res) {
           description: route.description,
           headerSettings: route.headerSettings,
           mapOverview: route.mapOverview || { description: '' },
+          staticMapUrl: route.staticMapUrl, // Include the static map URL
+          staticMapPublicId: route.staticMapPublicId, // Include the static map public ID
           _type: 'loaded',
           _loadedState: {
             name: route.name,
@@ -1459,7 +1853,9 @@ async function handlePartialUpdate(req, res) {
             lines: route.lines || [],
             photos: route.photos || [],
             headerSettings: route.headerSettings,
-            mapOverview: route.mapOverview || { description: '' }
+            mapOverview: route.mapOverview || { description: '' },
+            staticMapUrl: route.staticMapUrl, // Include the static map URL in _loadedState
+            staticMapPublicId: route.staticMapPublicId // Include the static map public ID in _loadedState
           }
         };
         

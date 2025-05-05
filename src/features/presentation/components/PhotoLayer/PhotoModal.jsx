@@ -338,16 +338,24 @@ export const PhotoModal = ({ photo, onClose, additionalPhotos, initialIndex = 0,
   useEffect(() => {
     if (!map) return;
     
-    // Set the pitch only once when the modal first opens
-    if (!pitchSetRef.current) {
-      const isMobile = isMobileDevice();
-      
-      // Set the pitch based on device type
-      map.setPitch(isMobile ? 0 : 60);
-      
-      // Mark that we've set the pitch
-      pitchSetRef.current = true;
-    }
+  // Set the pitch only once when the modal first opens
+  if (!pitchSetRef.current) {
+    const isMobile = isMobileDevice();
+    
+    // First set the pitch directly to ensure it changes
+    map.easeTo(isMobile ? 0 : 90,);
+    
+    // Then use easeTo for a smoother transition
+    setTimeout(() => {
+      map.easeTo({
+        pitch: isMobile ? 0 : 70,
+        duration: 800 // Longer duration for a smoother transition
+      });
+    }, 400);
+    
+    // Mark that we've set the pitch
+    pitchSetRef.current = true;
+  }
     
     // Restore pitch to 0 when component unmounts
     return () => {

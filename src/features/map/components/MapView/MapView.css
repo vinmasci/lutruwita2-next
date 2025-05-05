@@ -46,12 +46,12 @@
 /* Map container */
 .map-container {
   width: 100% !important;
-  height: calc(100vh - 64px) !important; /* Use viewport height instead */
+  height: auto !important; /* Auto height instead of fixed calculation */
   position: fixed !important; /* Changed from absolute to fixed for more stable positioning */
   top: 64px !important; /* Height of the AppBar */
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
+  bottom: 0 !important; /* Extend to bottom of viewport */
   z-index: 1 !important; /* Ensure it's below the header */
 }
 

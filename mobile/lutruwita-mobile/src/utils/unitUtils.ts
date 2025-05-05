@@ -35,6 +35,16 @@ export const formatElevationMetric = (meters: number, decimals: number = 0): str
 };
 
 /**
+ * Format a number with commas for thousands
+ * @param num Number to format
+ * @param decimals Number of decimal places (default: 0)
+ * @returns Formatted string with commas
+ */
+export const formatNumberWithCommas = (num: number, decimals: number = 0): string => {
+  return num.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+/**
  * Convert meters to feet and format for display
  * @param meters Elevation in meters
  * @param decimals Number of decimal places (default: 0)

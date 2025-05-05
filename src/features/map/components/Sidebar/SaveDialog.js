@@ -1,18 +1,95 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, Box } from '@mui/material';
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, Box, CircularProgress, Typography, LinearProgress } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
-export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing }) => {
+export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, isSaving = false, progress: externalProgress, logs = [] }) => {
     const [formData, setFormData] = useState({
         name: initialValues?.name || '',
         type: initialValues?.type || 'tourism',
         isPublic: initialValues?.isPublic || false,
         eventDate: initialValues?.eventDate ? dayjs(initialValues.eventDate) : null
     });
+    
+    // Progress indicator state
+    const [progress, setProgress] = useState(0);
+    const [progressStage, setProgressStage] = useState('');
+    const progressInterval = useRef(null);
+    
+    // Ref for auto-scrolling logs
+    const logContainerRef = useRef(null);
+    
+    // Auto-scroll logs to bottom when they update
+    useEffect(() => {
+        if (logContainerRef.current && logs.length > 0) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        }
+    }, [logs]);
+    
+    // Update progress when external progress changes
+    useEffect(() => {
+        if (externalProgress !== undefined) {
+            setProgress(externalProgress);
+            
+            // Update stage based on progress
+            if (externalProgress <= 25) {
+                setProgressStage('Processing route data');
+            } else if (externalProgress > 25 && externalProgress <= 50) {
+                setProgressStage('Uploading photos');
+            } else if (externalProgress > 50 && externalProgress <= 75) {
+                setProgressStage('Generating map tiles');
+            } else if (externalProgress > 75) {
+                setProgressStage('Finalizing');
+            }
+        }
+    }, [externalProgress]);
+
+    // Simulate progress when saving starts/stops and no external progress is provided
+    useEffect(() => {
+        // Only simulate progress if external progress is not provided
+        if (isSaving && externalProgress === undefined) {
+            // Reset progress when saving starts
+            setProgress(0);
+            setProgressStage('Processing route data');
+            
+            // Simulate progress updates
+            progressInterval.current = setInterval(() => {
+                setProgress(prev => {
+                    const newProgress = prev + (Math.random() * 2);
+                    
+                    // Update stage based on progress
+                    if (newProgress > 25 && newProgress <= 50 && progressStage !== 'Uploading photos') {
+                        setProgressStage('Uploading photos');
+                    } else if (newProgress > 50 && newProgress <= 75 && progressStage !== 'Generating map tiles') {
+                        setProgressStage('Generating map tiles');
+                    } else if (newProgress > 75 && newProgress < 95 && progressStage !== 'Finalizing') {
+                        setProgressStage('Finalizing');
+                    }
+                    
+                    return newProgress > 95 ? 95 : newProgress;
+                });
+            }, 300);
+            
+            return () => {
+                if (progressInterval.current) {
+                    clearInterval(progressInterval.current);
+                }
+            };
+        } else if (!isSaving) {
+            // Clear interval when saving stops
+            if (progressInterval.current) {
+                clearInterval(progressInterval.current);
+                progressInterval.current = null;
+            }
+            
+            // Reset progress when saving is complete
+            setProgress(0);
+            setProgressStage('');
+        }
+    }, [isSaving, externalProgress, progressStage]);
     
     // Reset form when dialog opens/closes
     useEffect(() => {
@@ -165,9 +242,74 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing }) 
                 children: [
                     _jsx(Button, { 
                         onClick: onClose, 
-                        sx: { color: 'rgba(255, 255, 255, 0.7)' }, 
+                        sx: { color: 'rgba(255, 255, 255, 0.7)' },
+                        disabled: isSaving,
                         children: "Cancel" 
-                    }), 
+                    }),
+                    
+                    
+                    isSaving ? 
+                    _jsxs(Box, {
+                        sx: { 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            width: '100%', 
+                            padding: '0 8px' 
+                        },
+                        children: [
+                            _jsxs(Box, {
+                                sx: { 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 1, 
+                                    mb: 1 
+                                },
+                                children: [
+                                    _jsx(CircularProgress, {
+                                        variant: "indeterminate",
+                                        size: 24,
+                                        sx: { color: '#90caf9' }
+                                    }),
+                                    _jsx(Typography, {
+                                        variant: "body1",
+                                        sx: { 
+                                            color: 'rgba(255, 255, 255, 0.9)', 
+                                            fontWeight: 'medium' 
+                                        },
+                                        children: `Saving... ${Math.round(progress)}%`
+                                    })
+                                ]
+                            }),
+                            
+                            _jsx(Box, {
+                                sx: { width: '100%', mb: 1 },
+                                children: _jsx(LinearProgress, {
+                                    variant: "determinate",
+                                    value: progress,
+                                    sx: {
+                                        height: 8,
+                                        borderRadius: 4,
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        '& .MuiLinearProgress-bar': {
+                                            backgroundColor: '#90caf9',
+                                            borderRadius: 4
+                                        }
+                                    }
+                                })
+                            }),
+                            
+                            _jsx(Typography, {
+                                variant: "caption",
+                                sx: {
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    alignSelf: 'flex-start',
+                                    mb: 1
+                                },
+                                children: `${progressStage} (${Math.round(progress)}%)`
+                            }),
+                            
+                        ]
+                    }) :
                     _jsx(Button, { 
                         onClick: () => onSave(formData), 
                         disabled: !formData.name, 

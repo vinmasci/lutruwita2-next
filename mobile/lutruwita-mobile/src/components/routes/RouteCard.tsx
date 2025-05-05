@@ -76,8 +76,8 @@ const RouteCard: React.FC<RouteCardProps> = ({ route, onPress }) => {
             </View>
           )}
           <FallbackMapPreview
-            center={route.mapState.center}
-            zoom={route.mapState.zoom}
+            center={route.mapState?.center || [0, 0]}
+            zoom={route.mapState?.zoom || 10}
             routes={route.routes}
             onMapReady={() => setIsMapLoading(false)}
             style={isMapLoading ? styles.hiddenImage : undefined}
@@ -134,11 +134,11 @@ const RouteCard: React.FC<RouteCardProps> = ({ route, onPress }) => {
             ]}
             textStyle={{ color: '#ffffff', fontSize: 10 }}
           >
-            {route.type.charAt(0).toUpperCase() + route.type.slice(1)}
+            {route.type ? route.type.charAt(0).toUpperCase() + route.type.slice(1) : 'Route'}
           </Chip>
           
           {/* Views */}
-          <Text style={styles.viewsText}>{route.viewCount} views</Text>
+          <Text style={styles.viewsText}>{route.viewCount || 0} views</Text>
         </View>
       </Card.Content>
     </Card>

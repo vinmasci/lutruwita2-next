@@ -19,3 +19,90 @@
   border: 2px solid white; /* White border */
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); /* Stronger shadow */
 }
+
+/* Force override highlight styles for non-highlighted markers */
+.presentation-photo-layer .photo-marker-bubble:not(.highlighted) {
+  transform: none !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  animation: none !important;
+}
+
+/* Force override highlight styles for the point */
+.presentation-photo-layer .photo-marker-container:not(.highlighted) .photo-marker-point {
+  border-top-color: white !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2)) !important;
+}
+
+/* Force override highlight styles for simplified markers */
+.presentation-photo-layer .simplified-photo-marker-bubble:not(.highlighted) {
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  transform: none !important;
+}
+
+.presentation-photo-layer .simplified-photo-marker-container:not(.highlighted) .simplified-photo-marker-point {
+  border-top-color: #fff !important;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2)) !important;
+}
+
+/* Highlighted simplified markers */
+.presentation-photo-layer .simplified-photo-marker-bubble.highlighted {
+  transform: scale(1.2) !important;
+  border: 3px solid #0066FF !important; /* Blue border */
+  box-shadow: 0 0 15px rgba(0, 102, 255, 0.7), 0 0 30px rgba(0, 102, 255, 0.5) !important; /* Blue glowing effect */
+  animation: blue-pulse 1.5s infinite alternate !important;
+}
+
+.presentation-photo-layer .simplified-photo-marker-container.highlighted .simplified-photo-marker-point {
+  border-top-color: #0066FF !important; /* Blue point */
+  filter: drop-shadow(0 0 5px rgba(0, 102, 255, 0.7)) !important;
+}
+
+/* Force override highlight styles for photo clusters */
+.presentation-photo-layer .photo-cluster-bubble:not(.highlighted) {
+  transform: none !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  animation: none !important;
+}
+
+.presentation-photo-layer .photo-cluster-container:not(.highlighted) .photo-cluster-point {
+  border-top-color: white !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2)) !important;
+}
+
+/* Force override highlight styles for simplified photo clusters */
+.presentation-photo-layer .simplified-photo-cluster-bubble:not(.highlighted) {
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  transform: none !important;
+}
+
+.presentation-photo-layer .simplified-photo-cluster-container:not(.highlighted) .simplified-photo-cluster-point {
+  border-top-color: rgba(0, 123, 255, 0.8) !important;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2)) !important;
+}
+
+/* Additional rules to specifically target highlighted elements */
+.presentation-photo-layer .photo-marker-bubble.highlighted {
+  transform: scale(1.2) !important;
+  border: 3px solid #0066FF !important; /* Blue border */
+  box-shadow: 0 0 15px rgba(0, 102, 255, 0.7), 0 0 30px rgba(0, 102, 255, 0.5) !important; /* Blue glowing effect */
+  animation: blue-pulse 1.5s infinite alternate !important;
+}
+
+.presentation-photo-layer .photo-marker-container.highlighted .photo-marker-point {
+  border-top-color: #0066FF !important; /* Blue point */
+  filter: drop-shadow(0 0 5px rgba(0, 102, 255, 0.7)) !important;
+}
+
+/* Blue pulse animation */
+@keyframes blue-pulse {
+  from {
+    box-shadow: 0 0 15px rgba(0, 102, 255, 0.7), 0 0 30px rgba(0, 102, 255, 0.5) !important;
+  }
+  to {
+    box-shadow: 0 0 20px rgba(0, 102, 255, 0.9), 0 0 40px rgba(0, 102, 255, 0.7) !important;
+  }
+}

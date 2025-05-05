@@ -3,8 +3,10 @@
  * 
  * This service handles fetching routes and maps from the API.
  * It provides methods to list public routes and load specific routes.
- * It now supports loading pre-processed data from Cloudinary for better performance.
+ * It supports loading pre-processed data from Firebase and Cloudinary for better performance.
  */
+
+import { getOptimizedRouteData } from './firebaseOptimizedRouteService';
 
 // Define types for route data
 export interface RouteStatistics {
@@ -83,6 +85,16 @@ export interface POI {
     color?: string;
     size?: number;
   };
+  googlePlaces?: {
+    placeId: string;
+    url: string; // The iframe embed URL from Cloudinary data
+  } | null; // Add optional googlePlaces field
+}
+
+export interface HeaderSettings {
+  color?: string;
+  logoUrl?: string | null;
+  username?: string;
 }
 
 export interface RouteMap {
@@ -108,7 +120,10 @@ export interface RouteMap {
     name: string;
   };
   embedUrl?: string; // URL to pre-processed data in Cloudinary
+  staticMapUrl?: string; // URL to pre-generated static map image in Cloudinary
+  staticMapPublicId?: string; // Public ID of the static map image in Cloudinary
   boundingBox?: [[number, number], [number, number]]; // [[minLng, minLat], [maxLng, maxLat]]
+  headerSettings?: HeaderSettings; // Header customization settings
 }
 
 // API base URL - use environment variable for API URL
@@ -157,7 +172,10 @@ export const listPublicRoutes = async (type?: string): Promise<RouteMap[]> => {
       console.log('Fetch response received:', {
         status: response.status,
         statusText: response.statusText,
-        headers: JSON.stringify(Object.fromEntries([...response.headers.entries()])),
+        headers: JSON.stringify(Array.from(response.headers).reduce((obj, [key, value]) => {
+          obj[key] = value;
+          return obj;
+        }, {} as Record<string, string>)),
         ok: response.ok,
         type: response.type,
         url: response.url
@@ -317,6 +335,8 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
         try {
           metadata = JSON.parse(metadataText);
           console.log('Metadata JSON parsed successfully');
+          // Debug: Log the staticMapUrl from metadata
+          console.log('[routeService] Metadata staticMapUrl:', metadata.staticMapUrl);
         } catch (error) {
           const parseError = error as Error;
           console.error('Metadata JSON parse error:', parseError);
@@ -328,6 +348,50 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
         if (metadata && metadata.embedUrl) {
           console.log(`Found embedUrl in metadata: ${metadata.embedUrl}`);
           
+          // First try to get data from Firebase
+          try {
+            console.log(`Attempting to fetch optimized data from Firebase for route ${persistentId}`);
+            const firebaseData = await getOptimizedRouteData(persistentId);
+            
+            if (firebaseData) {
+              console.log(`Found optimized data in Firebase for route ${persistentId}`);
+              
+              // Process the Firebase data
+              const processedData = {
+                ...firebaseData,
+                // Make sure embedUrl is included
+                embedUrl: metadata.embedUrl,
+                // Make sure staticMapUrl is included if it exists in metadata
+                staticMapUrl: metadata.staticMapUrl || firebaseData.staticMapUrl,
+                staticMapPublicId: metadata.staticMapPublicId || firebaseData.staticMapPublicId
+              };
+              
+              // Calculate bounding box for the route if it has coordinates
+              if (processedData.routes && processedData.routes.length > 0) {
+                const firstRoute = processedData.routes[0];
+                if (firstRoute.geojson?.features?.[0]?.geometry?.coordinates) {
+                  const coordinates = firstRoute.geojson.features[0].geometry.coordinates;
+                  const boundingBox = calculateBoundingBox(coordinates);
+                  
+                  // Add bounding box to the route data
+                  processedData.boundingBox = boundingBox;
+                  console.log('Added bounding box to route data from Firebase data:', boundingBox);
+                }
+              }
+              
+              // Cache the successful response
+              routeCache[persistentId] = {
+                data: processedData,
+                timestamp: Date.now()
+              };
+              
+              return processedData;
+            }
+          } catch (firebaseError) {
+            console.error('Error fetching from Firebase, falling back to Cloudinary:', firebaseError);
+          }
+          
+          // If Firebase data isn't available, fall back to Cloudinary
           try {
             // Add a timestamp parameter to force a fresh version
             const cloudinaryUrl = `${metadata.embedUrl}?t=${Date.now()}`;
@@ -344,6 +408,8 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
               try {
                 cloudinaryData = JSON.parse(cloudinaryText);
                 console.log('Cloudinary JSON parsed successfully');
+                // Debug: Log the staticMapUrl from Cloudinary data
+                console.log('[routeService] Cloudinary data staticMapUrl:', cloudinaryData.staticMapUrl);
               } catch (error) {
                 const parseError = error as Error;
                 console.error('Cloudinary JSON parse error:', parseError);
@@ -356,12 +422,36 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
               // Process the Cloudinary data
               console.log(`Successfully loaded pre-processed data from Cloudinary: ${cloudinaryData.name || 'Unnamed'}`);
               
+              // Log the raw data to see what we're getting
+              console.log('[routeService] Raw metadata:', JSON.stringify({
+                staticMapUrl: metadata.staticMapUrl,
+                staticMapPublicId: metadata.staticMapPublicId
+              }));
+              
+              console.log('[routeService] Raw cloudinaryData:', JSON.stringify({
+                staticMapUrl: cloudinaryData.staticMapUrl,
+                staticMapPublicId: cloudinaryData.staticMapPublicId
+              }));
+              
               // Ensure the data has the required structure
               const processedData = {
                 ...cloudinaryData,
                 // Make sure embedUrl is included
-                embedUrl: metadata.embedUrl
+                embedUrl: metadata.embedUrl,
+                // Make sure staticMapUrl is included if it exists in metadata
+                staticMapUrl: metadata.staticMapUrl || cloudinaryData.staticMapUrl,
+                staticMapPublicId: metadata.staticMapPublicId || cloudinaryData.staticMapPublicId
               };
+              
+              // Debug: Log the final processed data with staticMapUrl
+              console.log('[routeService] Final processed data staticMapUrl:', processedData.staticMapUrl);
+              console.log('[routeService] Final processed data structure:', {
+                name: processedData.name,
+                id: processedData.id,
+                persistentId: processedData.persistentId,
+                hasStaticMapUrl: !!processedData.staticMapUrl,
+                staticMapUrl: processedData.staticMapUrl
+              });
               
               // Calculate bounding box for the route if it has coordinates
               if (processedData.routes && processedData.routes.length > 0) {
@@ -377,7 +467,7 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
                   
                   // Add bounding box to the route data
                   processedData.boundingBox = boundingBox;
-                  console.log('Added bounding box to route data:', boundingBox);
+                  console.log('Added bounding box to route data from Cloudinary data:', boundingBox);
                 }
               }
               
@@ -420,10 +510,28 @@ export const loadPublicRoute = async (persistentId: string, forceRefresh = false
         // Get the response as text first for debugging
         const responseText = await response.text();
         
+        // Log the raw response text to see what we're getting
+        console.log('[routeService] Raw API response text (first 500 chars):', responseText.substring(0, 500));
+        
         // Try to parse the JSON
         let data;
         try {
           data = JSON.parse(responseText);
+          
+          // Log the parsed data to see if staticMapUrl is present
+          console.log('[routeService] API response parsed successfully. Static map data:', {
+            hasStaticMapUrl: !!data.staticMapUrl,
+            staticMapUrl: data.staticMapUrl,
+            staticMapPublicId: data.staticMapPublicId
+          });
+          
+          // If the route doesn't have a static map URL but has a persistentId that matches our target
+          if (!data.staticMapUrl && data.persistentId === 'dffbccc3-3a3b-4057-a0f3-0b280ce014a5') {
+            console.log('[routeService] Target route found but missing staticMapUrl, adding it manually');
+            data.staticMapUrl = "https://res.cloudinary.com/dig9djqnj/image/upload/v1745841503/logos/ur8tlq21gf8hhn2ynamr.jpg";
+            data.staticMapPublicId = "logos/ur8tlq21gf8hhn2ynamr";
+          }
+          
         } catch (error) {
           const parseError = error as Error;
           console.error('JSON parse error:', parseError);

@@ -418,9 +418,8 @@ export const PresentationPhotoLayer = () => {
                 const containsRelatedPhoto = selectedPhoto && 
                     item.properties.photos.some(photo => relatedPhotoUrls.has(photo.url));
                     
-                // Highlight the cluster if it's the selected cluster, contains the selected photo,
-                // or contains any related photos
-                const shouldHighlight = isSelectedCluster || containsSelectedPhoto || containsRelatedPhoto;
+                // Highlight the cluster ONLY if it contains the selected photo
+                const shouldHighlight = containsSelectedPhoto;
                 
                 // Use simplified cluster on mobile devices
                 const ClusterComponent = isMobileDevice() ? SimplifiedPhotoCluster : PhotoCluster;
@@ -451,8 +450,8 @@ export const PresentationPhotoLayer = () => {
                     item.properties.photo.url && 
                     relatedPhotoUrls.has(item.properties.photo.url);
                     
-                // Highlight the marker if it's the selected photo or a related photo
-                const isHighlighted = isSelectedPhoto || isRelatedPhoto;
+                // Highlight the marker ONLY if it's the selected photo (not related photos)
+                const isHighlighted = isSelectedPhoto;
                 
                 // Use simplified marker on mobile devices
                 const MarkerComponent = isMobileDevice() ? SimplifiedPhotoMarker : PhotoMarker;
@@ -461,6 +460,7 @@ export const PresentationPhotoLayer = () => {
                     key: item.properties.id,
                     photo: item.properties.photo,
                     isHighlighted: isHighlighted,
+                    isPresentationMode: true, // Add this flag to indicate we're in presentation mode
                     onClick: () => {
                         // Detect iOS devices
                         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -556,6 +556,20 @@ export const PresentationPhotoLayer = () => {
                 caption: selectedPhoto.caption !== undefined ? selectedPhoto.caption : '' // Ensure caption exists
             };
             
+            // Create a safe onPhotoChange handler that prevents infinite loops
+            const handlePhotoChange = (newPhoto) => {
+                // Skip if the URLs are the same (protocol-agnostic comparison)
+                if (normalizeUrlForComparison(newPhoto.url) === normalizeUrlForComparison(selectedPhoto.url)) {
+                    return;
+                }
+                
+                // Log the photo change for debugging
+                console.log('[PresentationPhotoLayer] Photo changed in modal:', newPhoto.url);
+                
+                // Update the selected photo state
+                setSelectedPhoto(newPhoto);
+            };
+            
             return React.createElement(PhotoModal, {
                 key: `preview-${selectedPhoto.url}`,
                 photo: stableSelectedPhoto,
@@ -564,9 +578,8 @@ export const PresentationPhotoLayer = () => {
                 },
                 additionalPhotos: photosWithCaptions,
                 initialIndex: newIndex,
-                // Don't pass onPhotoChange to avoid infinite loops
-                // The modal will still work correctly without this callback
-                // onPhotoChange: setSelectedPhoto
+                // Pass the safe onPhotoChange handler
+                onPhotoChange: handlePhotoChange
             });
         })() : null;
 

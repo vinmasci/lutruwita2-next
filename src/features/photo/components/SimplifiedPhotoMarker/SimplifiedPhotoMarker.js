@@ -3,7 +3,12 @@ import './SimplifiedPhotoMarker.css';
 import mapboxgl from 'mapbox-gl';
 import { useMapContext } from '../../../map/context/MapContext';
 
-export const SimplifiedPhotoMarker = ({ photo, onClick, isHighlighted }) => {
+// Helper function to check if we're in presentation mode
+const isInPresentationMode = () => {
+    return document.querySelector('.presentation-photo-layer') !== null;
+};
+
+export const SimplifiedPhotoMarker = ({ photo, onClick, isHighlighted, isPresentationMode = false }) => {
     const markerRef = useRef(null);
     const markerElementRef = useRef(null);
     const { map } = useMapContext();
@@ -35,10 +40,21 @@ export const SimplifiedPhotoMarker = ({ photo, onClick, isHighlighted }) => {
         const bubble = document.createElement('div');
         bubble.className = 'simplified-photo-marker-bubble';
         
+        // Check if we're in presentation mode
+        const inPresentationMode = isPresentationMode || isInPresentationMode();
+        
         // Apply highlighted class if needed
         if (isHighlighted) {
             bubble.classList.add('highlighted');
             container.classList.add('highlighted');
+        } else if (inPresentationMode) {
+            // In presentation mode, ensure non-highlighted markers don't have the highlighted class
+            bubble.classList.remove('highlighted');
+            container.classList.remove('highlighted');
+            
+            // Add a presentation-mode class to help with CSS targeting
+            bubble.classList.add('presentation-mode');
+            container.classList.add('presentation-mode');
         }
 
         // Create click handler with cleanup
@@ -93,17 +109,32 @@ export const SimplifiedPhotoMarker = ({ photo, onClick, isHighlighted }) => {
             const bubble = markerElementRef.current.querySelector('.simplified-photo-marker-bubble');
             const container = markerElementRef.current.querySelector('.simplified-photo-marker-container');
             
+            // Check if we're in presentation mode
+            const inPresentationMode = isPresentationMode || isInPresentationMode();
+            
             if (bubble && container) {
                 if (isHighlighted) {
                     bubble.classList.add('highlighted');
                     container.classList.add('highlighted');
+                    
+                    // In presentation mode, make sure the presentation-mode class is removed
+                    if (inPresentationMode) {
+                        bubble.classList.remove('presentation-mode');
+                        container.classList.remove('presentation-mode');
+                    }
                 } else {
                     bubble.classList.remove('highlighted');
                     container.classList.remove('highlighted');
+                    
+                    // In presentation mode, add the presentation-mode class to non-highlighted markers
+                    if (inPresentationMode) {
+                        bubble.classList.add('presentation-mode');
+                        container.classList.add('presentation-mode');
+                    }
                 }
             }
         }
-    }, [isHighlighted]);
+    }, [isHighlighted, isPresentationMode]);
 
     return null;
 };

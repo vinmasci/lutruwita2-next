@@ -95,8 +95,6 @@ export interface DynamicRouteFiltersResult {
   setDistanceFilter: (filter: string) => void;
   routeTypeFilter: string;
   setRouteTypeFilter: (filter: string) => void;
-  showingSavedRoutes: boolean;
-  setShowingSavedRoutes: (showing: boolean) => void;
   
   // Available options
   availableFilters: AvailableFilters;
@@ -116,7 +114,7 @@ export interface DynamicRouteFiltersResult {
 
 export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFiltersResult => {
   // Map type state
-  const [selectedMapType, setSelectedMapType] = useState<string>('bikepacking');
+  const [selectedMapType, setSelectedMapType] = useState<string>('all');
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -125,7 +123,6 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
   const [surfaceType, setSurfaceType] = useState<string>('all');
   const [distanceFilter, setDistanceFilter] = useState<string>('any');
   const [routeTypeFilter, setRouteTypeFilter] = useState<string>('all');
-  const [showingSavedRoutes, setShowingSavedRoutes] = useState<boolean>(false);
   
   // Results
   const [filteredRoutes, setFilteredRoutes] = useState<RouteMap[]>([]);
@@ -168,7 +165,7 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
       .filter((state): state is string => state !== undefined);
     
     // Return unique states
-    return [...new Set(states)].sort();
+    return Array.from(new Set(states)).sort();
   })();
   
   // Dynamically generate available regions based on selected state
@@ -192,7 +189,7 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
       });
     
     // Return unique regions
-    return [...new Set(regions)].sort();
+    return Array.from(new Set(regions)).sort();
   })();
   
   // Dynamically generate available map types from route metadata
@@ -207,7 +204,7 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
       .map(route => route.type.charAt(0).toUpperCase() + route.type.slice(1)); // Capitalize first letter
     
     // Return unique map types
-    return [...new Set(types)].sort();
+    return Array.from(new Set(types)).sort();
   })();
   
   // Load more routes
@@ -227,21 +224,24 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
     if (surfaceType !== 'all' && availableFilters.surface) count++;
     if (distanceFilter !== 'any' && availableFilters.distance) count++;
     if (routeTypeFilter !== 'all' && availableFilters.routeType) count++;
-    if (showingSavedRoutes) count++;
     
     return count;
   };
   
   // Apply filters to routes
   useEffect(() => {
+    // If there are no routes, explicitly set empty arrays
     if (!allRoutes.length) {
+      setFilteredRoutes([]);
+      setDisplayedRoutes([]);
+      setHasMore(false);
       return;
     }
     
     let result = [...allRoutes];
     
-    // Filter by map type first
-    if (selectedMapType) {
+    // Filter by map type first (skip filtering if "all" is selected)
+    if (selectedMapType && selectedMapType.toLowerCase() !== 'all') {
       result = result.filter(route => 
         route.type?.toLowerCase() === selectedMapType.toLowerCase()
       );
@@ -361,12 +361,7 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
       });
     }
     
-    // Apply saved routes filter
-    if (showingSavedRoutes) {
-      // This is a placeholder - in a real implementation, we would check if the route is saved
-      // For now, just show a subset of routes as "saved"
-      result = result.filter((_, index) => index % 3 === 0);
-    }
+    // No saved routes filtering needed - the SavedRoutesScreen directly passes in saved routes
     
     setFilteredRoutes(result);
     setDisplayedRoutes(result.slice(0, visibleCount));
@@ -380,7 +375,6 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
     surfaceType, 
     distanceFilter,
     routeTypeFilter,
-    showingSavedRoutes,
     visibleCount
   ]);
   
@@ -394,8 +388,7 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
     selectedRegion, 
     surfaceType, 
     distanceFilter,
-    routeTypeFilter,
-    showingSavedRoutes
+    routeTypeFilter
   ]);
   
   return {
@@ -416,8 +409,6 @@ export const useDynamicRouteFilters = (allRoutes: RouteMap[]): DynamicRouteFilte
     setDistanceFilter,
     routeTypeFilter,
     setRouteTypeFilter,
-    showingSavedRoutes,
-    setShowingSavedRoutes,
     
     // Available options
     availableFilters,

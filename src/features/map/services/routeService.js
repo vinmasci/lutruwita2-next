@@ -918,6 +918,7 @@ export const useRouteService = () => {
             // Upload each chunk
             for (let i = 0; i < chunks.length; i++) {
                 console.log(`[routeService] Uploading chunk ${i+1}/${chunks.length}`);
+                console.log(`[CHUNK_UPLOAD] Uploading chunk ${i+1} of ${chunks.length}`);
                 
                 const chunkResponse = await fetch(`${API_BASE}/chunked/upload`, {
                     method: 'POST',
@@ -956,6 +957,53 @@ export const useRouteService = () => {
 
     const loadRoute = async (persistentId) => {
         try {
+            console.log(`[routeService] Loading route with persistentId: ${persistentId}`);
+            
+            // First, try to load from Firebase if available
+            try {
+                // Import the Firebase optimized route service
+                const { getOptimizedRouteData } = await import('../../../services/firebaseOptimizedRouteService');
+                
+                // Check if the optimized data exists in Firebase
+                console.log(`[routeService] Checking for optimized data in Firebase for route: ${persistentId}`);
+                const optimizedData = await getOptimizedRouteData(persistentId);
+                
+                if (optimizedData) {
+                    console.log(`[routeService] Found optimized data in Firebase for route: ${persistentId}`);
+                    
+                    // Transform the data to match what the client expects
+                    let transformedData = optimizedData;
+                    
+                    // Ensure POIs are included in the transformed data
+                    if (!transformedData.pois) {
+                        console.log('[routeService] No POIs found in Firebase data, initializing empty POIs');
+                        transformedData.pois = { draggable: [], places: [] };
+                    }
+                    
+                    // Ensure lines are included in the transformed data
+                    if (!transformedData.lines) {
+                        console.log('[routeService] No lines found in Firebase data, initializing empty lines array');
+                        transformedData.lines = [];
+                    }
+                    
+                    // If the data doesn't have a 'route' property but has 'routes' directly,
+                    // wrap it in a 'route' property to maintain compatibility with the rest of the code
+                    if (!transformedData.route && transformedData.routes) {
+                        console.log('[routeService] Wrapping Firebase data in route property for compatibility');
+                        return { route: transformedData };
+                    }
+                    
+                    console.log('[routeService] Successfully loaded route from Firebase');
+                    return transformedData;
+                }
+                
+                console.log(`[routeService] No optimized data found in Firebase for route: ${persistentId}, falling back to API`);
+            } catch (firebaseError) {
+                console.error('[routeService] Error loading from Firebase, falling back to API:', firebaseError);
+            }
+            
+            // If Firebase loading fails or data doesn't exist, fall back to the API
+            console.log(`[routeService] Loading route from API: ${persistentId}`);
             const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE}/${persistentId}`, {
                 method: 'GET',

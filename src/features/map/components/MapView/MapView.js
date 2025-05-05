@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { SaveDialog } from '../Sidebar/SaveDialog';
 import React from 'react';
+import { startLogCapture, stopLogCapture, getCapturedLogs } from '../../../../utils/logCapture';
 import mapboxgl from 'mapbox-gl';
 import { useMapInitializer } from './hooks/useMapInitializer';
 import { useMapEvents } from './hooks/useMapEvents';
@@ -33,6 +34,7 @@ import { MapOverviewProvider, useMapOverview } from '../../../presentation/conte
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePhotoService } from '../../../photo/services/photoService';
 import CommitChangesButton from '../CommitChangesButton/CommitChangesButton';
+import FirebaseStatusIndicator from '../../../../components/FirebaseStatusIndicator';
 import './MapView.css';
 import './photo-fix.css'; // Nuclear option to force photos behind UI components
 import { Sidebar } from '../Sidebar';
@@ -93,10 +95,15 @@ function MapViewContent() {
     const setHoverCoordinatesRef = useRef(setHoverCoordinates); // Ref for state setter
     const { processGpx } = useClientGpxProcessing();
     
+    // Define dragPreview state here, before it's used in useMapEvents
+    const [dragPreview, setDragPreview] = useState(null);
+    const [onPoiPlacementClick, setPoiPlacementClick] = useState(undefined);
+    
     // State for commit changes button and save dialog
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+    const [saveLogs, setSaveLogs] = useState([]);
     
     // Get contexts for tracking changes
     const { 
@@ -164,7 +171,8 @@ function MapViewContent() {
         currentRoute,
         setHoverCoordinates,
         hoverCoordinates,
-        routeCoordinatesRef // Pass the route coordinates ref
+        routeCoordinatesRef, // Pass the route coordinates ref
+        dragPreview // Pass the dragPreview state to disable trace marker during drag operations
     });
 
     // Function to add route click handler
@@ -308,8 +316,6 @@ function MapViewContent() {
     };
 
     const [isPOIDrawerOpen, setIsPOIDrawerOpen] = useState(false);
-    const [dragPreview, setDragPreview] = useState(null);
-    const [onPoiPlacementClick, setPoiPlacementClick] = useState(undefined);
 
     // Update cursor style and click handler based on POI mode
     useEffect(() => {
@@ -926,23 +932,41 @@ function MapViewContent() {
             return;
         }
         
-        // Open the save dialog instead of directly saving
-        setIsSaveDialogOpen(true);
+                // Open the save dialog instead of directly saving
+                console.log('[MapView] Opening save dialog');
+                setIsSaveDialogOpen(true);
     };
     
     // Handle save dialog submit
     const handleSaveDialogSubmit = async (formData) => {
+        console.log('[MapView] Save dialog submitted with form data:', formData);
         setIsUploading(true);
         setUploadProgress(0);
+        setSaveLogs([]); // Clear previous logs
+        
+        // Start capturing logs
+        startLogCapture();
+        
+        // Add a test log to verify log capture is working
+        console.log('[TEST] Starting save process - this should appear in the save dialog');
         
         try {
+            // Log the start of the save process
+            console.log('[RouteContext] Starting save process');
+            
+            // Update logs immediately to show initial message
+            const initialLogs = getCapturedLogs();
+            setSaveLogs(initialLogs);
             // Check if we have photo changes
             if (changedPhotos.size > 0) {
                 // Get photos that need to be uploaded
                 const photosToUpload = getChangedPhotos();
                 
                 if (photosToUpload.length > 0) {
-                    console.log('[MapView] Committing changes for photos:', photosToUpload.length);
+                    console.log(`[RouteContext] Uploading ${photosToUpload.length} photos to Cloudinary`);
+                    
+                    // Update logs after starting photo uploads
+                    setSaveLogs(getCapturedLogs());
                     
                     // Upload photos in parallel with progress tracking
                     let completedUploads = 0;
@@ -957,6 +981,8 @@ function MapViewContent() {
                                 return;
                             }
                             
+                            console.log(`[RouteContext] Uploading photo ${photo.id || 'unknown'}`);
+                            
                             // Upload to Cloudinary
                             const result = await photoService.uploadPhotoWithProgress(
                                 photo._originalFile,
@@ -967,6 +993,8 @@ function MapViewContent() {
                                     setUploadProgress(newProgress);
                                 }
                             );
+                            
+                            console.log(`[RouteContext] Photo ${photo.id || 'unknown'} uploaded successfully`);
                             
                             // Update photo with Cloudinary URLs
                             updatePhoto(photo.url, {
@@ -989,8 +1017,13 @@ function MapViewContent() {
                         }
                     }));
                     
+                    console.log('[RouteContext] All photos uploaded successfully');
+                    
                     // Clear tracked photo changes
                     clearPhotoChanges();
+                    
+                    // Update logs after photo uploads complete
+                    setSaveLogs(getCapturedLogs());
                 }
             }
             
@@ -999,32 +1032,35 @@ function MapViewContent() {
             const hasRouteChanges = Object.keys(currentChangedSections).length > 0;
             
             if (hasRouteChanges) {
-                console.log('[MapView] Committing route changes');
+                console.log('[RouteContext] Saving route changes');
+                
+                // Update logs after starting route save
+                setSaveLogs(getCapturedLogs());
                 
                 // Set progress to 50% before saving route (photos were first 50%)
                 setUploadProgress(50);
                 
-                // Get lines data from LineContext if available
-                let linesToSave = loadedLineData || [];
+            // Get lines data from LineContext if available
+            let linesToSave = loadedLineData || [];
+            
+            // Get the lines from the LineContext
+            console.log('[RouteContext] Checking for line changes');
                 
-                // Get the lines from the LineContext
-                console.log('[MapView] Line context is available, checking for lines');
+            // We already have access to the LineContext at the top level
+            if (hasLineChanges && hasLineChanges()) {
+                console.log('[RouteContext] Line changes detected, using lines from context');
                 
-                // We already have access to the LineContext at the top level
-                if (hasLineChanges && hasLineChanges()) {
-                    console.log('[MapView] Line changes detected, using lines from context');
-                    
-                    // Use the lines state that we already have access to from the top level
-                    if (lines && lines.length > 0) {
-                        console.log('[MapView] Using lines from LineContext:', lines.length);
-                        linesToSave = lines;
-                    } else {
-                        console.log('[MapView] No lines found in LineContext, using loadedLineData:', loadedLineData ? loadedLineData.length : 0);
+                // Use the lines state that we already have access to from the top level
+                if (lines && lines.length > 0) {
+                    console.log(`[RouteContext] Using ${lines.length} lines from LineContext`);
+                    linesToSave = lines;
+                } else {
+                    console.log('[RouteContext] No lines found in LineContext, using loadedLineData');
                     }
                 }
                 
-                // Log the lines data for debugging
-                console.log('[MapView] Lines data being saved:', JSON.stringify(linesToSave));
+            // Log the lines data for debugging
+            console.log('[RouteContext] Lines data being saved');
                 
                 // Save the current state with the form data
                 await saveCurrentState(
@@ -1034,6 +1070,11 @@ function MapViewContent() {
                     linesToSave,
                     formData.eventDate
                 );
+                
+                console.log('[RouteContext] Route saved successfully');
+                
+                // Update logs after route save completes
+                setSaveLogs(getCapturedLogs());
                 
                 // Set progress to 100% after route save
                 setUploadProgress(100);
@@ -1054,13 +1095,25 @@ function MapViewContent() {
                 }
             }
             
-            console.log('[MapView] All changes committed successfully');
+            console.log('[RouteContext] Save process completed successfully');
+            
+            // Final update of logs before closing dialog
+            setSaveLogs(getCapturedLogs());
             
             // Close the save dialog
+            console.log('[MapView] Closing save dialog');
             setIsSaveDialogOpen(false);
         } catch (error) {
-            console.error('[MapView] Error committing changes:', error);
+            console.error('[RouteContext] Error during save process:', error);
         } finally {
+            // Get the captured logs
+            const logs = getCapturedLogs();
+            console.log('[MapView] Captured logs:', logs.length, 'logs');
+            setSaveLogs(logs);
+            
+            // Stop capturing logs
+            stopLogCapture();
+            
             setIsUploading(false);
         }
     };
@@ -1301,7 +1354,14 @@ function MapViewContent() {
                 },
                 isEditing: !!currentLoadedPersistentId,
                 isSaving: isUploading,
-                progress: uploadProgress
+                progress: uploadProgress,
+                logs: saveLogs // Pass the captured logs
+            }),
+            
+            // Firebase Status Indicator
+            React.createElement(FirebaseStatusIndicator, {
+                position: 'bottom-left',
+                showDetails: true
             })
         ])
     );

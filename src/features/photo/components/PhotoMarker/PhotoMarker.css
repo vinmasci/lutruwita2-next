@@ -46,10 +46,28 @@
   animation: pulse 1.5s infinite alternate;
 }
 
-/* Manually placed photo style */
-.photo-marker-bubble.manually-placed {
-  border: 3px solid #3498db; /* Blue border */
-  box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), 0 0 30px rgba(52, 152, 219, 0.5); /* Blue glow */
+/* In presentation mode, only the selected photo should be highlighted */
+.presentation-photo-layer .photo-marker-bubble.highlighted {
+  transform: scale(1.2);
+  border: 3px solid #FF9500; /* Orange border */
+  box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5); /* Glowing effect */
+  animation: pulse 1.5s infinite alternate;
+}
+
+/* In presentation mode, non-highlighted markers should have no highlight effect */
+.presentation-photo-layer .photo-marker-bubble:not(.highlighted),
+.photo-marker-bubble.presentation-mode {
+  transform: none !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  animation: none !important;
+}
+
+/* In presentation mode, non-highlighted marker points should have no highlight effect */
+.presentation-photo-layer .photo-marker-container:not(.highlighted) .photo-marker-point,
+.photo-marker-container.presentation-mode .photo-marker-point {
+  border-top-color: white !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2)) !important;
 }
 
 /* Unsaved changes style */
@@ -154,6 +172,18 @@
 .photo-marker-container.highlighted .photo-marker-point {
   border-top-color: #FF9500; /* Orange point */
   filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7));
+}
+
+/* In presentation mode, only the selected photo point should be highlighted */
+.presentation-photo-layer .photo-marker-container.highlighted .photo-marker-point {
+  border-top-color: #FF9500; /* Orange point */
+  filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7));
+}
+
+/* In presentation mode, non-highlighted marker points should have no highlight effect */
+.presentation-photo-layer .photo-marker-container:not(.highlighted) .photo-marker-point {
+  border-top-color: white !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2)) !important;
 }
 
 /* Manually placed marker point */

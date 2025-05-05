@@ -360,9 +360,8 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                 renderedItems.push(
                     _jsx(POICluster, {
                         cluster: item,
-                        onClick: () => handleClusterClick(item),
-                        key: `cluster-${item.properties.cluster_id}`
-                    })
+                        onClick: () => handleClusterClick(item)
+                    }, `cluster-${item.properties.cluster_id}`)
                 );
             } else {
                 renderedItems.push(
@@ -380,9 +379,8 @@ export const PresentationPOILayer = ({ map, onSelectPOI }) => {
                                 logger.info('PresentationPOILayer', 'Using setSelectedPOI');
                                 setSelectedPOI(originalPoi);
                             }
-                        },
-                        key: `poi-${item.properties.id}`
-                    })
+                        }
+                    }, `poi-${item.properties.id}`)
                 );
             }
         }

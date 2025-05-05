@@ -237,62 +237,69 @@ export const RoutePresentation = () => {
 
     // Always render the providers and RouteContent structure
     // Handle loading/error states inside or overlayed
+    // Create an array of children with proper keys
+    const boxChildren = [];
+    
+    // Conditionally add RouteContent
+    if (!loading && !error && route && routes.length > 0) {
+        boxChildren.push(
+            _jsx(RouteContent, { 
+                route: route, 
+                routeId: route.persistentId,
+                lineData: lineData
+            }, `route-content-${route.persistentId}`)
+        );
+    }
+    
+    // Conditionally add loading overlay
+    if (loading) {
+        boxChildren.push(
+            _jsx(Box, {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                sx: {
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    zIndex: 10
+                }
+            }, "loading-overlay", _jsx(CircularProgress, {}))
+        );
+    }
+    
+    // Conditionally add error overlay
+    if (!loading && (error || !route || routes.length === 0)) {
+        boxChildren.push(
+            _jsx(Box, {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                sx: {
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    zIndex: 10,
+                    p: 2 // Add padding for the alert
+                }
+            }, "error-overlay", _jsx(Alert, {
+                severity: "error",
+                sx: { maxWidth: 'sm' },
+                children: error || (routes.length === 0 ? 'No valid routes found in data' : 'Route not found')
+            }))
+        );
+    }
+    
     return (_jsx(LineProvider, { children: _jsx(RouteProvider, { children:
-        _jsx(Box, { sx: { position: 'relative', width: '100%', height: '100vh' }, children: [
-            // Conditionally render RouteContent only when route data is loaded and valid
-            !loading && !error && route && routes.length > 0 ? (
-                _jsx(RouteContent, { 
-                    route: route, 
-                    routeId: route.persistentId,
-                    lineData: lineData,
-                    key: `route-content-${route.persistentId}` 
-                })
-            ) : null,
-
-            // Loading overlay - Show only during initial load
-            loading && (
-                _jsx(Box, {
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    sx: {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.7)',
-                        zIndex: 10
-                    },
-                    key: "loading-overlay",
-                    children: _jsx(CircularProgress, {})
-                })
-            ),
-
-            // Error overlay - Show if there's an error OR if loading finished but route is still invalid
-            !loading && (error || !route || routes.length === 0) && (
-                _jsx(Box, {
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    sx: {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.7)',
-                        zIndex: 10,
-                        p: 2 // Add padding for the alert
-                    },
-                    key: "error-overlay",
-                    children: _jsx(Alert, {
-                        severity: "error",
-                        sx: { maxWidth: 'sm' },
-                        children: error || (routes.length === 0 ? 'No valid routes found in data' : 'Route not found')
-                    })
-                })
-            )
-        ].filter(Boolean) }) // Filter out null children
+        _jsx(Box, { 
+            sx: { position: 'relative', width: '100%', height: '100vh' }, 
+            children: boxChildren
+        })
     }) }));
 };

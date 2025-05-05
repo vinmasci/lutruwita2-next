@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implementation of the surface processing feature in the Lutruwita2 application. The feature uses vector tiles from MapTiler to detect the surface type (paved or unpaved) of roads along a GPX route. The application now supports both Tasmania and Victoria regions.
+This document describes the implementation of the surface processing feature in the Lutruwita2 application. The feature uses vector tiles from MapTiler to detect the surface type (paved or unpaved) of roads along a GPX route. The application now supports all Australian states and territories as well as New Zealand.
 
 ## Implementation Details
 
@@ -24,10 +24,24 @@ The `vectorTileService.js` file provides functionality to load and process vecto
      - URL: `https://api.maptiler.com/tiles/0196195a-de88-76e9-843f-9e8a373cc078/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
    - Victoria South: "victoria-south" tileset
      - URL: `https://api.maptiler.com/tiles/01961954-9312-726f-a37b-320cfa76aea0/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
-   - These tilesets provide comprehensive road data with surface information for both Tasmania and Victoria
+   - NSW Part 1: "nsw-part1" tileset
+     - URL: `https://api.maptiler.com/tiles/01961a2c-f4ea-7748-a9a9-e98d2dcab3dc/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - NSW Part 2: "nsw-part2" tileset
+     - URL: `https://api.maptiler.com/tiles/019619db-0a35-79cb-b098-2ac8ef8d8213/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - Queensland: "queensland" tileset
+     - URL: `https://api.maptiler.com/tiles/019619cb-40fa-7392-ac45-0a2bee28806b/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - South Australia: "south-australia" tileset
+     - URL: `https://api.maptiler.com/tiles/019619a2-1890-7dc3-b3a5-cd6ede88f26a/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - Western Australia: "western-australia" tileset
+     - URL: `https://api.maptiler.com/tiles/01961a53-6bf9-70b5-96f6-60c0be7cc9d0/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - Northern Territory & ACT: "nt-act" tileset
+     - URL: `https://api.maptiler.com/tiles/0196800b-307f-74ac-9634-e1004495bdf0/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - New Zealand: "new-zealand" tileset
+     - URL: `https://api.maptiler.com/tiles/01968004-0de6-7e5e-8dc8-9e452336a543/tiles.json?key=DFSAZFJXzvprKbxHrHXv`
+   - These tilesets provide comprehensive road data with surface information for all of Australia and New Zealand
 
 2. **Region-Based Tile Selection**:
-   - Added automatic detection of route location (Tasmania, Victoria North, or Victoria South)
+   - Added automatic detection of route location across all Australian states/territories and New Zealand
    - Dynamically selects the appropriate tileset based on geographic bounds
    - Handles routes that cross between regions by loading tiles from multiple sources
    - Improved tile coordinate calculation with proper handling of Y-coordinate inversion
@@ -117,5 +131,4 @@ Potential future improvements to the surface detection feature include:
 2. **Server-Side Processing**: Move the surface detection process to the server for better performance
 3. **Machine Learning**: Use machine learning to improve surface detection accuracy based on historical data
 4. **Additional Surface Types**: Expand beyond the binary paved/unpaved classification to include more detailed surface types
-5. **Additional Regions**: Expand coverage to include other Australian states and territories
-6. **Mapbox Integration**: Evaluate if switching to Mapbox vector tiles would provide performance benefits
+5. **Mapbox Integration**: Evaluate if switching to Mapbox vector tiles would provide performance benefits

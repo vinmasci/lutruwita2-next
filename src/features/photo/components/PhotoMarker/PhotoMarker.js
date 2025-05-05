@@ -5,8 +5,24 @@ import { useMapContext } from '../../../map/context/MapContext';
 import { usePhotoContext } from '../../context/PhotoContext';
 import { getPhotoIdentifier } from '../../utils/clustering';
 
-// Add isEditable prop, default to false for safety (non-editable by default)
-export const PhotoMarker = ({ photo, onClick, isHighlighted, isEditable = false }) => {
+// Helper function to check if an element is in presentation mode
+const isInPresentationMode = (element) => {
+    if (!element) return false;
+    
+    // Check if this element or any parent has the presentation-photo-layer class
+    let current = element;
+    while (current) {
+        if (current.classList && current.classList.contains('presentation-photo-layer')) {
+            return true;
+        }
+        current = current.parentElement;
+    }
+    
+    return false;
+};
+
+// Add isEditable and isPresentationMode props, default to false for safety
+export const PhotoMarker = ({ photo, onClick, isHighlighted, isEditable = false, isPresentationMode = false }) => {
     const markerRef = useRef(null);
     const markerElementRef = useRef(null);
     const { map } = useMapContext();
@@ -48,10 +64,21 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted, isEditable = false 
         const bubble = document.createElement('div');
         bubble.className = 'photo-marker-bubble';
         
+        // Check if this marker is in presentation mode
+        const inPresentationMode = isPresentationMode || document.querySelector('.presentation-photo-layer') !== null;
+        
         // Apply highlighted class if needed
         if (isHighlighted) {
             bubble.classList.add('highlighted');
             container.classList.add('highlighted');
+        } else if (inPresentationMode) {
+            // In presentation mode, ensure non-highlighted markers don't have the highlighted class
+            bubble.classList.remove('highlighted');
+            container.classList.remove('highlighted');
+            
+            // Add a presentation-mode class to help with CSS targeting
+            bubble.classList.add('presentation-mode');
+            container.classList.add('presentation-mode');
         }
         
         // Apply manually placed class if needed
@@ -165,14 +192,29 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted, isEditable = false 
             const bubble = markerElementRef.current.querySelector('.photo-marker-bubble');
             const container = markerElementRef.current.querySelector('.photo-marker-container');
             
+            // Check if this marker is in presentation mode
+            const inPresentationMode = isPresentationMode || document.querySelector('.presentation-photo-layer') !== null;
+            
             if (bubble && container) {
                 // Handle highlighted state
                 if (isHighlighted) {
                     bubble.classList.add('highlighted');
                     container.classList.add('highlighted');
+                    
+                    // In presentation mode, make sure the presentation-mode class is removed
+                    if (inPresentationMode) {
+                        bubble.classList.remove('presentation-mode');
+                        container.classList.remove('presentation-mode');
+                    }
                 } else {
                     bubble.classList.remove('highlighted');
                     container.classList.remove('highlighted');
+                    
+                    // In presentation mode, add the presentation-mode class to non-highlighted markers
+                    if (inPresentationMode) {
+                        bubble.classList.add('presentation-mode');
+                        container.classList.add('presentation-mode');
+                    }
                 }
                 
                 // Handle manually placed state

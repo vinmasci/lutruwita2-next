@@ -841,6 +841,45 @@ export const RouteProvider = ({ children, }) => {
                 // Continue with save even if logo upload fails
             }
 
+            // Generate and upload static map image to Cloudinary
+            let staticMapUrl = null;
+            let staticMapPublicId = null;
+
+            try {
+                // Import the generateStaticMapImage function
+                const { generateStaticMapImage } = await import('../../../utils/staticMapUtils');
+
+                console.log('[RouteContext] Starting static map generation for routes');
+                console.log(`[RouteContext] Generating static map for ${routes.length} routes`);
+                
+                if (map) {
+                    console.log(`[RouteContext] Map center: [${map.getCenter().lng.toFixed(4)}, ${map.getCenter().lat.toFixed(4)}], zoom: ${map.getZoom().toFixed(2)}`);
+                } else {
+                    console.log('[RouteContext] No map instance available, using default center and zoom');
+                }
+                
+                // Generate static map image with all routes
+                const result = await generateStaticMapImage({
+                    routes,
+                    center: map ? [map.getCenter().lng, map.getCenter().lat] : null,
+                    zoom: map ? map.getZoom() : null,
+                    width: 800,
+                    height: 600,
+                    style: 'satellite-streets-v12'
+                });
+
+                staticMapUrl = result.url;
+                staticMapPublicId = result.publicId;
+                
+                console.log('[RouteContext] Static map image successfully generated and uploaded');
+                console.log(`[RouteContext] Static map URL: ${staticMapUrl}`);
+                console.log(`[RouteContext] Static map public ID: ${staticMapPublicId}`);
+            } catch (staticMapError) {
+                console.error('[RouteContext] Error generating static map image:', staticMapError);
+                console.log('[RouteContext] Continuing save process without static map');
+                // Continue with save even if static map generation fails
+            }
+
             // Prepare the base route state with required fields
             const baseRouteState = {
                 id: "", // Will be set by backend
@@ -849,7 +888,10 @@ export const RouteProvider = ({ children, }) => {
                 type,
                 isPublic,
                 // Convert dayjs object to standard Date if type is 'event'
-                eventDate: type === 'event' && eventDate ? eventDate.toDate() : null
+                eventDate: type === 'event' && eventDate ? eventDate.toDate() : null,
+                // Add static map URL if available
+                staticMapUrl,
+                staticMapPublicId
             };
 
             // Create a partial update with only changed sections

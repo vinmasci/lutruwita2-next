@@ -9,13 +9,15 @@ import {
 import POIDetailsDrawer from '../components/map/POIDetailsDrawer';
 import PhotoViewerPolaroid from '../components/map/PhotoViewerPolaroid';
 import RouteElevationDrawer from '../components/map/RouteElevationDrawer';
+import MapHeader from '../components/map/MapHeader';
+import FirebaseStatusIndicator from '../components/common/FirebaseStatusIndicator';
 import { POI } from '../services/routeService';
 import { useTheme } from '../theme';
 import { useRoute } from '../context/RouteContext';
 import { createMasterRoute } from '../utils/masterRouteUtils';
 import MapboxGL from '@rnmapbox/maps';
 import { MAPBOX_ACCESS_TOKEN } from '../config/mapbox';
-import { ArrowLeft, Layers, Mountain, Camera } from 'lucide-react-native';
+import { Layers, Mountain, Camera } from 'lucide-react-native';
 import { ensureCorrectCoordinateOrder, ensureCorrectBoundingBox } from '../utils/coordinateUtils';
 import POIMarker from '../components/map/POIMarker';
 import DistanceMarker from '../components/map/DistanceMarker';
@@ -379,22 +381,33 @@ const MapScreen = ({ route, navigation }: any) => {
       // Set the current photo index to show the photo viewer
       setCurrentPhotoIndex(photoIndex);
       
-      // Center the map on the photo and switch to 3D mode
-      if (cameraRef.current) {
-        // Switch to 3D mode if not already in 3D mode
-        if (!is3DMode) {
+      // Use EXACTLY the same method as the 3D toggle button
+      if (cameraRef.current && mapRef.current && !is3DMode) {
+        try {
+          // Get the current center coordinate from the map (this is async)
+          mapRef.current.getCenter().then(currentCenter => {
+            // Update 3D mode state
+            setIs3DMode(true);
+            
+            // Set camera with ONLY the pitch change - NO CENTER OR ZOOM CHANGES
+            if (cameraRef.current) {
+              cameraRef.current.setCamera({
+                pitch: 60, // 3D mode
+                animationDuration: 500,
+              });
+            }
+            
+            console.log('[MapScreen] Switched to 3D mode when clicking on photo marker (using 3D toggle method)');
+          }).catch(error => {
+            console.error('[MapScreen] Error getting center when clicking photo:', error);
+            // Fall back to just toggling the state
+            setIs3DMode(true);
+          });
+        } catch (error) {
+          console.error('[MapScreen] Error in async operation when clicking photo:', error);
+          // Fall back to just toggling the state
           setIs3DMode(true);
         }
-        
-        // Set the camera to center on the photo with appropriate zoom and 3D pitch
-        cameraRef.current.setCamera({
-          centerCoordinate: ensureCorrectCoordinateOrder([photoData.coordinates.lng, photoData.coordinates.lat]),
-          zoomLevel: Math.max(currentZoom, 13), // Ensure we're zoomed in enough
-          pitch: 60, // 3D mode
-          animationDuration: 500,
-        });
-        
-        console.log('[MapScreen] Switched to 3D mode when clicking on photo marker');
       }
       }
     }
@@ -487,10 +500,16 @@ const MapScreen = ({ route, navigation }: any) => {
       <View style={[styles.container, { backgroundColor: paperTheme.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: paperTheme.colors.error }}>Map not found</Text>
         <TouchableOpacity 
-          style={styles.backButton}
+          style={{
+            backgroundColor: paperTheme.colors.primary,
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            marginTop: 16
+          }}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>Go Back</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -529,6 +548,8 @@ const MapScreen = ({ route, navigation }: any) => {
           pitchEnabled={is3DMode}
           rotateEnabled={true}
           zoomEnabled={true}
+          compassViewPosition={1} // Position compass at top-right
+          compassViewMargins={{ x: 16, y: 120 }} // Moved much further down to be below the header
         >
           {/* No need for custom icon images when using MarkerView */}
           
@@ -659,16 +680,21 @@ const MapScreen = ({ route, navigation }: any) => {
         </View>
       )}
       
-      {/* Map Control Buttons - Moved higher up to avoid being hidden by the elevation drawer */}
+      {/* Map Header - Positioned absolutely at the top */}
+      {mapDetails && (
+        <View style={styles.headerContainer}>
+          <MapHeader
+            title={mapDetails.name || 'Untitled Map'}
+            color={mapDetails.headerSettings?.color || '#ff4d4d'}
+            logoUrl={mapDetails.headerSettings?.logoUrl}
+            username={mapDetails.headerSettings?.username}
+            onBack={() => navigation.goBack()}
+          />
+        </View>
+      )}
+      
+      {/* Map Control Buttons - Positioned to avoid header and elevation drawer */}
       <View style={styles.controlButtonsContainer}>
-        {/* Back Button */}
-        <TouchableOpacity 
-          style={styles.controlButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft size={24} color="#fff" />
-        </TouchableOpacity>
-        
         {/* Map Style Toggle Button */}
         <TouchableOpacity 
           style={styles.controlButton}
@@ -684,8 +710,11 @@ const MapScreen = ({ route, navigation }: any) => {
               setCurrentMapStyle(MAP_STYLES.SATELLITE_STREETS);
             }
           }}
+          accessibilityLabel="Change map style"
+          accessibilityRole="button"
+          accessibilityHint="Cycles through different map styles"
         >
-          <Layers size={24} color="#fff" />
+          <Layers size={20} color="#fff" />
         </TouchableOpacity>
         
         {/* 3D Toggle Button */}
@@ -707,7 +736,7 @@ const MapScreen = ({ route, navigation }: any) => {
                 cameraRef.current.setCamera({
                   centerCoordinate: currentCenter,
                   zoomLevel: currentZoomLevel,
-                  pitch: newMode ? 60 : 0, // New pitch based on toggled state
+                  pitch: newMode ? 70 : 0, // New pitch based on toggled state
                   animationDuration: 500,
                 });
                 
@@ -723,11 +752,17 @@ const MapScreen = ({ route, navigation }: any) => {
               console.log('[MapScreen] Toggled 3D mode but camera ref not available');
             }
           }}
+          accessibilityLabel="Toggle 3D terrain"
+          accessibilityRole="button"
+          accessibilityHint="Switches between 2D and 3D map view"
         >
-          <Mountain 
-            size={24} 
-            color={is3DMode ? "#ff9500" : "#fff"} 
-          />
+          <Text style={{ 
+            color: is3DMode ? "#ff9500" : "#fff",
+            fontWeight: 'bold',
+            fontSize: 14
+          }}>
+            3D
+          </Text>
         </TouchableOpacity>
       </View>
       
@@ -821,6 +856,8 @@ const MapScreen = ({ route, navigation }: any) => {
                 pitch: 60, // 3D mode
                 animationDuration: 500,
               });
+              
+              console.log('[MapScreen] Navigated to photo and applied 3D pitch');
             }
           }}
         />
@@ -873,11 +910,22 @@ const MapScreen = ({ route, navigation }: any) => {
           }}
         />
       )}
+      
+      {/* Firebase Status Indicator */}
+      <FirebaseStatusIndicator position="bottom-right" showDetails={true} />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  headerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    marginTop: -20, // Increased negative margin to move it up even further
+    zIndex: 20, // Higher than map (10) to ensure it's above
+  },
   markerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -895,16 +943,16 @@ const styles = StyleSheet.create({
   controlButtonsContainer: {
     position: 'absolute',
     left: 16,
-    top: 100, // Moved down from 60 to 100 to avoid overlapping with the scale
+    top: 120, // Adjusted to position below the header
     flexDirection: 'column',
     alignItems: 'center',
     zIndex: 10,
   },
   controlButton: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40, // Reduced from 48px to 40px
+    height: 40, // Reduced from 48px to 40px
+    borderRadius: 20, // Adjusted to match new size
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12, // Add spacing between buttons
@@ -942,26 +990,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
   },
-  backButton: {
-    position: 'absolute',
-    left: 16,
-    bottom: 32,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
   errorContainer: {
     position: 'absolute',
     bottom: 90,
@@ -988,6 +1016,36 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#ff3b30',
     fontWeight: 'bold',
+  },
+  scaleBarContainer: {
+    position: 'absolute',
+    top: 170,
+    right: 16,
+    zIndex: 15,
+  },
+  scaleBar: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    flexDirection: 'column',
+    width: 100,
+  },
+  scaleText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  scaleBarLine: {
+    height: 2,
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    marginBottom: 4,
+  },
+  scaleTextContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   }
 });
 

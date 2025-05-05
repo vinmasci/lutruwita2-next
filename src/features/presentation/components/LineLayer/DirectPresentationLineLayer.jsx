@@ -15,13 +15,13 @@ import './DirectPresentationLineLayer.css';
  * @param {Object} props.map - The Mapbox map instance
  * @param {Array} props.lines - The line data to render
  */
-const DirectPresentationLineLayer = ({ map, lines = [] }) => {
+const DirectPresentationLineLayer = React.memo(({ map, lines = [] }) => {
   // Reduce logging in presentation mode to improve performance
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[DirectPresentationLineLayer] Rendering with map:', !!map);
-    console.log('[DirectPresentationLineLayer] Lines from props:', { 
-      linesCount: lines?.length || 0
-    });
+  if (process.env.NODE_ENV === 'development' && console.groupCollapsed) {
+    console.groupCollapsed('[DirectPresentationLineLayer] Render info');
+    console.log('Rendering with map:', !!map);
+    console.log('Lines from props:', { linesCount: lines?.length || 0 });
+    console.groupEnd();
   }
   
   // Reference to track if we've registered the style.load event listener
@@ -63,8 +63,10 @@ const DirectPresentationLineLayer = ({ map, lines = [] }) => {
   
   // Check if we have lines to render
   if (!lines || lines.length === 0) {
-    if (process.env.NODE_ENV === 'development') {
+    // Only log once per session using a module-level variable
+    if (process.env.NODE_ENV === 'development' && !DirectPresentationLineLayer.hasLoggedNoLines) {
       console.log('[DirectPresentationLineLayer] No lines to render');
+      DirectPresentationLineLayer.hasLoggedNoLines = true;
     }
     return null;
   }
@@ -181,6 +183,9 @@ const DirectPresentationLineLayer = ({ map, lines = [] }) => {
       />
     </>
   );
-};
+}); // Fixed: Added closing parenthesis for React.memo
+
+// Static property to track if we've already logged the "no lines" message
+DirectPresentationLineLayer.hasLoggedNoLines = false;
 
 export default DirectPresentationLineLayer;

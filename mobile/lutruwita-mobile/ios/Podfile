@@ -18,7 +18,7 @@ $RNMapboxMapsDownloadToken = 'sk.eyJ1IjoidmlubWFzY2kiLCJhIjoiY205ZjcyNDRoMHcybjJ
 $RNMapboxMapsImpl = 'mapbox'
 $RNMapboxMapsVersion = '11.11.0'
 # @generated end @rnmapbox/maps-rnmapboxmapsimpl
-target 'LutruwitaMobile' do
+target 'CyaTrails' do
   use_expo_modules!
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'

@@ -1,0 +1,59 @@
+📚 Summary: Fixing Mapbox Map Load Issues on iOS Simulator
+
+🧩 Problem:
+Mapbox map was failing to load only on the iOS Simulator.
+Worked fine on real mobile device.
+🔥 Root Cause:
+The iOS Simulator did not have a development build of the app installed after expo prebuild.
+Also possible minor network or caching issues in the Simulator.
+🛠 Steps Taken to Fix It:
+
+1. Identified that the code itself was fine.
+Because the map loaded normally on the real phone.
+Meaning the bug was Simulator-specific, not a real app bug.
+2. Realized that after using npx expo prebuild, a new native development build must be installed.
+expo start --ios alone is not enough after prebuild.
+After prebuild, you're in development build mode (real compiled iOS app needed).
+3. Correct Build Process:
+# 1. Prebuild native code if needed
+npx expo prebuild
+
+# 2. Build and install the app onto Simulator
+npx expo run:ios
+✅ npx expo run:ios compiles the app, installs it, and launches it properly.
+
+✅ Metro Bundler starts automatically afterward.
+
+✅ Mapbox map loads correctly once the app is installed properly!
+
+🧹 Optional Extra Cleaning (if needed):
+
+If there are Simulator issues (broken network, stale cache):
+
+# Reset all Simulators
+xcrun simctl shutdown all
+xcrun simctl erase all
+open -a Simulator
+(Use this only if problems persist.)
+
+✨ Key Lessons Learned:
+
+
+Insight	Why it matters
+If it works on real device but not Simulator, the code is fine.	Simulator-specific problem, not app bug.
+After expo prebuild, you must expo run:ios.	Because now you're using a native dev build, not Expo Go.
+Don't waste time wiping node_modules unless absolutely necessary.	Most Simulator issues are network/caching-related, not dependency bugs.
+Resetting the Simulator can fix invisible networking problems.	Quick fix for broken tile loading or SSL errors.
+⚡ Quick Future Command Cheat Sheet:
+
+cd mobile/lutruwita-mobile
+npx expo prebuild
+npx expo run:ios
+(or just npx expo run:ios if you already prebuilt.)
+
+🎯 Final Quick Takeaway:
+
+➔ Simulator was missing a built app.
+➔ Built and installed with npx expo run:ios.
+➔ Maps now load perfectly.
+

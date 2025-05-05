@@ -26,6 +26,8 @@ async function handleGetRouteForEmbed(req, res) {
       lastViewed: { type: Date },
       publicId: { type: String, index: true, sparse: true },
       embedUrl: { type: String }, // URL to the pre-processed embed data in Cloudinary
+      staticMapUrl: { type: String }, // URL to the pre-generated static map image in Cloudinary
+      staticMapPublicId: { type: String }, // Public ID of the static map image in Cloudinary
       
       // Map state
       mapState: {
@@ -267,12 +269,16 @@ async function handleGetRouteForEmbed(req, res) {
       elevation: route.routes.map(r => r.surface?.elevationProfile || []),
       description: route.description, // Include the top-level description field
       headerSettings: route.headerSettings, // Include the header settings
+      staticMapUrl: route.staticMapUrl, // Include the static map URL
+      staticMapPublicId: route.staticMapPublicId, // Include the static map public ID
       _type: 'loaded',
       _loadedState: {
         name: route.name,
         pois: route.pois || { draggable: [], places: [] },
         photos: route.photos || [],
-        headerSettings: route.headerSettings // Include header settings in _loadedState too
+        headerSettings: route.headerSettings, // Include header settings in _loadedState too
+        staticMapUrl: route.staticMapUrl, // Include the static map URL in _loadedState
+        staticMapPublicId: route.staticMapPublicId // Include the static map public ID in _loadedState
       }
     };
     

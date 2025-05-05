@@ -9,6 +9,10 @@ import {
   getOptimizedImageUrl, 
   generateSrcSet 
 } from '../../../../utils/imageUtils';
+import {
+  generateStaticMapUrl,
+  shouldUseStaticMaps
+} from '../../../../utils/staticMapUtils';
 
 // More reliable mobile detection function
 const isMobileDevice = () => {
@@ -141,7 +145,8 @@ export const ImageSlider = React.memo(({
   maxPhotos = 10,
   staticMapUrl,
   simplifiedMode = false, // New prop for simplified mode
-  preserveOrder = false // New prop to preserve the original order of photos
+  preserveOrder = false, // New prop to preserve the original order of photos
+  forceStaticMap = false // New prop to force using static map
 }) => {
   // Simplified state for the simplified mode
   const [loadedImages, setLoadedImages] = useState({});
@@ -224,19 +229,62 @@ export const ImageSlider = React.memo(({
     });
   }, [shuffledPhotoList, simplifiedMode]); // Depend on the shuffled state and simplified mode
 
+  // Determine if we should use a static map
+  const useStaticMap = useMemo(() => {
+    return forceStaticMap || shouldUseStaticMaps();
+  }, [forceStaticMap]);
+
+  // Generate static map URL if needed and not provided
+  const generatedStaticMapUrl = useMemo(() => {
+    if (staticMapUrl || !useStaticMap || !mapPreviewProps) {
+      return null;
+    }
+    
+    try {
+      const url = generateStaticMapUrl({
+        center: mapPreviewProps.center,
+        zoom: mapPreviewProps.zoom,
+        routes: mapPreviewProps.routes,
+        width: 600,
+        height: 400
+      });
+      
+      // If URL generation failed, return null to fall back to dynamic map
+      if (!url) {
+        console.warn('[ImageSlider] Failed to generate static map URL, falling back to dynamic map');
+        return null;
+      }
+      
+      return url;
+    } catch (error) {
+      console.error('[ImageSlider] Error generating static map URL:', error);
+      return null;
+    }
+  }, [staticMapUrl, useStaticMap, mapPreviewProps]);
+
   // Create items array for carousel - depends on photoSlides which depends on shuffledPhotoList
   const items = useMemo(() => {
     const result = [];
 
-    // Add static map image as the first item if URL exists
+    // Prioritize using the pre-generated static map URL from the route data
     if (staticMapUrl) {
+      console.log('[ImageSlider] Using pre-generated static map URL:', staticMapUrl);
       result.push({
         type: 'static-map',
         content: staticMapUrl
       });
     }
-    // Fallback: Add Mapbox preview if static URL doesn't exist but mapPreviewProps do
+    // Fallback 1: Use generated static map URL if available
+    else if (useStaticMap && generatedStaticMapUrl) {
+      console.log('[ImageSlider] Using generated static map URL:', generatedStaticMapUrl);
+      result.push({
+        type: 'static-map',
+        content: generatedStaticMapUrl
+      });
+    }
+    // Fallback 2: Add Mapbox preview if no static URL exists but mapPreviewProps do
     else if (mapPreviewProps) {
+      console.log('[ImageSlider] Falling back to dynamic Mapbox preview');
       result.push({
         type: 'map',
         content: mapPreviewProps

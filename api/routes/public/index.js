@@ -97,6 +97,10 @@ const RouteSchema = new mongoose.Schema({
   viewCount: { type: Number, default: 0 },
   lastViewed: { type: Date },
   
+  // Static map image
+  staticMapUrl: { type: String },
+  staticMapPublicId: { type: String },
+  
   // Header settings
   headerSettings: {
     color: { type: String },
@@ -463,7 +467,7 @@ async function handleGetPublicRoutes(req, res) {
     
     // Get routes from database
     const routes = await Route.find({ isPublic: true, ...filter })
-      .select('_id persistentId name type viewCount lastViewed createdAt updatedAt mapState routes pois photos userId metadata')
+      .select('_id persistentId name type viewCount lastViewed createdAt updatedAt mapState routes pois photos userId metadata staticMapUrl staticMapPublicId')
       .sort({ viewCount: -1, createdAt: -1 });
     
     console.log(`[API] Found ${routes.length} public routes`);
@@ -582,6 +586,8 @@ async function handleGetPublicRoutes(req, res) {
           lines: routeData.lines || [], // Include lines array
           photos: routeData.photos || [],
           metadata: routeData.metadata || {}, // Include metadata for filtering
+          staticMapUrl: routeData.staticMapUrl, // Include static map URL
+          staticMapPublicId: routeData.staticMapPublicId, // Include static map public ID
           createdBy: createdBy // Add the user information
         };
         

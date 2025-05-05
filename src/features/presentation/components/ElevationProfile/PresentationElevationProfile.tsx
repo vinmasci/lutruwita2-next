@@ -900,6 +900,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         <Typography 
                             variant="body2" 
                             color="text.secondary" 
+                            component="div"
                             sx={{ 
                                 fontSize: '0.75rem', 
                                 fontFamily: 'Lato',
@@ -914,6 +915,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         <Typography 
                             variant="body2" 
                             color="text.secondary" 
+                            component="div"
                             sx={{ 
                                 fontSize: '0.75rem', 
                                 fontFamily: 'Lato',
@@ -928,6 +930,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         <Typography 
                             variant="body2" 
                             color="text.secondary" 
+                            component="div"
                             sx={{ 
                                 fontSize: '0.75rem', 
                                 fontFamily: 'Lato',
@@ -942,6 +945,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                         <Typography 
                             variant="body2" 
                             color="text.secondary" 
+                            component="div"
                             sx={{ 
                                 fontSize: '0.75rem', 
                                 fontFamily: 'Lato',
@@ -968,6 +972,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                     <Typography 
                         variant="body2" 
                         color="text.secondary" 
+                        component="div"
                         sx={{ 
                             fontSize: '0.75rem', 
                             fontFamily: 'Lato',
@@ -986,6 +991,7 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
                     <Typography 
                         variant="body2" 
                         color="text.secondary" 
+                        component="div"
                         sx={{ 
                             fontSize: '0.75rem', 
                             fontFamily: 'Lato',

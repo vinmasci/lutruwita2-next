@@ -14,19 +14,10 @@ import {
   useTheme as usePaperTheme 
 } from 'react-native-paper';
 import { useTheme } from '../theme';
-
-// Mock user data for initial development
-const MOCK_USER = {
-  id: 'user123',
-  name: 'Jane Smith',
-  email: 'jane.smith@example.com',
-  isPremium: false,
-  joinedDate: '2025-01-15T10:30:00Z',
-  avatar: null, // We'll use a placeholder for now
-};
+import { useAuth } from '../context/AuthContext';
 
 const ProfileScreen = ({ navigation }: any) => {
-  const [isLoggedIn, setIsLoggedIn] = React.useState(true);
+  const { user, logout, isAuthenticated } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const paperTheme = usePaperTheme();
   
@@ -51,16 +42,6 @@ const ProfileScreen = ({ navigation }: any) => {
       [setting]: !prev[setting]
     }));
   };
-  
-  const handleLogout = () => {
-    // In a real app, we would call an authentication service
-    setIsLoggedIn(false);
-  };
-  
-  const handleLogin = () => {
-    // In a real app, we would navigate to a login screen
-    setIsLoggedIn(true);
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: paperTheme.colors.background }]}>
@@ -70,38 +51,26 @@ const ProfileScreen = ({ navigation }: any) => {
           Profile
         </Text>
         
-        {isLoggedIn ? (
+        {isAuthenticated && user ? (
           <Card style={styles.profileSection} elevation={0}>
             <Card.Content style={styles.profileContent}>
-              {MOCK_USER.avatar ? (
-                <Avatar.Image size={80} source={{ uri: MOCK_USER.avatar }} />
-              ) : (
-                <Avatar.Text size={80} label={MOCK_USER.name.charAt(0)} />
-              )}
+              <Avatar.Text 
+                size={80} 
+                label={user.name ? user.name.charAt(0) : '?'} 
+              />
               
-              <Title style={styles.userName}>{MOCK_USER.name}</Title>
-              <Paragraph style={styles.userEmail}>{MOCK_USER.email}</Paragraph>
-              <Text style={styles.userJoinDate}>Member since {formatDate(MOCK_USER.joinedDate)}</Text>
+              <Title style={styles.userName}>{user.name}</Title>
+              <Paragraph style={styles.userEmail}>{user.email}</Paragraph>
               
-              {MOCK_USER.isPremium ? (
-                <Button 
-                  mode="contained" 
-                  style={styles.premiumBadge}
-                  labelStyle={{ color: '#ffffff' }}
-                  disabled
-                >
-                  Premium Member
-                </Button>
-              ) : (
-                <Button 
-                  mode="outlined" 
-                  style={styles.upgradeToPremiumButton}
-                  icon="star"
-                  onPress={() => console.log('Upgrade to premium')}
-                >
-                  Upgrade to Premium
-                </Button>
-              )}
+              {/* Premium badge would be based on user entitlements */}
+              <Button 
+                mode="outlined" 
+                style={styles.upgradeToPremiumButton}
+                icon="star"
+                onPress={() => console.log('Upgrade to premium')}
+              >
+                Upgrade to Premium
+              </Button>
             </Card.Content>
           </Card>
         ) : (
@@ -110,13 +79,6 @@ const ProfileScreen = ({ navigation }: any) => {
               <Paragraph style={styles.loginPromptText}>
                 Sign in to access your profile, saved maps, and premium content.
               </Paragraph>
-              <Button 
-                mode="contained" 
-                style={styles.loginButton}
-                onPress={handleLogin}
-              >
-                Sign In
-              </Button>
             </Card.Content>
           </Card>
         )}
@@ -218,13 +180,13 @@ const ProfileScreen = ({ navigation }: any) => {
           </Card.Content>
         </Card>
         
-        {isLoggedIn && (
+        {isAuthenticated && (
           <Button 
             mode="outlined" 
             icon="logout" 
             style={styles.logoutButton}
             color={paperTheme.colors.error}
-            onPress={handleLogout}
+            onPress={logout}
           >
             Log Out
           </Button>

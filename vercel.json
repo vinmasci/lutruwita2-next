@@ -8,6 +8,42 @@
       "dest": "/api/health"
     },
     {
+      "src": "/api/user/saved-routes-direct/([^/]+)",
+      "dest": "/api/user/saved-routes-direct?routeId=$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
+      "src": "/api/user/saved-routes-direct",
+      "dest": "/api/user/saved-routes-direct",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
+      "src": "/api/user/saved-routes/([^/]+)",
+      "dest": "/api/user/saved-routes?routeId=$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
+      "src": "/api/user/saved-routes",
+      "dest": "/api/user/saved-routes",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
       "src": "/api/user",
       "dest": "/api/routes/user",
       "headers": {
@@ -81,6 +117,14 @@
     "api/health/index.js": {
       "memory": 128,
       "maxDuration": 5
+    },
+    "api/user/saved-routes-direct.js": {
+      "memory": 512,
+      "maxDuration": 30
+    },
+    "api/user/saved-routes.js": {
+      "memory": 512,
+      "maxDuration": 30
     },
     "api/routes/user.js": {
       "memory": 1024,

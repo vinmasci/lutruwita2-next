@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, CircularProgress, Box, Typography, LinearProgress } from '@mui/material';
+import ConsoleLogViewer from '../../../../utils/ConsoleLogViewer';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, CircularProgress, Box, Typography, LinearProgress, Paper } from '@mui/material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
-export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, isSaving = false, progress: externalProgress }) => {
+export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, isSaving = false, progress: externalProgress, logs = [] }) => {
     const [formData, setFormData] = useState({
         name: initialValues?.name || '',
         type: initialValues?.type || 'tourism',
@@ -17,6 +18,16 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
     const [progress, setProgress] = useState(0);
     const [progressStage, setProgressStage] = useState('');
     const progressInterval = useRef(null);
+    
+    // Ref for auto-scrolling logs
+    const logContainerRef = useRef(null);
+    
+    // Auto-scroll logs to bottom when they update
+    useEffect(() => {
+        if (logContainerRef.current && logs.length > 0) {
+            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        }
+    }, [logs]);
     
     // Update progress when external progress changes
     useEffect(() => {
@@ -233,6 +244,13 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
                 >
                     Cancel
                 </Button>
+                {/* Debug info */}
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    isSaving: {isSaving ? 'true' : 'false'}, 
+                    logs: {logs.length}, 
+                    progress: {Math.round(progress)}%
+                </Typography>
+                
                 {isSaving ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0 8px' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -242,7 +260,7 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
                                 sx={{ color: '#90caf9' }}
                             />
                             <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 'medium' }}>
-                                Rendering files...
+                                Saving... {Math.round(progress)}%
                             </Typography>
                         </Box>
                         
@@ -272,6 +290,9 @@ export const SaveDialog = ({ open, onClose, onSave, initialValues, isEditing, is
                         >
                             {progressStage} ({Math.round(progress)}%)
                         </Typography>
+                        
+                        {/* Real-time console log viewer */}
+                        <ConsoleLogViewer maxHeight="200px" maxLogs={100} />
                     </Box>
                 ) : (
                     <Button 

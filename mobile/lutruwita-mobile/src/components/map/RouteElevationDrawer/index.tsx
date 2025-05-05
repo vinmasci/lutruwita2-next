@@ -8,6 +8,7 @@ import RouteDescription from './RouteDescription';
 import WeatherForecast from './WeatherForecast';
 import HistoricalWeather from './HistoricalWeather';
 import MinimizedView from './MinimizedView';
+import RouteActionButtons from './RouteActionButtons';
 import { useStyles } from './styles';
 import { useTheme } from '../../../theme';
 import { createMasterRoute } from '../../../utils/masterRouteUtils';
@@ -316,6 +317,11 @@ const RouteElevationDrawer: React.FC<RouteElevationDrawerProps> = ({
                   tracerPosition={tracerPosition}
                 />
               </View>
+              
+              {/* Action buttons (only in Overview tab) */}
+              {activeRouteIndex === -1 && routeState.selectedRoute && (
+                <RouteActionButtons route={routeState.selectedRoute} />
+              )}
               
               {/* Route description */}
               <RouteDescription 

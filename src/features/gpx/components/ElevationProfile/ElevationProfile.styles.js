@@ -16,7 +16,8 @@ export const ElevationPanel = styled(Box)(({ theme }) => ({
     display: 'flex',
     flexDirection: 'column',
     '&.collapsed': {
-        transform: 'translateY(100%)'
+        transform: 'translateY(100%)',
+        visibility: 'hidden' // Hide completely when collapsed
     },
     '& > *': {
         flex: 1,

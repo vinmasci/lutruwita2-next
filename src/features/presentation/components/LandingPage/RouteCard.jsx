@@ -11,6 +11,7 @@ import { styled } from '@mui/material/styles';
 import { Route, Mountain, MoreHorizontal } from 'lucide-react';
 // Import ImageSlider directly without lazy loading
 import ImageSlider from '../ImageSlider/ImageSlider';
+import { shouldUseStaticMaps } from '../../../../utils/staticMapUtils';
 import { FilterCard } from './FilterCard';
 
 // Simple placeholder for images
@@ -206,9 +207,11 @@ export const RouteCard = ({ route }) => {
             zoom: route.mapState.zoom, 
             routes: route.routes 
           }}
+          staticMapUrl={route.staticMapUrl} // Use pre-generated static map URL if available
           photos={limitedPhotos}
           maxPhotos={MAX_PHOTOS_PER_CARD}
           simplifiedMode={true} // Enable simplified mode for better mobile compatibility
+          forceStaticMap={true} // Always use static maps for landing page cards
         />
       </MapPreviewWrapper>
       <CardContent sx={{ padding: '12px 8px' }}>

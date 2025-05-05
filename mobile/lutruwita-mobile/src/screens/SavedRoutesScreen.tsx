@@ -6,23 +6,27 @@ import {
   Searchbar, 
   useTheme as usePaperTheme,
   ActivityIndicator,
-  IconButton
+  IconButton,
+  Button,
+  Dialog,
+  Portal
 } from 'react-native-paper';
 import { useTheme } from '../theme';
-import { useRoute } from '../context/RouteContext';
+import { useSavedRoutes } from '../context/FirebaseSavedRoutesContext';
 import { useDynamicRouteFilters } from '../hooks/useDynamicRouteFilters';
 import MapTypeSelector from '../components/filters/MapTypeSelector';
 import FilterModal from '../components/filters/FilterModal';
-import RouteCard from '../components/routes/RouteCard';
+import SavedRouteCard from '../components/routes/SavedRouteCard';
 
 const SavedRoutesScreen = ({ navigation }: any) => {
   const { isDark } = useTheme();
   const paperTheme = usePaperTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const { routeState, loadRoutes } = useRoute();
+  const { savedRoutes, isLoading, error, refreshSavedRoutes, clearSavedRoutes } = useSavedRoutes();
+  const [clearDialogVisible, setClearDialogVisible] = useState(false);
   
-  // Use the dynamic route filters hook with saved routes enabled
+  // Use the dynamic route filters hook with saved routes
   const {
     selectedMapType,
     setSelectedMapType,
@@ -38,8 +42,6 @@ const SavedRoutesScreen = ({ navigation }: any) => {
     setDistanceFilter,
     routeTypeFilter,
     setRouteTypeFilter,
-    showingSavedRoutes,
-    setShowingSavedRoutes,
     availableFilters,
     availableStates,
     availableRegions,
@@ -48,24 +50,33 @@ const SavedRoutesScreen = ({ navigation }: any) => {
     hasMore,
     loadMoreRoutes,
     getActiveFilterCount
-  } = useDynamicRouteFilters(routeState.routes);
+  } = useDynamicRouteFilters(savedRoutes);
   
-  // Set showing saved routes to true when this screen is focused
-  useEffect(() => {
-    setShowingSavedRoutes(true);
-  }, [setShowingSavedRoutes]);
+  // This screen is specifically for saved routes, so we don't need to set showingSavedRoutes
+  // The filtering is now handled directly by passing the savedRoutes to the useDynamicRouteFilters hook
   
   // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadRoutes();
+      console.log('[SavedRoutesScreen] Refreshing saved routes');
+      await refreshSavedRoutes();
+      console.log('[SavedRoutesScreen] Refresh complete');
     } catch (error) {
-      console.error('Error refreshing routes:', error);
+      console.error('[SavedRoutesScreen] Error refreshing saved routes:', error);
     } finally {
       setRefreshing(false);
     }
   };
+  
+  // Force refresh when savedRoutes changes to empty
+  useEffect(() => {
+    if (savedRoutes.length === 0 && !isLoading) {
+      console.log('[SavedRoutesScreen] No saved routes detected, ensuring UI is updated');
+      // This will ensure the empty state is shown
+      onRefresh();
+    }
+  }, [savedRoutes.length]);
   
   // Reset all filters
   const resetFilters = () => {
@@ -83,7 +94,7 @@ const SavedRoutesScreen = ({ navigation }: any) => {
   
   // Render route card
   const renderRouteCard = ({ item }: { item: any }) => (
-    <RouteCard 
+    <SavedRouteCard 
       route={item}
       onPress={handleRoutePress}
     />
@@ -92,14 +103,27 @@ const SavedRoutesScreen = ({ navigation }: any) => {
   return (
     <View style={[styles.container, { backgroundColor: paperTheme.colors.background }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Text 
-        style={[
-          styles.title, 
-          { color: paperTheme.colors.onBackground }
-        ]}
-      >
-        Saved Routes
-      </Text>
+      <View style={styles.headerContainer}>
+        <Text 
+          style={[
+            styles.title, 
+            { color: paperTheme.colors.onBackground }
+          ]}
+        >
+          Saved Routes
+        </Text>
+        {savedRoutes.length > 0 && (
+          <Button 
+            mode="outlined" 
+            onPress={() => setClearDialogVisible(true)}
+            icon="delete"
+            textColor={paperTheme.colors.error}
+            style={styles.clearButton}
+          >
+            Clear All
+          </Button>
+        )}
+      </View>
       
       {/* Map Type Selector */}
       <MapTypeSelector
@@ -135,21 +159,21 @@ const SavedRoutesScreen = ({ navigation }: any) => {
       </View>
       
       {/* Route List */}
-      {routeState.isLoading ? (
+      {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={paperTheme.colors.primary} />
           <Text style={{ marginTop: 16 }}>Loading saved routes...</Text>
         </View>
-      ) : routeState.error ? (
+      ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={{ color: paperTheme.colors.error }}>
-            {routeState.error}
+            {error}
           </Text>
           <Text style={{ marginTop: 8 }}>
-            Using mock data instead.
+            Please try again later.
           </Text>
         </View>
-      ) : displayedRoutes.length === 0 ? (
+      ) : savedRoutes.length === 0 || displayedRoutes.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No saved routes found</Text>
           <Text style={styles.emptySubtext}>
@@ -195,6 +219,35 @@ const SavedRoutesScreen = ({ navigation }: any) => {
         }}
         resetFilters={resetFilters}
       />
+      
+      {/* Clear Confirmation Dialog */}
+      <Portal>
+        <Dialog visible={clearDialogVisible} onDismiss={() => setClearDialogVisible(false)}>
+          <Dialog.Title>Clear All Saved Routes</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              Are you sure you want to clear all saved routes? This action cannot be undone.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setClearDialogVisible(false)}>Cancel</Button>
+            <Button 
+              onPress={async () => {
+                setClearDialogVisible(false);
+                try {
+                  await clearSavedRoutes();
+                  console.log('[SavedRoutesScreen] Successfully cleared all saved routes');
+                } catch (error) {
+                  console.error('[SavedRoutesScreen] Error clearing saved routes:', error);
+                }
+              }}
+              textColor={paperTheme.colors.error}
+            >
+              Clear All
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 };
@@ -204,11 +257,20 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
     marginTop: 40,
+  },
+  clearButton: {
+    marginTop: 40,
+    borderColor: '#ee5253',
   },
   searchContainer: {
     flexDirection: 'row',

@@ -940,22 +940,20 @@ export default function PresentationMapView(props) {
                 ).map(route => {
                     return _jsx(RouteLayer, { 
                         map: mapInstance.current, 
-                        route: route,
-                        key: route.id || route.routeId // Ensure we have a stable key
+                        route: route
                     }, route.id || route.routeId);
                 }),
                 
                 // Then render the current route last to ensure it's on top
                 currentRoute && _jsx(RouteLayer, { 
                     map: mapInstance.current, 
-                    route: currentRoute,
-                    key: currentRoute.id || currentRoute.routeId // Ensure we have a stable key
+                    route: currentRoute
                 }, currentRoute.id || currentRoute.routeId),
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
                 mapContextValue.isPhotosVisible && _jsx(PresentationPhotoLayer, {}),
-                isLineMarkersVisible && _jsx(DirectPresentationLineLayer, { 
+                isLineMarkersVisible && props.lineData && props.lineData.length > 0 && _jsx(DirectPresentationLineLayer, { 
                   map: mapInstance.current, 
-                  lines: props.lineData || [] 
+                  lines: props.lineData 
                 }),
                 currentRoute && (_jsxs(_Fragment, { children: [
                     isDistanceMarkersVisible && _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),

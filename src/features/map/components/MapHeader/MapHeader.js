@@ -103,6 +103,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
     };
     
     return (_jsx(AppBar, { 
+        key: "map-header-app-bar",
         sx: {
             backgroundColor: color || '#000000',
             boxShadow: 3,
@@ -119,6 +120,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
         }, 
         children: 
             _jsx(Toolbar, { 
+                key: "map-header-toolbar",
                  sx: {
                      display: 'flex',
                      justifyContent: 'space-between',
@@ -151,7 +153,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                         children: [
                             // Inner content box (Title, Username) - Allow pointer events here
                             _jsxs(Box, {
-                                key: "title-box",
+                                key: "inner-content-box",
                                 sx: {
                                      pointerEvents: 'auto', // Re-enable pointer events for content
                                       display: 'flex',
@@ -205,6 +207,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                             title: "Clear Logo",
                                                             key: "clear-logo-tooltip",
                                                             children: _jsx(IconButton, {
+                                                                key: "clear-logo-button",
                                                                 size: "small",
                                                                 onClick: handleClearLogo,
                                                                 sx: {
@@ -216,7 +219,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                                     padding: '2px',
                                                                     '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.5)' }
                                                                 },
-                                                                children: _jsx(X, { size: 14 })
+                                                                children: _jsx(X, { key: "clear-logo-x-icon", size: 14 })
                                                             })
                                                         })
                                                     ]
@@ -235,7 +238,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                 children: [
                                                     // Title
                                                     _jsx(Typography, {
-                                                        key: "title-text",
+                                                        key: "route-title",
                                                         variant: "h6",
                                                         component: "div",
                                                         sx: {
@@ -253,12 +256,12 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                     }),
                                                     
                                                     // Small line break
-                                                    _jsx(Box, { sx: { height: '2px' }, key: "line-break" }),
+                                                    _jsx(Box, { sx: { height: '2px' } }, "line-break"),
                                                     
                                                     // Username attribution (if available)
                                                     username && (
                                                         _jsxs(Typography, {
-                                                            key: "username-text",
+                                                            key: "username-attribution",
                                                             variant: "body2",
                                                             sx: {
                                                                 color: '#ffffff',
@@ -285,19 +288,20 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
 
                     // Right side - Navigation links
                     _jsxs(Box, {
-                        key: "right-box",
                         sx: {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '1px',
                             // This Box remains on the right due to Toolbar's space-between
                         },
+                        key: "right-box",
                         children: [
                             // Home Icon with navigation delay
                             _jsx(Tooltip, {
                                 title: "Home",
                                 key: "home-tooltip",
                                 children: _jsx(IconButton, {
+                                    key: "home-button",
                                     // Use onClick with navigation delay instead of Link component
                                     onClick: withNavigationDelay(() => {
                                         window.location.href = '/';
@@ -311,6 +315,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                         // Removed filter from IconButton
                                     },
                                     children: _jsx(Home, {
+                                        key: "home-icon",
                                         size: 24,
                                         strokeWidth: 2, // Make consistently thicker
                                         color: '#ffffff',
@@ -323,6 +328,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                 title: "Map Editor",
                                 key: "map-editor-tooltip",
                                 children: _jsx(IconButton, {
+                                    key: "map-editor-button",
                                     // Use onClick with navigation delay instead of Link component
                                     onClick: withNavigationDelay(() => {
                                         window.location.href = '/editor';
@@ -336,6 +342,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                         // Removed filter from IconButton
                                     },
                                     children: _jsx(Map, {
+                                        key: "map-editor-icon",
                                         size: 24,
                                         strokeWidth: 2, // Make consistently thicker
                                         color: '#ffffff',
