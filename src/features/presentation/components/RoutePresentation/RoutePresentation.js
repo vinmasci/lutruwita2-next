@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { publicRouteService } from '../../services/publicRoute.service.js';
+import { getPublicRoute } from '../../../../services/firebasePublicRouteService';
 import { PresentationMapView } from '../PresentationMapView';
 import { Box, CircularProgress, Alert } from '@mui/material';
 import { RouteProvider, useRouteContext } from '../../../map/context/RouteContext';
@@ -11,6 +11,7 @@ import { usePOIContext } from '../../../poi/context/POIContext';
 import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { useRef } from 'react'; // Import useRef
 import logger from '../../../../utils/logger';
+import { normalizeRoute } from '../../../map/utils/routeUtils';
 
 // Module-level Set to track initialized persistent IDs across mounts/sessions
 const initializedPersistentIds = new Set();
@@ -28,41 +29,55 @@ export const RoutePresentation = () => {
 
     useEffect(() => {
         const fetchRoute = async () => {
-            if (!id) return;
-            
-            // Check if we're already loading this route
-            if (isCurrentlyLoading) {
-                console.log('[RoutePresentation] ⏭️ Already loading a route, skipping duplicate fetch');
+            if (!id) {
+                setRoute(null); // Clear route if ID is gone
+                setLoading(false);
+                setError(null);
+                return;
+            }
+
+            // If we already have the correct route loaded and are not in an error state, don't re-fetch.
+            if (route && route.persistentId === id && !error) {
+                console.log(`[RoutePresentation] ✅ Route ID ${id} already loaded and no error. Skipping fetch.`);
+                setLoading(false); // Ensure loading is false if we skip.
                 return;
             }
             
-            // Set the global loading flag
-            isCurrentlyLoading = true;
+            // Check if a global fetch is already in progress
+            if (isCurrentlyLoading) {
+                console.log(`[RoutePresentation] ⏭️ A global fetch is already in progress. Skipping duplicate fetch for ID: ${id}`);
+                return;
+            }
+            
+            console.log(`[RoutePresentation] Initiating data fetch for route ID: ${id}`);
+            isCurrentlyLoading = true; // Set the global loading flag
             
             try {
                 setLoading(true);
-                setError(null);
+                setError(null); // Clear previous errors for this new attempt
                 
-                const routeData = await publicRouteService.loadRoute(id);
-
-                if (!routeData) {
-                    setError('Route data is empty');
-                    return;
-                }
-
-                if (!routeData.routes || !Array.isArray(routeData.routes)) {
-                    setError('Invalid route data structure');
-                    return;
-                }
-
-                // Only update state if the route ID has changed or route is null
-                if (!route || route.persistentId !== routeData.persistentId) {
-                     setRoute(routeData);
+                let routeData = await getPublicRoute(id);
+                
+                if (routeData) {
+                    console.log('[RoutePresentation] Successfully loaded route from Firebase for ID:', id);
+                    // Ensure routes array exists and is valid before setting
+                    if (routeData.routes && Array.isArray(routeData.routes)) {
+                        setRoute(routeData);
+                    } else {
+                        console.error('[RoutePresentation] Invalid route data structure received for ID:', id, routeData);
+                        setError('Invalid route data structure');
+                        setRoute(null);
+                    }
+                } else {
+                    console.log('[RoutePresentation] Route not found in Firebase for ID:', id);
+                    setError('Route not found in Firebase');
+                    setRoute(null); // Clear any old route data
                 }
             }
-            catch (error) {
-                setError('Failed to load route');
-                console.error('[RoutePresentation] Error fetching route:', error);
+            catch (fetchErr) { // Renamed to avoid conflict with outer error state
+                console.error(`[RoutePresentation] Error fetching route ID ${id}:`, fetchErr);
+                setError(`Failed to load route: ${fetchErr.message}`);
+                setRoute(null); // Clear any old route data on error
             }
             finally {
                 setLoading(false);
@@ -74,13 +89,18 @@ export const RoutePresentation = () => {
         
         // Cleanup function to reset loading state if component unmounts during fetch
         return () => {
+            // This cleanup for a module-level flag can be tricky.
+            // If this specific effect instance initiated the load that is 'isCurrentlyLoading',
+            // then it should reset it on unmount if the load didn't complete.
+            // For now, keeping the original behavior, but it's an area for potential refinement
+            // if race conditions with the global flag are observed.
             if (isCurrentlyLoading) {
                 isCurrentlyLoading = false;
             }
         };
-    }, [id]);
+    }, [id, route, error]); // Dependencies updated to re-evaluate conditions for fetching
 
-    // Just add required fields to server routes
+    // Process routes using normalizeRoute function
     const routes = useMemo(() => {
         if (!route)
             return [];
@@ -94,24 +114,48 @@ export const RoutePresentation = () => {
                 return null;
             }
 
-            // Ensure the route object has the persistentId property
-            return {
-                ...routeData,
-                _type: 'loaded',
-                _loadedState: {
+            try {
+                // Create a route object that matches the format expected by normalizeRoute
+                const routeForNormalization = {
                     ...route,
-                    // Ensure persistentId is explicitly set in _loadedState
-                    persistentId: route.persistentId
-                },
-                // Also set persistentId directly on the route object
-                persistentId: route.persistentId,
-                id: routeData.routeId,
-                isVisible: true,
-                status: {
-                    processingState: 'completed',
-                    progress: 100
-                }
-            };
+                    routes: [routeData]
+                };
+                
+                // Use normalizeRoute to properly format the route data
+                const normalizedRoute = normalizeRoute(routeForNormalization);
+                
+                // Add persistentId to the normalized route
+                normalizedRoute.persistentId = route.persistentId;
+                
+                // Log the normalized route for debugging
+                console.log('[RoutePresentation] Normalized route:', {
+                    routeId: normalizedRoute.routeId,
+                    hasGeojson: !!normalizedRoute.geojson,
+                    geojsonType: normalizedRoute.geojson?.type,
+                    featuresCount: normalizedRoute.geojson?.features?.length || 0
+                });
+                
+                return normalizedRoute;
+            } catch (error) {
+                console.error('[RoutePresentation] Error normalizing route:', error);
+                
+                // Fallback to the original approach if normalization fails
+                return {
+                    ...routeData,
+                    _type: 'loaded',
+                    _loadedState: {
+                        ...route,
+                        persistentId: route.persistentId
+                    },
+                    persistentId: route.persistentId,
+                    id: routeData.routeId,
+                    isVisible: true,
+                    status: {
+                        processingState: 'completed',
+                        progress: 100
+                    }
+                };
+            }
         }).filter((route) => route !== null);
     }, [route]);
 
@@ -199,11 +243,13 @@ export const RoutePresentation = () => {
                             console.log('[RoutePresentation] Found mapOverview data in route:', route.mapOverview);
                         } else {
                             console.log('[RoutePresentation] No mapOverview data found in route');
-                        }
-                        
-                        setCurrentLoadedState(route);
-                        if (routeId) {
-                            setCurrentLoadedPersistentId(routeId);
+                         }
+                         
+                         // Use the original top-level route object for setCurrentLoadedState
+                         // This ensures properties like routeType, headerSettings, mapOverview are available
+                         setCurrentLoadedState(route); 
+                         if (routeId) {
+                             setCurrentLoadedPersistentId(routeId);
                         }
                     }
 

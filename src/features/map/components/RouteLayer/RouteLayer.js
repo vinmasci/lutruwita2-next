@@ -30,11 +30,17 @@ export const RouteLayer = ({ map, route }) => {
         borderWidth: 5
     });
     
-    // Track if this route has already been rendered
+    // Track if this route has already been rendered - reset when route changes
     const renderedRef = useRef(false);
     
     // Track if we've already moved this route to front after rendering
     const movedToFrontAfterRenderRef = useRef(false);
+    
+    // Reset rendered state when route changes
+    useEffect(() => {
+        renderedRef.current = false;
+        movedToFrontAfterRenderRef.current = false;
+    }, [route?.id, route?.routeId]);
 
     // Function to find and update layer visibility
     const updateLayerVisibility = useCallback(() => {
@@ -255,6 +261,14 @@ export const RouteLayer = ({ map, route }) => {
         try {
             // Skip rendering if the route has an error flag or is missing geojson data
             if (!map || !route || !isStyleLoaded || !route.geojson || route.error) {
+                console.log('[RouteLayer] Skipping route rendering due to missing requirements:', {
+                    hasMap: !!map,
+                    hasRoute: !!route,
+                    isStyleLoaded,
+                    hasGeojson: !!route?.geojson,
+                    hasError: !!route?.error,
+                    routeId: route?.id || route?.routeId
+                });
                 return;
             }
 
@@ -266,29 +280,73 @@ export const RouteLayer = ({ map, route }) => {
             const mainSourceId = `${routeId}-main`;
             const visibility = routeVisibility[routeId] || { mainRoute: true, unpavedSections: true };
             
+            // Log route data for debugging
+            console.log('[RouteLayer] Rendering route:', {
+                routeId,
+                name: route.name,
+                hasGeojson: !!route.geojson,
+                featureCount: route.geojson?.features?.length || 0,
+                geometryType: route.geojson?.features?.[0]?.geometry?.type,
+                coordinatesCount: route.geojson?.features?.[0]?.geometry?.coordinates?.length || 0,
+                alreadyRendered: renderedRef.current && map.getLayer(mainLayerId)
+            });
+            
             // If the route is already rendered, skip rendering
             if (map.getLayer(mainLayerId) && renderedRef.current) {
+                console.log(`[RouteLayer] Route ${routeId} already rendered, skipping`);
                 return;
             }
 
             // Queue the route rendering operation to ensure proper timing
             queueRouteOperation(map, route, (mapInstance, currentRoute) => {
                 try {
+                    // Log the GeoJSON data for debugging
+                    console.log('[RouteLayer] GeoJSON data for route:', {
+                        routeId: currentRoute.routeId || currentRoute.id,
+                        geojson: currentRoute.geojson,
+                        isObject: typeof currentRoute.geojson === 'object',
+                        hasFeatures: !!currentRoute.geojson.features,
+                        featuresIsArray: Array.isArray(currentRoute.geojson.features),
+                        featuresLength: currentRoute.geojson.features?.length || 0
+                    });
+
                     // Initial validation of GeoJSON data
                     if (!currentRoute.geojson.features || !currentRoute.geojson.features.length) {
                         logger.error('RouteLayer', 'Invalid GeoJSON data', {
                             routeId: currentRoute.routeId || currentRoute.id
                         });
-                        return;
+                        
+                        // Try to fix the GeoJSON data if it's a string
+                        if (typeof currentRoute.geojson === 'string') {
+                            try {
+                                console.log('[RouteLayer] Attempting to parse GeoJSON string');
+                                currentRoute.geojson = JSON.parse(currentRoute.geojson);
+                                console.log('[RouteLayer] Successfully parsed GeoJSON string');
+                            } catch (parseError) {
+                                console.error('[RouteLayer] Failed to parse GeoJSON string:', parseError);
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
                     }
 
                     // Extract and validate geometry
-                    const geometry = currentRoute.geojson.features[0].geometry;
+                    const geometry = currentRoute.geojson.features[0]?.geometry;
                     if (!geometry || geometry.type !== 'LineString') {
                         logger.error('RouteLayer', 'Invalid GeoJSON structure', {
                             featureType: geometry?.type,
                             expected: 'LineString'
                         });
+                        
+                        // Log more details about the geometry
+                        console.log('[RouteLayer] Invalid geometry details:', {
+                            geometry,
+                            geometryType: geometry?.type,
+                            hasCoordinates: !!geometry?.coordinates,
+                            coordinatesLength: geometry?.coordinates?.length || 0
+                        });
+                        
                         return;
                     }
 
@@ -356,12 +414,15 @@ export const RouteLayer = ({ map, route }) => {
                     }
 
                     // Add combined surface layer for all routes
-                    if (currentRoute.unpavedSections && currentRoute.unpavedSections.length > 0) {
+                    // Use the 'route' prop for its own unpavedSections, not 'currentRoute' from context
+                    logger.debug('RouteLayer', `Checking unpavedSections for specific segment ${routeId}:`, route.unpavedSections);
+                    if (route.unpavedSections && route.unpavedSections.length > 0) {
+                        logger.info('RouteLayer', `Rendering unpavedSections for specific segment ${routeId}`, route.unpavedSections);
                         const surfaceSourceId = `unpaved-sections-${routeId}`;
                         const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
 
                         // Combine all unpaved sections into a single feature collection
-                        const features = currentRoute.unpavedSections.map(section => ({
+                        const features = route.unpavedSections.map(section => ({
                             type: 'Feature',
                             properties: {
                                 surface: section.surfaceType
@@ -397,6 +458,7 @@ export const RouteLayer = ({ map, route }) => {
                                 'line-dasharray': [1, 3]
                             }
                         });
+                        logger.debug('RouteLayer', `Unpaved layer ${surfaceLayerId} for route ${routeId} visibility set to: ${visibility.unpavedSections ? 'visible' : 'none'}`);
                     }
 
                     // --- Event Handlers ---
@@ -451,21 +513,89 @@ export const RouteLayer = ({ map, route }) => {
                 }
             }, `render-route-${routeId}`);
 
-            // Return cleanup function
-            return () => {
-                // Clean up event listeners when component unmounts or route changes
-                if (map && map.getLayer(mainLayerId)) { // Check if layer still exists
+    // Return cleanup function
+    return () => {
+        // Clean up event listeners when component unmounts or route changes
+        if (map) {
+            try {
+                // Get the stable route ID
+                const routeId = route?.id || route?.routeId;
+                if (!routeId) return;
+                
+                // Create a list of all possible layer IDs that might have event handlers
+                const mainLayerId = `${routeId}-main-line`;
+                const borderLayerId = `${routeId}-main-border`;
+                const hoverLayerId = `${routeId}-hover-line`;
+                const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
+                
+                // List of all layer IDs to clean up
+                const layersToCleanup = [
+                    mainLayerId,
+                    borderLayerId,
+                    hoverLayerId,
+                    surfaceLayerId,
+                    // Add variations with 'route-' prefix
+                    `route-${routeId}-main-line`,
+                    `route-${routeId}-main-border`,
+                    `route-${routeId}-hover-line`,
+                    `unpaved-sections-layer-route-${routeId}`
+                ];
+                
+                // Remove all event handlers from all possible layers
+                layersToCleanup.forEach(layerId => {
                     try {
-                        map.off('click', mainLayerId);
-                        map.off('mouseenter', mainLayerId);
-                        map.off('mousemove', mainLayerId);
-                        map.off('mouseleave', mainLayerId);
-                    } catch (cleanupError) {
+                        if (map.getLayer(layerId)) {
+                            logger.debug('RouteLayer', `Removing event handlers from layer: ${layerId}`);
+                            map.off('click', layerId);
+                            map.off('mouseenter', layerId);
+                            map.off('mousemove', layerId);
+                            map.off('mouseleave', layerId);
+                        }
+                    } catch (layerError) {
                         // Log error but don't crash if map/layer is gone
-                        logger.warn('RouteLayer', 'Error cleaning up listeners:', cleanupError.message);
+                        logger.warn('RouteLayer', `Error cleaning up listeners for ${layerId}:`, layerError.message);
                     }
-                }
-            };
+                });
+                
+                // Also remove any layers and sources that might still exist
+                layersToCleanup.forEach(layerId => {
+                    try {
+                        if (map.getLayer(layerId)) {
+                            logger.debug('RouteLayer', `Removing layer during cleanup: ${layerId}`);
+                            map.removeLayer(layerId);
+                        }
+                    } catch (layerError) {
+                        // Ignore errors when removing layers
+                    }
+                });
+                
+                // Remove sources
+                const sourcesToCleanup = [
+                    `${routeId}-main`,
+                    `unpaved-section-${routeId}`,
+                    `unpaved-sections-${routeId}`,
+                    // Add variations with 'route-' prefix
+                    `route-${routeId}-main`,
+                    `unpaved-section-route-${routeId}`,
+                    `unpaved-sections-route-${routeId}`
+                ];
+                
+                sourcesToCleanup.forEach(sourceId => {
+                    try {
+                        if (map.getSource(sourceId)) {
+                            logger.debug('RouteLayer', `Removing source during cleanup: ${sourceId}`);
+                            map.removeSource(sourceId);
+                        }
+                    } catch (sourceError) {
+                        // Ignore errors when removing sources
+                    }
+                });
+            } catch (cleanupError) {
+                // Log error but don't crash if map is gone
+                logger.warn('RouteLayer', 'Error during comprehensive cleanup:', cleanupError.message);
+            }
+        }
+    };
         }
         catch (error) {
             logger.error('RouteLayer', 'Error rendering route:', error);

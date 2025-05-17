@@ -3,6 +3,9 @@ import { SaveDialog } from '../Sidebar/SaveDialog';
 import React from 'react';
 import { startLogCapture, stopLogCapture, getCapturedLogs } from '../../../../utils/logCapture';
 import mapboxgl from 'mapbox-gl';
+import { useAuth0 } from '@auth0/auth0-react';
+import { findMostRecentAutoSaveForUser, loadAutoSaveData } from '../../../../services/firebaseGpxAutoSaveService';
+import { useAutoSave } from '../../../../context/AutoSaveContext';
 import { useMapInitializer } from './hooks/useMapInitializer';
 import { useMapEvents } from './hooks/useMapEvents';
 import { safelyRemoveMap } from '../../utils/mapCleanup';
@@ -33,8 +36,9 @@ import { LineProvider, useLineContext } from '../../../lineMarkers/context/LineC
 import { MapOverviewProvider, useMapOverview } from '../../../presentation/context/MapOverviewContext.jsx';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePhotoService } from '../../../photo/services/photoService';
-import CommitChangesButton from '../CommitChangesButton/CommitChangesButton';
+// Removed CommitChangesButton import
 import FirebaseStatusIndicator from '../../../../components/FirebaseStatusIndicator';
+import AutoSavePanel from '../../../../components/AutoSavePanel/AutoSavePanel';
 import './MapView.css';
 import './photo-fix.css'; // Nuclear option to force photos behind UI components
 import { Sidebar } from '../Sidebar';
@@ -50,6 +54,9 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 function MapViewContent() {
     const containerRef = useRef(null); // Add a ref for the container
     
+    // Get Auth0 context for user ID
+    const { user, isAuthenticated } = useAuth0();
+    
     // Get RouteContext first so it's available to POIContext
     const { 
         addRoute, 
@@ -64,7 +71,8 @@ function MapViewContent() {
         changedSectionsRef, // Get the ref directly
         saveCurrentState,
         loadedLineData,
-        currentLoadedPersistentId
+        currentLoadedPersistentId,
+        overallRouteName // Get overallRouteName from context
     } = useRouteContext();
     
     // Now get POIContext after RouteContext is initialized
@@ -78,14 +86,16 @@ function MapViewContent() {
         getPOIsForRoute,
         hasPOIChanges, // Get the function to check for POI changes
         clearPOIChanges, // Get the function to clear POI changes
-        localPOIChanges // Get the local POI changes state directly
+        localPOIChanges, // Get the local POI changes state directly
+        loadPOIsFromRoute // Get the function to load POIs from a route
     } = usePOIContext();
     const { 
         isDrawing,
         hasLineChanges,
         clearLineChanges,
         localLineChanges,
-        lines
+        lines,
+        loadLinesFromRoute // Get the function to load lines from a route
     } = useLineContext();
     const [isGpxDrawerOpen, setIsGpxDrawerOpen] = useState(false);
     const currentRouteId = useRef(null);
@@ -122,6 +132,9 @@ function MapViewContent() {
     
     // Get photo service at component level
     const photoService = usePhotoService();
+    
+    // Get AutoSave context
+    const autoSaveContext = useAutoSave();
     
     // Function to notify RouteContext of map state changes
     const notifyMapStateChange = useCallback(() => {
@@ -162,6 +175,126 @@ function MapViewContent() {
         notifyMapStateChange,
         containerRef
     });
+    
+    // Effect to check for and load auto-saves when the editor is opened
+    useEffect(() => {
+        // Only run this effect when the map is ready and we have a user ID
+        if (!isMapReady || !isAuthenticated || !user?.sub) {
+            return;
+        }
+        
+        // Skip if we already have routes loaded
+        if (routes.length > 0) {
+            console.log('[MapView] Routes already loaded, skipping auto-save check');
+            return;
+        }
+        
+        // Check if we've just cleared an auto-save
+        const autoSaveClearedAt = localStorage.getItem('autoSaveClearedAt');
+        if (autoSaveClearedAt) {
+            const clearedTime = parseInt(autoSaveClearedAt, 10);
+            const now = Date.now();
+            const timeSinceCleared = now - clearedTime;
+            
+            // If we've cleared an auto-save within the last 10 seconds, skip loading
+            if (timeSinceCleared < 10000) {
+                console.log('[MapView] Auto-save was recently cleared, skipping auto-save check');
+                return;
+            } else {
+                // Clear the flag if it's older than 10 seconds
+                localStorage.removeItem('autoSaveClearedAt');
+            }
+        }
+        
+        const userId = user.sub;
+        console.log('[MapView] Checking for auto-saves for user:', userId);
+        
+        // Find the most recent auto-save for this user
+        findMostRecentAutoSaveForUser(userId)
+            .then(autoSaveData => {
+                if (!autoSaveData) {
+                    console.log('[MapView] No auto-saves found for user:', userId);
+                    return;
+                }
+                
+                console.log('[MapView] Found auto-save:', autoSaveData.id);
+                
+                // Load the auto-save data
+                return loadAutoSaveData(autoSaveData.id);
+            })
+            .then(autoSaveData => {
+                if (!autoSaveData) {
+                    return;
+                }
+                
+                console.log('[MapView] Loaded auto-save data:', autoSaveData);
+                
+                // Check if we have routes with data
+                if (!autoSaveData.routesWithData || autoSaveData.routesWithData.length === 0) {
+                    console.log('[MapView] No routes found in auto-save');
+                    return;
+                }
+                
+                // Add each route to the RouteContext
+                autoSaveData.routesWithData.forEach(route => {
+                    console.log('[MapView] Adding route from auto-save:', route.routeId);
+                    
+                    // Normalize the route
+                    const normalizedRoute = normalizeRoute(route);
+                    
+                    // Add the route to the RouteContext
+                    addRoute(normalizedRoute);
+                    
+                    // Set the first route as the current route
+                    if (autoSaveData.routesWithData.indexOf(route) === 0) {
+                        setCurrentRoute(normalizedRoute);
+                    }
+                });
+                
+                // Mark routes as changed
+                setChangedSections(prev => ({...prev, routes: true}));
+                
+                // Update header settings if available
+                if (autoSaveData.headerSettings) {
+                    updateHeaderSettings(autoSaveData.headerSettings);
+                }
+                
+                // Load POIs if available
+                if (autoSaveData.pois) {
+                    console.log('[MapView] Loading POIs from auto-save:', {
+                        draggableCount: autoSaveData.pois.draggable?.length || 0,
+                        placesCount: autoSaveData.pois.places?.length || 0
+                    });
+                    
+                    // Use the loadPOIsFromRoute function from POIContext
+                    loadPOIsFromRoute(autoSaveData.pois);
+                }
+                
+                // Load lines if available
+                if (autoSaveData.lines && autoSaveData.lines.length > 0) {
+                    console.log('[MapView] Loading lines from auto-save:', autoSaveData.lines.length);
+                    
+                    // If LineContext is available, use it to load lines
+                    if (typeof loadLinesFromRoute === 'function') {
+                        loadLinesFromRoute(autoSaveData.lines);
+                    }
+                }
+                
+                // Update the AutoSaveContext with the auto-save ID and route ID
+                if (autoSaveData.id && autoSaveData.routesWithData && autoSaveData.routesWithData.length > 0) {
+                    const firstRouteId = autoSaveData.routesWithData[0].routeId;
+                    console.log('[MapView] Updating AutoSaveContext with auto-save ID:', autoSaveData.id, 'and route ID:', firstRouteId);
+                    
+                    // Call completeAutoSave to update the AutoSaveContext
+                    autoSaveContext.completeAutoSave(autoSaveData.id, firstRouteId);
+                }
+                
+                console.log('[MapView] Auto-save loaded successfully');
+            })
+            .catch(error => {
+                console.error('[MapView] Error loading auto-save:', error);
+            });
+    }, [isMapReady, isAuthenticated, user, routes.length, addRoute, setCurrentRoute, setChangedSections, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute]);
     
     // Set up map event handlers
     useMapEvents({
@@ -651,14 +784,17 @@ function MapViewContent() {
     };
 
     // Create the MapHeader component
+    console.log('[MapViewContent] headerSettings from context before passing to MapHeader:', headerSettings);
+
     const mapHeaderProps = {
-        title: currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
+        title: overallRouteName || currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
         color: headerSettings.color,
         logoUrl: headerSettings.logoUrl,
         username: headerSettings.username,
         type: currentRoute?._loadedState?.type || currentRoute?.type,
         eventDate: currentRoute?._loadedState?.eventDate || currentRoute?.eventDate
     };
+    console.log('[MapViewContent] Props being passed to MapHeader:', mapHeaderProps);
 
     // Create the map container div
     const mapContainerProps = {
@@ -1152,8 +1288,8 @@ function MapViewContent() {
         className: "header-customization-container",
         style: {
             position: 'absolute',
-            top: '75px',
-            left: '70px', // Changed from right to left
+            top: '140px', // Moved below the AutoSavePanel
+            right: '70px', // Positioned on the right side like AutoSavePanel
             zIndex: 1000
         }
     };
@@ -1331,15 +1467,7 @@ function MapViewContent() {
             // Selected POI viewer
             selectedPOI && React.createElement(POIViewer, poiViewerProps),
             
-            // Commit Changes Button
-            React.createElement(CommitChangesButton, {
-                isVisible: getTotalChangeCount() > 0,
-                isUploading: isUploading,
-                uploadProgress: uploadProgress,
-                onClick: handleCommitChanges,
-                changeCount: getTotalChangeCount(),
-                position: 'bottom-right'
-            }),
+            // Commit Changes Button removed
             
             // Save Dialog with progress feedback
             React.createElement(SaveDialog, {
@@ -1362,7 +1490,10 @@ function MapViewContent() {
             React.createElement(FirebaseStatusIndicator, {
                 position: 'bottom-left',
                 showDetails: true
-            })
+            }),
+            
+            // Auto Save Panel
+            React.createElement(AutoSavePanel, {})
         ])
     );
 }

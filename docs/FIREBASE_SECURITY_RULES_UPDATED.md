@@ -1,17 +1,12 @@
-# Firebase Security Rules for Saved Routes and Offline Maps
-
-This document outlines the Firebase security rules needed for both the saved routes and offline maps features in the Lutruwita mobile app.
+# Updated Firebase Security Rules for Route-Centric Structure
 
 ## Overview
 
-Both features use Firebase Firestore to store and sync user data across devices:
-1. **Saved Routes**: Stores references to routes that users have bookmarked
-2. **Offline Maps**: Tracks which maps users have downloaded for offline use
+This document provides the updated Firebase security rules for the new route-centric data structure. These rules are designed to:
 
-Our security approach focuses on:
-1. Ensuring only authenticated users can access their data
-2. Simplifying the security model to avoid permission issues with Auth0 integration
-3. Supporting the core functionality where users can save any route and download any map
+1. Allow public read access to route data for embedded maps
+2. Restrict write access to authenticated users only
+3. Maintain existing rules for user-specific collections
 
 ## Security Rules
 
@@ -19,14 +14,34 @@ Our security approach focuses on:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow any authenticated user to read/write to any saved routes collection
+    // Existing rules for user collections
     match /users/{userId}/savedRoutes/{document=**} {
       allow read, write: if request.auth != null;
     }
     
-    // Allow any authenticated user to read/write to any offline maps collection
     match /users/{userId}/offlineMaps/{document=**} {
       allow read, write: if request.auth != null;
+    }
+    
+    match /users/{userId}/mapTilerOfflineMaps/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /users/{userId}/offlineRoutes/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // New rules for route-centric data structure
+    // Allow public read access to all route data
+    match /routes/{routeId}/{collection}/{document=**} {
+      allow read: if true;  // Anyone can read route data
+      allow write: if request.auth != null;  // Only authenticated users can write
+    }
+    
+    // Allow public read access to type index
+    match /type_index/{type}/{routeId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
@@ -34,45 +49,81 @@ service cloud.firestore {
 
 ## Explanation
 
-These security rules ensure that:
+### User Collections
 
-1. **Authentication Required**: The `request.auth != null` condition ensures that only authenticated users can access the data. This prevents unauthenticated users from reading or writing to any collections.
+The rules for user-specific collections remain unchanged. These collections require authentication for both read and write operations:
 
-2. **Simplified Access Model**: By removing the `request.auth.uid == userId` check, we allow any authenticated user to read and write to any user's collections. This simplifies the implementation and avoids permission issues.
+- `/users/{userId}/savedRoutes/{document=**}`
+- `/users/{userId}/offlineMaps/{document=**}`
+- `/users/{userId}/mapTilerOfflineMaps/{document=**}`
+- `/users/{userId}/offlineRoutes/{document=**}`
 
-3. **Feature Support**: This model supports both the saved routes and offline maps features, where any authenticated user can save routes and download maps to their personal collections.
+### Route-Centric Structure
 
-## Implementation Notes
+The new rules for the route-centric structure allow public read access to all route data, which is necessary for embedded maps. Write operations are restricted to authenticated users only.
 
-In our current implementation, we're using anonymous authentication with Firebase and storing the Auth0 user ID in the Firebase user's display name. This creates a challenge because:
+The route-centric structure follows this pattern:
 
-1. The Firebase `request.auth.uid` is the anonymous UID, not the Auth0 user ID
-2. The Auth0 user ID is stored in the Firebase user's display name
-3. The Firestore path uses the Auth0 user ID as the `userId` segment
+```
+routes/
+  ├── {routeId}/
+  │     ├── metadata/
+  │     │     └── info
+  │     ├── geojson/
+  │     │     └── routes
+  │     ├── coordinates/
+  │     │     ├── {routeSegmentId}/
+  │     │     │     └── chunks/
+  │     │     │           ├── chunk_0
+  │     │     │           └── chunk_1
+  │     │     └── another_segment_id/...
+  │     ├── pois/
+  │     │     └── data
+  │     ├── lines/
+  │     │     └── data
+  │     └── photos/
+  │           └── data
+  └── {anotherRouteId}/...
 
-To make this work correctly, we need to ensure that:
+type_index/
+  ├── bikepacking/
+  │     ├── {routeId}: true
+  │     └── {anotherRouteId}: true
+  ├── tourism/
+  │     └── {routeId}: true
+  └── event/
+        └── {routeId}: true
+```
 
-1. When we save routes or download maps, we use the Auth0 user ID (from `user.sub`) as the path segment
-2. When we authenticate with Firebase, we need to link the anonymous account with the Auth0 user ID
+The wildcard rule `match /routes/{routeId}/{collection}/{document=**}` covers all collections and documents within a route, allowing for a simpler and more maintainable security rule set.
 
-## Security Considerations
+## Implementation
 
-The simplified security rules we're using (`allow read, write: if request.auth != null;`) are appropriate for these features because:
+To implement these security rules:
 
-1. **Limited Scope**: Users are only saving references to routes and tracking downloaded maps, not modifying the routes themselves
-2. **Personal Collections**: Each user has their own collections
-3. **No Sensitive Data**: The collections don't contain sensitive user information
-
-While more restrictive security rules would be ideal in theory, our current implementation with anonymous authentication makes them impractical without significant changes to the codebase.
-
-## Testing the Rules
-
-To test these rules:
-
-1. Go to the [Firebase Console](https://console.firebase.google.com/)
-2. Navigate to your project
-3. Go to Firestore Database > Rules
-4. Paste the rules above
+1. Go to the Firebase Console
+2. Navigate to Firestore Database
+3. Click on the "Rules" tab
+4. Replace the existing rules with the rules provided above
 5. Click "Publish"
 
-You can then use the Firebase Console's Rules Playground to test different scenarios and ensure the rules work as expected.
+## Considerations for Production
+
+For a production environment, you might want to consider more restrictive rules, such as:
+
+```javascript
+// Only allow public read access to routes that are marked as public
+match /routes/{routeId}/{collection}/{document=**} {
+  allow read: if 
+    // Public read access for routes marked as public
+    get(/databases/$(database)/documents/routes/$(routeId)/metadata/info).data.isPublic == true
+    // Or if the user is authenticated and is the owner of the route
+    || (request.auth != null && get(/databases/$(database)/documents/routes/$(routeId)/metadata/info).data.userId == request.auth.uid);
+  
+  allow write: if request.auth != null && get(/databases/$(database)/documents/routes/$(routeId)/metadata/info).data.userId == request.auth.uid;
+}
+```
+
+This would restrict read access to only public routes or routes owned by the authenticated user, and restrict write access to only the owner of the route.
+
+However, for the purposes of testing the embedded maps, the simpler rules provided above should be sufficient.

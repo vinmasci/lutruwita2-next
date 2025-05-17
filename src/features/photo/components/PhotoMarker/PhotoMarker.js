@@ -103,27 +103,46 @@ export const PhotoMarker = ({ photo, onClick, isHighlighted, isEditable = false,
             bubble.addEventListener('click', handleClick);
         }
         
-        // Use tinyThumbnailUrl if available, otherwise fall back to thumbnailUrl
-        const thumbnailUrl = photo.tinyThumbnailUrl || photo.thumbnailUrl;
+        let finalThumbnailUrl = photo.tinyThumbnailUrl || photo.thumbnailUrl;
+
+        if (!finalThumbnailUrl && photo.publicId && photo.url) {
+            try {
+                const urlParts = photo.url.split('/');
+                // Example URL: https://res.cloudinary.com/cloud_name/image/upload/v12345/public_id.jpg
+                // We need to find "cloud_name"
+                const cloudinaryBase = "https://res.cloudinary.com/";
+                if (photo.url.startsWith(cloudinaryBase)) {
+                    const pathAfterBase = photo.url.substring(cloudinaryBase.length);
+                    const cloudName = pathAfterBase.split('/')[0];
+                    if (cloudName) {
+                        // Construct a thumbnail URL, e.g., 50x50 fill crop
+                        finalThumbnailUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_50,h_50,c_fill,g_auto/${photo.publicId}`;
+                        console.log('[PhotoMarker] Constructed Cloudinary thumbnail URL:', finalThumbnailUrl);
+                    }
+                }
+            } catch (e) {
+                console.error('[PhotoMarker] Error constructing Cloudinary thumbnail URL:', e);
+            }
+        }
         
         // Create image element
         const img = document.createElement('img');
         
         // Set up error handler for fallback
         img.onerror = () => {
-            console.error('Failed to load photo thumbnail:', thumbnailUrl);
-            img.src = '/images/photo-fallback.svg';
-            img.alt = 'Failed to load photo';
+            console.error('Failed to load photo thumbnail:', img.src);
+            img.src = '/images/photo-fallback.svg'; // A generic fallback image
+            img.alt = 'Photo not available';
         };
         
         // Set alt text
         img.alt = photo.name || 'Photo';
         
-        // Check if the thumbnailUrl is a data URL (local preview) or a regular URL
-        if (thumbnailUrl) {
-            img.src = thumbnailUrl;
+        if (finalThumbnailUrl) {
+            img.src = finalThumbnailUrl;
         } else {
-            // No thumbnail URL, use fallback
+            // No thumbnail URL could be determined, use fallback
+            console.warn('[PhotoMarker] No thumbnail URL available for photo:', photo.id || photo.url, 'Using fallback.');
             img.src = '/images/photo-fallback.svg';
             img.alt = 'No thumbnail available';
         }

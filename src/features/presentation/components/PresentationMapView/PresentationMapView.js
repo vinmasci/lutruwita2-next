@@ -128,6 +128,18 @@ export default function PresentationMapView(props) {
         onInitialized: () => {
             logger.info('PresentationMapView', 'Routes initialized with unified approach');
             console.log('[PresentationMapView] ✅ Routes initialized with unified approach');
+            
+            // Log route data for debugging
+            if (routes && routes.length > 0) {
+                console.log('[PresentationMapView] Routes data:', routes.map(r => ({
+                    id: r.id,
+                    routeId: r.routeId,
+                    name: r.name,
+                    hasGeojson: !!r.geojson
+                })));
+            } else {
+                console.log('[PresentationMapView] No routes available');
+            }
         }
     });
     
@@ -225,8 +237,19 @@ export default function PresentationMapView(props) {
     const hasZoomedToCurrentRouteRef = useRef(false);
     const pendingZoomRef = useRef(false);
     
-    // Update currentRouteIdRef when currentRoute changes
+    // Update currentRouteIdRef when currentRoute changes and log route details
     useEffect(() => {
+        console.log('[PresentationMapView] currentRoute updated:', {
+            routeId: currentRoute?.routeId,
+            persistentId: currentRoute?.persistentId,
+            name: currentRoute?.name,
+            hasGeojson: !!currentRoute?.geojson,
+            geojsonType: currentRoute?.geojson?.type,
+            featuresCount: currentRoute?.geojson?.features?.length || 0,
+            coordinatesCount: currentRoute?.geojson?.features?.[0]?.geometry?.coordinates?.length || 0,
+            sampleCoords: currentRoute?.geojson?.features?.[0]?.geometry?.coordinates?.slice(0, 2) || 'N/A'
+        });
+
         if (currentRoute?.routeId) {
             // If the route ID has changed, reset the zoom tracking
             if (currentRouteIdRef.current !== currentRoute.routeId) {
@@ -245,17 +268,42 @@ export default function PresentationMapView(props) {
     // Function to zoom to the current route bounds
     const zoomToCurrentRoute = useCallback(() => {
         if (!mapInstance.current) {
+            console.log('[PresentationMapView] Cannot zoom: map instance not available');
             return false;
         }
         
-        if (!currentRoute?.geojson) {
+        if (!currentRoute) {
+            console.log('[PresentationMapView] Cannot zoom: no current route');
             return false;
         }
+        
+        if (!currentRoute.geojson) {
+            console.log('[PresentationMapView] Cannot zoom: route has no geojson data', {
+                routeId: currentRoute.routeId,
+                id: currentRoute.id,
+                name: currentRoute.name
+            });
+            return false;
+        }
+        
+        console.log('[PresentationMapView] Attempting to zoom to route:', {
+            routeId: currentRoute.routeId,
+            id: currentRoute.id,
+            name: currentRoute.name,
+            geojsonType: currentRoute.geojson?.features?.[0]?.geometry?.type,
+            hasFeatures: !!currentRoute.geojson?.features,
+            featureCount: currentRoute.geojson?.features?.length || 0
+        });
         
         // Get route bounds
         if (currentRoute.geojson?.features?.[0]?.geometry?.type === 'LineString') {
             const feature = currentRoute.geojson.features[0];
             const coordinates = feature.geometry.coordinates;
+            
+            console.log('[PresentationMapView] Route coordinates:', {
+                count: coordinates?.length || 0,
+                sample: coordinates?.slice(0, 2) || []
+            });
             
             if (coordinates && coordinates.length > 0) {
                 const bounds = new mapboxgl.LngLatBounds();
@@ -265,10 +313,22 @@ export default function PresentationMapView(props) {
                     }
                 });
                 
+                console.log('[PresentationMapView] Created bounds for route:', {
+                    southwest: [bounds.getSouthWest().lng, bounds.getSouthWest().lat],
+                    northeast: [bounds.getNorthEast().lng, bounds.getNorthEast().lat]
+                });
+                
                 try {
                     // Always fit bounds to show the entire route with substantial padding for maximum context
-                    mapInstance.current.fitBounds(bounds, {
-                        padding: 200,  // Significantly increased padding to zoom out much more
+            console.log('[PresentationMapView] Fitting bounds to route. GeoJSON check:', {
+                hasGeojson: !!currentRoute.geojson,
+                hasFeatures: !!currentRoute.geojson?.features,
+                featureCount: currentRoute.geojson?.features?.length || 0,
+                geometryType: currentRoute.geojson?.features?.[0]?.geometry?.type,
+                coordinatesCount: currentRoute.geojson?.features?.[0]?.geometry?.coordinates?.length || 0
+            });
+            mapInstance.current.fitBounds(bounds, {
+                padding: 200, // Significantly increased padding to zoom out much more
                         duration: 1500
                     });
                     
@@ -284,12 +344,19 @@ export default function PresentationMapView(props) {
                         zoomRetryTimeoutRef.current = null;
                     }
                     
+                    console.log('[PresentationMapView] Successfully zoomed to route');
                     return true;
                 } catch (error) {
                     logger.error('PresentationMapView', 'Error during fitBounds:', error);
+                    console.error('[PresentationMapView] Error during fitBounds:', error);
                     return false;
                 }
+            } else {
+                console.log('[PresentationMapView] Route has no coordinates');
             }
+        } else {
+            console.log('[PresentationMapView] Route geometry type is not LineString:', 
+                currentRoute.geojson?.features?.[0]?.geometry?.type);
         }
         
         return false;
@@ -322,20 +389,33 @@ export default function PresentationMapView(props) {
     // Update map state when route changes - with delay for route data to load
     useEffect(() => {
         if (!currentRoute?.routeId) {
+            console.log('[PresentationMapView] No current route ID available for zooming');
             return;
         }
         
         if (!isMapReady || !mapInstance.current) {
+            console.log('[PresentationMapView] Map not ready yet, marking zoom as pending');
             pendingZoomRef.current = true;
             return;
         }
         
         // Check if we've already zoomed to this route
         if (hasZoomedToCurrentRouteRef.current) {
+            console.log('[PresentationMapView] Already zoomed to current route, skipping');
             return;
         }
         
+        // Log route data for debugging
+        console.log('[PresentationMapView] Current route for zooming:', {
+            id: currentRoute.id,
+            routeId: currentRoute.routeId,
+            name: currentRoute.name,
+            hasGeojson: !!currentRoute.geojson,
+            coordinatesCount: currentRoute.geojson?.features?.[0]?.geometry?.coordinates?.length || 0
+        });
+        
         // Add a small delay to allow route data to fully load
+        console.log('[PresentationMapView] Scheduling zoom attempt with delay');
         setTimeout(() => {
             attemptZoomWithRetry();
         }, 300);
@@ -933,27 +1013,27 @@ export default function PresentationMapView(props) {
                         zIndex: 1000
                     }, children: [_jsx(CircularProgress, { size: 60, sx: { mb: 2 } }), _jsx(Typography, { variant: "h6", color: "white", children: "Loading map..." })] })),
             isMapReady && mapInstance.current && (_jsxs(_Fragment, { children: [
-                // First render non-current routes
-                routes.filter(route => 
-                    route.id !== currentRoute?.id && 
-                    route.routeId !== currentRoute?.routeId
-                ).map(route => {
-                    return _jsx(RouteLayer, { 
-                        map: mapInstance.current, 
+                // Render all routes in a single operation, just like in MapView.js
+                routes.map(route => {
+                    // Add logging before rendering RouteLayer
+                    console.log('[PresentationMapView] Rendering RouteLayer for route:', {
+                        routeId: route.id || route.routeId,
+                        name: route.name,
+                        hasGeojson: !!route.geojson,
+                        geojsonType: route.geojson?.type,
+                        featuresCount: route.geojson?.features?.length || 0,
+                        coordinatesCount: route.geojson?.features?.[0]?.geometry?.coordinates?.length || 0
+                    });
+                    return _jsx(RouteLayer, {
+                        map: mapInstance.current,
                         route: route
                     }, route.id || route.routeId);
                 }),
-                
-                // Then render the current route last to ensure it's on top
-                currentRoute && _jsx(RouteLayer, { 
-                    map: mapInstance.current, 
-                    route: currentRoute
-                }, currentRoute.id || currentRoute.routeId),
                 _jsx(PresentationPOILayer, { map: mapInstance.current }),
                 mapContextValue.isPhotosVisible && _jsx(PresentationPhotoLayer, {}),
-                isLineMarkersVisible && props.lineData && props.lineData.length > 0 && _jsx(DirectPresentationLineLayer, { 
-                  map: mapInstance.current, 
-                  lines: props.lineData 
+                isLineMarkersVisible && props.lineData && props.lineData.length > 0 && _jsx(DirectPresentationLineLayer, {
+                  map: mapInstance.current,
+                  lines: props.lineData
                 }),
                 currentRoute && (_jsxs(_Fragment, { children: [
                     isDistanceMarkersVisible && _jsx(PresentationDistanceMarkers, { map: mapInstance.current, route: currentRoute }),

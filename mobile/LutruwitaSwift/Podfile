@@ -1,0 +1,46 @@
+# Uncomment the next line to define a global platform for your project
+platform :ios, '16.0'
+
+target 'LutruwitaSwift' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  # Pods for LutruwitaSwift
+  
+  # Mapbox
+  pod 'MapboxMaps', '~> 11.0'
+  
+  # Firebase
+  pod 'Firebase/Core'
+  pod 'Firebase/Auth'
+  pod 'Firebase/Firestore'
+  pod 'Firebase/Storage'
+  
+  # Auth0
+  pod 'Auth0', '~> 2.0'
+  
+  # Kingfisher for image loading/caching
+  pod 'Kingfisher', '~> 7.0'
+  
+  # SwiftUI helpers
+  pod 'Introspect', '~> 0.2'
+  
+end
+
+# This post_install hook is needed for Mapbox
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+      
+      # For Mapbox
+      if target.name == 'MapboxMaps'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+      
+      # Disable code signing for pods
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+    end
+  end
+end

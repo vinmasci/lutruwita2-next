@@ -26,6 +26,17 @@ const HeaderCustomization = ({ color, logoUrl, username, onSave }) => {
   const [headerUsername, setHeaderUsername] = useState(username || '');
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Effect to synchronize local state with incoming props
+  useEffect(() => {
+    setHeaderColor(color || 'rgba(35, 35, 35, 0.9)');
+    setHeaderLogoUrl(logoUrl || '');
+    setHeaderUsername(username || '');
+    // Also update the color input ref if it exists, as its default value might be stale
+    if (colorInputRef.current) {
+      colorInputRef.current.value = color || 'rgba(35, 35, 35, 0.9)';
+    }
+  }, [color, logoUrl, username]);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedLogoFile, setSelectedLogoFile] = useState(null);
   const [logoBlob, setLogoBlob] = useState(null);
@@ -122,6 +133,11 @@ const HeaderCustomization = ({ color, logoUrl, username, onSave }) => {
   // Handle save
   const handleSave = async () => {
     try {
+      // Set uploading state if we have a logo file
+      if (selectedLogoFile) {
+        setIsUploading(true);
+      }
+      
       // Save the changes with console log for debugging
       console.log('Saving header settings:', {
         color: headerColor,
@@ -157,11 +173,15 @@ const HeaderCustomization = ({ color, logoUrl, username, onSave }) => {
       // Don't revoke the object URL here as we need it to persist
       // We'll handle cleanup when the route is saved to Cloudinary
       
-      // Reset state
-      setSelectedLogoFile(null);
+      // Only hide the panel, don't reset the file state
+      // This ensures the file is still available for upload
       setIsExpanded(false);
+      
+      // Reset uploading state
+      setIsUploading(false);
     } catch (error) {
       console.error('Error saving header customization:', error);
+      setIsUploading(false);
     }
   };
 
@@ -285,24 +305,35 @@ const HeaderCustomization = ({ color, logoUrl, username, onSave }) => {
         // Remove positioning from here as it's handled by the parent container
       }, 
       children: [
-        // Customize Header button with map control styling
-        _jsx(Button, {
-          variant: "contained",
+        // Container with similar background to AutoSavePanel
+        _jsx(Box, {
           sx: {
+            backgroundColor: 'rgba(35, 35, 35, 0.8)',
             color: 'white',
-            textTransform: 'none',
-            padding: '6px 10px',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            boxShadow: '0px 0px 0px 2px rgba(0, 0, 0, 0.1)',
+            padding: '8px 12px',
             borderRadius: '4px',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.7)'
-            }
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(5px)',
+            width: '100%'
           },
-          onClick: () => setIsExpanded(!isExpanded),
-          children: isExpanded ? "Hide Options" : "Customize Header"
+          children: _jsx(Button, {
+            variant: "outlined",
+            sx: {
+              color: '#2196F3', // Blue color
+              borderColor: '#2196F3',
+              textTransform: 'none',
+              padding: '6px 10px',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              width: '100%', // Make it the same width as the AutoSavePanel
+              '&:hover': {
+                backgroundColor: 'rgba(33, 150, 243, 0.1)', // Slightly darker blue on hover
+                borderColor: '#1976D2' // Darker blue border on hover
+              }
+            },
+            onClick: () => setIsExpanded(!isExpanded),
+            children: isExpanded ? "Hide Options" : "Customize Header"
+          })
         }),
         
         // Expanded customization panel

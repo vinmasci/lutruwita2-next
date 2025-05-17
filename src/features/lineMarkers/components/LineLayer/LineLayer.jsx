@@ -215,13 +215,31 @@ const LineLayer = () => {
     logger.debug('LineLayer', 'Saving line:', finalLine);
 
     if (finalLine.id && finalLine.coordinates) {
-      if (lines.some(line => line.id === finalLine.id)) {
-        updateLine(finalLine.id, finalLine);
+      // Store the line ID before updating/adding
+      const lineId = finalLine.id;
+      
+      // Update or add the line
+      if (lines.some(line => line.id === lineId)) {
+        logger.debug('LineLayer', `Updating existing line: ${lineId}`);
+        updateLine(lineId, finalLine);
       } else {
+        logger.debug('LineLayer', `Adding new line: ${lineId}`);
         addLine(finalLine);
       }
+      
+      // Close the drawer but don't immediately clear the selected line
+      // This helps prevent the line from being removed during state updates
       setDrawerOpen(false);
-      setSelectedLine(null);
+      
+      // Use a small delay before clearing the selected line
+      // This gives time for the line to be properly saved in the state
+      setTimeout(() => {
+        setSelectedLine(null);
+        
+        // Log the current lines state to verify the line is still there
+        logger.debug('LineLayer', `Current lines after save (${lines.length} total):`, 
+          lines.map(l => ({ id: l.id, name: l.name })));
+      }, 100);
     } else {
       logger.error('LineLayer', 'Invalid line data:', finalLine);
     }

@@ -2,7 +2,10 @@ import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-run
 import { useState, useEffect } from 'react';
 import { List, ListItem, ListItemButton, ListItemIcon, Tooltip, Divider, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { useRouteContext } from '../../context/RouteContext';
+import { getUserRouteIndex, loadSavedRoute, deleteSavedRoute as firebaseDeleteSavedRoute } from '../../../../services/firebaseSaveCompleteRouteService';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useMapContext } from '../../context/MapContext';
+import mapboxgl from 'mapbox-gl';
 import { usePOIContext } from '../../../poi/context/POIContext';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePlaceContext } from '../../../place/context/PlaceContext';
@@ -12,20 +15,22 @@ import { useAuth } from '../../../auth/context/AuthContext';
 import { useAuthModal } from '../../../auth/context/AuthModalContext.jsx';
 import { useSidebar } from './useSidebar';
 import { SidebarIcons, RefreshIcon } from './icons';
+import { useAutoSave } from '../../../../context/AutoSaveContext';
 import { SaveDialog } from './SaveDialog.jsx';
 import { LoadDialog } from './LoadDialog';
 import { EmbedDialog } from './EmbedDialog.jsx';
 import { removeAllMapboxMarkers } from '../../utils/mapCleanup';
 
 export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine, onAddMapOverview, onItemClick }) => {
-    const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork, setChangedSections } = useRouteContext();
+    const { routes, savedRoutes, listRoutes, loadRoute, deleteSavedRoute, currentLoadedState, currentLoadedPersistentId, hasUnsavedChanges, isSaving, clearCurrentWork, setChangedSections, addRoute, setCurrentLoadedPersistentId, setCurrentLoadedState, setCurrentRoute } = useRouteContext();
     const { map } = useMapContext();
-    const { clearPOIs, setPoiMode, clearPOIChanges } = usePOIContext();
-    const { clearPhotos, clearPhotoChanges } = usePhotoContext();
+    const { clearPOIs, setPoiMode, clearPOIChanges, loadPOIsFromRoute } = usePOIContext();
+    const { clearPhotos, clearPhotoChanges, loadPhotos } = usePhotoContext();
     const { clearPlaces } = usePlaceContext();
-    const { setIsDrawing, saveRoute, stopDrawing, lines, setLines, clearLineChanges } = useLineContext();
+    const { setIsDrawing, saveRoute, stopDrawing, lines, setLines, clearLineChanges, loadLinesFromRoute } = useLineContext();
     const { clearMapOverviewChanges } = useMapOverview();
     const { isAuthenticated } = useAuth();
+    const autoSave = useAutoSave(); // Get AutoSave context
     const { showAuthModal } = useAuthModal();
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
     const [loadDialogOpen, setLoadDialogOpen] = useState(false);
@@ -51,6 +56,10 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         setSaveDialogOpen(true);
     };
 
+    // Get Auth0 user information
+    const { user, isAuthenticated: auth0IsAuthenticated } = useAuth0();
+    const [firebaseRoutes, setFirebaseRoutes] = useState([]);
+
     const handleLoadClick = () => {
         console.log('Load clicked');
         // Open the modal immediately with loading state
@@ -61,19 +70,31 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         setSnackbarMessage('Loading routes, this may take a moment...');
         setSnackbarSeverity('info');
         
-        // Fetch routes in the background with metadataOnly=true for better performance
-        listRoutes(undefined, true)
-            .then(() => {
-                // Update the loading state when routes are fetched
+        // Get the user ID from Auth0
+        const userId = auth0IsAuthenticated && user?.sub ? user.sub : null;
+        
+        if (!userId) {
+            console.error('User ID not available');
+            setIsLoadingRoutes(false);
+            setSnackbarMessage('Error: User ID not available');
+            setSnackbarSeverity('error');
+            return;
+        }
+        
+        // Fetch routes from Firebase
+        getUserRouteIndex(userId)
+            .then((routes) => {
+                console.log('[SidebarListItems] Loaded routes from Firebase:', routes);
+                setFirebaseRoutes(routes);
                 setIsLoadingRoutes(false);
-                // Close the snackbar
                 setSnackbarOpen(false);
             })
             .catch(error => {
-                console.error('Failed to list routes:', error);
+                console.error('Failed to list routes from Firebase:', error);
                 setIsLoadingRoutes(false);
-                // Close the snackbar
-                setSnackbarOpen(false);
+                setSnackbarMessage('Error loading routes');
+                setSnackbarSeverity('error');
+                setSnackbarOpen(true);
             });
     };
 
@@ -338,6 +359,11 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
         // Reset the changedSections state in RouteContext to ensure the CommitChangesButton is reset
         setChangedSections({});
         console.log('[SidebarListItems] Reset changedSections in RouteContext');
+
+        // Clear any loaded permanent route ID from AutoSaveContext
+        if (autoSave && typeof autoSave.setLoadedPermanentRoute === 'function') {
+            autoSave.setLoadedPermanentRoute(null);
+        }
         
         // Force a refresh of the map by triggering a style reload
         refreshMapStyle();
@@ -453,18 +479,14 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             icon: SidebarIcons.actions.gpx,
             text: 'Add GPX',
             onClick: withAuthCheck(() => {
+                // If a permanent route was loaded, clicking "Add GPX" should start a new temporary auto-save session.
+                if (autoSave && typeof autoSave.setLoadedPermanentRoute === 'function' && autoSave.loadedPermanentRouteId) {
+                    console.log('[SidebarListItems] Add GPX clicked while permanent route was loaded. Resetting to temporary auto-save mode.');
+                    autoSave.setLoadedPermanentRoute(null);
+                }
                 onItemClick('gpx');
                 onUploadGpx();
             }, 'add GPX files')
-        },
-        {
-            id: 'mapOverview',
-            icon: SidebarIcons.actions.mapOverview,
-            text: 'Map Overview',
-            onClick: withAuthCheck(() => {
-                onItemClick('mapOverview');
-                onAddMapOverview();
-            }, 'add map overview')
         },
         {
             id: 'photos',
@@ -490,13 +512,6 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
     ];
 
     const bottomItems = [
-        {
-            id: 'clear',
-            icon: SidebarIcons.actions.clear,
-            text: 'Clear Map',
-            onClick: handleClearClick,
-            disabled: routes.length === 0
-        },
         {
             id: 'load',
             icon: SidebarIcons.actions.load,
@@ -608,18 +623,256 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
             _jsx(LoadDialog, { 
                 open: loadDialogOpen, 
                 onClose: () => setLoadDialogOpen(false), 
-                routes: savedRoutes,
+                routes: firebaseRoutes,
                 isLoading: isLoadingRoutes,
                 onLoad: async (id) => {
                     try {
-                        await loadRoute(id);
-                        setLoadDialogOpen(false);
+                        // Get the user ID from Auth0
+                        const userId = auth0IsAuthenticated && user?.sub ? user.sub : null;
+                        
+                        if (!userId) {
+                            console.error('User ID not available');
+                            setSnackbarMessage('Error: User ID not available');
+                            setSnackbarSeverity('error');
+                            setSnackbarOpen(true);
+                            return;
+                        }
+                        
+                        // Show loading message
+                        setSnackbarMessage('Loading route...');
+                        setSnackbarSeverity('info');
+                        setSnackbarOpen(true);
+                        
+                        // Load the route from Firebase
+                        const routeData = await loadSavedRoute(id, userId);
+                        
+                        if (!routeData) {
+                            console.error('Failed to load route from Firebase');
+                            setSnackbarMessage('Error: Failed to load route');
+                            setSnackbarSeverity('error');
+                            setSnackbarOpen(true);
+                            return;
+                        }
+                        
+                        console.log('[SidebarListItems] Loaded route from Firebase:', routeData);
+                        
+                        // Clear current work before loading new route
+                        performClearMap(); // Use performClearMap to ensure loadedPermanentRouteId is reset
+                                                
+                        // Skip the loadRoute function entirely and use Firebase directly
+                        // This avoids the MongoDB API loading that's causing the 404 error
+                        if (routeData.routesWithData && routeData.routesWithData.length > 0) {
+                            console.log('[SidebarListItems] Loading route directly from Firebase data');
+                            
+                            // Set the currentLoadedPersistentId to ensure updates go to the permanent route
+                            setCurrentLoadedPersistentId(id);
+                            
+                            // Set the currentLoadedState to the loaded route data
+                            // Make sure routeType is included in the state
+                            setCurrentLoadedState({
+                                ...routeData,
+                                routeType: routeData.routeType || 'Single' // Ensure routeType is set
+                            });
+
+                            // Set the loaded permanent route ID in AutoSaveContext
+                            if (autoSave && typeof autoSave.setLoadedPermanentRoute === 'function') {
+                                autoSave.setLoadedPermanentRoute(id);
+                            }
+                            
+                            // Log the route type for debugging
+                            console.log('[SidebarListItems] Route type from loaded route:', routeData.routeType);
+                            
+                            // Add each route to the RouteContext
+                            for (const route of routeData.routesWithData) {
+                                // Add the route to the RouteContext with _type and _loadedState
+                                addRoute({
+                                    ...route,
+                                    _type: 'loaded',
+                                    _loadedState: routeData
+                                });
+                            }
+                            
+                            // Load POIs if available
+                            if (routeData.pois) {
+                                console.log('[SidebarListItems] Loading POIs from routeData. POI count:', routeData.pois?.draggable?.length + routeData.pois?.places?.length || 'N/A');
+                                loadPOIsFromRoute(routeData.pois);
+                            }
+                            
+                            // Load photos if available
+                            if (routeData.photos && Array.isArray(routeData.photos)) {
+                                console.log(`[SidebarListItems] Found photos in routeData. Count: ${routeData.photos.length}`);
+                                console.log('[SidebarListItems] routeData.photos content:', JSON.stringify(routeData.photos, null, 2));
+                                loadPhotos(routeData.photos);
+                            } else {
+                                console.log('[SidebarListItems] No photos array found in routeData or it is not an array. routeData.photos:', routeData.photos);
+                                // Explicitly call loadPhotos with an empty array if photos are undefined/null or not an array.
+                                // This ensures PhotoContext state is correctly cleared.
+                                loadPhotos([]);
+                            }
+                            
+                            // Load lines if available
+                            if (routeData.lines && routeData.lines.length > 0 && typeof loadLinesFromRoute === 'function') {
+                                loadLinesFromRoute(routeData.lines);
+                            }
+                            
+                            // Manually fit the map to the route bounds
+                            if (map && routeData.routesWithData[0].geojson?.features?.[0]?.geometry?.coordinates) {
+                                try {
+                                    const coordinates = routeData.routesWithData[0].geojson.features[0].geometry.coordinates;
+                                    
+                                    // Create a bounds object
+                                    const bounds = new mapboxgl.LngLatBounds();
+                                    
+                                    // Extend the bounds with all coordinates
+                                    coordinates.forEach(coord => {
+                                        bounds.extend([coord[0], coord[1]]);
+                                    });
+                                    
+                                    // Fit the map to the bounds with padding
+                                    map.fitBounds(bounds, {
+                                        padding: 50,
+                                        duration: 1000
+                                    });
+                                    
+                                    console.log('[SidebarListItems] Map fitted to route bounds');
+                                } catch (error) {
+                                    console.error('[SidebarListItems] Error fitting map to bounds:', error);
+                                }
+                            } else {
+                                console.warn('[SidebarListItems] Cannot fit map to bounds - map or coordinates not available');
+                            }
+                            
+                            // Show success message
+                            setSnackbarMessage('Route loaded successfully');
+                            setSnackbarSeverity('success');
+                            setSnackbarOpen(true);
+                            
+                            // Close the dialog first
+                            setLoadDialogOpen(false);
+                            
+                            // Open the uploader UI with a longer delay to ensure the dialog is closed
+                            setTimeout(() => {
+                                console.log('[SidebarListItems] Opening uploader UI after dialog close');
+                                
+                                // Open the uploader UI
+                                onUploadGpx();
+                                
+                                // Set active item to 'gpx' to highlight the GPX button
+                                setActiveItem('gpx');
+                                
+                                // Add a longer delay before selecting the route to ensure the uploader UI is fully open
+                                setTimeout(() => {
+                                    console.log('[SidebarListItems] Attempting to select route after uploader UI open');
+                                    
+                                    // Always select the first route instead of trying to use the master route
+                                    if (routeData.routesWithData && routeData.routesWithData.length > 0) {
+                                        const firstRoute = routeData.routesWithData[0];
+                                        
+                                        // Ensure the route has all required properties
+                                        const enhancedRoute = {
+                                            ...firstRoute,
+                                            _type: 'loaded',
+                                            _loadedState: routeData
+                                        };
+                                        
+                                        // Log the route we're trying to select
+                                        console.log('[SidebarListItems] Setting first route as current:', {
+                                            routeId: enhancedRoute.routeId || enhancedRoute.id,
+                                            name: enhancedRoute.name
+                                        });
+                                        
+                                        // Set the first route as current with a direct call
+                                        console.log('[SidebarListItems] Calling setCurrentRoute with route:', enhancedRoute);
+                                        setCurrentRoute(enhancedRoute);
+                                        
+                                        // Add another timeout to verify the route selection
+                                        setTimeout(() => {
+                                            console.log('[SidebarListItems] Verifying route selection');
+                                            
+                                            // Try to force the route selection again
+                                            console.log('[SidebarListItems] Forcing route selection again');
+                                            setCurrentRoute(enhancedRoute);
+                                            
+                                            // Try to directly access the RouteContext and call setCurrentRoute
+                                            try {
+                                                if (window.__contextRegistry && window.__contextRegistry.RouteContext) {
+                                                    console.log('[SidebarListItems] Found RouteContext in global registry, calling setCurrentRoute directly');
+                                                    const routeContext = window.__contextRegistry.RouteContext;
+                                                    if (routeContext && typeof routeContext.setCurrentRoute === 'function') {
+                                                        routeContext.setCurrentRoute(enhancedRoute);
+                                                    }
+                                                }
+                                            } catch (error) {
+                                                console.error('[SidebarListItems] Error accessing RouteContext from registry:', error);
+                                            }
+                                        }, 1000);
+                                    } else {
+                                        console.warn('[SidebarListItems] No routes available to select');
+                                    }
+                                }, 800); // Longer delay to ensure uploader UI is fully open
+                            }, 300); // Longer delay to ensure dialog is fully closed
+                        } else {
+                            console.error('No route data found in the loaded route');
+                            setSnackbarMessage('Error: No route data found');
+                            setSnackbarSeverity('error');
+                            setSnackbarOpen(true);
+                        }
                     }
                     catch (error) {
-                        console.error('Failed to load:', error);
+                        console.error('Failed to load route from Firebase:', error);
+                        setSnackbarMessage('Error: Failed to load route');
+                        setSnackbarSeverity('error');
+                        setSnackbarOpen(true);
                     }
                 }, 
-                onDelete: deleteSavedRoute, 
+                onDelete: async (id) => {
+                    try {
+                        // Get the user ID from Auth0
+                        const userId = auth0IsAuthenticated && user?.sub ? user.sub : null;
+                        
+                        if (!userId) {
+                            console.error('User ID not available');
+                            setSnackbarMessage('Error: User ID not available');
+                            setSnackbarSeverity('error');
+                            setSnackbarOpen(true);
+                            return;
+                        }
+                        
+                        // Show loading message
+                        setSnackbarMessage('Deleting route...');
+                        setSnackbarSeverity('info');
+                        setSnackbarOpen(true);
+                        
+                        console.log('[SidebarListItems] Deleting route with ID:', id);
+                        
+                        // Make sure the ID is a string
+                        const routeId = String(id);
+                        
+                        // Delete the route from Firebase using the Firebase function
+                        const success = await firebaseDeleteSavedRoute(routeId, userId);
+                        
+                        if (success) {
+                            // Remove the route from the local state
+                            setFirebaseRoutes(prevRoutes => prevRoutes.filter(route => route.id !== id));
+                            
+                            // Show success message
+                            setSnackbarMessage('Route deleted successfully');
+                            setSnackbarSeverity('success');
+                            setSnackbarOpen(true);
+                        } else {
+                            console.error('Failed to delete route from Firebase');
+                            setSnackbarMessage('Error: Failed to delete route');
+                            setSnackbarSeverity('error');
+                            setSnackbarOpen(true);
+                        }
+                    }
+                    catch (error) {
+                        console.error('Failed to delete route from Firebase:', error);
+                        setSnackbarMessage('Error: Failed to delete route');
+                        setSnackbarSeverity('error');
+                        setSnackbarOpen(true);
+                    }
+                }, 
                 hasUnsavedChanges: hasUnsavedChanges 
             }),
             _jsx(EmbedDialog, {

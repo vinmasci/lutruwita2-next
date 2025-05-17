@@ -16,10 +16,13 @@ import './DirectEmbedLineLayer.css';
  * @param {Array} props.lines - The line data to render
  */
 const DirectEmbedLineLayer = ({ map, lines = [] }) => {
-  console.log('[DirectEmbedLineLayer] Rendering with map:', !!map);
-  console.log('[DirectEmbedLineLayer] Lines from props:', { 
-    linesCount: lines?.length || 0
-  });
+  // Only log on first render or when lines change
+  useEffect(() => {
+    console.log('[DirectEmbedLineLayer] Rendering with map:', !!map);
+    console.log('[DirectEmbedLineLayer] Lines from props:', { 
+      linesCount: lines?.length || 0
+    });
+  }, [map, lines?.length]);
   
   // Reference to track if we've registered the style.load event listener
   const styleLoadListenerRef = useRef(false);
@@ -56,16 +59,24 @@ const DirectEmbedLineLayer = ({ map, lines = [] }) => {
   const [placeDetails, setPlaceDetails] = useState(null); // Renamed
   const currentFetchIdRef = useRef(null); // Ref to track the current fetch operation
   
-  // Log the full line data for debugging
-  if (lines && lines.length > 0) {
-    console.log('[DirectEmbedLineLayer] First line data:', JSON.stringify(lines[0], null, 2));
-    console.log('[DirectEmbedLineLayer] Line name:', lines[0].name);
-    console.log('[DirectEmbedLineLayer] Line coordinates:', lines[0].coordinates);
-    console.log('[DirectEmbedLineLayer] Line icons:', lines[0].icons);
-  } else {
-    console.log('[DirectEmbedLineLayer] No lines to render');
+  // Check if we have lines to render
+  if (!(lines && lines.length > 0)) {
+    // Only log this message once on mount or when lines change
+    useEffect(() => {
+      console.log('[DirectEmbedLineLayer] No lines to render');
+    }, [lines?.length]);
     return null;
   }
+  
+  // Log detailed line data only in development mode and only when lines change
+  useEffect(() => {
+    if (lines && lines.length > 0) {
+      console.log('[DirectEmbedLineLayer] First line data:', JSON.stringify(lines[0], null, 2));
+      console.log('[DirectEmbedLineLayer] Line name:', lines[0].name);
+      console.log('[DirectEmbedLineLayer] Line coordinates:', lines[0].coordinates);
+      console.log('[DirectEmbedLineLayer] Line icons:', lines[0].icons);
+    }
+  }, [lines]);
 
   // Handle line click with memoized callback to prevent unnecessary re-renders
   const handleLineClick = useCallback(async (line) => {

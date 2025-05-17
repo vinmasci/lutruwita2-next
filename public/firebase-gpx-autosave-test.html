@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firebase GPX Auto-Save Test</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #333;
+      margin-top: 0;
+    }
+    .section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #555;
+    }
+    button {
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #3367d6;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    pre {
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .status {
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .info {
+      background-color: #d1ecf1;
+      color: #0c5460;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Firebase GPX Auto-Save Test</h1>
+    
+    <div class="section">
+      <h2>Firebase Configuration</h2>
+      <p>This page tests the Firebase GPX auto-save functionality.</p>
+      <div id="firebase-status" class="status info">Initializing Firebase...</div>
+    </div>
+    
+    <div class="section">
+      <h2>User Authentication</h2>
+      <div id="auth-status" class="status info">Checking authentication...</div>
+      <div id="auth-buttons" style="margin-top: 10px;">
+        <button id="login-button">Sign in Anonymously</button>
+        <button id="logout-button" style="display: none;">Sign Out</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Auto-Saved GPX Files</h2>
+      <button id="refresh-button">Refresh Auto-Saves</button>
+      <div id="auto-saves-container">
+        <p>Sign in to view your auto-saved GPX files.</p>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Test Auto-Save</h2>
+      <p>This is for testing purposes only. In the actual application, auto-save happens automatically when a GPX file is processed.</p>
+      <button id="test-autosave-button" disabled>Test Auto-Save (Simulated)</button>
+      <div id="test-status" class="status info" style="display: none;"></div>
+    </div>
+  </div>
+
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDMPCfqbTIiT3vFE1QZRZXkUuX1Nc85XxI",
+      authDomain: "cyatrails.firebaseapp.com",
+      projectId: "cyatrails",
+      storageBucket: "cyatrails.appspot.com",
+      messagingSenderId: "79924943942",
+      appId: "1:79924943942:web:5a4e7a9bf38fe5f4e9c5a0"
+    };
+
+    // Initialize Firebase
+    let app, db, auth;
+    try {
+      app = firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      auth = firebase.auth();
+      
+      document.getElementById('firebase-status').textContent = 'Firebase initialized successfully.';
+      document.getElementById('firebase-status').className = 'status success';
+    } catch (error) {
+      document.getElementById('firebase-status').textContent = 'Error initializing Firebase: ' + error.message;
+      document.getElementById('firebase-status').className = 'status error';
+      console.error('Firebase initialization error:', error);
+    }
+
+    // Authentication
+    auth.onAuthStateChanged(user => {
+      const authStatus = document.getElementById('auth-status');
+      const loginButton = document.getElementById('login-button');
+      const logoutButton = document.getElementById('logout-button');
+      const testButton = document.getElementById('test-autosave-button');
+      
+      if (user) {
+        authStatus.textContent = `Signed in as: ${user.uid} (${user.isAnonymous ? 'Anonymous' : 'Authenticated'})`;
+        authStatus.className = 'status success';
+        loginButton.style.display = 'none';
+        logoutButton.style.display = 'inline-block';
+        testButton.disabled = false;
+        
+        // Refresh auto-saves when user signs in
+        refreshAutoSaves();
+      } else {
+        authStatus.textContent = 'Not signed in.';
+        authStatus.className = 'status info';
+        loginButton.style.display = 'inline-block';
+        logoutButton.style.display = 'none';
+        testButton.disabled = true;
+        
+        // Clear auto-saves when user signs out
+        document.getElementById('auto-saves-container').innerHTML = '<p>Sign in to view your auto-saved GPX files.</p>';
+      }
+    });
+
+    // Sign in anonymously
+    document.getElementById('login-button').addEventListener('click', () => {
+      auth.signInAnonymously()
+        .catch(error => {
+          document.getElementById('auth-status').textContent = 'Error signing in: ' + error.message;
+          document.getElementById('auth-status').className = 'status error';
+          console.error('Authentication error:', error);
+        });
+    });
+
+    // Sign out
+    document.getElementById('logout-button').addEventListener('click', () => {
+      auth.signOut()
+        .catch(error => {
+          console.error('Sign out error:', error);
+        });
+    });
+
+    // Refresh auto-saves
+    document.getElementById('refresh-button').addEventListener('click', refreshAutoSaves);
+
+    function refreshAutoSaves() {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const container = document.getElementById('auto-saves-container');
+      container.innerHTML = '<p>Loading auto-saves...</p>';
+      
+      console.log('Fetching auto-saves for user:', user.uid);
+      
+      db.collection('gpx_auto_saves')
+        .where('userId', '==', user.uid)
+        .orderBy('createdAt', 'desc')
+        .get()
+        .then(querySnapshot => {
+          console.log('Auto-saves query result:', { empty: querySnapshot.empty, size: querySnapshot.size });
+          
+          if (querySnapshot.empty) {
+            container.innerHTML = '<p>No auto-saved GPX files found.</p>';
+            return;
+          }
+          
+          let html = '<table>';
+          html += '<tr><th>Name</th><th>File</th><th>Status</th><th>Created</th><th>ID</th><th>Actions</th></tr>';
+          
+          const autoSaves = [];
+          
+          querySnapshot.forEach(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt ? data.createdAt.toDate().toLocaleString() : 'N/A';
+            const autoSaveId = doc.id;
+            
+            autoSaves.push({ id: autoSaveId, ...data });
+            
+            html += `<tr>
+              <td>${data.name || 'Unnamed'}</td>
+              <td>${data.gpxFileName || 'N/A'}</td>
+              <td>${data.status || 'N/A'}</td>
+              <td>${createdAt}</td>
+              <td>${autoSaveId}</td>
+              <td><button onclick="viewSubcollections('${autoSaveId}')">View Data</button></td>
+            </tr>`;
+          });
+          
+          html += '</table>';
+          
+          // Add a section for subcollection data
+          html += `
+            <div id="subcollection-data" style="margin-top: 20px; display: none;">
+              <h3>Subcollection Data</h3>
+              <div id="subcollection-content"></div>
+            </div>
+          `;
+          
+          container.innerHTML = html;
+          
+          // Store auto-saves in a global variable for later use
+          window.autoSaves = autoSaves;
+        })
+        .catch(error => {
+          container.innerHTML = `<p class="error">Error loading auto-saves: ${error.message}</p>`;
+          console.error('Error getting auto-saves:', error);
+        });
+    }
+    
+    // Function to view subcollections for an auto-save
+    function viewSubcollections(autoSaveId) {
+      console.log('Viewing subcollections for auto-save:', autoSaveId);
+      
+      const subcollectionDiv = document.getElementById('subcollection-data');
+      const contentDiv = document.getElementById('subcollection-content');
+      
+      subcollectionDiv.style.display = 'block';
+      contentDiv.innerHTML = '<p>Loading subcollection data...</p>';
+      
+      // Get the coordinates document
+      console.log('Fetching coordinates data...');
+      db.collection('gpx_auto_saves').doc(autoSaveId).collection('data').doc('coords')
+        .get()
+        .then(coordsDoc => {
+          console.log('Coordinates document exists:', coordsDoc.exists);
+          
+          let html = '';
+          
+          if (coordsDoc.exists) {
+            const coordsData = coordsDoc.data();
+            console.log('Coordinates data:', coordsData);
+            
+            html += `<h4>Coordinates</h4>`;
+            if (coordsData.data && Array.isArray(coordsData.data)) {
+              html += `<p>Found ${coordsData.data.length} coordinate points.</p>`;
+              
+              // Display a sample of coordinates
+              if (coordsData.data.length > 0) {
+                html += `<p>Sample (first 3):</p>`;
+                html += `<pre>${JSON.stringify(coordsData.data.slice(0, 3), null, 2)}</pre>`;
+              }
+            } else {
+              html += `<p>No coordinate data found or invalid format.</p>`;
+            }
+          } else {
+            html += `<h4>Coordinates</h4><p>No coordinates document found.</p>`;
+          }
+          
+          // Get the elevation document
+          console.log('Fetching elevation data...');
+          return db.collection('gpx_auto_saves').doc(autoSaveId).collection('data').doc('elevation')
+            .get()
+            .then(elevationDoc => {
+              console.log('Elevation document exists:', elevationDoc.exists);
+              
+              html += `<h4>Elevation</h4>`;
+              if (elevationDoc.exists) {
+                const elevationData = elevationDoc.data();
+                console.log('Elevation data:', elevationData);
+                
+                if (elevationData.data && Array.isArray(elevationData.data)) {
+                  html += `<p>Found ${elevationData.data.length} elevation points.</p>`;
+                  
+                  // Display a sample of elevations
+                  if (elevationData.data.length > 0) {
+                    html += `<p>Sample (first 5):</p>`;
+                    html += `<pre>${JSON.stringify(elevationData.data.slice(0, 5), null, 2)}</pre>`;
+                  }
+                } else {
+                  html += `<p>No elevation data found or invalid format.</p>`;
+                }
+              } else {
+                html += `<p>No elevation document found.</p>`;
+              }
+              
+              // Get the unpaved sections document
+              console.log('Fetching unpaved sections data...');
+              return db.collection('gpx_auto_saves').doc(autoSaveId).collection('data').doc('unpaved')
+                .get()
+                .then(unpavedDoc => {
+                  console.log('Unpaved document exists:', unpavedDoc.exists);
+                  
+                  html += `<h4>Unpaved Sections</h4>`;
+                  if (unpavedDoc.exists) {
+                    const unpavedData = unpavedDoc.data();
+                    console.log('Unpaved data:', unpavedData);
+                    
+                    if (unpavedData.data && Array.isArray(unpavedData.data)) {
+                      html += `<p>Found ${unpavedData.data.length} unpaved sections.</p>`;
+                      
+                      // Display all unpaved sections (usually not many)
+                      if (unpavedData.data.length > 0) {
+                        html += `<pre>${JSON.stringify(unpavedData.data, null, 2)}</pre>`;
+                      }
+                    } else {
+                      html += `<p>No unpaved sections found or invalid format.</p>`;
+                    }
+                  } else {
+                    html += `<p>No unpaved sections document found.</p>`;
+                  }
+                  
+                  contentDiv.innerHTML = html;
+                });
+            });
+        })
+        .catch(error => {
+          console.error('Error fetching subcollection data:', error);
+          contentDiv.innerHTML = `<p class="error">Error fetching subcollection data: ${error.message}</p>`;
+        });
+    }
+
+    // Test auto-save (simulated)
+    document.getElementById('test-autosave-button').addEventListener('click', () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const testStatus = document.getElementById('test-status');
+      testStatus.textContent = 'Simulating auto-save...';
+      testStatus.className = 'status info';
+      testStatus.style.display = 'block';
+      
+      // Create a simulated processed route
+      const simulatedRoute = {
+        routeId: 'route-' + Math.random().toString(36).substring(2, 15),
+        name: 'Test Route ' + new Date().toLocaleString(),
+        geojson: {
+          features: [{
+            geometry: {
+              coordinates: [
+                [147.3, -42.8],
+                [147.31, -42.81],
+                [147.32, -42.82],
+                [147.33, -42.83]
+              ]
+            },
+            properties: {
+              coordinateProperties: {
+                elevation: [100, 110, 105, 95]
+              }
+            }
+          }]
+        },
+        unpavedSections: [
+          { startIndex: 1, endIndex: 2, surfaceType: 'unpaved' }
+        ],
+        statistics: {
+          totalDistance: 5000,
+          elevationGain: 200,
+          elevationLoss: 150
+        }
+      };
+      
+      // Transform coordinates from arrays to objects to avoid nested arrays in Firestore
+      const rawCoordinates = simulatedRoute.geojson.features[0].geometry.coordinates;
+      const elevations = simulatedRoute.geojson.features[0].properties.coordinateProperties.elevation;
+      
+      const transformedCoordinates = rawCoordinates.map((coord, index) => ({
+        lng: coord[0],
+        lat: coord[1],
+        elevation: elevations[index]
+      }));
+      
+      // Simulate auto-save
+      const autoSaveRef = db.collection('gpx_auto_saves').doc();
+      const autoSaveId = autoSaveRef.id;
+      
+      // Create batch
+      const batch = db.batch();
+      
+      // Main metadata document
+      batch.set(autoSaveRef, {
+        userId: user.uid,
+        gpxFileName: 'simulated-test.gpx',
+        status: 'pending_action',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        name: simulatedRoute.name,
+        statistics: simulatedRoute.statistics || {}
+      });
+      
+      // Coordinates document - use transformed coordinates
+      const coordsRef = db.collection('gpx_auto_saves').doc(autoSaveId).collection('data').doc('coords');
+      batch.set(coordsRef, { 
+        data: transformedCoordinates 
+      });
+      
+      // Elevation document
+      const elevationRef = db.collection('gpx_auto_saves').doc(autoSaveId).collection('data').doc('elevation');
+      batch.set(elevationRef, { 
+        data: simulatedRoute.geojson.features[0].properties.coordinateProperties.elevation 
+      });
+      
+      // Transform unpaved sections to match MongoDB structure and avoid nested arrays
+      const transformedUnpavedSections = (simulatedRoute.unpavedSections || []).map(section => {
+        // Create a new object with the required fields
+        const transformedSection = { 
+          startIndex: section.startIndex,
+          endIndex: section.endIndex,
+          surfaceType: section.surfaceType || 'unpaved'
+        };
+        
+        // Extract coordinates for this section from the main coordinates array
+        const sectionCoordinates = rawCoordinates.slice(
+          Math.max(0, section.startIndex),
+          Math.min(rawCoordinates.length, section.endIndex + 1)
+        );
+        
+        // Transform coordinates to objects to avoid nested arrays
+        transformedSection.coordinates = sectionCoordinates.map(coord => {
+          if (Array.isArray(coord)) {
+            return { lng: coord[0], lat: coord[1] };
+          }
+          return coord;
+        });
+        
+        return transformedSection;
+      });
+      
+      console.log('Transformed unpaved sections for test:', { 
+        original: simulatedRoute.unpavedSections, 
+        transformed: transformedUnpavedSections 
+      });
+      
+      // Unpaved sections document
+      const unpavedRef = db.collection('gpx_auto_saves').doc(autoSaveId).collection('data').doc('unpaved');
+      batch.set(unpavedRef, { 
+        data: transformedUnpavedSections 
+      });
+      
+      // Commit the batch
+      batch.commit()
+        .then(() => {
+          testStatus.textContent = `Auto-save simulation successful! ID: ${autoSaveId}`;
+          testStatus.className = 'status success';
+          
+          // Refresh the auto-saves list
+          refreshAutoSaves();
+        })
+        .catch(error => {
+          testStatus.textContent = `Auto-save simulation failed: ${error.message}`;
+          testStatus.className = 'status error';
+          console.error('Auto-save simulation error:', error);
+        });
+    });
+  </script>
+</body>
+</html>

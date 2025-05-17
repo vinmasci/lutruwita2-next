@@ -1,0 +1,7 @@
+** BUILD FAILED **
+
+
+The following build commands failed:
+	CompileC /Users/vincentmasci/Library/Developer/Xcode/DerivedData/CyaTrails-caxuuiiispdzwddyrovupuuwbqnc/Build/Intermediates.noindex/Pods.build/Release-iphoneos/RNFBAuth.build/Objects-normal/arm64/RNFBAuthModule.o /Users/vincentmasci/Desktop/lutruwita2-next/mobile/lutruwita-mobile/node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler (in target 'RNFBAuth' from project 'Pods')
+	Building workspace CyaTrails with scheme CyaTrails and configuration Release
+(2 failures)

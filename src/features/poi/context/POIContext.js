@@ -3,6 +3,9 @@ import React, { createContext, useContext, useEffect, useReducer, useState, useM
 import { useRouteContext } from '../../map/context/RouteContext';
 import { v4 as uuidv4 } from 'uuid';
 import { extractPlaceIdFromUrl, fetchBasicPlaceDetails, searchPlacesByNameAndCoords } from '../services/googlePlacesService';
+import { autoSavePOIsToFirebase } from '../../../services/firebasePOIAutoSaveService';
+import { useAutoSave } from '../../../context/AutoSaveContext';
+import { useAuth0 } from '@auth0/auth0-react';
 // Reducer
 const poiReducer = (state, action) => {
     switch (action.type) {
@@ -97,6 +100,11 @@ const poiReducer = (state, action) => {
 };
 // Context
 const POIContext = createContext(null);
+// Create a global registry for contexts if it doesn't exist
+if (typeof window !== 'undefined' && !window.__contextRegistry) {
+    window.__contextRegistry = {};
+}
+
 // Provider component
 export const POIProvider = ({ children }) => {
     const [pois, dispatch] = useReducer(poiReducer, []);
@@ -105,6 +113,9 @@ export const POIProvider = ({ children }) => {
     const [poiMode, setPoiMode] = useState('none');
     const [visibleCategories, setVisibleCategories] = useState(Object.keys({}));
     
+    // Get access to the Auth0 context for user information
+    const { user, isAuthenticated } = useAuth0();
+    
     // Get access to the RouteContext to notify it of POI changes
     let routeContext;
     try {
@@ -112,6 +123,15 @@ export const POIProvider = ({ children }) => {
     } catch (error) {
         // This is expected when the POIProvider is used outside of a RouteProvider
         routeContext = null;
+    }
+    
+    // Get access to the AutoSaveContext for global auto-save state
+    let autoSave;
+    try {
+        autoSave = useAutoSave();
+    } catch (error) {
+        // This is expected when the POIProvider is used outside of an AutoSaveProvider
+        autoSave = null;
     }
     
     // Track POI changes locally if routeContext is not available
@@ -231,11 +251,11 @@ export const POIProvider = ({ children }) => {
 
     const addPOI = async (poi) => {
         try {
-            // console.log('[POIContext] Adding POI with coordinates:', {
-            //     coordinates: poi.coordinates,
-            //     coordinatesString: `${poi.coordinates[0].toFixed(6)}, ${poi.coordinates[1].toFixed(6)}`,
-            //     poi
-            // });
+            console.log('[POIContext] Adding POI with coordinates:', {
+                coordinates: poi.coordinates,
+                coordinatesString: `${poi.coordinates[0].toFixed(6)}, ${poi.coordinates[1].toFixed(6)}`,
+                poi
+            });
 
             // Generate a temporary ID for logging consistency
             const tempId = `temp-${uuidv4()}`;
@@ -260,14 +280,24 @@ export const POIProvider = ({ children }) => {
                 poiWithGooglePlaces.googlePlaceUrl = googlePlaces.url;
             }
 
+            // Make sure the POI has all required fields
+            const completePoiData = {
+                ...poiWithGooglePlaces,
+                googlePlaces,
+                // Ensure required fields are present
+                type: 'draggable', // Explicitly set type
+                category: poiWithGooglePlaces.category || 'default', // Ensure category exists
+                icon: poiWithGooglePlaces.icon || 'default-icon', // Ensure icon exists
+                name: poiWithGooglePlaces.name || 'Unnamed POI' // Ensure name exists
+            };
+            
+            console.log('[POIContext] Complete POI data being added to state:', completePoiData);
+            
             // Add POI to local state with Google Places data if available
             dispatch({
                 type: 'ADD_POI',
                 payload: {
-                    poi: {
-                        ...poiWithGooglePlaces,
-                        googlePlaces
-                    },
+                    poi: completePoiData,
                     tempId
                 }
             });
@@ -276,6 +306,88 @@ export const POIProvider = ({ children }) => {
             // console.log('[POIContext] Notifying RouteContext of POI changes (add)');
             notifyPOIChange();
 
+    // Auto-save POIs to Firebase
+    try {
+        // Check if we're in presentation mode by looking at the URL
+        const isPresentationMode = window.location.pathname.includes('/presentation/') || 
+                                  window.location.pathname.includes('/preview/') ||
+                                  window.location.pathname.includes('/route/');
+        
+        // Skip auto-save if in presentation mode
+        if (isPresentationMode) {
+            console.log('[POIContext] Skipping auto-save - in presentation mode');
+            return;
+        }
+        
+        // Get the current route from RouteContext
+        const currentRoute = routeContext?.currentRoute;
+        const currentLoadedPermanentRouteId = autoSave?.loadedPermanentRouteId || null;
+        
+        // Skip auto-save if no route is available AND no permanent route is loaded
+        if (!currentRoute && !currentLoadedPermanentRouteId) {
+            console.log('[POIContext] Skipping auto-save - no current route and no permanent route loaded');
+            return;
+        }
+        
+        // Get the current user ID from Auth0 context
+        const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+        
+        console.log('[POIContext] Auto-saving POIs to Firebase after adding POI');
+        console.log('[POIContext] Current route available:', !!currentRoute);
+        
+        // Start auto-save in the global context if available
+        if (autoSave) {
+            autoSave.startAutoSave();
+        }
+                
+                // CRITICAL FIX: Instead of using getPOIsForRoute which uses the state that might not be updated yet,
+                // create a POI structure directly with all existing POIs plus the newly added POI
+                const allPOIs = {
+                    draggable: [
+                        ...pois.map(poi => ({
+                            ...poi,
+                            // Ensure required fields are present
+                            type: poi.type || 'draggable',
+                            category: poi.category || 'default',
+                            icon: poi.icon || 'default-icon',
+                            name: poi.name || 'Unnamed POI'
+                        })),
+                        completePoiData // Include the POI we just added
+                    ]
+                };
+                
+                console.log('[POIContext] About to call autoSavePOIsToFirebase with DIRECT POI DATA:', {
+                    poiCount: allPOIs.draggable.length,
+                    hasCurrentRoute: !!currentRoute,
+                    userId,
+                    hasAutoSave: !!autoSave,
+                    autoSaveId: autoSave?.autoSaveId,
+                    firstPOI: allPOIs.draggable[0]
+                });
+                
+                // Call the auto-save function - pass null for processedRoute if not available
+                // Also pass the autoSave context and loadedPermanentRouteId
+                // currentLoadedPermanentRouteId is already defined above
+                const autoSaveId = await autoSavePOIsToFirebase(allPOIs, currentRoute || null, userId, autoSave, currentLoadedPermanentRouteId);
+                
+                console.log('[POIContext] autoSavePOIsToFirebase returned autoSaveId:', autoSaveId);
+                
+                // Update the global context with the successful auto-save if needed
+                if (autoSave && autoSaveId && !autoSave.autoSaveId) {
+                    const routeId = currentRoute ? currentRoute.routeId : null;
+                    autoSave.completeAutoSave(autoSaveId, routeId);
+                }
+            } catch (autoSaveError) {
+                console.error('[POIContext] Error auto-saving POIs to Firebase:', autoSaveError);
+                
+                // Update the global context with the error if available
+                if (autoSave) {
+                    autoSave.setAutoSaveError(autoSaveError);
+                }
+                
+                // Continue with normal flow even if auto-save fails
+            }
+
             // console.log('[POIContext] POI added to state with ID:', tempId);
         }
         catch (error) {
@@ -283,7 +395,7 @@ export const POIProvider = ({ children }) => {
             setError(error instanceof Error ? error : new Error('Failed to save POI'));
         }
     };
-    const removePOI = (id) => {
+    const removePOI = async (id) => {
         try {
             // console.log('[POIContext] Removing POI with ID:', id);
 
@@ -292,6 +404,67 @@ export const POIProvider = ({ children }) => {
             // Notify RouteContext of POI changes
             // console.log('[POIContext] Notifying RouteContext of POI changes (remove)');
             notifyPOIChange();
+
+            // Auto-save POIs to Firebase
+            try {
+                // Get the current route from RouteContext
+                const currentRoute = routeContext?.currentRoute;
+                
+                // Get the current user ID from Auth0 context
+                const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                
+                console.log('[POIContext] Auto-saving POIs to Firebase after removing POI');
+                console.log('[POIContext] Current route available:', !!currentRoute);
+                
+                // Start auto-save in the global context if available
+                if (autoSave) {
+                    autoSave.startAutoSave();
+                }
+                
+                // CRITICAL FIX: Create a POI structure directly with the updated POIs
+                // Filter out the removed POI from the current state
+                const updatedPois = pois.filter(p => p.id !== id);
+                
+                // Create a POI structure with the updated POIs
+                const allPOIs = {
+                    draggable: updatedPois.map(poi => ({
+                        ...poi,
+                        // Ensure required fields are present
+                        type: poi.type || 'draggable',
+                        category: poi.category || 'default',
+                        icon: poi.icon || 'default-icon',
+                        name: poi.name || 'Unnamed POI'
+                    }))
+                };
+                
+                console.log('[POIContext] About to call autoSavePOIsToFirebase with DIRECT POI DATA after removal:', {
+                    poiCount: allPOIs.draggable.length,
+                    hasCurrentRoute: !!currentRoute,
+                    userId,
+                    hasAutoSave: !!autoSave,
+                    autoSaveId: autoSave?.autoSaveId
+                });
+                
+                // Call the auto-save function - pass null for processedRoute if not available
+                // Also pass the autoSave context and loadedPermanentRouteId
+                // currentLoadedPermanentRouteId is already defined above
+                const autoSaveId = await autoSavePOIsToFirebase(allPOIs, currentRoute || null, userId, autoSave, currentLoadedPermanentRouteId);
+                
+                // Update the global context with the successful auto-save if needed
+                if (autoSave && autoSaveId && !autoSave.autoSaveId) {
+                    const routeId = currentRoute ? currentRoute.routeId : null;
+                    autoSave.completeAutoSave(autoSaveId, routeId);
+                }
+            } catch (autoSaveError) {
+                console.error('[POIContext] Error auto-saving POIs to Firebase:', autoSaveError);
+                
+                // Update the global context with the error if available
+                if (autoSave) {
+                    autoSave.setAutoSaveError(autoSaveError);
+                }
+                
+                // Continue with normal flow even if auto-save fails
+            }
 
             // console.log('[POIContext] POI removed successfully');
         }
@@ -332,18 +505,154 @@ export const POIProvider = ({ children }) => {
             
             // Notify RouteContext of POI changes
             notifyPOIChange();
+            
+            // Auto-save POIs to Firebase
+            try {
+                // Get the current route from RouteContext
+                const currentRoute = routeContext?.currentRoute;
+                
+                // Get the current user ID from Auth0 context
+                const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                
+                console.log('[POIContext] Auto-saving POIs to Firebase after updating POI');
+                console.log('[POIContext] Current route available:', !!currentRoute);
+                
+                // Start auto-save in the global context if available
+                if (autoSave) {
+                    autoSave.startAutoSave();
+                }
+                
+                // CRITICAL FIX: Create a POI structure directly with the updated POIs
+                // Map the current state to include the updated POI
+                const updatedPois = pois.map(poi => {
+                    if (poi.id === id) {
+                        return {
+                            ...poi,
+                            ...updatedData,
+                            // Ensure required fields are present
+                            type: 'draggable',
+                            category: updatedData.category || poi.category || 'default',
+                            icon: updatedData.icon || poi.icon || 'default-icon',
+                            name: updatedData.name || poi.name || 'Unnamed POI'
+                        };
+                    }
+                    return poi;
+                });
+                
+                // Create a POI structure with the updated POIs
+                const allPOIs = {
+                    draggable: updatedPois
+                };
+                
+                console.log('[POIContext] About to call autoSavePOIsToFirebase with DIRECT POI DATA after update:', {
+                    poiCount: allPOIs.draggable.length,
+                    hasCurrentRoute: !!currentRoute,
+                    userId,
+                    hasAutoSave: !!autoSave,
+                    autoSaveId: autoSave?.autoSaveId,
+                    updatedPOI: updatedPois.find(p => p.id === id)
+                });
+                
+                // Call the auto-save function - pass null for processedRoute if not available
+                // Also pass the autoSave context and loadedPermanentRouteId
+                // currentLoadedPermanentRouteId is already defined above
+                const autoSaveId = await autoSavePOIsToFirebase(allPOIs, currentRoute || null, userId, autoSave, currentLoadedPermanentRouteId);
+                
+                // Update the global context with the successful auto-save if needed
+                if (autoSave && autoSaveId && !autoSave.autoSaveId) {
+                    const routeId = currentRoute ? currentRoute.routeId : null;
+                    autoSave.completeAutoSave(autoSaveId, routeId);
+                }
+            } catch (autoSaveError) {
+                console.error('[POIContext] Error auto-saving POIs to Firebase:', autoSaveError);
+                
+                // Update the global context with the error if available
+                if (autoSave) {
+                    autoSave.setAutoSaveError(autoSaveError);
+                }
+                
+                // Continue with normal flow even if auto-save fails
+            }
         }
         catch (error) {
             console.error('[POIContext] Error updating POI:', error);
             setError(error instanceof Error ? error : new Error('Failed to update POI'));
         }
     };
-    const updatePOIPosition = (id, coordinates) => {
+    const updatePOIPosition = async (id, coordinates) => {
         try {
             dispatch({ type: 'UPDATE_POSITION', payload: { id, coordinates } });
             
             // Notify RouteContext of POI changes
             notifyPOIChange();
+            
+            // Auto-save POIs to Firebase
+            try {
+                // Get the current route from RouteContext
+                const currentRoute = routeContext?.currentRoute;
+                
+                // Get the current user ID from Auth0 context
+                const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                
+                console.log('[POIContext] Auto-saving POIs to Firebase after updating POI position');
+                console.log('[POIContext] Current route available:', !!currentRoute);
+                
+                // Start auto-save in the global context if available
+                if (autoSave) {
+                    autoSave.startAutoSave();
+                }
+                
+                // CRITICAL FIX: Create a POI structure directly with the updated POIs
+                // Map the current state to include the updated POI position
+                const updatedPois = pois.map(poi => {
+                    if (poi.id === id) {
+                        return {
+                            ...poi,
+                            coordinates,
+                            // Ensure required fields are present
+                            type: poi.type || 'draggable',
+                            category: poi.category || 'default',
+                            icon: poi.icon || 'default-icon',
+                            name: poi.name || 'Unnamed POI'
+                        };
+                    }
+                    return poi;
+                });
+                
+                // Create a POI structure with the updated POIs
+                const allPOIs = {
+                    draggable: updatedPois
+                };
+                
+                console.log('[POIContext] About to call autoSavePOIsToFirebase with DIRECT POI DATA after position update:', {
+                    poiCount: allPOIs.draggable.length,
+                    hasCurrentRoute: !!currentRoute,
+                    userId,
+                    hasAutoSave: !!autoSave,
+                    autoSaveId: autoSave?.autoSaveId,
+                    updatedPOI: updatedPois.find(p => p.id === id)
+                });
+                
+                // Call the auto-save function - pass null for processedRoute if not available
+                // Also pass the autoSave context and loadedPermanentRouteId
+                // currentLoadedPermanentRouteId is already defined above
+                const autoSaveId = await autoSavePOIsToFirebase(allPOIs, currentRoute || null, userId, autoSave, currentLoadedPermanentRouteId);
+                
+                // Update the global context with the successful auto-save if needed
+                if (autoSave && autoSaveId && !autoSave.autoSaveId) {
+                    const routeId = currentRoute ? currentRoute.routeId : null;
+                    autoSave.completeAutoSave(autoSaveId, routeId);
+                }
+            } catch (autoSaveError) {
+                console.error('[POIContext] Error auto-saving POIs to Firebase:', autoSaveError);
+                
+                // Update the global context with the error if available
+                if (autoSave) {
+                    autoSave.setAutoSaveError(autoSaveError);
+                }
+                
+                // Continue with normal flow even if auto-save fails
+            }
         }
         catch (error) {
             console.error('[POIContext] Error updating POI position:', error);
@@ -352,26 +661,58 @@ export const POIProvider = ({ children }) => {
     };
     // Get POIs in route format - memoized to prevent unnecessary recalculations
     const getPOIsForRoute = React.useCallback((_routeId) => {
-        // console.log('[POIContext] getPOIsForRoute called, total POIs:', pois.length);
+        console.log('[POIContext] getPOIsForRoute called, total POIs:', pois.length);
+        
+        // Log all POIs for debugging
+        console.log('[POIContext] All POIs:', pois.map(p => ({
+            id: p.id,
+            type: p.type,
+            name: p.name,
+            category: p.category,
+            coordinates: p.coordinates
+        })));
 
         // Log POIs with Google Places data
         const poisWithGooglePlaces = pois.filter(poi => poi.googlePlaces);
-        // console.log('[POIContext] POIs with Google Places data:', poisWithGooglePlaces.length);
-        // if (poisWithGooglePlaces.length > 0) {
-        //     console.log('[POIContext] First POI with Google Places data:', {
-        //         id: poisWithGooglePlaces[0].id,
-        //         name: poisWithGooglePlaces[0].name,
-        //         googlePlaces: poisWithGooglePlaces[0].googlePlaces
-        //     });
-        // }
+        console.log('[POIContext] POIs with Google Places data:', poisWithGooglePlaces.length);
+        if (poisWithGooglePlaces.length > 0) {
+            console.log('[POIContext] First POI with Google Places data:', {
+                id: poisWithGooglePlaces[0].id,
+                name: poisWithGooglePlaces[0].name,
+                googlePlaces: poisWithGooglePlaces[0].googlePlaces
+            });
+        }
 
         // Split POIs by type and validate
         const draggablePois = pois.filter((poi) => {
+            // Log each POI for debugging
+            console.log('[POIContext] Validating POI:', {
+                id: poi.id,
+                type: poi.type || 'undefined',
+                hasCoordinates: !!poi.coordinates,
+                hasName: !!poi.name,
+                hasCategory: !!poi.category,
+                hasIcon: !!poi.icon
+            });
+            
+            // Check if type is missing and default to 'draggable'
+            if (!poi.type) {
+                console.warn('[POIContext] POI missing type, defaulting to draggable:', poi.id);
+                poi.type = 'draggable';
+            }
+            
             if (poi.type !== 'draggable')
                 return false;
+                
             // Validate required fields
             if (!poi.id || !poi.coordinates || !poi.name || !poi.category || !poi.icon) {
-                console.warn('[POIContext] Invalid draggable POI:', poi.id);
+                console.warn('[POIContext] Invalid draggable POI:', poi.id, {
+                    missingId: !poi.id,
+                    missingCoordinates: !poi.coordinates,
+                    missingName: !poi.name,
+                    missingCategory: !poi.category,
+                    missingIcon: !poi.icon
+                });
                 return false;
             }
             return true;
@@ -402,18 +743,20 @@ export const POIProvider = ({ children }) => {
         });
 
         // Log the final POIs that will be saved to MongoDB
-        // console.log('[POIContext] Final draggable POIs for MongoDB:', draggablePois.length);
-        // if (draggablePois.length > 0) {
-        //     const poisWithGooglePlaces = draggablePois.filter(poi => poi.googlePlaces);
-        //     console.log('[POIContext] Final POIs with Google Places data:', poisWithGooglePlaces.length);
-        //     if (poisWithGooglePlaces.length > 0) {
-        //         console.log('[POIContext] Example POI with Google Places data for MongoDB:', {
-        //             id: poisWithGooglePlaces[0].id,
-        //             name: poisWithGooglePlaces[0].name,
-        //             googlePlaces: poisWithGooglePlaces[0].googlePlaces
-        //         });
-        //     }
-        // }
+        console.log('[POIContext] Final draggable POIs for MongoDB:', draggablePois.length);
+        if (draggablePois.length > 0) {
+            console.log('[POIContext] First draggable POI:', draggablePois[0]);
+            
+            const poisWithGooglePlaces = draggablePois.filter(poi => poi.googlePlaces);
+            console.log('[POIContext] Final POIs with Google Places data:', poisWithGooglePlaces.length);
+            if (poisWithGooglePlaces.length > 0) {
+                console.log('[POIContext] Example POI with Google Places data for MongoDB:', {
+                    id: poisWithGooglePlaces[0].id,
+                    name: poisWithGooglePlaces[0].name,
+                    googlePlaces: poisWithGooglePlaces[0].googlePlaces
+                });
+            }
+        }
 
         // Place POI functionality is commented out
         /*
@@ -430,9 +773,25 @@ export const POIProvider = ({ children }) => {
         */
         
         const result = {
-            draggable: draggablePois,
-            places: [] // Empty array since place POIs are disabled
+            draggable: draggablePois
         };
+        
+        console.log('[POIContext] Final POI data structure being returned:', {
+            draggableCount: result.draggable.length,
+            firstPOI: result.draggable.length > 0 ? {
+                id: result.draggable[0].id,
+                type: result.draggable[0].type,
+                coordinates: result.draggable[0].coordinates
+            } : null
+        });
+        
+        // Extra validation to ensure we're returning a valid object
+        console.log('[POIContext] FINAL RESULT VALIDATION:');
+        console.log('- result is object:', typeof result === 'object');
+        console.log('- result.draggable exists:', !!result.draggable);
+        console.log('- result.draggable is array:', Array.isArray(result.draggable));
+        console.log('- result.draggable length:', result.draggable.length);
+        console.log('- Full result object:', JSON.stringify(result));
         
         return result;
     }, [pois]); // Only recompute when POIs change
@@ -450,11 +809,14 @@ export const POIProvider = ({ children }) => {
             // });
 
             // Process new POIs - they should all be full POI objects now
-            // Place POI functionality is commented out
-            const newPOIs = [
-                ...(routePOIs.draggable || [])
-                // ...(routePOIs.places || []) // Place POIs are disabled
-            ];
+            let newPOIs = [];
+            if (Array.isArray(routePOIs)) {
+                // If routePOIs is already an array (new Firebase structure)
+                newPOIs = [...routePOIs];
+            } else if (routePOIs && routePOIs.draggable) {
+                // If routePOIs is an object with a draggable property (old MongoDB-like structure)
+                newPOIs = [...(routePOIs.draggable || [])];
+            }
 
             // console.log('[POIContext] Total POIs to load:', newPOIs.length);
 
@@ -490,21 +852,47 @@ export const POIProvider = ({ children }) => {
         }
     };
     
-    const clearPOIs = () => {
+    // Define clearPOIs function
+    const clearPOIs = useCallback(() => {
         try {
+            console.log('[POIContext] Clearing all POIs');
             // Clear all POIs by loading an empty array
             dispatch({ type: 'LOAD_POIS', payload: [] });
             
             // Notify RouteContext of POI changes
             notifyPOIChange();
 
-            // console.log('[POIContext] All POIs cleared');
+            console.log('[POIContext] All POIs cleared successfully');
+            return true;
         }
         catch (error) {
             console.error('[POIContext] Error clearing POIs:', error);
             setError(error instanceof Error ? error : new Error('Failed to clear POIs'));
+            return false;
         }
-    };
+    }, [notifyPOIChange]);
+    
+    // Register the clearPOIs function with the global registry
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            // Create a context instance with the clearPOIs function
+            const contextInstance = { clearPOIs };
+            
+            // Register the context instance
+            window.__contextRegistry = window.__contextRegistry || {};
+            window.__contextRegistry.POIContext = contextInstance;
+            
+            console.log('[POIContext] Registered clearPOIs function with global registry');
+            
+            // Clean up when unmounted
+            return () => {
+                if (window.__contextRegistry && window.__contextRegistry.POIContext) {
+                    delete window.__contextRegistry.POIContext;
+                    console.log('[POIContext] Unregistered from global registry');
+                }
+            };
+        }
+    }, [clearPOIs]);
     // Initialize visible categories with all categories when POIs are loaded
     useEffect(() => {
         if (pois.length > 0) {

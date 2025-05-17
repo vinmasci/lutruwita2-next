@@ -7,7 +7,68 @@ import { reverseGeocodeForRoad } from '../../../../utils/geocoding';
 import './ClimbMarkers.css';
 
 // Cache for climb data to avoid recalculating for the same route
+// Using a Map that can be cleared when needed
 const climbCache = new Map();
+
+// Global reference to all active markers for cleanup
+let activeMarkers = [];
+
+// Register the clearClimbCache function with the global registry
+if (typeof window !== 'undefined') {
+    window.__contextRegistry = window.__contextRegistry || {};
+}
+
+// Function to clear the climb cache and remove all markers - can be called externally
+export const clearClimbCache = () => {
+    console.log('[ClimbMarkers] Clearing climb cache and removing all markers');
+    climbCache.clear();
+    
+    // Remove all active markers
+    if (activeMarkers.length > 0) {
+        console.log(`[ClimbMarkers] Removing ${activeMarkers.length} active markers`);
+        activeMarkers.forEach(marker => {
+            try {
+                if (marker) marker.remove();
+            } catch (error) {
+                console.warn('[ClimbMarkers] Error removing marker:', error);
+            }
+        });
+        activeMarkers = [];
+    }
+    
+    // Also try to remove all climb marker elements directly from the DOM
+    try {
+        const markerElements = document.getElementsByClassName('climb-marker');
+        if (markerElements && markerElements.length > 0) {
+            console.log(`[ClimbMarkers] Found ${markerElements.length} climb marker elements to remove directly from DOM`);
+            // Convert HTMLCollection to Array and remove each marker's parent (the mapboxgl-marker div)
+            Array.from(markerElements).forEach(element => {
+                try {
+                    // Try to get the parent mapboxgl-marker element
+                    const markerParent = element.closest('.mapboxgl-marker');
+                    if (markerParent) {
+                        markerParent.remove();
+                    } else {
+                        // If we can't find the parent, remove the element itself
+                        element.remove();
+                    }
+                } catch (error) {
+                    console.warn('[ClimbMarkers] Error removing marker element:', error);
+                }
+            });
+        }
+    } catch (error) {
+        console.warn('[ClimbMarkers] Error removing marker elements from DOM:', error);
+    }
+    
+    return true;
+};
+
+// Register the clearClimbCache function with the global registry
+if (typeof window !== 'undefined') {
+    window.__contextRegistry.ClimbMarkers = { clearClimbCache };
+    console.log('[ClimbMarkers] Registered clearClimbCache with global registry');
+}
 
 export const ClimbMarkers = ({ map, route }) => {
     const [markers, setMarkers] = useState([]);
@@ -60,48 +121,14 @@ export const ClimbMarkers = ({ map, route }) => {
             
             // Create elevation data in the same format as the ElevationProfile component
             const elevationProfileData = [];
-            
-            // Calculate cumulative distances for each point
-            const cumulativeDistances = [0]; // First point is at distance 0
-            let totalDistanceCalculated = 0;
-            
-            // Calculate distance between two points using Haversine formula
-            const calculateDistance = (point1, point2) => {
-                const [lon1, lat1] = point1;
-                const [lon2, lat2] = point2;
-                
-                // Convert to radians
-                const toRad = (value) => value * Math.PI / 180;
-                const φ1 = toRad(lat1);
-                const φ2 = toRad(lat2);
-                const Δφ = toRad(lat2 - lat1);
-                const Δλ = toRad(lon2 - lon1);
-                
-                // Haversine formula
-                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                          Math.cos(φ1) * Math.cos(φ2) *
-                          Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                
-                // Earth's radius in meters
-                const R = 6371e3;
-                return R * c;
-            };
-            
-            // Calculate cumulative distances
-            for (let j = 1; j < routeCoordinates.length; j++) {
-                const distance = calculateDistance(routeCoordinates[j-1], routeCoordinates[j]);
-                totalDistanceCalculated += distance;
-                cumulativeDistances.push(totalDistanceCalculated);
-            }
-            
-            // Create elevation data with accurate distances - exactly like in ElevationProfile.tsx
-            for (let k = 0; k < elevations.length; k++) {
-                // Use the actual distance for this point, or interpolate if needed
-                const distanceIndex = Math.min(k, cumulativeDistances.length - 1);
+            const pointCount = elevations.length;
+
+            for (let i = 0; i < pointCount; i++) {
+                const distance = (i / (pointCount - 1)) * totalDistance; // totalDistance is in meters
+                const elevation = elevations[i];
                 elevationProfileData.push({
-                    distance: cumulativeDistances[distanceIndex],
-                    elevation: elevations[k]
+                    distance, // distance is in meters
+                    elevation
                 });
             }
             
@@ -114,7 +141,12 @@ export const ClimbMarkers = ({ map, route }) => {
                 console.log(`[ClimbMarkers] Using cached climbs for route ${routeId}`);
             } else {
                 // Detect climbs using the same data format as ElevationProfile.tsx
+                console.log(`[ClimbMarkers] Data for detectClimbs (route ${routeId}):`, {
+                    length: elevationProfileData.length,
+                    sample: elevationProfileData.slice(0, 5)
+                });
                 const climbs = detectClimbs(elevationProfileData);
+                console.log(`[ClimbMarkers] Detected ${climbs.length} climbs for route ${routeId}`);
                 
                 // Sort climbs by distance to get them in route order
                 sortedClimbs = [...climbs].sort((a, b) => a.startPoint.distance - b.startPoint.distance);
@@ -358,11 +390,22 @@ export const ClimbMarkers = ({ map, route }) => {
                 newMarkers.push(startMarker, endMarker);
             });
 
+            // Store markers in both component state and global activeMarkers array
             setMarkers(newMarkers);
+            activeMarkers = [...activeMarkers, ...newMarkers];
+            console.log(`[ClimbMarkers] Added ${newMarkers.length} markers to activeMarkers array (total: ${activeMarkers.length})`);
             
             // Clean up event listeners when component unmounts or route changes
             return () => {
                 map.off('zoom', updateZoom);
+                
+                // Remove markers from activeMarkers array
+                newMarkers.forEach(marker => {
+                    const index = activeMarkers.indexOf(marker);
+                    if (index !== -1) {
+                        activeMarkers.splice(index, 1);
+                    }
+                });
             };
         } catch (error) {
             console.error('[ClimbMarkers] Error creating climb markers:', error);

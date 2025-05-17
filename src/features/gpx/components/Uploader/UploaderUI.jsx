@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Alert, Box, Button, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider, Popover, LinearProgress } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Typography, IconButton, TextField, List, Paper, Divider, Popover, LinearProgress, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { useRouteContext } from '../../../map/context/RouteContext';
 import { getRouteDistance, getUnpavedPercentage, getElevationGain, getElevationLoss } from '../../utils/routeUtils';
 import { getRouteLocationData } from '../../../../utils/geocoding';
+import { useAutoSave } from '../../../../context/AutoSaveContext';
+import { useAuth0 } from '@auth0/auth0-react';
+import { updateRouteInFirebase } from '../../../../services/firebaseGpxAutoSaveService';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useDropzone } from 'react-dropzone';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -43,11 +46,221 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
     const [selectedRouteId, setSelectedRouteId] = useState(null);
     const [customColor, setCustomColor] = useState('');
     const [customColorError, setCustomColorError] = useState('');
+    const [routeType, setRouteType] = useState('Single');
+    const { overallRouteName, updateOverallRouteName, currentLoadedPersistentId } = useRouteContext(); // Get overallRouteName and its updater
+    const [localOverallName, setLocalOverallName] = useState(overallRouteName || '');
+    
+    // Get the AutoSave context and Auth0 context for Firebase auto-save
+    const autoSave = useAutoSave();
+    const { user, isAuthenticated } = useAuth0();
+    
+    // Get the current loaded state from RouteContext
+    const { currentLoadedState } = useRouteContext();
+    
+    // Effect to update route type when currentRoute changes
+    useEffect(() => {
+        if (currentRoute?._loadedState?.routeType) {
+            console.log('[UploaderUI] Setting route type from currentRoute._loadedState:', currentRoute._loadedState.routeType);
+            setRouteType(currentRoute._loadedState.routeType);
+        }
+    }, [currentRoute]);
+    
+    // Additional effect to update route type when currentLoadedState changes
+    useEffect(() => {
+        if (currentLoadedState?.routeType) {
+            console.log('[UploaderUI] Setting route type from currentLoadedState:', currentLoadedState.routeType);
+            setRouteType(currentLoadedState.routeType);
+        }
+    }, [currentLoadedState]);
 
     // Effect to update local routes when routes change
     useEffect(() => {
         setLocalRoutes(routes);
     }, [routes]);
+
+    // Effect to update localOverallName when overallRouteName from context changes (e.g., on load)
+    useEffect(() => {
+        setLocalOverallName(overallRouteName || '');
+    }, [overallRouteName]);
+
+    // Generate master route by combining all routes
+    const masterRoute = useMemo(() => {
+        if (routeType !== 'Bikepacking' || !localRoutes || localRoutes.length === 0) return null;
+        
+        // Create a combined route object with a unique ID
+        const combinedRoute = {
+            routeId: "master-route",
+            id: "master-route",
+            name: "Full Route",
+            color: "#4a9eff", // Blue color for master route
+            priority: 100, // High priority to ensure it renders on top
+            // Initialize with empty values that will be calculated
+            statistics: {
+                totalDistance: 0,
+                elevationGain: 0,
+                elevationLoss: 0
+            },
+            unpavedSections: [],
+            // Add description field for the master route
+            description: "Combined route of all segments"
+        };
+        
+        // Combine statistics from all routes
+        let totalDistance = 0;
+        let totalElevationGain = 0;
+        let totalElevationLoss = 0;
+        
+        // Calculate combined statistics
+        localRoutes.forEach(route => {
+            totalDistance += getRouteDistance(route);
+            totalElevationGain += getElevationGain(route);
+            totalElevationLoss += getElevationLoss(route);
+        });
+        
+        // Update the combined route with calculated statistics
+        combinedRoute.statistics.totalDistance = totalDistance;
+        combinedRoute.statistics.elevationGain = totalElevationGain;
+        combinedRoute.statistics.elevationLoss = totalElevationLoss;
+        
+        // Create a combined GeoJSON structure with proper elevation data
+        const allCoordinates = [];
+        const allElevations = [];
+        const allUnpavedSections = [];
+        let currentCoordinateIndex = 0;
+        
+        // Process each route to combine coordinates, elevations, and unpaved sections
+        localRoutes.forEach(route => {
+            if (!route.geojson?.features?.[0]?.geometry?.coordinates) return;
+            
+            const coordinates = route.geojson.features[0].geometry.coordinates;
+            const elevations = route.geojson.features[0].properties?.coordinateProperties?.elevation || [];
+            
+            // Add coordinates and elevations
+            coordinates.forEach((coord, idx) => {
+                allCoordinates.push(coord);
+                // Use elevation if available, otherwise use 0
+                allElevations.push(elevations[idx] || 0);
+            });
+            
+            // Process unpaved sections
+            if (route.unpavedSections && route.unpavedSections.length > 0) {
+                route.unpavedSections.forEach(section => {
+                    allUnpavedSections.push({
+                        ...section,
+                        // Adjust indices for the combined route
+                        startIndex: section.startIndex + currentCoordinateIndex,
+                        endIndex: section.endIndex + currentCoordinateIndex,
+                        // Add original route info
+                        originalRouteName: route.name,
+                        originalRouteId: route.routeId || route.id
+                    });
+                });
+            }
+            
+            // Update current index for the next route
+            currentCoordinateIndex += coordinates.length;
+        });
+        
+        // Create the combined GeoJSON with proper elevation data
+        combinedRoute.geojson = {
+            type: "FeatureCollection",
+            features: [{
+                type: "Feature",
+                properties: {
+                    name: "Full Route",
+                    coordinateProperties: {
+                        elevation: allElevations
+                    }
+                },
+                geometry: {
+                    type: "LineString",
+                    coordinates: allCoordinates
+                }
+            }]
+        };
+        
+        // Set unpaved sections
+        combinedRoute.unpavedSections = allUnpavedSections;
+        
+        // Add surface information
+        combinedRoute.surface = {
+            surfaceTypes: []
+        };
+        
+        // Calculate unpaved percentage
+        if (allUnpavedSections.length > 0) {
+            let unpavedDistance = 0;
+            allUnpavedSections.forEach(section => {
+                // Calculate distance for this section
+                const sectionCoords = allCoordinates.slice(section.startIndex, section.endIndex + 1);
+                let sectionDistance = 0;
+                
+                for (let i = 0; i < sectionCoords.length - 1; i++) {
+                    const [lon1, lat1] = sectionCoords[i];
+                    const [lon2, lat2] = sectionCoords[i + 1];
+                    
+                    // Use Haversine formula for accurate distance
+                    const R = 6371e3; // Earth's radius in meters
+                    const φ1 = lat1 * Math.PI / 180;
+                    const φ2 = lat2 * Math.PI / 180;
+                    const Δφ = (lat2 - lat1) * Math.PI / 180;
+                    const Δλ = (lon2 - lon1) * Math.PI / 180;
+                    
+                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                        Math.cos(φ1) * Math.cos(φ2) *
+                        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    
+                    sectionDistance += R * c;
+                }
+                
+                unpavedDistance += sectionDistance;
+            });
+            
+            const unpavedPercentage = Math.round((unpavedDistance / totalDistance) * 100);
+            
+            combinedRoute.surface.surfaceTypes = [
+                { type: 'paved', percentage: 100 - unpavedPercentage },
+                { type: 'trail', percentage: unpavedPercentage }
+            ];
+        } else {
+            combinedRoute.surface.surfaceTypes = [
+                { type: 'paved', percentage: 100 },
+                { type: 'trail', percentage: 0 }
+            ];
+        }
+        
+        // Add metadata from all routes
+        combinedRoute.metadata = {
+            country: 'Australia', // Default
+            state: '',
+            lga: ''
+        };
+        
+        // Collect all states and LGAs
+        const states = new Set();
+        const lgas = new Set();
+        
+        localRoutes.forEach(route => {
+            if (route.metadata) {
+                if (route.metadata.country) {
+                    combinedRoute.metadata.country = route.metadata.country;
+                }
+                if (route.metadata.state) {
+                    states.add(route.metadata.state);
+                }
+                if (route.metadata.lga) {
+                    lgas.add(route.metadata.lga);
+                }
+            }
+        });
+        
+        // Join states and LGAs with commas
+        combinedRoute.metadata.state = Array.from(states).join(', ');
+        combinedRoute.metadata.lga = Array.from(lgas).join(', ');
+        
+        return combinedRoute;
+    }, [routeType, localRoutes]);
     
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -433,52 +646,240 @@ const UploaderUI = ({ isLoading, error, debugLog, onFileAdd, onFileDelete, onFil
             
             <Divider sx={{ my: 2, backgroundColor: 'rgba(255, 255, 255, 0.1)', width: '100%' }} />
 
-            {localRoutes.length > 0 && (
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
+            {/* Route Type Selector */}
+            <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel id="route-type-label" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Route Type</InputLabel>
+                <Select
+                    labelId="route-type-label"
+                    value={routeType}
+                    onChange={(e) => {
+                        const newRouteType = e.target.value;
+                        setRouteType(newRouteType);
+                        
+                        // Auto-save route type to Firebase
+                        try {
+                            // Get the current user ID from Auth0
+                            const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                            
+                            console.log('[UploaderUI] Auto-saving route type to Firebase:', newRouteType);
+                            
+                            // Call the update function with the autoSave context
+                            // We'll update the main document with the routeType
+                            updateRouteInFirebase(
+                                routes[0]?.routeId, // Use the first route's ID
+                                { routeType: newRouteType }, 
+                                userId, 
+                                autoSave
+                            )
+                            .then(autoSaveId => {
+                                if (autoSaveId) {
+                                    console.log('[UploaderUI] Route type auto-saved to Firebase successfully', { autoSaveId });
+                                } else {
+                                    console.warn('[UploaderUI] Failed to auto-save route type to Firebase');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('[UploaderUI] Error auto-saving route type to Firebase:', error);
+                            });
+                        } catch (error) {
+                            console.error('[UploaderUI] Error during Firebase auto-save:', error);
+                            // Continue with normal flow even if auto-save fails
+                        }
+                    }}
+                    sx={{
+                        color: 'white',
+                        '.MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.23)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.4)',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#4a9eff',
+                        },
+                        '.MuiSvgIcon-root': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                        }
+                    }}
                 >
-                    <SortableContext
-                        items={localRoutes.map(route => route.routeId || route.id)}
-                        strategy={verticalListSortingStrategy}
+                    <MenuItem value="Tourism">Tourism</MenuItem>
+                    <MenuItem value="Event">Event</MenuItem>
+                    <MenuItem value="Bikepacking">Bikepacking</MenuItem>
+                    <MenuItem value="Single">Single</MenuItem>
+                </Select>
+            </FormControl>
+
+            {/* Overall Route Name (only shown if a permanent route is loaded) */}
+            {currentLoadedPersistentId && (
+                <TextField
+                    label="Overall Route Name"
+                    value={localOverallName}
+                    onChange={(e) => setLocalOverallName(e.target.value)}
+                    onBlur={() => {
+                        if (localOverallName !== overallRouteName) {
+                            updateOverallRouteName(localOverallName);
+                        }
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            if (localOverallName !== overallRouteName) {
+                                updateOverallRouteName(localOverallName);
+                            }
+                            e.target.blur(); // Remove focus from the input
+                        }
+                    }}
+                    fullWidth
+                    sx={{ 
+                        mb: 2,
+                        '& .MuiInputBase-root': {
+                            color: 'white',
+                        },
+                        '& .MuiInputLabel-root': {
+                            color: 'rgba(255, 255, 255, 0.7)',
+                        },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.23)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255, 255, 255, 0.4)',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#4a9eff',
+                        },
+                    }}
+                    variant="outlined"
+                />
+            )}
+
+            {/* Master Route (only shown for Bikepacking type) */}
+            {routeType === 'Bikepacking' && masterRoute && (
+                <Box sx={{ mb: 2 }}>
+                    <Typography 
+                        variant="subtitle2" 
+                        sx={{ 
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)', 
+                            paddingBottom: '8px',
+                            marginBottom: '8px',
+                            fontWeight: 'bold',
+                            color: '#4a9eff'
+                        }}
                     >
-                        <List sx={{ width: '240px' }}>
-                            {localRoutes.map((route) => (
-                                <DraggableRouteItem
-                                    key={route.routeId || route.id}
-                                    route={route}
-                                >
-                                    <Box
-                                        onClick={() => setCurrentRoute(route)}
-                                        sx={{
-                                            backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
-                                            borderRadius: '4px',
-                                            mb: 1,
-                                            padding: '6px 36px 6px 8px',
-                                            transition: 'all 0.2s ease-in-out',
-                                            cursor: 'pointer',
-                                            position: 'relative',
-                                            outline: 'none',
-                                            border: currentRoute?.routeId === route.routeId ? '1px solid rgba(74, 158, 255, 0.5)' : '1px solid transparent',
-                                            '&:hover': {
-                                                backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(74, 158, 255, 0.2)' : 'rgba(45, 45, 45, 0.9)',
-                                                transform: 'scale(1.02)',
-                                            },
-                                            '&:focus-visible': {
-                                                outline: '2px solid rgba(255, 255, 255, 0.5)',
-                                                outlineOffset: '-2px',
-                                            },
-                                            minHeight: '72px'
-                                        }}
+                        Full Route
+                    </Typography>
+                    <Box
+                        onClick={() => setCurrentRoute(masterRoute)}
+                        sx={{
+                            backgroundColor: currentRoute?.routeId === masterRoute.routeId ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
+                            borderRadius: '4px',
+                            mb: 1,
+                            padding: '6px 36px 6px 8px',
+                            transition: 'all 0.2s ease-in-out',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            outline: 'none',
+                            border: currentRoute?.routeId === masterRoute.routeId ? '1px solid rgba(74, 158, 255, 0.5)' : '1px solid transparent',
+                            '&:hover': {
+                                backgroundColor: currentRoute?.routeId === masterRoute.routeId ? 'rgba(74, 158, 255, 0.2)' : 'rgba(45, 45, 45, 0.9)',
+                                transform: 'scale(1.02)',
+                            },
+                            '&:focus-visible': {
+                                outline: '2px solid rgba(255, 255, 255, 0.5)',
+                                outlineOffset: '-2px',
+                            },
+                            minHeight: '72px',
+                            width: '240px'
+                        }}
+                    >
+                        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.25, pt: 0.5 }}>
+                            {/* Distance row */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <i className="fa-solid fa-route" style={{ color: '#2196f3', fontSize: '0.75rem' }} /> {(getRouteDistance(masterRoute) / 1000).toFixed(1)}km
+                                </Typography>
+                            </Box>
+
+                            {/* Unpaved row */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '20px' }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <i className="fa-solid fa-person-biking-mountain" style={{ color: '#2196f3', fontSize: '0.75rem' }} /> {getUnpavedPercentage(masterRoute)}% unpaved
+                                </Typography>
+                            </Box>
+
+                            {/* Elevation row */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, height: '20px' }}>
+                                <Typography variant="body2" sx={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.7 }}>
+                                    <i className="fa-solid fa-up-right" style={{ color: '#2196f3', fontSize: '0.75rem' }} /> &nbsp;{Math.round(getElevationGain(masterRoute)).toLocaleString()}m
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <i className="fa-solid fa-down-right" style={{ color: '#2196f3', fontSize: '0.75rem' }} /> {Math.round(getElevationLoss(masterRoute)).toLocaleString()}m
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Box>
+                </Box>
+            )}
+
+            {localRoutes.length > 0 && (
+                <>
+                    <Typography 
+                        variant="subtitle2" 
+                        sx={{ 
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)', 
+                            paddingBottom: '8px',
+                            marginBottom: '8px',
+                            fontWeight: 'bold',
+                            color: '#4a9eff',
+                            width: '100%'
+                        }}
+                    >
+                        Stages
+                    </Typography>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={localRoutes.map(route => route.routeId || route.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <List sx={{ width: '240px' }}>
+                                {localRoutes.map((route) => (
+                                    <DraggableRouteItem
+                                        key={route.routeId || route.id}
+                                        route={route}
                                     >
-                                        {renderRouteContent(route)}
-                                    </Box>
-                                </DraggableRouteItem>
-                            ))}
-                        </List>
-                    </SortableContext>
-                </DndContext>
+                                        <Box
+                                            onClick={() => setCurrentRoute(route)}
+                                            sx={{
+                                                backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(74, 158, 255, 0.15)' : 'rgba(35, 35, 35, 0.9)',
+                                                borderRadius: '4px',
+                                                mb: 1,
+                                                padding: '6px 36px 6px 8px',
+                                                transition: 'all 0.2s ease-in-out',
+                                                cursor: 'pointer',
+                                                position: 'relative',
+                                                outline: 'none',
+                                                border: currentRoute?.routeId === route.routeId ? '1px solid rgba(74, 158, 255, 0.5)' : '1px solid transparent',
+                                                '&:hover': {
+                                                    backgroundColor: currentRoute?.routeId === route.routeId ? 'rgba(74, 158, 255, 0.2)' : 'rgba(45, 45, 45, 0.9)',
+                                                    transform: 'scale(1.02)',
+                                                },
+                                                '&:focus-visible': {
+                                                    outline: '2px solid rgba(255, 255, 255, 0.5)',
+                                                    outlineOffset: '-2px',
+                                                },
+                                                minHeight: '72px'
+                                            }}
+                                        >
+                                            {renderRouteContent(route)}
+                                        </Box>
+                                    </DraggableRouteItem>
+                                ))}
+                            </List>
+                        </SortableContext>
+                    </DndContext>
+                </>
             )}
 
             {/* Route Summary Section */}

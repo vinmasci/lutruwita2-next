@@ -1,5 +1,7 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react"; // Import useRef
+import { useAuth0 } from "@auth0/auth0-react";
+import { useAutoSave } from "../../../context/AutoSaveContext";
 import { getMapOverviewData, setMapOverviewData, setMarkMapOverviewChangedFunction } from "../../presentation/store/mapOverviewStore";
 import { useRouteService } from "../services/routeService";
 import { useMapContext } from "./MapContext";
@@ -12,6 +14,8 @@ import { usePhotoService } from "../../photo/services/photoService";
 import { usePlaceContext } from "../../place/context/PlaceContext";
 import { useLineContext } from "../../lineMarkers/context/LineContext";
 import { normalizeRoute } from "../utils/routeUtils";
+import { updateRouteInFirebase, updateHeaderSettingsInFirebase } from "../../../services/firebaseGpxAutoSaveService";
+import { updateSavedRoute } from "../../../services/firebaseSaveCompleteRouteService";
 import { getRouteLocationData } from "../../../utils/geocoding";
 import { getRouteDistance, getUnpavedPercentage, getElevationGain } from "../../gpx/utils/routeUtils";
 import { AuthAlert } from "@/features/auth/components/AuthAlert/AuthAlert";
@@ -169,8 +173,9 @@ export const RouteProvider = ({ children, }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadedMap, setIsLoadedMap] = useState(false);
-    const [currentLoadedState, setCurrentLoadedState] = useState(null);
+    const [currentLoadedState, _setCurrentLoadedState] = useState(null); // Renamed setter
     const [currentLoadedPersistentId, setCurrentLoadedPersistentId] = useState(null);
+    const [overallRouteName, setOverallRouteName] = useState(''); // State for overall route name
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // Use state for changedSections but also a ref to hold the latest value
@@ -198,6 +203,73 @@ export const RouteProvider = ({ children, }) => {
         logoBlob: null
     });
 
+    const setCurrentLoadedState = useCallback((loadedStateData) => {
+        _setCurrentLoadedState(loadedStateData);
+        if (loadedStateData) {
+            const settingsToUse = loadedStateData.headerSettings || {};
+            const color = settingsToUse.color || loadedStateData.color || '#000000';
+            let logoUrl = settingsToUse.logoUrl || loadedStateData.thumbnailUrl || null;
+            let logoPublicId = settingsToUse.logoPublicId || loadedStateData.thumbnailPublicId || null;
+            const username = settingsToUse.username || loadedStateData.username || '';
+
+            if (logoUrl && logoUrl.startsWith('blob:')) {
+                logoUrl = null;
+                logoPublicId = null;
+            }
+            
+            const newSettings = {
+                color,
+                logoUrl,
+                logoPublicId,
+                username,
+                logoFile: null, 
+                logoData: null, 
+                logoBlob: null
+            };
+            setHeaderSettings(newSettings);
+            console.log('[RouteContext] setCurrentLoadedState also updated headerSettings to:', newSettings);
+        } else {
+            // Clearing loaded state, so reset headerSettings to defaults
+            const defaultSettings = {
+                color: '#000000',
+                logoUrl: null,
+                logoPublicId: null,
+                username: '',
+                logoFile: null,
+                logoData: null,
+                logoBlob: null
+            };
+            setHeaderSettings(defaultSettings);
+            console.log('[RouteContext] setCurrentLoadedState cleared, headerSettings reset to defaults:', defaultSettings);
+        }
+    }, [/* setHeaderSettings is stable */]);
+    
+    // Get the AutoSave context and Auth0 context
+    const autoSave = useAutoSave();
+    const { user, isAuthenticated } = useAuth0();
+
+    const updateOverallRouteName = useCallback((newName) => {
+        setOverallRouteName(newName);
+        setHasUnsavedChanges(true);
+        setChangedSections(prev => ({ ...prev, overallName: true }));
+
+        if (currentLoadedPersistentId && isAuthenticated && user?.sub) {
+            console.log('[RouteContext] Auto-saving overall route name to permanent route:', currentLoadedPersistentId);
+            // Call updateSavedRoute with null for segmentRouteId to indicate an overall update
+            updateSavedRoute(currentLoadedPersistentId, null, { name: newName }, user.sub)
+                .then(success => {
+                    if (success) {
+                        console.log('[RouteContext] Overall route name saved to permanent route successfully');
+                    } else {
+                        console.warn('[RouteContext] Failed to save overall route name to permanent route');
+                    }
+                })
+                .catch(error => {
+                    console.error('[RouteContext] Error saving overall route name to permanent route:', error);
+                });
+        }
+    }, [currentLoadedPersistentId, isAuthenticated, user, setChangedSections]);
+
     const reorderRoutes = useCallback((oldIndex, newIndex) => {
         setRoutes(prev => {
             const newRoutes = [...prev];
@@ -212,7 +284,49 @@ export const RouteProvider = ({ children, }) => {
         });
         setHasUnsavedChanges(true);
         setChangedSections(prev => ({...prev, routes: true}));
-    }, []);
+        
+        // Auto-save to Firebase if authenticated
+        try {
+            // Use the user and isAuthenticated from the top-level hook
+            const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+            
+            console.log('[RouteContext] Auto-saving route reordering to Firebase with userId:', userId);
+            
+            // We need to get the updated routes after the state update
+            // This is a bit tricky since state updates are asynchronous
+            // For now, we'll just log a warning and rely on the next auto-save
+            console.warn('[RouteContext] Route reordering will be saved on the next auto-save operation');
+            
+            // We'll update the routes in Firebase on the next state update
+            setTimeout(() => {
+                setRoutes(currentRoutes => {
+                    // Auto-save the current routes to Firebase
+                    updateRouteInFirebase(
+                        currentRoutes[0]?.routeId, 
+                        { routes: currentRoutes }, 
+                        userId, 
+                        autoSave
+                    )
+                    .then(autoSaveId => {
+                        if (autoSaveId) {
+                            console.log('[RouteContext] Route reordering auto-saved to Firebase successfully', { autoSaveId });
+                        } else {
+                            console.warn('[RouteContext] Failed to auto-save route reordering to Firebase');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[RouteContext] Error auto-saving route reordering to Firebase:', error);
+                    });
+                    
+                    // Return the current routes unchanged
+                    return currentRoutes;
+                });
+            }, 100);
+        } catch (autoSaveError) {
+            console.error('[RouteContext] Error during Firebase auto-save:', autoSaveError);
+            // Continue with normal flow even if auto-save fails
+        }
+    }, [autoSave, user, isAuthenticated]);
 
     // Update route properties
     const updateRoute = useCallback((routeId, updates) => {
@@ -244,7 +358,59 @@ export const RouteProvider = ({ children, }) => {
         }
 
         setChangedSections(changedSectionUpdates); // Use the new setter
-    }, [setChangedSections]); // Add setChangedSections dependency
+
+        // Check if this is a permanently saved route
+        if (currentLoadedPersistentId) {
+            // Use the user and isAuthenticated from the top-level hook
+            const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+            
+            console.log('[RouteContext] Auto-saving route update to permanent route:', currentLoadedPersistentId, 'for segment:', routeId);
+            
+            // Call the updateSavedRoute function to update the permanent route
+            // Pass routeId as the segmentRouteId
+            updateSavedRoute(currentLoadedPersistentId, routeId, { ...updates }, userId)
+                .then(success => {
+                    if (success) {
+                        console.log('[RouteContext] Route segment update saved to permanent route successfully');
+                    } else {
+                        console.warn('[RouteContext] Failed to save route update to permanent route');
+                    }
+                })
+                .catch(error => {
+                    console.error('[RouteContext] Error saving route update to permanent route:', error);
+                });
+        } else {
+            // Auto-save to Firebase if authenticated and not a permanent route
+            try {
+                // Use the user and isAuthenticated from the top-level hook
+                const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                
+                // Skip auto-save if the user is not authenticated
+                if (userId === 'anonymous-user') {
+                    console.log('[RouteContext] Skipping auto-save to Firebase for anonymous user');
+                    return;
+                }
+                
+                console.log('[RouteContext] Auto-saving route update to Firebase with userId:', userId);
+                
+                // Call the update function with the autoSave context
+                updateRouteInFirebase(routeId, updates, userId, autoSave)
+                    .then(autoSaveId => {
+                        if (autoSaveId) {
+                            console.log('[RouteContext] Route update auto-saved to Firebase successfully', { autoSaveId });
+                        } else {
+                            console.warn('[RouteContext] Failed to auto-save route update to Firebase');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[RouteContext] Error auto-saving route update to Firebase:', error);
+                    });
+            } catch (autoSaveError) {
+                console.error('[RouteContext] Error during Firebase auto-save:', autoSaveError);
+                // Continue with normal flow even if auto-save fails
+            }
+        }
+    }, [setChangedSections, autoSave, currentLoadedPersistentId, isAuthenticated, user, updateSavedRoute]); // Add dependencies
     // Context hooks
     const routeService = useRouteService();
     const { map } = useMapContext();
@@ -429,7 +595,7 @@ export const RouteProvider = ({ children, }) => {
             console.error('[RouteContext] Error updating route with location data:', error);
             return route;
         }
-    }, []);
+    }, [updateRoute]); // Added updateRoute to dependency array
 
     const addRoute = useCallback((route) => {
         setRoutes((prev) => {
@@ -574,121 +740,482 @@ export const RouteProvider = ({ children, }) => {
         setHasUnsavedChanges(true);
         setChangedSections(prev => ({...prev, routes: true}));
     }, [map]);
-    // Clear current work
+    // Enhanced clearCurrentWork function with complete map reset and event handler cleanup
     const clearCurrentWork = useCallback(() => {
-        // console.debug('[RouteContext] Clearing current work');
-        // Clean up map layers for all routes first
-        if (map) {
-            routes.forEach(route => {
-                const routeId = route.routeId || route.id;
-                // console.debug('[RouteContext] Cleaning up map layers for route:', routeId);
-
-                try {
-                    const style = map.getStyle();
-                    if (!style) {
-                        console.warn('[RouteContext] Map style not available');
-                        return;
-                    }
-
-                    // Find all layers that might be related to this route
-                    const layerPatterns = [
-                        `${routeId}-main-line`,
-                        `${routeId}-main-border`,
-                        `${routeId}-hover`,
-                        `unpaved-section-layer-${routeId}`,
-                        `${routeId}-surface`,
-                        `${routeId}-unpaved-line`
-                    ];
-
-                    // Find all layers that match our patterns or start with the routeId
-                    const allLayers = style.layers
-                        .map(layer => layer.id)
-                        .filter(id => id.includes(routeId) ||
-                                     layerPatterns.some(pattern => id.includes(pattern)));
-
-                    // console.debug('[RouteContext] Found layers to remove:', allLayers);
-
-                    // Remove all layers first
-                    allLayers.forEach(layerId => {
-                        if (map.getLayer(layerId)) {
-                            try {
-                                // console.debug('[RouteContext] Removing layer:', layerId);
-                                map.removeLayer(layerId);
-                            } catch (error) {
-                                console.error('[RouteContext] Error removing layer:', layerId, error);
-                            }
-                        }
-                    });
-
-                    // Find all sources that might be related to this route
-                    const sourcePatterns = [
-                        `${routeId}-main`,
-                        `unpaved-section-${routeId}`,
-                        `${routeId}-unpaved`
-                    ];
-
-                    // Get all source IDs from the style
-                    const allSources = Object.keys(style.sources || {})
-                        .filter(id => sourcePatterns.some(pattern => id.includes(pattern)));
-
-                    // console.debug('[RouteContext] Found sources to remove:', allSources);
-
-                    // Remove all sources after a brief delay
-                    setTimeout(() => {
-                        allSources.forEach(sourceId => {
-                            if (map.getSource(sourceId)) {
-                                try {
-                                    // console.debug('[RouteContext] Removing source:', sourceId);
-                                    map.removeSource(sourceId);
-                                } catch (error) {
-                                    console.error('[RouteContext] Error removing source:', sourceId, error);
-                                }
-                            }
-                        });
-                    }, 100);
-                } catch (error) {
-                    console.error('[RouteContext] Error cleaning up map layers:', error);
-                }
-            });
-
-            // Force a map redraw
-            setTimeout(() => {
-                try {
-                    map.resize();
-                } catch (error) {
-                    console.error('[RouteContext] Error resizing map:', error);
-                }
-            }, 200);
-        }
-
-        // Clear state
+        console.log('[RouteContext] Starting enhanced clearCurrentWork process');
+        
+        // Step 1: Clear all state variables first
+        console.log('[RouteContext] Clearing all state variables');
+        
+        // Clear route-related state
         setRoutes([]);
         setCurrentRoute(null);
-        setCurrentLoadedState(null);
+        setCurrentLoadedState(null); // This will also reset headerSettings via the new setCurrentLoadedState
         setCurrentLoadedPersistentId(null);
+        setOverallRouteName(''); // Reset overall route name
         setHasUnsavedChanges(false);
         setIsLoadedMap(false);
-        setHeaderSettings({
-            color: '#000000',
-            logoUrl: null,
-            username: '',
-            logoFile: null,
-            logoData: null,
-            logoBlob: null
-        });
-
+        
+        // Note: setHeaderSettings is now handled by setCurrentLoadedState(null)
+        
+        // Clear loadedLineData to ensure DirectLineLayer doesn't render any lines
+        console.log('[RouteContext] Clearing loadedLineData');
+        setLoadedLineData([]);
+        
+        // Reset changed sections tracking
+        console.log('[RouteContext] Resetting changed sections tracking');
+        setChangedSections({});
+        
+        // Step 2: Clear related contexts using a more reliable approach
+        
+        // IMPORTANT: Clear the climb markers first - this is critical for removing the flags
+        // Try multiple approaches to ensure climb markers are cleared
+        console.log('[RouteContext] Clearing climb markers using multiple approaches');
+        
+        // Approach 1: Use the global registry
+        try {
+            if (window && window.__contextRegistry && window.__contextRegistry.ClimbMarkers) {
+                console.log('[RouteContext] Using global registry to clear climb markers');
+                const climbMarkersInstance = window.__contextRegistry.ClimbMarkers;
+                if (climbMarkersInstance && typeof climbMarkersInstance.clearClimbCache === 'function') {
+                    climbMarkersInstance.clearClimbCache();
+                    console.log('[RouteContext] Successfully cleared climb markers using global registry');
+                }
+            }
+        } catch (error) {
+            console.warn('[RouteContext] Error clearing climb markers using global registry:', error);
+        }
+        
+        // Approach 2: Try direct require (as before)
+        try {
+            const ClimbMarkersModule = require('../components/ClimbMarkers/ClimbMarkers');
+            
+            if (ClimbMarkersModule && typeof ClimbMarkersModule.clearClimbCache === 'function') {
+                console.log('[RouteContext] Directly calling clearClimbCache to remove all climb markers');
+                ClimbMarkersModule.clearClimbCache();
+                console.log('[RouteContext] Successfully cleared climb markers via direct require');
+            }
+        } catch (error) {
+            console.warn('[RouteContext] Error clearing climb markers via direct require:', error);
+        }
+        
+        // Approach 3: Aggressive DOM cleanup for climb markers
+        try {
+            console.log('[RouteContext] Performing aggressive DOM cleanup for climb markers');
+            
+            // Find and remove all mapboxgl-marker elements that contain climb-marker elements
+            const mapboxMarkers = document.querySelectorAll('.mapboxgl-marker');
+            if (mapboxMarkers && mapboxMarkers.length > 0) {
+                console.log(`[RouteContext] Found ${mapboxMarkers.length} mapboxgl-marker elements to check`);
+                
+                mapboxMarkers.forEach(marker => {
+                    try {
+                        // Check if this marker contains a climb-marker element
+                        if (marker.querySelector('.climb-marker')) {
+                            console.log('[RouteContext] Removing mapboxgl-marker containing climb-marker');
+                            marker.remove();
+                        }
+                    } catch (error) {
+                        console.warn('[RouteContext] Error checking/removing mapboxgl-marker:', error);
+                    }
+                });
+            }
+            
+            // Also try to remove any remaining climb-marker elements directly
+            const climbMarkers = document.querySelectorAll('.climb-marker');
+            if (climbMarkers && climbMarkers.length > 0) {
+                console.log(`[RouteContext] Found ${climbMarkers.length} climb-marker elements to remove directly`);
+                
+                climbMarkers.forEach(marker => {
+                    try {
+                        // Try to get the parent mapboxgl-marker element
+                        const markerParent = marker.closest('.mapboxgl-marker');
+                        if (markerParent) {
+                            markerParent.remove();
+                        } else {
+                            // If we can't find the parent, remove the element itself
+                            marker.remove();
+                        }
+                    } catch (error) {
+                        console.warn('[RouteContext] Error removing climb-marker element:', error);
+                    }
+                });
+            }
+            
+            console.log('[RouteContext] Aggressive DOM cleanup for climb markers completed');
+        } catch (error) {
+            console.error('[RouteContext] Error during aggressive DOM cleanup for climb markers:', error);
+        }
+        
         // Clear photos from PhotoContext
-        if (photoContext && photoContext.clearPhotos) {
-            // console.debug('[RouteContext] Clearing photos from PhotoContext');
+        if (photoContext && typeof photoContext.clearPhotos === 'function') {
+            console.log('[RouteContext] Clearing photos from PhotoContext');
             photoContext.clearPhotos();
         } else {
             console.warn('[RouteContext] PhotoContext or clearPhotos not available during clearCurrentWork');
         }
-
-        // IMPORTANT: Also clear loadedLineData to ensure DirectLineLayer doesn't render any lines
-        // console.debug('[RouteContext] Clearing loadedLineData');
-        setLoadedLineData([]);
-    }, [map, routes, photoContext]); // Added photoContext dependency
+        
+        // Clear POIs - use a more direct approach
+        // First try using the imported POIContext if available
+        try {
+            // Access POIContext through the global window object if it's been registered there
+            if (window && window.__contextRegistry && window.__contextRegistry.POIContext) {
+                const poiContextInstance = window.__contextRegistry.POIContext;
+                if (poiContextInstance && typeof poiContextInstance.clearPOIs === 'function') {
+                    console.log('[RouteContext] Clearing POIs using registered context');
+                    poiContextInstance.clearPOIs();
+                }
+            } else {
+                // As a fallback, try to clear POI markers directly from the map
+                if (map) {
+                    console.log('[RouteContext] Attempting to remove POI markers directly from the map');
+                    // Find and remove all elements with class that might be related to POIs
+                    const poiElements = document.querySelectorAll('.poi-marker, .poi-icon, .mapboxgl-marker.poi');
+                    if (poiElements && poiElements.length > 0) {
+                        console.log(`[RouteContext] Found ${poiElements.length} POI elements to remove`);
+                        poiElements.forEach(element => {
+                            try {
+                                element.remove();
+                            } catch (error) {
+                                console.warn('[RouteContext] Error removing POI element:', error);
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('[RouteContext] Error clearing POIs:', error);
+        }
+        
+        // Clear lines - try multiple approaches to ensure line markers are cleared
+        console.log('[RouteContext] Clearing line markers using multiple approaches');
+        
+        // Approach 1: Set the force cleanup flag and use the global registry
+        try {
+            // Set the global force cleanup flag to bypass conditional cleanup logic in LineMarker
+            if (typeof window !== 'undefined') {
+                console.log('[RouteContext] Setting global force cleanup flag');
+                window.__forceLineCleanup = true;
+            }
+            
+            if (window && window.__contextRegistry && window.__contextRegistry.LineContext) {
+                console.log('[RouteContext] Using global registry to clear line markers');
+                const lineContextInstance = window.__contextRegistry.LineContext;
+                if (lineContextInstance && typeof lineContextInstance.clearLines === 'function') {
+                    lineContextInstance.clearLines();
+                    console.log('[RouteContext] Successfully cleared line markers using global registry');
+                }
+            }
+        } catch (error) {
+            console.warn('[RouteContext] Error clearing line markers using global registry:', error);
+        }
+        
+        // Approach 2: Try using the lineContext if available (as before)
+        if (lineContext && typeof lineContext.clearLines === 'function') {
+            console.log('[RouteContext] Clearing lines from LineContext');
+            lineContext.clearLines();
+        }
+        
+        // Approach 3: Extremely aggressive DOM and map cleanup for line markers
+        try {
+            console.log('[RouteContext] Performing extremely aggressive cleanup for line markers');
+            
+            // First, clear the lines array in LineContext to prevent re-rendering
+            if (window && window.__contextRegistry && window.__contextRegistry.LineContext) {
+                console.log('[RouteContext] Using global registry to clear line markers');
+                const lineContextInstance = window.__contextRegistry.LineContext;
+                if (lineContextInstance && typeof lineContextInstance.clearLines === 'function') {
+                    lineContextInstance.clearLines();
+                    console.log('[RouteContext] Successfully cleared line markers using global registry');
+                }
+            }
+            
+            // Find and remove all mapboxgl-marker elements that might be related to lines
+            const mapboxMarkers = document.querySelectorAll('.mapboxgl-marker');
+            if (mapboxMarkers && mapboxMarkers.length > 0) {
+                console.log(`[RouteContext] Found ${mapboxMarkers.length} mapboxgl-marker elements to check for line markers`);
+                
+                mapboxMarkers.forEach(marker => {
+                    try {
+                        // Check if this marker contains a line-marker element or has a line-related class
+                        // Also check for line-text-container and line-icons-container
+                        if (marker.querySelector('.line-marker') || 
+                            marker.querySelector('.line-text-container') ||
+                            marker.querySelector('.line-icons-container') ||
+                            marker.querySelector('.line-text-label') ||
+                            marker.classList.contains('line-marker') || 
+                            marker.classList.contains('line')) {
+                            console.log('[RouteContext] Removing mapboxgl-marker containing line-marker or line-related elements');
+                            marker.remove();
+                        }
+                    } catch (error) {
+                        console.warn('[RouteContext] Error checking/removing mapboxgl-marker for lines:', error);
+                    }
+                });
+            }
+            
+            // Also try to remove any remaining line-marker elements directly
+            const lineElements = document.querySelectorAll('.line-marker, .line-icon, .mapboxgl-marker.line, .line-text-container, .line-icons-container, .line-text-label');
+            if (lineElements && lineElements.length > 0) {
+                console.log(`[RouteContext] Found ${lineElements.length} line elements to remove directly`);
+                lineElements.forEach(element => {
+                    try {
+                        // Try to get the parent mapboxgl-marker element
+                        const markerParent = element.closest('.mapboxgl-marker');
+                        if (markerParent) {
+                            markerParent.remove();
+                        } else {
+                            // If we can't find the parent, remove the element itself
+                            element.remove();
+                        }
+                    } catch (error) {
+                        console.warn('[RouteContext] Error removing line element:', error);
+                    }
+                });
+            }
+            
+            // Super aggressive approach to remove ALL line-related layers and sources from the map
+            if (map) {
+                try {
+                    const style = map.getStyle();
+                    if (style && style.layers) {
+                        // Find ALL layers that might be related to lines
+                        const lineLayerPatterns = [
+                            'line-', // Matches any layer starting with 'line-'
+                            '-line', // Matches any layer ending with '-line'
+                            '-shadow', // Matches shadow layers
+                            'circle-', // Matches circle layers for line markers
+                            'inner-circle-', // Matches inner circle layers
+                            '-extrusion', // Matches any extrusion layers
+                            '-glow' // Matches any glow layers
+                        ];
+                        
+                        // Get all layers that match any of the patterns
+                        const allLineLayers = style.layers
+                            .filter(layer => {
+                                return lineLayerPatterns.some(pattern => layer.id.includes(pattern));
+                            })
+                            .map(layer => layer.id);
+                        
+                        console.log(`[RouteContext] Found ${allLineLayers.length} potential line-related layers to remove`);
+                        
+                        // Remove all line-related layers
+                        allLineLayers.forEach(layerId => {
+                            try {
+                                if (map.getLayer(layerId)) {
+                                    console.log(`[RouteContext] Removing layer: ${layerId}`);
+                                    map.removeLayer(layerId);
+                                }
+                            } catch (error) {
+                                console.warn(`[RouteContext] Error removing layer ${layerId}:`, error);
+                            }
+                        });
+                        
+                        // Find and remove all line-related sources
+                        const lineSourcePatterns = [
+                            'line-', // Matches any source starting with 'line-'
+                            '-line', // Matches any source ending with '-line'
+                            'circle-source-' // Matches circle sources for line markers
+                        ];
+                        
+                        // Get all sources that match any of the patterns
+                        const allLineSources = Object.keys(style.sources || {})
+                            .filter(sourceId => {
+                                return lineSourcePatterns.some(pattern => sourceId.includes(pattern));
+                            });
+                        
+                        console.log(`[RouteContext] Found ${allLineSources.length} potential line-related sources to remove`);
+                        
+                        // Remove all line-related sources
+                        allLineSources.forEach(sourceId => {
+                            try {
+                                if (map.getSource(sourceId)) {
+                                    console.log(`[RouteContext] Removing source: ${sourceId}`);
+                                    map.removeSource(sourceId);
+                                }
+                            } catch (error) {
+                                console.warn(`[RouteContext] Error removing source ${sourceId}:`, error);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.warn('[RouteContext] Error removing line layers and sources:', error);
+                }
+            }
+            
+            // Force LineContext to reset its state by directly modifying its internal state if possible
+            if (lineContext) {
+                try {
+                    console.log('[RouteContext] Forcing LineContext to reset its state');
+                    
+                    // Try to access and reset all relevant state variables
+                    if (typeof lineContext.setLines === 'function') {
+                        lineContext.setLines([]);
+                    }
+                    
+                    if (typeof lineContext.setCurrentLine === 'function') {
+                        lineContext.setCurrentLine(null);
+                    }
+                    
+                    if (typeof lineContext.setSelectedLine === 'function') {
+                        lineContext.setSelectedLine(null);
+                    }
+                    
+                    if (typeof lineContext.setIsDrawing === 'function') {
+                        lineContext.setIsDrawing(false);
+                    }
+                    
+                    if (typeof lineContext.setIsDrawingInitialized === 'function') {
+                        lineContext.setIsDrawingInitialized(false);
+                    }
+                    
+                    console.log('[RouteContext] Successfully reset LineContext state');
+                } catch (error) {
+                    console.warn('[RouteContext] Error resetting LineContext state:', error);
+                }
+            }
+            
+            // Reset the global force cleanup flag after a short delay
+            setTimeout(() => {
+                if (typeof window !== 'undefined') {
+                    console.log('[RouteContext] Resetting global force cleanup flag');
+                    window.__forceLineCleanup = false;
+                }
+            }, 500); // Longer timeout to ensure all cleanup has completed
+            
+            console.log('[RouteContext] Aggressive DOM cleanup for line markers completed');
+        } catch (error) {
+            console.error('[RouteContext] Error during aggressive DOM cleanup for line markers:', error);
+        }
+        
+        // Step 3: Aggressively remove all map layers and event handlers before resetting style
+        if (map) {
+            try {
+                console.log('[RouteContext] Aggressively removing all map layers and event handlers');
+                
+                // Get all layers and sources from the map
+                const style = map.getStyle();
+                if (style && style.layers && style.sources) {
+                    // First, remove all event handlers from route layers
+                    const routeLayers = style.layers
+                        .filter(layer => 
+                            layer.id.includes('-main-line') || 
+                            layer.id.includes('-hover-line') ||
+                            layer.id.includes('unpaved-section')
+                        )
+                        .map(layer => layer.id);
+                    
+                    console.log('[RouteContext] Removing event handlers from route layers:', routeLayers);
+                    
+                    // Remove all event handlers from route layers
+                    routeLayers.forEach(layerId => {
+                        try {
+                            // Remove all possible event handlers
+                            map.off('click', layerId);
+                            map.off('mouseenter', layerId);
+                            map.off('mousemove', layerId);
+                            map.off('mouseleave', layerId);
+                            console.log('[RouteContext] Removed event handlers from layer:', layerId);
+                        } catch (error) {
+                            console.warn('[RouteContext] Error removing event handlers from layer:', layerId, error);
+                        }
+                    });
+                    
+                    // Remove all custom layers (non-mapbox layers)
+                    const customLayers = style.layers
+                        .filter(layer => !layer.id.startsWith('mapbox-'))
+                        .map(layer => layer.id);
+                    
+                    console.log('[RouteContext] Removing custom layers:', customLayers.length);
+                    
+                    customLayers.forEach(layerId => {
+                        try {
+                            if (map.getLayer(layerId)) {
+                                map.removeLayer(layerId);
+                                console.log('[RouteContext] Removed layer:', layerId);
+                            }
+                        } catch (error) {
+                            console.warn('[RouteContext] Error removing layer:', layerId, error);
+                        }
+                    });
+                    
+                    // Remove all custom sources (non-mapbox sources)
+                    const customSources = Object.keys(style.sources)
+                        .filter(sourceId => !sourceId.startsWith('mapbox-'));
+                    
+                    console.log('[RouteContext] Removing custom sources:', customSources.length);
+                    
+                    customSources.forEach(sourceId => {
+                        try {
+                            if (map.getSource(sourceId)) {
+                                map.removeSource(sourceId);
+                                console.log('[RouteContext] Removed source:', sourceId);
+                            }
+                        } catch (error) {
+                            console.warn('[RouteContext] Error removing source:', sourceId, error);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('[RouteContext] Error during aggressive layer cleanup:', error);
+            }
+        }
+        
+        // Step 4: Reset the map style - this is the most effective way to clear all data
+        if (map) {
+            console.log('[RouteContext] Resetting map style to clear all data');
+            
+            try {
+                // Get the current style URL or name
+                const currentStyle = map.getStyle();
+                const styleUrl = currentStyle.name || currentStyle.sprite || 'mapbox://styles/mapbox/streets-v11';
+                
+                console.log('[RouteContext] Current style:', styleUrl);
+                
+                // Save the current view state
+                const center = map.getCenter();
+                const zoom = map.getZoom();
+                const bearing = map.getBearing();
+                const pitch = map.getPitch();
+                
+                console.log('[RouteContext] Saving view state:', { 
+                    center: [center.lng, center.lat], 
+                    zoom, 
+                    bearing, 
+                    pitch 
+                });
+                
+                // Set the style to the same style - this completely resets the map
+                // while preserving the style appearance
+                map.setStyle(styleUrl);
+                
+                // When the style loads, restore the view state
+                map.once('style.load', () => {
+                    console.log('[RouteContext] Style loaded, restoring view state');
+                    
+                    map.setCenter(center);
+                    map.setZoom(zoom);
+                    map.setBearing(bearing);
+                    map.setPitch(pitch);
+                    
+                    // Force a final resize to ensure everything is refreshed
+                    setTimeout(() => {
+                        map.resize();
+                        console.log('[RouteContext] Map reset complete');
+                        
+                        // Force a repaint to ensure all layers are properly cleared
+                        if (map.repaint) {
+                            map.repaint = true;
+                        }
+                    }, 100);
+                });
+            } catch (error) {
+                console.error('[RouteContext] Error resetting map style:', error);
+            }
+        }
+        
+        console.log('[RouteContext] Enhanced clearCurrentWork process complete');
+    }, [map, photoContext, lineContext, setChangedSections]);
     // Function to get lines from LineContext will be passed as parameter
 
     // Save current state to backend
@@ -1137,9 +1664,10 @@ export const RouteProvider = ({ children, }) => {
             //     hasGeojson: route.routes[0]?.geojson != null
             // });
             setIsLoadedMap(true);
-            setCurrentLoadedState(route);
-            // Ensure we're setting the persistentId from the route object if available, otherwise use the parameter
+            // setCurrentLoadedState will now also handle setting headerSettings
+            setCurrentLoadedState(route); 
             setCurrentLoadedPersistentId(route.persistentId || persistentId);
+            setOverallRouteName(route.name || ''); // Initialize overallRouteName
 
             // Log the persistentId for debugging
             // console.log('[RouteContext] Setting currentLoadedPersistentId:', route.persistentId || persistentId);
@@ -1167,6 +1695,9 @@ export const RouteProvider = ({ children, }) => {
             // console.log('[RouteContext] Skipping metadata update for loaded routes');
                         // Instead of immediately trying to position the map, store the route bounds for later use
             // console.log('[RouteContext] Preparing route bounds for deferred positioning');
+
+            // Header settings are now handled by setCurrentLoadedState(route) call above.
+            // The specific setHeaderSettings logic below can be removed.
 
             try {
                 // Find the middle route to position the map
@@ -1283,28 +1814,6 @@ export const RouteProvider = ({ children, }) => {
                 // console.log('[RouteContext] No lines data found in loaded route');
                 // Clear any previously loaded line data
                 setLoadedLineData([]);
-            }
-
-            // Load header settings if available
-            if (route.headerSettings) {
-                // Check if the logo URL is a blob URL, which would be invalid after reload
-                if (route.headerSettings.logoUrl && route.headerSettings.logoUrl.startsWith('blob:')) {
-                    console.warn('[RouteContext] Detected blob URL in loaded route, clearing it:', route.headerSettings.logoUrl);
-                    // Create a new headerSettings object with the logoUrl set to null
-                    const sanitizedHeaderSettings = {
-                        ...route.headerSettings,
-                        logoUrl: null
-                    };
-                    setHeaderSettings(sanitizedHeaderSettings);
-
-                    // Also update the route object to avoid using the blob URL in the future
-                    if (route._loadedState) {
-                        route._loadedState.headerSettings = sanitizedHeaderSettings;
-                    }
-                } else {
-                    // Logo URL is not a blob URL, so it's safe to use
-                    setHeaderSettings(route.headerSettings);
-                }
             }
 
             // Load map overview data if available
@@ -1434,6 +1943,8 @@ export const RouteProvider = ({ children, }) => {
                     isLoadedMap,
                     currentLoadedState,
                     currentLoadedPersistentId,
+                    overallRouteName, // Expose overallRouteName
+                    updateOverallRouteName, // Expose its updater
                     hasUnsavedChanges,
                     // Change tracking (expose the setter)
                     setChangedSections,
@@ -1468,6 +1979,30 @@ export const RouteProvider = ({ children, }) => {
                         setHeaderSettings(newSettings);
                         setHasUnsavedChanges(true);
                         setChangedSections(prev => ({...prev, headerSettings: true}));
+                        
+                        // Auto-save to Firebase if authenticated
+                        try {
+                            // Get the current user ID from Auth0
+                            const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                            
+                            console.log('[RouteContext] Auto-saving header settings to Firebase with userId:', userId);
+                            
+                            // Call the update function with the autoSave context
+                            updateHeaderSettingsInFirebase(newSettings, userId, autoSave)
+                                .then(autoSaveId => {
+                                    if (autoSaveId) {
+                                        console.log('[RouteContext] Header settings auto-saved to Firebase successfully', { autoSaveId });
+                                    } else {
+                                        console.warn('[RouteContext] Failed to auto-save header settings to Firebase');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('[RouteContext] Error auto-saving header settings to Firebase:', error);
+                                });
+                        } catch (autoSaveError) {
+                            console.error('[RouteContext] Error during Firebase auto-save:', autoSaveError);
+                            // Continue with normal flow even if auto-save fails
+                        }
                     },
                     // Expose changedSections and ref for debugging
                     changedSections,

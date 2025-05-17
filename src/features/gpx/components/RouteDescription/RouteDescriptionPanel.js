@@ -7,6 +7,9 @@ import { fileToProcessedPhoto, deserializePhoto, serializePhoto } from '../../..
 import { useRouteContext } from '../../../../features/map/context/RouteContext';
 import { usePhotoService } from '../../../../features/photo/services/photoService';
 import { usePhotoContext } from '../../../../features/photo/context/PhotoContext';
+import { autoSaveDescriptionToFirebase } from '../../../../services/firebaseDescriptionAutoSaveService';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useAutoSave } from '../../../../context/AutoSaveContext';
 
 // @ts-ignore - Import ImageSliderWithLightbox
 import ImageSliderWithLightbox from '../../../../features/presentation/components/ImageSlider/ImageSliderWithLightbox';
@@ -136,6 +139,11 @@ export const RouteDescriptionPanel = ({ route }) => {
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [mapPhotosAdded, setMapPhotosAdded] = useState(false);
+    
+    // Add these lines to get the user ID and auto-save context
+    const { user, isAuthenticated } = useAuth0();
+    const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+    const autoSave = useAutoSave();
 
     // Filter photos that are near the current route
     const nearbyPhotos = useMemo(() => {
@@ -220,6 +228,43 @@ export const RouteDescriptionPanel = ({ route }) => {
             return () => clearTimeout(timeoutId);
         }
     }, [description, photos, route?.routeId, routes, updateRoute]);
+    
+    // Add a new useEffect for auto-saving to Firebase
+    useEffect(() => {
+        if (!route?.routeId || !userId) return;
+        
+        // Skip auto-save if we're already saving to MongoDB
+        if (isSaving) return;
+        
+        // Create a description object that matches the MongoDB structure
+        const descriptionData = {
+            description: description ?? '',
+            photos: photos.map(serializePhoto)
+        };
+        
+        // Debounce the auto-save to avoid too many writes
+        const timeoutId = setTimeout(() => {
+            console.debug('[RouteDescriptionPanel] Auto-saving description to Firebase:', {
+                routeId: route.routeId,
+                descriptionLength: description?.length || 0,
+                photoCount: photos.length
+            });
+            
+            autoSaveDescriptionToFirebase(descriptionData, route, userId, autoSave)
+                .then(autoSaveId => {
+                    if (autoSaveId) {
+                        console.debug('[RouteDescriptionPanel] Description auto-saved successfully with ID:', autoSaveId);
+                    } else {
+                        console.warn('[RouteDescriptionPanel] Description auto-save did not return an ID');
+                    }
+                })
+                .catch(error => {
+                    console.error('[RouteDescriptionPanel] Error auto-saving description:', error);
+                });
+        }, 1000); // 1 second debounce
+        
+        return () => clearTimeout(timeoutId);
+    }, [description, photos, route, userId, autoSave]);
 
     const handlePhotoChange = (event) => {
         if (event.target.files) {

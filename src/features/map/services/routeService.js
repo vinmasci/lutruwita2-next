@@ -959,47 +959,52 @@ export const useRouteService = () => {
         try {
             console.log(`[routeService] Loading route with persistentId: ${persistentId}`);
             
-            // First, try to load from Firebase if available
-            try {
-                // Import the Firebase optimized route service
-                const { getOptimizedRouteData } = await import('../../../services/firebaseOptimizedRouteService');
-                
-                // Check if the optimized data exists in Firebase
-                console.log(`[routeService] Checking for optimized data in Firebase for route: ${persistentId}`);
-                const optimizedData = await getOptimizedRouteData(persistentId);
-                
-                if (optimizedData) {
-                    console.log(`[routeService] Found optimized data in Firebase for route: ${persistentId}`);
+            // Skip Firebase loading in creation mode
+            if (isPresentationMode()) {
+                // Only try to load from Firebase if we're in presentation mode
+                try {
+                    // Import the Firebase optimized route service
+                    const { getOptimizedRouteData } = await import('../../../services/firebaseOptimizedRouteService');
                     
-                    // Transform the data to match what the client expects
-                    let transformedData = optimizedData;
+                    // Check if the optimized data exists in Firebase
+                    console.log(`[routeService] Checking for optimized data in Firebase for route: ${persistentId}`);
+                    const optimizedData = await getOptimizedRouteData(persistentId);
                     
-                    // Ensure POIs are included in the transformed data
-                    if (!transformedData.pois) {
-                        console.log('[routeService] No POIs found in Firebase data, initializing empty POIs');
-                        transformedData.pois = { draggable: [], places: [] };
+                    if (optimizedData) {
+                        console.log(`[routeService] Found optimized data in Firebase for route: ${persistentId}`);
+                        
+                        // Transform the data to match what the client expects
+                        let transformedData = optimizedData;
+                        
+                        // Ensure POIs are included in the transformed data
+                        if (!transformedData.pois) {
+                            console.log('[routeService] No POIs found in Firebase data, initializing empty POIs');
+                            transformedData.pois = { draggable: [], places: [] };
+                        }
+                        
+                        // Ensure lines are included in the transformed data
+                        if (!transformedData.lines) {
+                            console.log('[routeService] No lines found in Firebase data, initializing empty lines array');
+                            transformedData.lines = [];
+                        }
+                        
+                        // If the data doesn't have a 'route' property but has 'routes' directly,
+                        // wrap it in a 'route' property to maintain compatibility with the rest of the code
+                        if (!transformedData.route && transformedData.routes) {
+                            console.log('[routeService] Wrapping Firebase data in route property for compatibility');
+                            return { route: transformedData };
+                        }
+                        
+                        console.log('[routeService] Successfully loaded route from Firebase');
+                        return transformedData;
                     }
                     
-                    // Ensure lines are included in the transformed data
-                    if (!transformedData.lines) {
-                        console.log('[routeService] No lines found in Firebase data, initializing empty lines array');
-                        transformedData.lines = [];
-                    }
-                    
-                    // If the data doesn't have a 'route' property but has 'routes' directly,
-                    // wrap it in a 'route' property to maintain compatibility with the rest of the code
-                    if (!transformedData.route && transformedData.routes) {
-                        console.log('[routeService] Wrapping Firebase data in route property for compatibility');
-                        return { route: transformedData };
-                    }
-                    
-                    console.log('[routeService] Successfully loaded route from Firebase');
-                    return transformedData;
+                    console.log(`[routeService] No optimized data found in Firebase for route: ${persistentId}, falling back to API`);
+                } catch (firebaseError) {
+                    console.error('[routeService] Error loading from Firebase, falling back to API:', firebaseError);
                 }
-                
-                console.log(`[routeService] No optimized data found in Firebase for route: ${persistentId}, falling back to API`);
-            } catch (firebaseError) {
-                console.error('[routeService] Error loading from Firebase, falling back to API:', firebaseError);
+            } else {
+                console.log(`[routeService] In creation mode, skipping Firebase load for route: ${persistentId}`);
             }
             
             // If Firebase loading fails or data doesn't exist, fall back to the API

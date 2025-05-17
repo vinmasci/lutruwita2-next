@@ -1,7 +1,11 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { useRouteContext } from '../../map/context/RouteContext';
 import { getPhotoIdentifier } from '../../photo/utils/clustering';
+import { autoSavePhotosToFirebase } from '../../../services/firebasePhotoAutoSaveService';
+import { useAuth0 } from '@auth0/auth0-react';
+
+// REMOVED top-level dynamic import of useAutoSave
 
 const PhotoContext = createContext(undefined);
 export const usePhotoContext = () => {
@@ -24,6 +28,140 @@ export const PhotoProvider = ({ children }) => {
         // This is expected when the PhotoProvider is used outside of a RouteProvider
         routeContext = null;
     }
+    
+    // Get the current user ID from Auth0
+    const { user } = useAuth0();
+    const userId = user?.sub;
+    
+    const [useAutoSaveHook, setUseAutoSaveHook] = useState(null);
+    const [autoSaveContextAvailable, setAutoSaveContextAvailable] = useState(false);
+
+    // State to manage dirty status for photos related to a loaded permanent route
+    const [lastLoadedPermanentRouteIdForPhotos, setLastLoadedPermanentRouteIdForPhotos] = useState(null);
+    const [photosDirtySinceLastLoad, setPhotosDirtySinceLastLoad] = useState(false);
+
+    useEffect(() => {
+        // Attempt to dynamically import useAutoSave on component mount
+        const importAutoSave = async () => {
+            try {
+                console.log('[PhotoContext] Attempting dynamic import of AutoSaveContext...');
+                const AutoSaveModule = await import('../../../context/AutoSaveContext');
+                if (AutoSaveModule && AutoSaveModule.useAutoSave) {
+                    console.log('[PhotoContext] Successfully imported useAutoSave hook.');
+                    setUseAutoSaveHook(() => AutoSaveModule.useAutoSave); // Store the hook function itself
+                    setAutoSaveContextAvailable(true);
+                } else {
+                    console.warn('[PhotoContext] Dynamic import of AutoSaveContext succeeded, but useAutoSave hook is not available on the module.');
+                    setAutoSaveContextAvailable(false);
+                }
+            } catch (error) {
+                console.error('[PhotoContext] Failed to dynamically import AutoSaveContext:', error);
+                setAutoSaveContextAvailable(false);
+            }
+        };
+        importAutoSave();
+    }, []); // Empty dependency array ensures this runs once on mount
+
+    // Get AutoSaveContext if the hook is available
+    // This will re-run when useAutoSaveHook changes
+    const autoSave = useAutoSaveHook ? useAutoSaveHook() : null;
+    const currentLoadedPermanentRouteIdFromAutoSave = autoSave?.loadedPermanentRouteId;
+
+    // Effect to reset dirty flag when the loaded permanent route in AutoSaveContext changes
+    useEffect(() => {
+        if (currentLoadedPermanentRouteIdFromAutoSave !== lastLoadedPermanentRouteIdForPhotos) {
+            console.log(`[PhotoContext] Permanent route changed or cleared. Old: ${lastLoadedPermanentRouteIdForPhotos}, New: ${currentLoadedPermanentRouteIdFromAutoSave}. Resetting photosDirtySinceLastLoad.`);
+            setPhotosDirtySinceLastLoad(false);
+            setLastLoadedPermanentRouteIdForPhotos(currentLoadedPermanentRouteIdFromAutoSave);
+        }
+    }, [currentLoadedPermanentRouteIdFromAutoSave, lastLoadedPermanentRouteIdForPhotos]);
+
+    useEffect(() => {
+        if (useAutoSaveHook) {
+            console.log('[PhotoContext] useAutoSaveHook is available. Value of autoSave from useAutoSaveHook() during render-effect:', autoSave);
+        } else if (autoSaveContextAvailable === false && useAutoSaveHook === null) {
+            // This condition means the import attempt finished but failed or hook wasn't found
+            console.log('[PhotoContext] AutoSaveContext was determined to be unavailable or import failed.');
+        } else {
+            // This means import is still in progress or initial state
+            console.log('[PhotoContext] useAutoSaveHook is not yet available (likely still loading).');
+        }
+    }, [useAutoSaveHook, autoSave, autoSaveContextAvailable]);
+    
+    // Auto-save photos to Firebase when they change
+    useEffect(() => {
+        // Check if we're in presentation mode by looking at the URL
+        const isPresentationMode = window.location.pathname.includes('/presentation/') || 
+                                  window.location.pathname.includes('/preview/') ||
+                                  window.location.pathname.includes('/route/');
+        
+        // Skip auto-save if in presentation mode
+        if (isPresentationMode) {
+            console.log('[PhotoContext] Skipping auto-save - in presentation mode');
+            return;
+        }
+        
+        // Skip auto-save if no user
+        if (!userId) {
+            console.log('[PhotoContext] Skipping auto-save - no user ID');
+            return;
+        }
+        
+        // Get the route from RouteContext if available
+        const route = routeContext?.currentRoute;
+        const currentLoadedPermanentRouteId = autoSave?.loadedPermanentRouteId || null;
+
+        // Enhanced logging for debugging auto-save conditions
+        console.log('[PhotoContext] Auto-save check:', {
+            hasRoute: !!route,
+            currentRouteDetails: route ? { id: route.id, name: route.name } : null, // Log some route details if available
+            currentLoadedPermanentRouteId: currentLoadedPermanentRouteId,
+            autoSaveContextState: autoSave ? { loadedPermanentRouteId: autoSave.loadedPermanentRouteId, autoSaveId: autoSave.autoSaveId } : null
+        });
+        
+        // Skip auto-save if no route is available AND no permanent route is loaded
+        if (!route && !currentLoadedPermanentRouteId) {
+            console.log('[PhotoContext] Skipping auto-save - no current route and no permanent route loaded');
+            return;
+        }
+        
+            console.log('[PhotoContext] Proceeding with auto-save. Details:', {
+            photosCount: photos.length,
+            userId,
+            routeAvailable: !!route,
+            currentLoadedPermanentRouteId: currentLoadedPermanentRouteId,
+            photosDirtySinceLastLoad: photosDirtySinceLastLoad
+        });
+
+        // If a permanent route is loaded, only save if photos are dirty since that route was loaded.
+        // This prevents overwriting permanent photos if `loadPhotos` (e.g. with an empty array due to load failure or new route)
+        // was the last thing to change the `photos` state for this permanent route.
+        if (currentLoadedPermanentRouteId && !photosDirtySinceLastLoad) {
+            console.log('[PhotoContext] Skipping auto-save for permanent route - photos not dirty since this permanent route context was established.');
+            return;
+        }
+        
+        // Auto-save photos to Firebase (even if photos array is empty, to handle deletions)
+        // Use currentLoadedPermanentRouteId directly, as loadedPermanentRouteId was redundant
+        autoSavePhotosToFirebase(photos, route, userId, autoSave, currentLoadedPermanentRouteId)
+            .then(autoSaveId => {
+                if (autoSaveId) {
+                    console.log('[PhotoContext] Photos auto-saved successfully with ID:', autoSaveId);
+                    // If save was to a permanent route and it was successful, mark as no longer dirty
+                    if (currentLoadedPermanentRouteId) {
+                        setPhotosDirtySinceLastLoad(false);
+                    }
+                } else {
+                    console.warn('[PhotoContext] Photos auto-save did not return an ID');
+                }
+            })
+            .catch(error => {
+                console.error('[PhotoContext] Error auto-saving photos:', error);
+            });
+    }, [photos, userId, routeContext?.currentRoute, autoSave?.loadedPermanentRouteId, useAutoSaveHook, photosDirtySinceLastLoad, currentLoadedPermanentRouteIdFromAutoSave]);
+    // Dependency changed from 'autoSave' object to 'autoSave?.loadedPermanentRouteId' (specific value)
+    // and 'useAutoSaveHook' (to re-run when hook is available)
+    // Added photosDirtySinceLastLoad and currentLoadedPermanentRouteIdFromAutoSave (which is autoSave?.loadedPermanentRouteId)
     
     // Track photo changes
     const trackPhotoChange = useCallback((photoId) => {
@@ -108,16 +246,12 @@ export const PhotoProvider = ({ children }) => {
                 trackPhotoChange(photoId);
             }
         });
-        
+        setPhotosDirtySinceLastLoad(true);
         notifyPhotoChange('add');
     };
-    const deletePhoto = (photoUrl) => {
-        // console.log('[PhotoContext] Deleting photo with URL:', photoUrl);
-        // console.log('[PhotoContext] Current photos count before deletion:', photos.length);
-
-        // Log all current photo identifiers for debugging
-        // console.log('[PhotoContext] Current photo identifiers:',
-        //     photos.map(p => ({ id: getPhotoIdentifier(p.url), url: p.url.substring(0, 30) + '...' })));
+    const deletePhoto = async (photoUrl) => {
+        console.log('[PhotoContext] Deleting photo with URL:', photoUrl);
+        console.log('[PhotoContext] Current photos count before deletion:', photos.length);
 
         const identifier = getPhotoIdentifier(photoUrl);
         if (!identifier) {
@@ -125,8 +259,11 @@ export const PhotoProvider = ({ children }) => {
             return; // Abort deletion if we can't get an identifier
         }
 
-        // console.log('[PhotoContext] Deleting photo with identifier:', identifier);
+        console.log('[PhotoContext] Deleting photo with identifier:', identifier);
 
+        // Find the photo to get its publicId before removing it
+        const photoToDelete = photos.find(p => getPhotoIdentifier(p.url) === identifier);
+        
         // Create a copy of the photos array for comparison
         const photosBefore = [...photos];
 
@@ -135,9 +272,6 @@ export const PhotoProvider = ({ children }) => {
             const newPhotos = prev.filter(p => {
                 const photoId = getPhotoIdentifier(p.url);
                 const shouldKeep = photoId !== identifier;
-                // if (!shouldKeep) {
-                //     console.log(`[PhotoContext] Removing photo with ID: ${photoId}`);
-                // }
                 return shouldKeep;
             });
 
@@ -150,28 +284,13 @@ export const PhotoProvider = ({ children }) => {
             // Check if any photos were actually removed
             if (newPhotos.length === prev.length) {
                 console.warn('[PhotoContext] No photos were removed! Identifier not found:', identifier);
-                // console.log('[PhotoContext] Available identifiers:',
-                //     prev.map(p => getPhotoIdentifier(p.url)));
             } else {
-                // console.log(`[PhotoContext] Successfully removed ${prev.length - newPhotos.length} photo(s)`);
+                console.log(`[PhotoContext] Successfully removed ${prev.length - newPhotos.length} photo(s)`);
             }
 
-            // console.log('[PhotoContext] Deleted photo, remaining count:', newPhotos.length);
-            // console.log('[PhotoContext] Remaining photo IDs:', newPhotos.map(p => getPhotoIdentifier(p.url)));
+            console.log('[PhotoContext] Deleted photo, remaining count:', newPhotos.length);
             return newPhotos;
         });
-
-        // Double-check that the photo was actually removed by comparing arrays
-        // setTimeout(() => {
-        //     if (photos.length === photosBefore.length) {
-        //         console.warn('[PhotoContext] Photo deletion may not have been applied to state!');
-        //         console.log('[PhotoContext] Photos before:', photosBefore.map(p => getPhotoIdentifier(p.url)));
-        //         console.log('[PhotoContext] Photos after:', photos.map(p => getPhotoIdentifier(p.url)));
-        //     } else {
-        //         console.log('[PhotoContext] Photo deletion confirmed, photos count reduced from',
-        //             photosBefore.length, 'to', photos.length);
-        //     }
-        // }, 0);
 
         // Remove the photo from tracked changes if it was being tracked
         if (identifier && changedPhotos.has(identifier)) {
@@ -182,8 +301,30 @@ export const PhotoProvider = ({ children }) => {
             });
         }
         
+        // If the photo has a publicId, delete it from Cloudinary
+        if (photoToDelete && photoToDelete.publicId) {
+            try {
+                console.log('[PhotoContext] Deleting photo from Cloudinary with publicId:', photoToDelete.publicId);
+                
+                // Import the deleteFromCloudinary function dynamically
+                const { deleteFromCloudinary } = await import('../../../utils/cloudinary');
+                
+                // Delete the photo from Cloudinary
+                const result = await deleteFromCloudinary(photoToDelete.publicId);
+                
+                if (result) {
+                    console.log('[PhotoContext] Successfully deleted photo from Cloudinary');
+                } else {
+                    console.warn('[PhotoContext] Failed to delete photo from Cloudinary');
+                }
+            } catch (error) {
+                console.error('[PhotoContext] Error deleting photo from Cloudinary:', error);
+            }
+        }
+        
         // Ensure we mark this as a deletion in the RouteContext
-        // console.log('[PhotoContext] Notifying RouteContext of photo deletion');
+        console.log('[PhotoContext] Notifying RouteContext of photo deletion');
+        setPhotosDirtySinceLastLoad(true);
         notifyPhotoChange('delete');
     };
     const updatePhoto = (photoUrl, updates) => {
@@ -212,7 +353,7 @@ export const PhotoProvider = ({ children }) => {
         
         // Track this photo as changed
         trackPhotoChange(identifier);
-        
+        setPhotosDirtySinceLastLoad(true);
         notifyPhotoChange('update');
     };
 
@@ -242,7 +383,7 @@ export const PhotoProvider = ({ children }) => {
         
         // Track this photo as changed
         trackPhotoChange(identifier);
-        
+        setPhotosDirtySinceLastLoad(true);
         notifyPhotoChange('update');
     };
     // Cache for photo identifiers to avoid reloading the same photos
@@ -331,6 +472,7 @@ export const PhotoProvider = ({ children }) => {
 
         // Replace existing photos entirely
         setPhotos(processedPhotos);
+        setPhotosDirtySinceLastLoad(false); // Explicitly mark as not dirty after a load operation
         
         // Update the cache with the new photo identifiers
         photoIdentifiersCache.current = new Set(newPhotoIdentifiers);
@@ -344,6 +486,7 @@ export const PhotoProvider = ({ children }) => {
         setPhotos([]);
         // Clear all tracked changes
         clearPhotoChanges();
+        setPhotosDirtySinceLastLoad(true); // Clearing photos is a "dirtying" action
         notifyPhotoChange('clear');
         // console.log('[PhotoContext] All photos cleared');
     };

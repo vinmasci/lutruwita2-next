@@ -40,15 +40,17 @@ const isValidSurfaceType = (type) => {
 export const normalizeRoute = (route) => {
     // Handle saved route state
     if (isSavedRouteState(route)) {
-        const firstRoute = route.routes[0];
+        const firstRoute = route.routes[0]; // firstRoute here is the segment data
         if (!firstRoute) {
             throw new Error('No route found in saved state');
         }
         const defaultRoute = createDefaultRoute(firstRoute.id);
-        const unpavedSections = firstRoute.unpavedSections?.map(section => ({
-            startIndex: section.startIndex,
-            endIndex: section.endIndex,
-            coordinates: section.coordinates,
+        // Use unpavedSections from the segment (firstRoute) if available, otherwise from parent (route) as a fallback.
+        const sectionsToProcess = firstRoute.unpavedSections || route.unpavedSections;
+        const unpavedSections = sectionsToProcess?.map(section => ({
+            startIndex: section.startIndex, // May not exist if coming directly from Firebase segment's unpaved doc
+            endIndex: section.endIndex,     // May not exist
+            coordinates: section.coordinates, // This should be the array of [lng, lat]
             surfaceType: isValidSurfaceType(section.surfaceType) ? section.surfaceType : 'unpaved'
         })) || [];
         
@@ -64,7 +66,22 @@ export const normalizeRoute = (route) => {
             isVisible: firstRoute.isVisible ?? defaultRoute.isVisible,
             gpxData: firstRoute.gpxData || defaultRoute.gpxData,
             rawGpx: firstRoute.rawGpx || defaultRoute.rawGpx,
-            geojson: firstRoute.geojson || defaultRoute.geojson,
+            geojson: firstRoute.geojson && firstRoute.geojson.features && firstRoute.geojson.features.length > 0 && firstRoute.geojson.features[0].geometry ? 
+                     { // Ensure valid structure if source geojson exists
+                         type: 'FeatureCollection',
+                         features: [
+                             {
+                                 ...firstRoute.geojson.features[0],
+                                 type: 'Feature',
+                                 geometry: {
+                                     type: firstRoute.geojson.features[0].geometry.type || 'LineString', // Default to LineString if missing
+                                     coordinates: firstRoute.geojson.features[0].geometry.coordinates || []
+                                 },
+                                 properties: firstRoute.geojson.features[0].properties || {}
+                             }
+                         ]
+                     } : 
+                     defaultRoute.geojson, // Fallback to default empty geojson
             // Explicitly copy these fields from the top-level route object
             type: route.type || firstRoute.type || 'tourism',
             isPublic: route.isPublic !== undefined ? route.isPublic : (firstRoute.isPublic !== undefined ? firstRoute.isPublic : true),
@@ -78,7 +95,8 @@ export const normalizeRoute = (route) => {
                 ...firstRoute.status,
                 processingState: firstRoute.status?.processingState || 'completed'
             },
-            unpavedSections
+            unpavedSections,
+            pois: route.pois || [] // Add POIs from the parent route object
         };
     }
     // Handle fresh route
@@ -99,7 +117,22 @@ export const normalizeRoute = (route) => {
             isVisible: route.isVisible ?? defaultRoute.isVisible,
             gpxData: route.gpxData || defaultRoute.gpxData,
             rawGpx: route.rawGpx || defaultRoute.rawGpx,
-            geojson: route.geojson || defaultRoute.geojson,
+            geojson: route.geojson && route.geojson.features && route.geojson.features.length > 0 && route.geojson.features[0].geometry ?
+                     { // Ensure valid structure if source geojson exists
+                         type: 'FeatureCollection',
+                         features: [
+                             {
+                                 ...route.geojson.features[0],
+                                 type: 'Feature',
+                                 geometry: {
+                                     type: route.geojson.features[0].geometry.type || 'LineString', // Default to LineString if missing
+                                     coordinates: route.geojson.features[0].geometry.coordinates || []
+                                 },
+                                 properties: route.geojson.features[0].properties || {}
+                             }
+                         ]
+                     } :
+                     defaultRoute.geojson, // Fallback to default empty geojson
             // Ensure type, isPublic, and eventDate are explicitly set for fresh routes as well
             type: route.type || 'tourism',
             isPublic: route.isPublic !== undefined ? route.isPublic : true,
@@ -113,7 +146,8 @@ export const normalizeRoute = (route) => {
                 ...route.status,
                 processingState: route.status?.processingState || 'completed'
             },
-            unpavedSections
+            unpavedSections,
+            pois: route.pois || [] // Add POIs for fresh routes as well, defaulting to empty
         };
     }
     throw new Error('Invalid route format');

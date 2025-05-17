@@ -377,7 +377,10 @@ export const PresentationElevationProfile: React.FC<Props> = ({ route, isLoading
     }, [hoverCoordinates, data, route]);
 
     useEffect(() => {
+        // More robust null checking for route data
         if (!route?.geojson?.features?.[0]?.properties?.coordinateProperties?.elevation) {
+            console.log('[PresentationElevationProfile] No elevation data available for route:', 
+                route?.id || route?.routeId || 'unknown');
             setData([]);
             return;
         }

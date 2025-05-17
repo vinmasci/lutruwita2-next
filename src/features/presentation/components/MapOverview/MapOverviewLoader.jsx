@@ -57,12 +57,20 @@ const MapOverviewLoader = () => {
         setError(null);
 
         // Get the persistentId from the URL params or from the current route
-        const routeId = persistentId || currentRoute?.persistentId || currentRoute?.routeId;
+        let routeId = persistentId || currentRoute?.persistentId || currentRoute?.routeId;
         
         if (!routeId) {
           console.warn('[MapOverviewLoader] No persistentId available, cannot fetch map overview data');
           setIsLoading(false);
           return;
+        }
+        
+        // Handle route IDs with the "route-" prefix
+        // Extract the UUID part if the routeId is in the format "route-{uuid}"
+        if (routeId.startsWith('route-')) {
+          console.log(`[MapOverviewLoader] Detected route ID with prefix: ${routeId}`);
+          routeId = routeId.substring(6);
+          console.log(`[MapOverviewLoader] Using extracted route ID: ${routeId}`);
         }
 
         console.log('[MapOverviewLoader] Fetching map overview data for route:', routeId);

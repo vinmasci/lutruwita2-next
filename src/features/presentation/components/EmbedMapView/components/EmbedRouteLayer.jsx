@@ -9,6 +9,86 @@ const DEFAULT_COLORS = {
     hover: '#ff5252'  // Lighter red
 };
 
+/**
+ * Helper function to check if a color is a valid hex color
+ * @param {string} color - The color to check
+ * @returns {boolean} - True if the color is a valid hex color
+ */
+const isValidHexColor = (color) => {
+    return typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color);
+};
+
+/**
+ * Helper function to convert a hex color to RGBA
+ * @param {string} hex - The hex color to convert
+ * @param {number} alpha - The alpha value (0-1)
+ * @returns {string} - The RGBA color string
+ */
+const hexToRgba = (hex, alpha = 1) => {
+    // Default to red if hex is invalid
+    if (!isValidHexColor(hex)) {
+        return `rgba(244, 67, 54, ${alpha})`; // Default red with alpha
+    }
+    
+    // Remove the hash
+    hex = hex.replace('#', '');
+    
+    // Convert 3-digit hex to 6-digit
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    // Parse the hex values
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // Return the rgba string
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+/**
+ * Helper function to get a valid color with opacity for Mapbox
+ * @param {string} color - The base color
+ * @param {number} opacity - The opacity value (0-1)
+ * @returns {string} - A valid color string with opacity
+ */
+const getColorWithOpacity = (color, opacity = 0.6) => {
+    // If it's a valid hex color, convert to rgba
+    if (isValidHexColor(color)) {
+        return hexToRgba(color, opacity);
+    }
+    
+    // If it's already an rgba color, try to parse and update the alpha
+    if (typeof color === 'string' && color.startsWith('rgba(')) {
+        try {
+            // Extract the RGB values
+            const rgbMatch = color.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*[\d.]+\s*\)/);
+            if (rgbMatch) {
+                return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${opacity})`;
+            }
+        } catch (e) {
+            console.error('[EmbedRouteLayer] Error parsing rgba color:', e);
+        }
+    }
+    
+    // If it's an rgb color, convert to rgba
+    if (typeof color === 'string' && color.startsWith('rgb(')) {
+        try {
+            // Extract the RGB values
+            const rgbMatch = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+            if (rgbMatch) {
+                return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${opacity})`;
+            }
+        } catch (e) {
+            console.error('[EmbedRouteLayer] Error parsing rgb color:', e);
+        }
+    }
+    
+    // For any other format or if parsing fails, return the default color with opacity
+    return `rgba(244, 67, 54, ${opacity})`; // Default red with alpha
+};
+
 // This is a simplified version of RouteLayer that doesn't use RouteContext
 export const EmbedRouteLayer = ({ map, route, currentRoute }) => {
     const isStyleLoaded = useMapStyle(map);
@@ -293,6 +373,13 @@ export const EmbedRouteLayer = ({ map, route, currentRoute }) => {
 
                     // Add hover layer (initially hidden) only for focused routes
                     if (currentRoute.isFocused) {
+                        // Use the getColorWithOpacity helper to ensure a valid color with opacity
+                        const hoverColor = currentRoute.color 
+                            ? getColorWithOpacity(currentRoute.color, 0.6) // 0.6 opacity (similar to 99 in hex)
+                            : DEFAULT_COLORS.hover;
+                            
+                        console.log(`[EmbedRouteLayer] Using hover color: ${hoverColor} for route: ${routeId}`);
+                        
                         mapInstance.addLayer({
                             id: hoverLayerId,
                             type: 'line',
@@ -303,7 +390,7 @@ export const EmbedRouteLayer = ({ map, route, currentRoute }) => {
                                 visibility: 'none'
                             },
                             paint: {
-                                'line-color': currentRoute.color ? `${currentRoute.color}99` : DEFAULT_COLORS.hover,
+                                'line-color': hoverColor,
                                 'line-width': 5,
                                 'line-opacity': 1
                             }
@@ -315,43 +402,64 @@ export const EmbedRouteLayer = ({ map, route, currentRoute }) => {
                         const surfaceSourceId = `unpaved-sections-${routeId}`;
                         const surfaceLayerId = `unpaved-sections-layer-${routeId}`;
 
+                        // Get the main route coordinates
+                        const mainCoordinates = currentRoute.geojson.features[0].geometry.coordinates;
+                        
                         // Combine all unpaved sections into a single feature collection
-                        const features = currentRoute.unpavedSections.map(section => ({
-                            type: 'Feature',
-                            properties: {
-                                surface: section.surfaceType
-                            },
-                            geometry: {
-                                type: 'LineString',
-                                coordinates: section.coordinates
-                            }
-                        }));
+                        const features = currentRoute.unpavedSections
+                            .filter(section => section.coordinates && section.coordinates.length > 0)
+                            .map(section => {
+                                console.log(`[EmbedRouteLayer] Using coordinates for unpaved section: ${section.surfaceType}, ${section.coordinates.length} points`);
+                                
+                                return {
+                                    type: 'Feature',
+                                    properties: {
+                                        surface: section.surfaceType
+                                    },
+                                    geometry: {
+                                        type: 'LineString',
+                                        coordinates: section.coordinates
+                                    }
+                                };
+                            });
 
-                        mapInstance.addSource(surfaceSourceId, {
-                            type: 'geojson',
-                            data: {
-                                type: 'FeatureCollection',
-                                features
-                            },
-                            tolerance: 1, // Increase simplification tolerance
-                            maxzoom: 14 // Limit detail at high zoom levels
-                        });
+                        // Filter out features with empty coordinates
+                        const validFeatures = features.filter(feature => 
+                            feature.geometry.coordinates && 
+                            feature.geometry.coordinates.length > 1
+                        );
+                        
+                        if (validFeatures.length > 0) {
+                            mapInstance.addSource(surfaceSourceId, {
+                                type: 'geojson',
+                                data: {
+                                    type: 'FeatureCollection',
+                                    features: validFeatures
+                                },
+                                tolerance: 1, // Increase simplification tolerance
+                                maxzoom: 14 // Limit detail at high zoom levels
+                            });
 
-                        mapInstance.addLayer({
-                            id: surfaceLayerId,
-                            type: 'line',
-                            source: surfaceSourceId,
-                            layout: {
-                                'line-join': 'round',
-                                'line-cap': 'round',
-                                visibility: visibility.unpavedSections ? 'visible' : 'none'
-                            },
-                            paint: {
-                                'line-color': '#ffffff',
-                                'line-width': 2,
-                                'line-dasharray': [1, 3]
-                            }
-                        });
+                            mapInstance.addLayer({
+                                id: surfaceLayerId,
+                                type: 'line',
+                                source: surfaceSourceId,
+                                layout: {
+                                    'line-join': 'round',
+                                    'line-cap': 'round',
+                                    visibility: visibility.unpavedSections ? 'visible' : 'none'
+                                },
+                                paint: {
+                                    'line-color': '#ffffff',
+                                    'line-width': 2,
+                                    'line-dasharray': [1, 3]
+                                }
+                            });
+                            
+                            console.log(`[EmbedRouteLayer] Added unpaved sections layer with ${validFeatures.length} features`);
+                        } else {
+                            console.warn('[EmbedRouteLayer] No valid unpaved section features to render');
+                        }
                     }
 
                     // Add hover handlers only for focused routes
@@ -386,6 +494,7 @@ export const EmbedRouteLayer = ({ map, route, currentRoute }) => {
                     renderedRef.current = true;
                 } catch (error) {
                     console.error('[EmbedRouteLayer] Error in route rendering operation:', error);
+                    // Don't try to use setError here as it's not available
                 }
             }, `render-route-${routeId}`);
 
@@ -429,10 +538,15 @@ export const EmbedRouteLayer = ({ map, route, currentRoute }) => {
             
             // Update hover layer color if it exists
             if (map.getLayer(hoverLayerId)) {
+                // Use the getColorWithOpacity helper to ensure a valid color with opacity
+                const hoverColor = currentColor 
+                    ? getColorWithOpacity(currentColor, 0.6) // 0.6 opacity (similar to 99 in hex)
+                    : DEFAULT_COLORS.hover;
+                
                 map.setPaintProperty(
                     hoverLayerId,
                     'line-color',
-                    currentColor ? `${currentColor}99` : DEFAULT_COLORS.hover
+                    hoverColor
                 );
             }
             

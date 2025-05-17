@@ -53,6 +53,9 @@ const LineMarker = ({
 
     logger.debug('LineMarker', 'Setting up map layers for line:', line.id);
     
+    // Flag to track if this is a line being drawn
+    const isDrawingLine = line.id && line.id.includes('line-') && !line.name;
+    
     // Listen for style.load events to recreate layers after style changes
     const handleStyleLoad = () => {
       logger.debug('LineMarker', 'Map style changed, recreating layers for line:', line.id);
@@ -269,10 +272,24 @@ const LineMarker = ({
       // Remove the style.load event listener
       map.off('style.load', handleStyleLoad);
       
-      // Skip cleanup if drawer is open for this line
-      if (drawerOpen && selected) {
-        logger.debug('LineMarker', `Skipping cleanup for line ${line.id} because drawer is open`);
-        return;
+      // Check if there's a global force cleanup flag
+      const isForceCleanup = window.__forceLineCleanup === true;
+      
+      // If force cleanup is active, proceed with cleanup regardless of line state
+      if (!isForceCleanup) {
+        // Skip cleanup if:
+        // 1. Drawer is open for this line
+        // 2. It's a line being drawn (has line- prefix but no name)
+        // 3. It's a saved line (has a name)
+        const isDrawingLine = line.id && line.id.includes('line-') && !line.name;
+        const isSavedLine = !!line.name; // Check if the line has a name (indicating it's saved)
+        
+        if ((drawerOpen && selected) || isDrawingLine || isSavedLine) {
+          logger.debug('LineMarker', `Skipping cleanup for line ${line.id} because it's either: drawer open, being drawn, or a saved line`);
+          return;
+        }
+      } else {
+        logger.debug('LineMarker', `Force cleanup active - cleaning up line ${line.id} regardless of state`);
       }
       
       logger.debug('LineMarker', `Starting cleanup for line ${line.id}`);

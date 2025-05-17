@@ -296,6 +296,34 @@ export const ElevationProfile: React.FC<ElevationProfileProps> = ({ route, isLoa
     console.log('[ElevationProfile] ✅ Created spatial grid and distance map for elevation profile');
   }, [route]);
 
+  // Effect to clear all state when route is null or undefined
+  useEffect(() => {
+    if (!route) {
+      console.log('[ElevationProfile] Route is null or undefined, clearing all state');
+      setData([]);
+      setClimbs([]);
+      setCurrentProfilePoint(null);
+      setStats({
+        elevationGained: 0,
+        elevationLost: 0,
+        totalDistance: 0,
+        unpavedPercentage: 0
+      });
+      
+      // Reset the route data ref
+      routeDataRef.current = {
+        spatialGrid: null,
+        distanceMap: null,
+        indexMap: null
+      };
+      
+      // Clear hover coordinates to prevent map tracer from showing
+      if (setHoverCoordinates) {
+        setHoverCoordinates(null);
+      }
+    }
+  }, [route, setHoverCoordinates]);
+
   // Effect to update the current profile point based on hover coordinates
   useEffect(() => {
     if (!hoverCoordinates || !data.length || !route?.geojson?.features?.[0] || !routeDataRef.current.spatialGrid) {

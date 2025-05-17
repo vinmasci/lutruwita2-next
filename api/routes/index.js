@@ -51,7 +51,7 @@ const initializeFirebase = async () => {
             // Read and parse the service account key file
             const serviceAccountKey = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
             
-            // Initialize Firebase with the service account key
+            // Initialize Firebase with the service account key and ignoreUndefinedProperties
             admin.initializeApp({
               credential: admin.credential.cert(serviceAccountKey)
             });
@@ -89,9 +89,12 @@ const initializeFirebase = async () => {
         
         console.log('[API] Firebase Admin SDK initialized successfully');
         
-        // Get Firestore instance
+        // Get Firestore instance with ignoreUndefinedProperties set to true
         db = admin.firestore();
-        console.log('[API] Firestore instance created');
+        
+        // Set ignoreUndefinedProperties to true
+        db.settings({ ignoreUndefinedProperties: true });
+        console.log('[API] Firestore instance created with ignoreUndefinedProperties enabled');
         
         // Test Firestore connection
         try {
@@ -114,6 +117,11 @@ const initializeFirebase = async () => {
       // Firebase is already initialized
       console.log('[API] Firebase Admin SDK already initialized');
       db = admin.firestore();
+      
+      // Set ignoreUndefinedProperties to true
+      db.settings({ ignoreUndefinedProperties: true });
+      console.log('[API] Firestore instance settings updated with ignoreUndefinedProperties enabled');
+      
       firebaseAvailable = true;
     }
   } catch (importError) {
@@ -268,7 +276,78 @@ const isValidForFirestore = (value, path = '') => {
 };
 
 /**
- * Save optimized route data to Firebase
+ * Sanitize data for Firestore
+ * Firestore has limitations on what data types it can store
+ * This function recursively processes objects to make them Firestore-compatible
+ * @param {*} data - The data to sanitize
+ * @param {number} depth - Current recursion depth (to prevent stack overflow)
+ * @returns {*} - The sanitized data
+ */
+const sanitizeForFirestore = (data, depth = 0) => {
+  // Prevent stack overflow with a reasonable depth limit
+  if (depth > 50) {
+    console.log('[API] Maximum recursion depth reached, returning null');
+    return null;
+  }
+  
+  // Handle null or undefined
+  if (data === null || data === undefined) {
+    return null;
+  }
+  
+  // Handle primitive types
+  if (typeof data !== 'object') {
+    return data;
+  }
+  
+  // Handle Date objects
+  if (data instanceof Date) {
+    return admin.firestore.Timestamp.fromDate(data);
+  }
+  
+  // Handle arrays
+  if (Array.isArray(data)) {
+    // Check if this is a nested array (contains any arrays)
+    const containsArrays = data.some(item => Array.isArray(item));
+    
+    // Always convert arrays to objects with numeric keys to avoid nested array issues
+    if (containsArrays || data.length > 100) {
+      console.log('[API] Converting array to object for Firestore compatibility');
+      const obj = {};
+      data.forEach((item, index) => {
+        obj[`item_${index}`] = sanitizeForFirestore(item, depth + 1);
+      });
+      return obj;
+    }
+    
+    // For simple arrays with primitive values, keep as array but sanitize each item
+    return data.map(item => sanitizeForFirestore(item, depth + 1));
+  }
+  
+  // Handle objects
+  const sanitizedObj = {};
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      // Skip functions and symbols
+      if (typeof data[key] === 'function' || typeof data[key] === 'symbol') {
+        continue;
+      }
+      
+      // Skip undefined values
+      if (data[key] === undefined) {
+        continue;
+      }
+      
+      // Sanitize the value
+      sanitizedObj[key] = sanitizeForFirestore(data[key], depth + 1);
+    }
+  }
+  
+  return sanitizedObj;
+};
+
+/**
+ * Save optimized route data to Firebase using route-centric hierarchical structure
  * @param {string} routeId - The persistent ID of the route
  * @param {Object} optimizedData - The optimized route data to save
  * @returns {Promise<boolean>} - True if successful, false otherwise
@@ -281,40 +360,275 @@ const saveOptimizedRouteDataToFirebase = async (routeId, optimizedData) => {
   }
   
   try {
-    console.log(`[API] Saving optimized data to Firebase for route: ${routeId}`);
-    console.log(`[API] Data size: ${JSON.stringify(optimizedData).length} bytes`);
+    // Extract the UUID part if the routeId is in the format "route-{uuid}"
+    const firebaseRouteId = routeId.startsWith('route-') ? routeId.substring(6) : routeId;
     
-    // Log collection and document info
-    console.log(`[API] Firestore collection: optimizedRoutes, document ID: ${routeId}`);
+    console.log(`[API] Original route ID: ${routeId}`);
+    console.log(`[API] Extracted Firebase route ID: ${firebaseRouteId}`);
+    console.log(`[API] Saving optimized data to Firebase for route: ${firebaseRouteId}`);
+    console.log(`[API] Data size: ${JSON.stringify(optimizedData).length} bytes`);
     
     // Convert any MongoDB ObjectId to string
     const processedData = convertObjectIdToString(optimizedData);
     console.log('[API] Processed data for Firebase compatibility');
     
-    // Always use the stringified version to avoid Firestore limitations
-    console.log('[API] Saving data as a stringified JSON to avoid Firestore limitations');
+    // Create a batch for atomic operations
+    const batch = db.batch();
     
-    // Create the document data with stringified JSON
-    const docData = {
-      dataString: JSON.stringify(processedData),
+    // Extract data components
+    const {
+      name,
+      type,
+      isPublic,
+      userId,
+      routes,
+      pois,
+      lines,
+      photos,
+      mapState,
+      headerSettings,
+      mapOverview,
+      eventDate,
+      staticMapUrl,
+      staticMapPublicId,
+      _loadedState
+    } = processedData;
+    
+    console.log(`[API] Saving data using route-centric structure for route: ${routeId}`);
+    
+    // 1. Save route metadata - sanitize and simplify
+    const metadataRef = db.collection('routes').doc(firebaseRouteId).collection('metadata').doc('info');
+    batch.set(metadataRef, sanitizeForFirestore({
+      name: name || 'Untitled Route',
+      type: type || 'tourism',
+      isPublic: isPublic === undefined ? false : isPublic,
+      userId: userId || 'anonymous',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      version: 1 // Initial version
-    };
+      eventDate: eventDate || null,
+      headerSettings: headerSettings ? {
+        color: headerSettings.color || '#000000',
+        logoUrl: headerSettings.logoUrl || null,
+        username: headerSettings.username || ''
+      } : {},
+      mapState: mapState ? {
+        zoom: mapState.zoom || 0,
+        center: mapState.center || [0, 0],
+        bearing: mapState.bearing || 0,
+        pitch: mapState.pitch || 0,
+        style: mapState.style || 'default'
+      } : {},
+      mapOverview: mapOverview ? {
+        description: mapOverview.description || ''
+      } : { description: '' },
+      staticMapUrl: staticMapUrl || null,
+      staticMapPublicId: staticMapPublicId || null
+    }));
     
-    // Save to Firestore
-    await db.collection('optimizedRoutes').doc(routeId).set(docData);
+    // 2. Save route GeoJSON data - simplified version
+    if (routes && routes.length > 0) {
+      const geojsonRef = db.collection('routes').doc(firebaseRouteId).collection('geojson').doc('routes');
+      
+      // Simplify routes to essential data only
+      const simplifiedRoutes = routes.map(route => ({
+        routeId: route.routeId || `route-${Date.now()}`,
+        name: route.name || 'Unnamed Route',
+        color: route.color || '#ff4d4d',
+        // Store only essential GeoJSON data
+        geojson: route.geojson ? {
+          type: route.geojson.type || 'FeatureCollection',
+          features: route.geojson.features ? route.geojson.features.map(feature => ({
+            type: feature.type || 'Feature',
+            properties: feature.properties ? {
+              name: feature.properties.name || '',
+              time: feature.properties.time || ''
+            } : {},
+            geometry: feature.geometry ? {
+              type: feature.geometry.type || 'LineString',
+              // Store coordinates as a reference to save space
+              coordinatesRef: `routes/${firebaseRouteId}/coordinates/${route.routeId}`
+            } : {}
+          })) : []
+        } : null,
+  // Simplified surface data with elevation profile
+  surface: route.surface ? {
+    surfaceTypes: (route.surface.surfaceTypes || []).map(st => ({
+      type: st.type || 'unknown',
+      percentage: st.percentage || 0,
+      distance: st.distance || 0
+    })),
+    // Include elevation profile data for the elevation chart
+    elevationProfile: route.surface.elevationProfile || []
+  } : null,
+        // Keep the full coordinates in unpaved sections as they are used directly for rendering
+        unpavedSections: (route.unpavedSections || []).map(section => ({
+          startIndex: section.startIndex || 0,
+          endIndex: section.endIndex || 0,
+          surfaceType: section.surfaceType || 'unpaved',
+          coordinates: section.coordinates || []
+        })),
+        description: route.description || null
+      }));
+      
+      batch.set(geojsonRef, sanitizeForFirestore({
+        routes: simplifiedRoutes,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }));
+      
+    // Store coordinates separately for each route
+    for (const route of routes) {
+      if (route.geojson?.features?.[0]?.geometry?.coordinates) {
+        const coordinates = route.geojson.features[0].geometry.coordinates;
+        
+        // Try to save all coordinates in a single document if they're small enough
+        if (coordinates.length < 2000) {
+          // For small routes, save all coordinates in a single document
+          const allCoordsRef = db.collection('routes').doc(firebaseRouteId)
+            .collection('coordinates').doc('all');
+          
+          batch.set(allCoordsRef, sanitizeForFirestore({
+            coordinates: coordinates
+          }));
+          
+          console.log(`[API] Saved all ${coordinates.length} coordinates in a single document for route: ${route.routeId || 'default'}`);
+        } else {
+          // For large routes, split into chunks
+          const CHUNK_SIZE = 400; // Firestore has limits on document size
+          const chunks = [];
+          
+          for (let i = 0; i < coordinates.length; i += CHUNK_SIZE) {
+            chunks.push(coordinates.slice(i, i + CHUNK_SIZE));
+          }
+          
+          // Save each chunk directly in the coordinates collection
+          for (let i = 0; i < chunks.length; i++) {
+            const chunkRef = db.collection('routes').doc(firebaseRouteId)
+              .collection('coordinates').doc(`chunk_${i}`);
+            
+            batch.set(chunkRef, sanitizeForFirestore({
+              coordinates: chunks[i],
+              index: i,
+              total: chunks.length
+            }));
+          }
+          
+          console.log(`[API] Saved ${chunks.length} coordinate chunks directly in coordinates collection for route: ${route.routeId || 'default'}`);
+        }
+      }
+    }
+    }
     
-    console.log(`[API] Successfully saved optimized data to Firebase for route: ${routeId}`);
+    // 3. Save POIs - simplified version
+    if (pois) {
+      const poisRef = db.collection('routes').doc(firebaseRouteId).collection('pois').doc('data');
+      
+      // Simplify POIs to essential data only
+      const simplifiedPOIs = {
+        draggable: (pois.draggable || []).map(poi => ({
+          id: poi.id || `poi-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+          coordinates: poi.coordinates || [0, 0],
+          name: poi.name || 'Unnamed POI',
+          description: poi.description || '',
+          category: poi.category || 'default',
+          icon: poi.icon || 'Default',
+          type: poi.type || 'draggable',
+          googlePlaceId: poi.googlePlaceId || null,
+          googlePlaceUrl: poi.googlePlaceUrl || null
+        })),
+        places: (pois.places || []).map(place => ({
+          id: place.id || `place-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+          coordinates: place.coordinates || [0, 0],
+          name: place.name || 'Unnamed Place',
+          category: place.category || 'default',
+          icon: place.icon || 'Default',
+          type: place.type || 'place',
+          placeId: place.placeId || null
+        })),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      batch.set(poisRef, sanitizeForFirestore(simplifiedPOIs));
+    }
     
-    // Verify the data was saved
-    const docRef = db.collection('optimizedRoutes').doc(routeId);
-    const docSnapshot = await docRef.get();
+    // 4. Save lines - simplified version
+    if (lines && lines.length > 0) {
+      const linesRef = db.collection('routes').doc(firebaseRouteId).collection('lines').doc('data');
+      
+      // Simplify lines to essential data only
+      const simplifiedLines = {
+        lines: lines.map(line => ({
+          id: line.id || `line-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+          type: line.type || 'line',
+          coordinates: {
+            start: line.coordinates?.start || [0, 0],
+            end: line.coordinates?.end || [0, 0],
+            mid: line.coordinates?.mid || null
+          },
+          name: line.name || '',
+          description: line.description || ''
+        })),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      batch.set(linesRef, sanitizeForFirestore(simplifiedLines));
+    }
     
-    if (docSnapshot.exists) {
-      console.log(`[API] Verified data was saved to Firebase for route: ${routeId}`);
+    // 5. Save photos metadata - simplified version
+    if (photos && photos.length > 0) {
+      const photosRef = db.collection('routes').doc(firebaseRouteId).collection('photos').doc('data');
+      
+      // Simplify photos to essential metadata only
+      const simplifiedPhotos = {
+        photos: photos.map(photo => ({
+          name: photo.name || 'Unnamed Photo',
+          url: photo.url || '',
+          thumbnailUrl: photo.thumbnailUrl || '',
+          dateAdded: photo.dateAdded || new Date().toISOString(),
+          caption: photo.caption || '',
+          coordinates: {
+            lat: photo.coordinates?.lat || 0,
+            lng: photo.coordinates?.lng || 0
+          }
+        })),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      batch.set(photosRef, sanitizeForFirestore(simplifiedPhotos));
+    }
+    
+    // 6. Add to type index for faster filtering
+    if (type) {
+      const typeIndexRef = db.collection('type_index').doc(type || 'unknown');
+      // Use set with merge to avoid overwriting other routes in this type
+      batch.set(typeIndexRef, sanitizeForFirestore({ 
+        [firebaseRouteId]: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }), { merge: true });
+    }
+    
+    // Commit the batch
+    console.log(`[API] Committing batch with ${batch._mutations ? batch._mutations.length : 'unknown'} operations`);
+    try {
+      const commitResult = await batch.commit();
+      console.log(`[API] Batch commit successful with ${commitResult ? commitResult.length : 0} write results`);
+      console.log(`[API] Successfully saved route-centric data to Firebase for route: ${routeId}`);
+    } catch (commitError) {
+      console.error(`[API] Batch commit failed:`, commitError);
+      console.error(`[API] Commit error details:`, commitError.message);
+      if (commitError.code) {
+        console.error(`[API] Commit error code:`, commitError.code);
+      }
+      throw commitError; // Re-throw to be caught by the outer try/catch
+    }
+    
+    // Verify the metadata was saved (as a representative check)
+    const metadataSnapshot = await metadataRef.get();
+    
+    if (metadataSnapshot.exists) {
+      console.log(`[API] Verified metadata was saved to Firebase for route: ${routeId}`);
       return true;
     } else {
-      console.error(`[API] Data was not saved to Firebase for route: ${routeId}`);
+      console.error(`[API] Metadata was not saved to Firebase for route: ${routeId}`);
       return false;
     }
   } catch (error) {
@@ -657,20 +971,48 @@ async function handleCreateRoute(req, res) {
       
       console.log(`[API] Embed data uploaded successfully: ${result.url}`);
       
-      // Try to save to Firebase if available
-      if (firebaseAvailable) {
-        try {
-          console.log(`[API] Attempting to save optimized data to Firebase for route: ${route.persistentId}`);
-          const firebaseSaveResult = await saveOptimizedRouteDataToFirebase(route.persistentId, embedData);
-          console.log(`[API] Firebase save result: ${firebaseSaveResult ? 'Success' : 'Failed'}`);
-        } catch (firebaseError) {
-          console.error(`[API] Error saving to Firebase, but continuing:`, firebaseError);
-          console.error(`[API] Error details:`, firebaseError.message);
-          if (firebaseError.code) {
-            console.error(`[API] Error code:`, firebaseError.code);
+    // Try to save to Firebase if available
+    if (firebaseAvailable) {
+      try {
+        console.log(`[API] ===== FIREBASE SAVE START =====`);
+        console.log(`[API] Attempting to save optimized data to Firebase for route: ${route.persistentId}`);
+        
+        // Log the structure of the data being saved
+        console.log(`[API] Data size: ${JSON.stringify(embedData).length} bytes`);
+        console.log(`[API] Data structure top-level keys:`, Object.keys(embedData));
+        
+        // Check if the data has the expected structure for hierarchical storage
+        if (!embedData.routes || !Array.isArray(embedData.routes)) {
+          console.warn(`[API] Warning: embedData.routes is missing or not an array`);
+        } else {
+          console.log(`[API] Routes array length: ${embedData.routes.length}`);
+          if (embedData.routes.length > 0) {
+            console.log(`[API] First route keys:`, Object.keys(embedData.routes[0]));
           }
-          // Continue even if Firebase save fails
         }
+        
+        if (!embedData.pois) {
+          console.warn(`[API] Warning: embedData.pois is missing`);
+        } else {
+          console.log(`[API] POIs structure:`, {
+            draggableCount: Array.isArray(embedData.pois.draggable) ? embedData.pois.draggable.length : 'not an array',
+            placesCount: Array.isArray(embedData.pois.places) ? embedData.pois.places.length : 'not an array'
+          });
+        }
+        
+        const firebaseSaveResult = await saveOptimizedRouteDataToFirebase(route.persistentId, embedData);
+        console.log(`[API] Firebase save result: ${firebaseSaveResult ? 'Success' : 'Failed'}`);
+        console.log(`[API] ===== FIREBASE SAVE END =====`);
+      } catch (firebaseError) {
+        console.error(`[API] ===== FIREBASE SAVE ERROR =====`);
+        console.error(`[API] Error saving to Firebase, but continuing:`, firebaseError);
+        console.error(`[API] Error details:`, firebaseError.message);
+        if (firebaseError.code) {
+          console.error(`[API] Error code:`, firebaseError.code);
+        }
+        console.error(`[API] ===== FIREBASE SAVE ERROR END =====`);
+        // Continue even if Firebase save fails
+      }
       } else {
         console.log(`[API] Firebase not available, skipping Firebase save for route: ${route.persistentId}`);
       }
@@ -927,15 +1269,19 @@ async function handleUpdateRoute(req, res) {
       // Try to save to Firebase if available
       if (firebaseAvailable) {
         try {
+          console.log(`[API] ===== FIREBASE SAVE START =====`);
           console.log(`[API] Attempting to save optimized data to Firebase for route: ${route.persistentId}`);
           const firebaseSaveResult = await saveOptimizedRouteDataToFirebase(route.persistentId, embedData);
           console.log(`[API] Firebase save result: ${firebaseSaveResult ? 'Success' : 'Failed'}`);
+          console.log(`[API] ===== FIREBASE SAVE END =====`);
         } catch (firebaseError) {
+          console.error(`[API] ===== FIREBASE SAVE ERROR =====`);
           console.error(`[API] Error saving to Firebase, but continuing:`, firebaseError);
           console.error(`[API] Error details:`, firebaseError.message);
           if (firebaseError.code) {
             console.error(`[API] Error code:`, firebaseError.code);
           }
+          console.error(`[API] ===== FIREBASE SAVE ERROR END =====`);
           // Continue even if Firebase save fails
         }
       } else {
@@ -1877,6 +2223,24 @@ async function handlePartialUpdate(req, res) {
         }
         
         console.log(`[API] Updated embed data uploaded successfully: ${result.url}`);
+        
+        // Try to save to Firebase if available
+        if (firebaseAvailable) {
+          try {
+            console.log(`[API] Attempting to save optimized data to Firebase for route: ${route.persistentId}`);
+            const firebaseSaveResult = await saveOptimizedRouteDataToFirebase(route.persistentId, embedData);
+            console.log(`[API] Firebase save result: ${firebaseSaveResult ? 'Success' : 'Failed'}`);
+          } catch (firebaseError) {
+            console.error(`[API] Error saving to Firebase, but continuing:`, firebaseError);
+            console.error(`[API] Error details:`, firebaseError.message);
+            if (firebaseError.code) {
+              console.error(`[API] Error code:`, firebaseError.code);
+            }
+            // Continue even if Firebase save fails
+          }
+        } else {
+          console.log(`[API] Firebase not available, skipping Firebase save for route: ${route.persistentId}`);
+        }
       } catch (embedError) {
         console.error(`[API] Error generating updated embed data:`, embedError);
         // Continue even if embed data generation fails

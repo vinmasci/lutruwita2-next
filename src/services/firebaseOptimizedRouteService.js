@@ -7,7 +7,7 @@
  */
 
 import { db } from './firebaseService';
-import { collection, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, FieldPath } from 'firebase/firestore';
 
 // SUPER VISIBLE LOGS FOR DEBUGGING
 console.log('=================================================================');
@@ -27,7 +27,7 @@ export const firebaseStatus = {
 console.log('FIREBASE STATUS INITIALIZED:', firebaseStatus);
 
 /**
- * Get optimized route data from Firebase
+ * Get optimized route data from Firebase using route-centric hierarchical structure
  * @param {string} routeId - The persistent ID of the route
  * @returns {Promise<Object|null>} - The optimized route data or null if not found
  */
@@ -38,9 +38,13 @@ export const getOptimizedRouteData = async (routeId) => {
     firebaseStatus.lastLoadedRoute = routeId;
     firebaseStatus.error = null;
     
+    // Extract the UUID part if the routeId is in the format "route-{uuid}"
+    const firebaseRouteId = routeId.startsWith('route-') ? routeId.substring(6) : routeId;
+    
     // SUPER VISIBLE LOGGING
     console.log('=================================================================');
     console.log(`🔄🔄🔄 FIREBASE LOADING ROUTE: ${routeId} 🔄🔄🔄`);
+    console.log(`🔄🔄🔄 FIREBASE ROUTE ID: ${firebaseRouteId} 🔄🔄🔄`);
     console.log('=================================================================');
     
     // Check if Firebase is initialized
@@ -57,96 +61,174 @@ export const getOptimizedRouteData = async (routeId) => {
     
     console.log('FIREBASE DB IS INITIALIZED, PROCEEDING WITH FETCH');
     
-    // Get the document reference
-    const docRef = doc(db, 'optimizedRoutes', routeId);
-    console.log('FIREBASE DOCUMENT REFERENCE CREATED:', docRef);
-    
-    // Get the document
-    console.log('STARTING FIREBASE DOCUMENT FETCH...');
+    // Start timing
     const startTime = performance.now();
-    const docSnap = await getDoc(docRef);
-    const endTime = performance.now();
-    const loadTime = (endTime - startTime).toFixed(2);
-    console.log(`FIREBASE DOCUMENT FETCH COMPLETED IN ${loadTime}ms`);
     
-    // Check if the document exists
-    if (docSnap.exists()) {
+    // Load from route-centric hierarchical structure
+    console.log('LOADING FROM ROUTE-CENTRIC STRUCTURE...');
+    
+    // 1. Get route metadata
+    const metadataRef = doc(db, 'routes', firebaseRouteId, 'metadata', 'info');
+    const metadataSnap = await getDoc(metadataRef);
+    
+    if (!metadataSnap.exists()) {
       console.log('=================================================================');
-      console.log(`✅✅✅ FIREBASE FOUND DATA FOR ROUTE: ${routeId} ✅✅✅`);
-      console.log(`✅✅✅ LOADED IN: ${loadTime}ms ✅✅✅`);
+      console.log(`❌❌❌ FIREBASE NO ROUTE METADATA FOUND FOR ROUTE: ${routeId} ❌❌❌`);
+      console.log(`❌❌❌ FIREBASE ROUTE ID USED: ${firebaseRouteId} ❌❌❌`);
       console.log('=================================================================');
       
-      const data = docSnap.data();
-      console.log('FIREBASE DATA STRUCTURE:', Object.keys(data));
-      
-      // Update status
       firebaseStatus.isLoading = false;
-      firebaseStatus.success = true;
-      firebaseStatus.lastLoadTime = loadTime;
-      
-      // Check if the data is stored as a string (new format) or as an object (old format)
-      if (data.dataString) {
-        console.log('FIREBASE DATA FORMAT: String format (dataString)');
-        console.log(`FIREBASE DATA SIZE: ${(data.dataString.length / 1024).toFixed(2)} KB`);
+      firebaseStatus.success = false;
+      firebaseStatus.error = 'Route metadata not found';
+      return null;
+    }
+    
+    console.log('FOUND ROUTE METADATA IN ROUTE-CENTRIC STRUCTURE');
+    
+    // 2. Get route GeoJSON data
+    const geojsonRef = doc(db, 'routes', firebaseRouteId, 'geojson', 'routes');
+    const geojsonSnap = await getDoc(geojsonRef);
+    
+    // 3. Get POIs
+    const poisRef = doc(db, 'routes', firebaseRouteId, 'pois', 'data');
+    const poisSnap = await getDoc(poisRef);
+    
+    // 4. Get lines
+    const linesRef = doc(db, 'routes', firebaseRouteId, 'lines', 'data');
+    const linesSnap = await getDoc(linesRef);
+    
+    // 5. Get photos metadata
+    const photosRef = doc(db, 'routes', firebaseRouteId, 'photos', 'data');
+    const photosSnap = await getDoc(photosRef);
+    
+    // 6. Load route coordinates if needed
+    const geojsonData = geojsonSnap.exists() ? geojsonSnap.data() : { routes: [] };
+    const routes = geojsonData.routes || [];
+    
+    // Check if any route segments need coordinates loaded
+    for (const route of routes) {
+      if (route.geojson?.features?.[0]?.geometry?.coordinates?.length === 0) {
+        console.log(`Loading coordinates for route segment: ${route.name || 'unnamed'}`);
         
-        try {
-          // Parse the stringified data
-          console.log('PARSING FIREBASE STRING DATA...');
-          const parsedData = JSON.parse(data.dataString);
-          console.log('=================================================================');
-          console.log('✅✅✅ FIREBASE DATA PARSED SUCCESSFULLY ✅✅✅');
-          console.log('=================================================================');
+        // First try to load all coordinates at once from the 'all' document
+        const allCoordsRef = doc(db, 'routes', firebaseRouteId, 'coordinates', 'all');
+        const allCoordsSnap = await getDoc(allCoordsRef);
+        
+        if (allCoordsSnap.exists()) {
+          // Use the single document with all coordinates
+          const allCoords = allCoordsSnap.data().coordinates || [];
+          route.geojson.features[0].geometry.coordinates = allCoords;
+          console.log(`Loaded ${allCoords.length} coordinates from single document`);
+        } else {
+          // Fall back to loading from chunks directly in the coordinates collection
+          const chunksQuery = query(
+            collection(db, 'routes', firebaseRouteId, 'coordinates'),
+            where(FieldPath.documentId(), '>=', 'chunk_'),
+            where(FieldPath.documentId(), '<=', 'chunk_~'),
+            orderBy(FieldPath.documentId())
+          );
           
-          // Log some data properties to verify content
-          if (parsedData) {
-            console.log('FIREBASE PARSED DATA PROPERTIES:', 
-              Object.keys(parsedData).slice(0, 10).join(', '));
-            
-            if (parsedData.name) {
-              console.log('FIREBASE ROUTE NAME:', parsedData.name);
-            }
-            
-            if (parsedData.persistentId) {
-              console.log('FIREBASE ROUTE PERSISTENT ID:', parsedData.persistentId);
+          const chunksSnap = await getDocs(chunksQuery);
+          
+          // Reassemble coordinates from chunks
+          const allCoordinates = [];
+          const chunks = [];
+          
+          chunksSnap.forEach(chunkDoc => {
+            const chunkData = chunkDoc.data();
+            chunks[chunkData.index] = chunkData;
+          });
+          
+          // Ensure chunks are in the correct order
+          for (let i = 0; i < chunks.length; i++) {
+            if (chunks[i] && chunks[i].coordinates) {
+              allCoordinates.push(...chunks[i].coordinates);
             }
           }
           
-          return parsedData;
-        } catch (parseError) {
-          console.log('=================================================================');
-          console.log('❌❌❌ FIREBASE ERROR PARSING DATA ❌❌❌');
-          console.log('ERROR:', parseError.message);
-          console.log('=================================================================');
-          
-          firebaseStatus.error = 'Error parsing data';
-          firebaseStatus.success = false;
-          return null;
+                // Set coordinates in the route
+                if (allCoordinates.length > 0) {
+                  route.geojson.features[0].geometry.coordinates = allCoordinates;
+                  console.log(`Loaded ${allCoordinates.length} coordinates from ${chunks.length} chunks`);
+                }
+                
+                // Ensure the route has the elevation data in the expected format
+                if (route.surface && route.surface.elevationProfile && route.surface.elevationProfile.length > 0) {
+                  // Make sure properties and coordinateProperties exist
+                  if (!route.geojson.features[0].properties) {
+                    route.geojson.features[0].properties = {};
+                  }
+                  if (!route.geojson.features[0].properties.coordinateProperties) {
+                    route.geojson.features[0].properties.coordinateProperties = {};
+                  }
+                  
+                  // Extract just the elevation values
+                  const elevations = route.surface.elevationProfile.map(point => point.elevation);
+                  route.geojson.features[0].properties.coordinateProperties.elevation = elevations;
+                  console.log(`Added ${elevations.length} elevation points from surface.elevationProfile`);
+                }
         }
-      } else if (data.data) {
-        // Old format - data stored directly in data field
-        console.log('FIREBASE DATA FORMAT: Direct object format (data)');
-        console.log('FIREBASE DATA PROPERTIES:', 
-          Object.keys(data.data).slice(0, 10).join(', '));
-        return data.data;
       }
-      
-      console.log('=================================================================');
-      console.log('❌❌❌ FIREBASE NO VALID DATA FORMAT FOUND ❌❌❌');
-      console.log('=================================================================');
-      
-      firebaseStatus.error = 'Invalid data format';
-      firebaseStatus.success = false;
-      return null;
-    } else {
-      console.log('=================================================================');
-      console.log(`❌❌❌ FIREBASE NO DATA FOUND FOR ROUTE: ${routeId} ❌❌❌`);
-      console.log('=================================================================');
-      
-      firebaseStatus.isLoading = false;
-      firebaseStatus.success = false;
-      firebaseStatus.error = 'Document not found';
-      return null;
     }
+    
+    // Calculate load time
+    const endTime = performance.now();
+    const loadTime = (endTime - startTime).toFixed(2);
+    
+    // Combine all data
+    const metadata = metadataSnap.data() || {};
+    const poisData = poisSnap.exists() ? poisSnap.data() : { draggable: [], places: [] };
+    const linesData = linesSnap.exists() ? linesSnap.data() : { lines: [] };
+    const photosData = photosSnap.exists() ? photosSnap.data() : { photos: [] };
+    
+    // Only log lines data in development mode
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development') {
+      console.log(`[Firebase] Lines data for route ${routeId}: ${linesData.lines ? linesData.lines.length : 0} lines`);
+    }
+    
+    // Construct the combined data object
+    const combinedData = {
+      persistentId: routeId,
+      name: metadata.name,
+      type: metadata.type,
+      isPublic: metadata.isPublic,
+      userId: metadata.userId,
+      eventDate: metadata.eventDate,
+      headerSettings: metadata.headerSettings,
+      mapState: metadata.mapState,
+      mapOverview: metadata.mapOverview,
+      staticMapUrl: metadata.staticMapUrl,
+      staticMapPublicId: metadata.staticMapPublicId,
+      routes: routes,
+      pois: poisData,
+      lines: linesData.lines || [],
+      photos: photosData.photos || [],
+      _type: 'loaded',
+      _loadedState: {
+        name: metadata.name,
+        type: metadata.type,
+        eventDate: metadata.eventDate,
+        pois: poisData,
+        lines: linesData.lines || [],
+        photos: photosData.photos || [],
+        headerSettings: metadata.headerSettings,
+        mapOverview: metadata.mapOverview,
+        staticMapUrl: metadata.staticMapUrl,
+        staticMapPublicId: metadata.staticMapPublicId
+      }
+    };
+    
+    console.log('=================================================================');
+    console.log(`✅✅✅ FIREBASE LOADED ROUTE-CENTRIC DATA FOR ROUTE: ${routeId} ✅✅✅`);
+    console.log(`✅✅✅ LOADED IN: ${loadTime}ms ✅✅✅`);
+    console.log('=================================================================');
+    
+    // Update status
+    firebaseStatus.isLoading = false;
+    firebaseStatus.success = true;
+    firebaseStatus.lastLoadTime = loadTime;
+    
+    return combinedData;
   } catch (error) {
     console.log('=================================================================');
     console.log('❌❌❌ FIREBASE ERROR GETTING OPTIMIZED DATA ❌❌❌');
@@ -173,8 +255,12 @@ export const hasOptimizedRouteData = async (routeId) => {
     firebaseStatus.lastLoadedRoute = routeId;
     firebaseStatus.error = null;
     
+    // Extract the UUID part if the routeId is in the format "route-{uuid}"
+    const firebaseRouteId = routeId.startsWith('route-') ? routeId.substring(6) : routeId;
+    
     console.log('=================================================================');
     console.log(`🔍🔍🔍 FIREBASE CHECKING IF ROUTE EXISTS: ${routeId} 🔍🔍🔍`);
+    console.log(`🔍🔍🔍 FIREBASE ROUTE ID: ${firebaseRouteId} 🔍🔍🔍`);
     console.log('=================================================================');
     
     // Check if Firebase is initialized
@@ -191,35 +277,35 @@ export const hasOptimizedRouteData = async (routeId) => {
     
     console.log('FIREBASE DB IS INITIALIZED, PROCEEDING WITH CHECK');
     
-    // Get the document reference
-    const docRef = doc(db, 'optimizedRoutes', routeId);
-    console.log('FIREBASE DOCUMENT REFERENCE CREATED FOR CHECK:', docRef);
-    
-    // Get the document
-    console.log('STARTING FIREBASE DOCUMENT CHECK...');
+    // Start timing
     const startTime = performance.now();
-    const docSnap = await getDoc(docRef);
+    
+    // Check route-centric structure
+    console.log('CHECKING ROUTE-CENTRIC STRUCTURE...');
+    
+    // Check for route metadata (the most essential part)
+    const metadataRef = doc(db, 'routes', firebaseRouteId, 'metadata', 'info');
+    const metadataSnap = await getDoc(metadataRef);
+    
     const endTime = performance.now();
     const checkTime = (endTime - startTime).toFixed(2);
-    console.log(`FIREBASE DOCUMENT CHECK COMPLETED IN ${checkTime}ms`);
     
     // Update status
     firebaseStatus.isLoading = false;
-    firebaseStatus.success = docSnap.exists();
+    firebaseStatus.success = metadataSnap.exists();
     firebaseStatus.lastLoadTime = checkTime;
     
-    if (docSnap.exists()) {
+    if (metadataSnap.exists()) {
       console.log('=================================================================');
-      console.log(`✅✅✅ FIREBASE ROUTE DATA EXISTS (checked in ${checkTime}ms) ✅✅✅`);
+      console.log(`✅✅✅ FIREBASE ROUTE DATA EXISTS IN ROUTE-CENTRIC STRUCTURE (checked in ${checkTime}ms) ✅✅✅`);
       console.log('=================================================================');
+      return true;
     } else {
       console.log('=================================================================');
       console.log(`❌❌❌ FIREBASE ROUTE DATA DOES NOT EXIST (checked in ${checkTime}ms) ❌❌❌`);
       console.log('=================================================================');
+      return false;
     }
-    
-    // Return true if the document exists
-    return docSnap.exists();
   } catch (error) {
     console.log('=================================================================');
     console.log('❌❌❌ FIREBASE ERROR CHECKING OPTIMIZED DATA ❌❌❌');

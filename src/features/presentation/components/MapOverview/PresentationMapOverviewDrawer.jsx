@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import MapOverviewContextAdapter from '../EmbedMapView/components/MapOverviewContextAdapter';
-import MapOverviewLoader from './MapOverviewLoader';
 import { PresentationMapOverviewContent } from './PresentationMapOverviewContent';
 
 const PresentationMapOverviewDrawer = () => {
@@ -38,7 +37,7 @@ const PresentationMapOverviewDrawer = () => {
         <Box sx={{ height: '20px' }}></Box>
         
         <MapOverviewContextAdapter>
-          <MapOverviewLoader />
+          {/* MapOverviewLoader removed as it's no longer needed */}
           <PresentationMapOverviewContent />
         </MapOverviewContextAdapter>
       </Box>

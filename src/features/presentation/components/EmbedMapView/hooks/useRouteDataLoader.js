@@ -154,7 +154,13 @@ export const useRouteDataLoader = (stateId) => {
                 }
                 
                 // Get the first route ID (we'll only load one route for simplicity)
-                const routeId = decodedState.routes[0].id;
+                let routeId = decodedState.routes[0].id;
+                
+                // Ensure the route ID has the "route-" prefix if it doesn't already
+                if (!routeId.startsWith('route-')) {
+                    routeId = `route-${routeId}`;
+                    console.log(`[useRouteDataLoader] Added 'route-' prefix to route ID: ${routeId}`);
+                }
                 
                 try {
                     // First get the route data from the API to get the embedUrl

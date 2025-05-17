@@ -81,11 +81,21 @@ export default function EmbedMapView() {
         isLoading,
         routeData,
         mapState,
-        error,
+        error: routeDataError,
         currentRoute,
         setCurrentRoute,
         setRouteData
     } = useRouteDataLoader(stateId);
+    
+    // Add local error state for map errors
+    const [error, setError] = useState(routeDataError);
+    
+    // Update local error state when routeDataError changes
+    useEffect(() => {
+        if (routeDataError) {
+            setError(routeDataError);
+        }
+    }, [routeDataError]);
     
     // Load Font Awesome for icons
     useEffect(() => {
@@ -585,14 +595,18 @@ export default function EmbedMapView() {
                 // Check if component is still mounted
                 if (!isMounted) return;
                 
+                // Use import.meta.env instead of process.env for browser compatibility
+                const isDevelopment = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development';
+                const debugLogging = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_DEBUG_LOGGING === 'true';
+                
                 // Reduced logging - only log in development mode
-                if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                if (isDevelopment && debugLogging) {
                     console.log('[EmbedMapView] Style changed, checking if hover-point needs to be re-added');
                 }
                 
                 // Check if the hover-point source exists
                 if (!map.getSource('hover-point')) {
-                    if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                    if (isDevelopment && debugLogging) {
                         console.log('[EmbedMapView] Re-adding hover-point source and layer after style change');
                     }
                     
@@ -647,12 +661,20 @@ export default function EmbedMapView() {
             // Check if style is fully loaded
             const waitForStyleLoaded = () => {
                 if (map.isStyleLoaded()) {
-                    if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                    // Use import.meta.env instead of process.env for browser compatibility
+                    const isDevelopment = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development';
+                    const debugLogging = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_DEBUG_LOGGING === 'true';
+                    
+                    if (isDevelopment && debugLogging) {
                         console.log('[EmbedMapView] Map style fully loaded, proceeding with initialization');
                     }
                     initializeMapAfterStyleLoad();
                 } else {
-                    if (process.env.NODE_ENV === 'development' && process.env.VITE_DEBUG_LOGGING === 'true') {
+                    // Use import.meta.env instead of process.env for browser compatibility
+                    const isDevelopment = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development';
+                    const debugLogging = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_DEBUG_LOGGING === 'true';
+                    
+                    if (isDevelopment && debugLogging) {
                         console.log('[EmbedMapView] Style not fully loaded yet, waiting...');
                     }
                     // Wait a bit and check again

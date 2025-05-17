@@ -46,19 +46,19 @@
         </p>
         
         <div class="embed-container">
-            <h2>Example Embed</h2>
-            <p>This is an example of an embedded map:</p>
-            
+            <h2>Firebase Embed</h2>
+            <p>This is our Firebase implementation for route data storage:</p>
+
             <iframe 
-              src="http://localhost:3000/embed/eyJyb3V0ZXMiOlt7ImlkIjoicm91dGUtYTdjNmEzYzYtYTNmNy00OWNmLTlhNjgtZmZmMDk2ZjkxNzQ0IiwidmlzaWJsZSI6dHJ1ZX0seyJpZCI6InJvdXRlLTU4OWNlMDkwLTQ5YTQtNDU4MC05NTUyLTc4NDliZWM3MWZlMiIsInZpc2libGUiOnRydWV9LHsiaWQiOiJyb3V0ZS02MmU0MjBiZi1hZjQzLTQyZTctYjRiZS03OTAzN2E5YjM5YzgiLCJ2aXNpYmxlIjp0cnVlfSx7ImlkIjoicm91dGUtMTE2MjE1MzYtZjcyNS00MmVlLThjY2QtNjU5OGNlM2E1ZWQ4IiwidmlzaWJsZSI6dHJ1ZX1dLCJtYXBTdGF0ZSI6eyJjZW50ZXIiOlsxNDIuNDc0NDQ3MjIwODE3OTgsLTM3LjA5Njk0MTIxMzUyNTIyXSwiem9vbSI6MTEuNDY3NjM0MzM1MTgxNTY2LCJiZWFyaW5nIjowLCJwaXRjaCI6MCwic3R5bGUiOiJNYXBib3ggU2F0ZWxsaXRlIFN0cmVldHMifX0=" 
-              width="800" 
-              height="600" 
-              style="border:0; border-radius:12px; overflow:hidden;" 
-              allowfullscreen="" 
-              loading="lazy">
-            </iframe>
+            src="http://localhost:3000/embed/eyJyb3V0ZXMiOlt7ImlkIjoiYzQ5OTQ5MWMtZTZjOC00NTAzLTllNjUtNzU1Y2JiMTFjOWRkIiwidmlzaWJsZSI6dHJ1ZX1dLCJtYXBTdGF0ZSI6eyJjZW50ZXIiOlsxNDcuMzU3ODksLTQxLjM1NDU4NjIyNDMyNTQyXSwiem9vbSI6MTMuMjE1MzMyMTM1MTc1ODYzLCJiZWFyaW5nIjowLCJwaXRjaCI6MCwic3R5bGUiOiJNYXBib3ggU2F0ZWxsaXRlIFN0cmVldHMifX0=" 
+            width="800px" 
+            height="600px" 
+            style="border:0; border-radius:12px; overflow:hidden;" 
+            allowfullscreen="" 
+            loading="lazy">
+          </iframe>
             
-            <p><em>Note: This iframe now uses our new Cloudinary-based implementation for faster loading. The system automatically generated and uploaded the pre-processed data to Cloudinary!</em></p>
+            <p><em>Note: This iframe uses our Firebase implementation for loading route data. The system loads data directly from our Firebase hierarchical data structure.</em></p>
         </div>
         
         <h2>How to Embed</h2>
@@ -84,15 +84,34 @@
             <li>Optimized performance with caching</li>
         </ul>
         
-        <h2>New Implementation Improvements</h2>
+        <h2>Implementation Improvements</h2>
         <ul>
-            <li><strong>Pre-processed data stored in Cloudinary</strong> for ultra-fast CDN delivery</li>
-            <li>Single API request for all data (routes, POIs, elevation data)</li>
+            <li><strong>Hierarchical data stored in Firebase</strong> for improved performance and offline capabilities</li>
+            <li><strong>Optimized data structure</strong> for efficient querying and retrieval</li>
+            <li>Single data source for all route components (metadata, GeoJSON, POIs, etc.)</li>
             <li>Simplified component architecture for better performance</li>
             <li>Progressive loading for better user experience</li>
-            <li>Server-side caching for faster loading</li>
             <li>Direct rendering of POIs without complex context providers</li>
             <li>Automatic updates to embed data when routes are modified</li>
+            <li>Consistent error handling and user feedback</li>
+        </ul>
+        
+        <h2>Firebase Implementation</h2>
+        <p>
+            The iframe above demonstrates our Firebase implementation. It uses a dedicated route data loader
+            that loads data exclusively from Firebase, with no fallbacks to other storage systems. This approach
+            provides a cleaner, more direct data flow and better performance.
+        </p>
+        <p>
+            Key aspects of the implementation:
+        </p>
+        <ul>
+            <li>Loading route metadata from Firebase's hierarchical structure</li>
+            <li>Loading route GeoJSON data from Firebase</li>
+            <li>Loading POIs from Firebase</li>
+            <li>Loading lines from Firebase</li>
+            <li>Direct error handling for Firebase-specific issues</li>
+            <li>Simplified data flow with no fallback complexity</li>
         </ul>
     </div>
 </body>

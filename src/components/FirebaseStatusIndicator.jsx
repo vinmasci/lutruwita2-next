@@ -6,12 +6,33 @@ import { getFirebaseStatus } from '../services/firebaseOptimizedRouteService';
  * This helps users see when data is being loaded from Firebase and whether it was successful
  */
 const FirebaseStatusIndicator = ({ position = 'bottom-right', showDetails = true }) => {
-  const [status, setStatus] = useState(getFirebaseStatus());
+  const [status, setStatus] = useState(null);
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  // Update status every 500ms
+  // Helper function to check if we're in presentation mode
+  const isPresentationMode = () => {
+    if (typeof window === 'undefined') return false;
+    
+    // Check if the current URL path indicates presentation mode
+    const path = window.location.pathname;
+    return path.startsWith('/preview') || 
+           path.startsWith('/embed') || 
+           path === '/'; // Landing page is also presentation mode
+  };
+
+  // Update status every 500ms, but only if in presentation mode
   useEffect(() => {
+    // Skip in creation mode
+    if (!isPresentationMode()) {
+      console.log('[FirebaseStatusIndicator] In creation mode, skipping Firebase status updates');
+      return;
+    }
+
+    // Initialize status
+    const initialStatus = getFirebaseStatus();
+    setStatus(initialStatus);
+    
     const interval = setInterval(() => {
       const currentStatus = getFirebaseStatus();
       setStatus(currentStatus);
@@ -47,8 +68,8 @@ const FirebaseStatusIndicator = ({ position = 'bottom-right', showDetails = true
     }
   };
 
-  // Don't render if not visible
-  if (!visible) return null;
+  // Don't render if not visible or if status is null
+  if (!visible || !status) return null;
 
   return (
     <div 

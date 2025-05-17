@@ -27,7 +27,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: #4AA4DE;
+  background-color: #36454F; /* Charcoal background */
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
@@ -150,7 +150,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 50%;
+  border-radius: 50%; /* Make the image itself circular */
 }
 
 .photo-marker-bubble:hover {
@@ -163,7 +163,7 @@
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-top: 8px solid white;
+  border-top: 8px solid white; /* Default to white point */
   margin-top: -1px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
@@ -186,11 +186,13 @@
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2)) !important;
 }
 
-/* Manually placed marker point */
+/* Manually placed marker point - now defaults to white due to above change, or remove/comment this rule if blue is not desired */
+/*
 .photo-marker-container.manually-placed .photo-marker-point {
-  border-top-color: #3498db; /* Blue point */
+  border-top-color: #3498db; // Blue point 
   filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
 }
+*/
 
 /* Unsaved changes marker point */
 .photo-marker-container.unsaved-changes .photo-marker-point {
@@ -198,11 +200,13 @@
   filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
 }
 
-/* Highlighted and manually placed marker point */
+/* Highlighted and manually placed marker point - if manually placed should have a distinct color, re-enable and adjust. For now, it will take highlighted color or default white. */
+/*
 .photo-marker-container.highlighted.manually-placed .photo-marker-point {
-  border-top-color: #3498db; /* Blue point */
+  border-top-color: #3498db; // Blue point 
   filter: drop-shadow(0 0 5px rgba(52, 152, 219, 0.7));
 }
+*/
 
 /* Unsaved changes marker point with other states */
 .photo-marker-container.unsaved-changes.manually-placed .photo-marker-point,
