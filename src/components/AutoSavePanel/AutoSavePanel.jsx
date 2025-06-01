@@ -79,7 +79,7 @@ const AutoSavePanel = () => {
         autoSaveId,
         routeName.trim(),
         userId,
-        false, // Not public by default
+        true, // Public by default
         [] // No tags by default
       );
       

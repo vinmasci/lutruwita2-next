@@ -335,7 +335,7 @@ export const PhotoModal = ({
             style={{
               height: '100%',
               width: '100%',
-              objectFit: 'cover', // Fill the container while maintaining aspect ratio
+              objectFit: 'cover', // Fill the frame, cropping if necessary
               objectPosition: 'center' // Center the image
             }}
           />

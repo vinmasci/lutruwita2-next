@@ -26,7 +26,8 @@ export const UserProfileModal = ({ open, onClose }) => {
     name: '',
     email: '',
     website: '',
-    picture: ''
+    picture: '',
+    username: ''
   });
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -78,7 +79,8 @@ export const UserProfileModal = ({ open, onClose }) => {
               name: userData.name || '',
               email: userData.email || '',
               website: userData.website || '',
-              picture: userData.picture || user?.picture || ''
+              picture: userData.picture || user?.picture || '',
+              username: userData.nickname || ''
             });
             return;
           }
@@ -93,7 +95,8 @@ export const UserProfileModal = ({ open, onClose }) => {
           name: user.name || '',
           email: user.email || '',
           website: user.website || '',
-          picture: user.picture || ''
+          picture: user.picture || '',
+          username: user.nickname || ''
         });
       } else {
         console.log('Not initializing form - conditions not met:', { open, isAuthenticated, hasUser: !!user });
@@ -225,6 +228,17 @@ export const UserProfileModal = ({ open, onClose }) => {
               onChange={handleChange}
               margin="normal"
               variant="outlined"
+            />
+            
+            <TextField
+              fullWidth
+              label="Username"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              margin="normal"
+              variant="outlined"
+              placeholder="e.g., mascivincent"
             />
             
             <TextField

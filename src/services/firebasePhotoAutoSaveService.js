@@ -31,6 +31,29 @@ export const firebasePhotoAutoSaveStatus = {
   autoSaveId: null // Add autoSaveId to track the current auto-save
 };
 
+// Helper function to recursively remove undefined properties from an object or array
+const sanitizeForFirebase = (data) => {
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirebase(item)).filter(item => item !== undefined);
+  } else if (data !== null && typeof data === 'object') {
+    const sanitizedObject = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key) && data[key] !== undefined) {
+        const value = sanitizeForFirebase(data[key]);
+        if (value !== undefined) {
+          sanitizedObject[key] = value;
+        }
+      }
+    }
+    // Return null if the object becomes empty after sanitization,
+    // or if the original object was intended to represent deletion (e.g. an empty object for a subcollection)
+    // However, for setDoc, an empty object might be valid to clear fields.
+    // Let's return the object even if empty, Firestore handles empty objects for document data.
+    return sanitizedObject;
+  }
+  return data;
+};
+
 /**
  * Auto-save photos to Firebase
  * @param {Array} photos - The photos data from PhotoContext
@@ -196,8 +219,12 @@ export const autoSavePhotosToFirebase = async (photos, processedRoute, userId, a
     firebasePhotoAutoSaveStatus.error = error.message;
     
     // Also update the global context if available
-    if (autoSave && autoSave.setAutoSaveError) {
+    // Check if autoSave and setAutoSaveError are defined before calling
+    if (autoSave && typeof autoSave.setAutoSaveError === 'function') {
       autoSave.setAutoSaveError(error);
+    } else {
+      // Log if autoSave or setAutoSaveError is not available
+      console.warn('[firebasePhotoAutoSaveService] AutoSaveContext or setAutoSaveError not available in error handler for autoSavePhotosToFirebase');
     }
     return null;
   }
@@ -294,16 +321,19 @@ const savePhotosToExistingAutoSave = async (autoSaveId, photos, processedRoute =
           id: photo.id || `photo-${Date.now()}-${Math.random().toString().substring(2, 8)}`,
           publicId: uploadedPhoto.publicId,
           url: uploadedPhoto.url, // This is already a secure HTTPS URL
-          caption: photo.caption || '',
-          dateAdded: (photo.dateAdded && typeof photo.dateAdded !== 'string') 
-            ? photo.dateAdded.toISOString() 
-            : (photo.dateAdded || new Date().toISOString()),
-          isManuallyPlaced: !!photo.isManuallyPlaced,
-          name: photo.name || '',
-          coordinates: photo.coordinates && photo.isManuallyPlaced ? {
+          caption: uploadedPhoto.caption || photo.caption || '', // Prioritize uploadedPhoto's caption
+          dateAdded: (uploadedPhoto.dateAdded || photo.dateAdded) 
+            ? new Date(uploadedPhoto.dateAdded || photo.dateAdded).toISOString()
+            : new Date().toISOString(),
+          isManuallyPlaced: !!uploadedPhoto.isManuallyPlaced, // Use isManuallyPlaced from uploadedPhoto
+          name: uploadedPhoto.name || photo.name || '', // Prioritize uploadedPhoto's name
+          coordinates: uploadedPhoto.coordinates ? { // Use coordinates from uploadedPhoto if they exist
+            lng: uploadedPhoto.coordinates.lng,
+            lat: uploadedPhoto.coordinates.lat
+          } : (photo.coordinates ? { // Fallback to original photo's coordinates
             lng: photo.coordinates.lng,
             lat: photo.coordinates.lat
-          } : undefined
+          } : undefined)
         };
       } else {
         // Create a clean photo object with only the properties we need
@@ -335,13 +365,14 @@ const savePhotosToExistingAutoSave = async (autoSaveId, photos, processedRoute =
           // Don't include blob URLs as they're temporary and only valid in the current session
         }
         
-        // Only add coordinates if they exist and the photo is manually placed
-        if (photo.coordinates && photo.isManuallyPlaced) {
+        // Add coordinates if they exist on the photo object, regardless of isManuallyPlaced
+        if (photo.coordinates) {
           cleanPhoto.coordinates = {
             lng: photo.coordinates.lng,
             lat: photo.coordinates.lat
           };
         }
+        // isManuallyPlaced is already set correctly on cleanPhoto
         
         return cleanPhoto;
       }
@@ -398,9 +429,14 @@ const savePhotosToExistingAutoSave = async (autoSaveId, photos, processedRoute =
           console.log('Photos document does not exist, nothing to delete');
         }
       } else {
-        // Save the data to Firebase
-        await setDoc(photosRef, { data: processedPhotos });
-        console.log('Photos data saved successfully to Firebase');
+        // Sanitize the data before saving
+        const sanitizedPhotoData = sanitizeForFirebase(processedPhotos);
+        
+        // Ensure the top-level structure is { data: [...] }
+        const dataToSave = { data: Array.isArray(sanitizedPhotoData) ? sanitizedPhotoData : [] };
+
+        await setDoc(photosRef, dataToSave);
+        console.log('Photos data saved successfully to Firebase with data:', dataToSave);
       }
       
       // Verify the data was saved by reading it back

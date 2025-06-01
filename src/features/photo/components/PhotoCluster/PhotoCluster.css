@@ -33,27 +33,27 @@
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
-  z-index: 1;
-  overflow: hidden;
-  opacity: 1; /* 60% transparent */
+  z-index: 1; /* Bubble is at z-index 1 */
+  overflow: hidden; /* Crucial for clipping the image to the bubble's shape */
+  opacity: 1; /* Ensure full opacity, remove misleading comment */
 }
 
 /* Highlighted cluster style */
 .photo-cluster-bubble.highlighted {
-  transform: scale(1.2);
-  border: 3px solid #FF9500; /* Orange border */
-  box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5); /* Glowing effect */
-  animation: pulse 1.5s infinite alternate;
+  transform: scale(1.2); /* Keep scale for visual feedback */
+  /* border: 3px solid #FF9500; */ /* Orange border - REMOVED */
+  /* box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5); */ /* Glowing effect - REMOVED */
+  /* animation: pulse 1.5s infinite alternate; */ /* REMOVED */
 }
 
-@keyframes pulse {
+/* @keyframes pulse {
   from {
     box-shadow: 0 0 15px rgba(255, 149, 0, 0.7), 0 0 30px rgba(255, 149, 0, 0.5);
   }
   to {
     box-shadow: 0 0 20px rgba(255, 149, 0, 0.9), 0 0 40px rgba(255, 149, 0, 0.7);
   }
-}
+} */ /* REMOVED pulse animation */
 
 /* Zoom-based scaling for the entire container */
 .photo-cluster[data-zoom="3"] .photo-cluster-container { transform: scale(0.1); }
@@ -71,14 +71,23 @@
 
 .photo-cluster-count {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: -5px; /* Reverted for more overlap */
+  right: -5px; /* Reverted for more overlap */
+  background-color: #ff0000; /* Match POI cluster chip */
   color: white;
+  border: 1px solid white; /* Match POI cluster chip */
+  border-radius: 50%;
+  font-size: 10px; /* Match POI cluster chip */
   font-weight: bold;
-  font-size: 14px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  z-index: 2;
+  width: 20px; /* Match POI cluster chip */
+  height: 20px; /* Match POI cluster chip */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Match POI cluster chip */
+  z-index: 5; /* Increased z-index to ensure it's on top of the bubble and image */
+  /* text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); Removed as POI chip doesn't have it */
+  /* transform: translate(-50%, -50%); Removed as positioning is now top/right */
 }
 
 .photo-cluster-previews {
@@ -87,6 +96,9 @@
   left: 0;
   width: 100%;
   height: 100%;
+  border-radius: 50%; /* Ensure image container is also circular */
+  overflow: hidden; /* Clip the image within this container */
+  z-index: 1; /* Image preview should be stacked within the bubble, above its background but respecting its border */
 }
 
 .photo-cluster-previews img {
@@ -116,6 +128,8 @@
 
 /* Highlighted cluster point */
 .photo-cluster-container.highlighted .photo-cluster-point {
-  border-top-color: #FF9500; /* Orange point */
-  filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7));
+  /* border-top-color: #FF9500; */ /* Orange point - REMOVED */
+  /* filter: drop-shadow(0 0 5px rgba(255, 149, 0, 0.7)); */ /* REMOVED */
+  /* Keep original point color (white) or default */
+  border-top-color: white; /* Explicitly set back to white or remove if default is white */
 }

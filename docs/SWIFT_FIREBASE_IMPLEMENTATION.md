@@ -1526,6 +1526,73 @@ The Swift app's landing page should follow the design and functionality of the e
 - [x] Type filtering (All, Tourism, Bikepacking, Event)
 - [x] Camera positioning to show all visible routes
 - [x] Tap handling for route markers
+- [x] On-demand loading of full route coordinates
+- [x] Display of full route path when marker is tapped
+- [x] RouteListDrawer for browsing visible routes
+- [x] RoutePreviewDrawer for quick route information
+- [x] Shared UI utilities for consistent styling
+
+### 8. Performance Optimizations
+
+#### 8.1 Efficient Route Marker Loading
+
+To improve performance and user experience, we implemented a two-phase loading approach:
+
+1. **Initial Load (Fast)**:
+   - Load only the first coordinate for each route synchronously
+   - Display route markers immediately on the map
+   - This provides users with an immediate overview of available routes
+
+2. **On-Demand Detail Loading**:
+   - Load full route coordinates only when a marker is tapped
+   - Display the complete route path after loading
+   - This avoids loading unnecessary data for routes the user isn't interested in
+
+#### 8.2 Implementation Details
+
+The implementation uses a notification system to handle marker taps:
+
+```swift
+// In HomeView.swift - Set up notification observer
+NotificationCenter.default.addObserver(
+    forName: Notification.Name("RouteMarkerTapped"),
+    object: nil,
+    queue: .main
+) { notification in
+    if let routeId = notification.userInfo?["routeId"] as? String {
+        // Load full route coordinates
+        Task {
+            await viewModel.loadFullRouteCoordinates(for: routeId)
+        }
+    }
+}
+
+// In MapViewRepresentable - Handle tap and post notification
+@objc func handleMapTap(_ gesture: UITapGestureRecognizer) {
+    // Find tapped annotation
+    if let routeId = tappedRouteId {
+        NotificationCenter.default.post(
+            name: Notification.Name("RouteMarkerTapped"),
+            object: nil,
+            userInfo: ["routeId": routeId]
+        )
+    }
+}
+
+// In RouteListViewModel - Load full coordinates
+func loadFullRouteCoordinates(for routeId: String) async {
+    // Find the route in the routes array
+    guard let index = routes.firstIndex(where: { $0.id == routeId }) else {
+        return
+    }
+    
+    // Load coordinates from Firebase
+    // Update the route with coordinates
+    // Notify SwiftUI that the view model has changed
+}
+```
+
+This approach ensures that the app remains responsive while providing detailed route information when needed.
 
 ## Conclusion
 
@@ -1533,4 +1600,17 @@ This implementation guide provides a comprehensive approach to integrating Fireb
 
 The implementation is based on the existing web app's architecture, with adaptations for Swift and iOS. The Firebase schema is used as a reference for creating the Swift models and implementing the data fetching logic.
 
-For any questions or issues, refer to the reference files listed at the beginning of this document.
+The two-phase loading approach (markers first, full routes on demand) provides an optimal balance between performance and functionality, ensuring a smooth user experience even with a large number of routes.
+
+## Related Documentation
+
+For more information on implementing specific features using this Firebase integration, refer to:
+
+- [FIREBASE_QUERY_FIX.md](FIREBASE_QUERY_FIX.md) - Details on fixing Firebase query limitations and implementing efficient route loading
+- [SWIFT_ROUTE_DETAILS_IMPLEMENTATION_PLAN.md](SWIFT_ROUTE_DETAILS_IMPLEMENTATION_PLAN.md) - Comprehensive plan for implementing route details functionality, including:
+  - Feature mapping between React Native and Swift implementations
+  - Step-by-step implementation guide for route details views
+  - Incremental testing plan
+  - Integration with the Firebase implementation described in this document
+
+These documents together provide a complete roadmap for implementing the route-related functionality in the CyaTrails Swift app.

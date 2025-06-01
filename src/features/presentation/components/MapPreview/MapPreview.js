@@ -65,6 +65,11 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
                 preserveDrawingBuffer: true, // Needed for screenshots
                 failIfMajorPerformanceCaveat: false // Don't fail on performance issues
             });
+
+            // Ensure the map canvas itself also ignores pointer events
+            if (map.current) {
+                map.current.getCanvas().style.pointerEvents = 'none';
+            }
         } catch (error) {
             console.error('[MapPreview] Error initializing map:', error);
             setHasError(true);
@@ -261,6 +266,10 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
                         animate: false // Disable animation
                     });
                 }
+                // Re-assert that the map is not interactive after layers are loaded
+                if (map.current) {
+                    map.current.interactive = false;
+                }
             });
         } catch (error) {
             console.error('[MapPreview] Error setting up map routes:', error);
@@ -278,11 +287,16 @@ export const MapPreview = ({ center, zoom, routes = [], className = '', disableF
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#666'
+                    color: '#666',
+                    pointerEvents: 'none' // Ensure it doesn't block clicks either
                 }
             })
         );
     }
     
-    return (_jsx("div", { ref: mapContainer, className: `w-full h-full ${className}` }));
+    return (_jsx("div", { 
+        ref: mapContainer, 
+        className: `w-full h-full ${className}`,
+        style: { pointerEvents: 'none' } 
+    }));
 };

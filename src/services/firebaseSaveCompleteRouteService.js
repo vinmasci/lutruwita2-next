@@ -541,9 +541,20 @@ export const loadSavedRoute = async (routeId, userId) => {
     }
     
     // Get the route data
+    let descriptionValue = '';
+    if (routeData.description) {
+        if (typeof routeData.description === 'object' && routeData.description.description) {
+            descriptionValue = routeData.description.description;
+            console.warn('[firebaseSaveCompleteRouteService] Loaded nested description object from routeData, extracting string value. Consider data migration.');
+        } else if (typeof routeData.description === 'string') {
+            descriptionValue = routeData.description;
+        }
+    }
+
     const routeWithData = {
       id: routeDoc.id,
-      ...routeData
+      ...routeData,
+      description: descriptionValue // Ensure description is the string value
     };
     
     // Get the routes metadata
@@ -641,7 +652,7 @@ export const loadSavedRoute = async (routeId, userId) => {
     const poisDoc = await getDoc(poisRef);
     
     if (poisDoc.exists()) {
-      routeWithData.pois = poisDoc.data().data;
+      routeWithData.pois = poisDoc.data();
     }
     
     // Get lines
@@ -855,6 +866,13 @@ export const removeRouteFromUserIndex = async (userId, routeId) => {
  */
 export const updateSavedRoute = async (permanentRouteId, segmentRouteId, updates, userId) => {
   try {
+    // Defensive check: If "master-route" is passed as segmentRouteId,
+    // treat it as null for a master document update and log a warning.
+    if (segmentRouteId === "master-route") {
+      console.warn(`[firebaseSaveCompleteRouteService] 'master-route' was passed as segmentRouteId for permanent route ${permanentRouteId}. Correcting to null for a master document update. Please review the calling code, as 'master-route' is not a valid segment ID.`);
+      segmentRouteId = null; 
+    }
+
     if (segmentRouteId) {
       console.log(`[firebaseSaveCompleteRouteService] Updating segment ${segmentRouteId} in permanent route: ${permanentRouteId}`);
     } else {
@@ -963,4 +981,64 @@ export default {
   deleteSavedRoute,
   updateSavedRoute,
   firebaseSaveRouteStatus
+};
+
+/**
+ * Fetches only the main data for a saved route (excluding sub-collections like segments, POIs, etc.)
+ * @param {string} routeId - The ID of the route to load
+ * @param {string} userId - The ID of the user
+ * @returns {Promise<Object|null>} - The main route data if found, null otherwise
+ */
+export const getSavedRouteMainData = async (routeId, userId) => {
+  console.log(`[FSCSR DEBUG] getSavedRouteMainData: Called with routeId: ${routeId}, userId: ${userId}`);
+  try {
+    const routeRef = doc(db, 'user_saved_routes', routeId);
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: routeRef created for path: user_saved_routes/${routeId}`);
+    
+    const routeDoc = await getDoc(routeRef);
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: getDoc call completed.`);
+
+    if (!routeDoc.exists()) {
+      console.log(`[FSCSR DEBUG] getSavedRouteMainData: Document DOES NOT EXIST for routeId: ${routeId}. Returning null.`);
+      return null;
+    }
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: Document EXISTS for routeId: ${routeId}.`);
+
+    const routeData = routeDoc.data();
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: routeData from doc.data():`, routeData);
+
+    // Basic access check
+    if (routeData.userId !== userId && !routeData.isPublic) {
+      console.error(`[FSCSR DEBUG] getSavedRouteMainData: User ${userId} does not have access to route: ${routeId}. routeData.userId: ${routeData.userId}, routeData.isPublic: ${routeData.isPublic}. Returning null.`);
+      return null;
+    }
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: Access check passed for userId: ${userId}.`);
+    
+    // Ensure description is a string, handling potential nested objects
+    let descriptionValue = '';
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: Initial routeData.description:`, routeData.description);
+    if (routeData.description !== undefined && routeData.description !== null) {
+        let currentDesc = routeData.description;
+        // Handle cases where description might be an object like { description: "actual text" }
+        while (typeof currentDesc === 'object' && currentDesc.hasOwnProperty('description')) {
+            console.log(`[FSCSR DEBUG] getSavedRouteMainData: Unwrapping nested description. Current currentDesc:`, currentDesc);
+            currentDesc = currentDesc.description;
+        }
+        if (typeof currentDesc === 'string') {
+            descriptionValue = currentDesc;
+            console.log(`[FSCSR DEBUG] getSavedRouteMainData: Successfully extracted string descriptionValue: "${descriptionValue}"`);
+        } else {
+             console.warn(`[FSCSR DEBUG] getSavedRouteMainData: Description for route ${routeId} was not a string or expected nested structure after unwrapping. Original routeData.description:`, routeData.description, `Final currentDesc type: ${typeof currentDesc}, value:`, currentDesc);
+        }
+    } else {
+        console.log(`[FSCSR DEBUG] getSavedRouteMainData: routeData.description is undefined or null. descriptionValue remains empty.`);
+    }
+    
+    const result = { ...routeData, id: routeDoc.id, description: descriptionValue };
+    console.log(`[FSCSR DEBUG] getSavedRouteMainData: Returning result:`, result);
+    return result;
+  } catch (error) {
+    console.error('[FSCSR DEBUG] getSavedRouteMainData: Error fetching saved route main data:', error);
+    return null;
+  }
 };

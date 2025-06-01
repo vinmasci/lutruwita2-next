@@ -421,6 +421,9 @@ export const POIProvider = ({ children }) => {
                     autoSave.startAutoSave();
                 }
                 
+                // Define currentLoadedPermanentRouteId, similar to other functions
+                const currentLoadedPermanentRouteId = autoSave?.loadedPermanentRouteId || null;
+
                 // CRITICAL FIX: Create a POI structure directly with the updated POIs
                 // Filter out the removed POI from the current state
                 const updatedPois = pois.filter(p => p.id !== id);
@@ -798,53 +801,45 @@ export const POIProvider = ({ children }) => {
     // Load POIs from route
     const loadPOIsFromRoute = (routePOIs) => {
         try {
+            console.log('[POIContext] DEBUG: loadPOIsFromRoute CALLED with routePOIs:', JSON.stringify(routePOIs, null, 2)); 
             if (!routePOIs) {
-                // console.log('[POIContext] No POIs to load from route');
+                console.log('[POIContext] No POIs to load from route (inside function check)');
                 return;
             }
 
-            // console.log('[POIContext] Loading POIs from route:', {
-            //     draggableCount: routePOIs.draggable?.length || 0,
-            //     placesCount: routePOIs.places?.length || 0
-            // });
+            console.log('[POIContext] Loading POIs from route (original log):', { 
+                draggableCount: routePOIs.draggable?.length || 0, // This will be 0 if routePOIs is {data: {draggable:[]}}
+                placesCount: routePOIs.places?.length || 0    // This will be 0
+            });
 
-            // Process new POIs - they should all be full POI objects now
-            let newPOIs = [];
-            if (Array.isArray(routePOIs)) {
-                // If routePOIs is already an array (new Firebase structure)
-                newPOIs = [...routePOIs];
-            } else if (routePOIs && routePOIs.draggable) {
-                // If routePOIs is an object with a draggable property (old MongoDB-like structure)
-                newPOIs = [...(routePOIs.draggable || [])];
+            let rawPoisArray = [];
+            if (Array.isArray(routePOIs)) { 
+                // This case might still be useful if POIs are ever passed as a direct array
+                rawPoisArray = [...routePOIs];
+            } else if (routePOIs && routePOIs.data && Array.isArray(routePOIs.data.draggable)) { // Check for the nested structure
+                rawPoisArray = [...(routePOIs.data.draggable || [])];
+            } else if (routePOIs && Array.isArray(routePOIs.draggable)) { 
+                // Keep the old check as a fallback, though less likely to be hit now
+                rawPoisArray = [...(routePOIs.draggable || [])];
+            } else {
+                console.warn('[POIContext] loadPOIsFromRoute: Received POIs in an unrecognized structure:', routePOIs);
             }
 
-            // console.log('[POIContext] Total POIs to load:', newPOIs.length);
+            // Ensure each POI has a unique 'id'
+            const newPOIs = rawPoisArray.map((poi, index) => ({
+                ...poi,
+                // Use existing poi.id, or poi.googlePlaceId, or generate a new unique ID
+                id: poi.id || poi.googlePlaceId || `loaded-poi-${uuidv4()}-${index}` 
+            }));
 
-            // Ensure all place POIs have proper placeId set
-            // Place POI functionality is commented out
-            /*
-            const processedPOIs = newPOIs.map(poi => {
-                // If it's a place POI but doesn't have a placeId, try to generate one
-                if (poi.type === 'place' && !poi.placeId && poi.coordinates) {
-                    // Use coordinates as a fallback placeId
-                    const placeId = `${poi.coordinates[0]},${poi.coordinates[1]}`;
-                    console.log(`[POIContext] Adding missing placeId to place POI: ${placeId}`);
-                    return {
-                        ...poi,
-                        placeId
-                    };
-                }
-                return poi;
-            });
-            */
+            console.log('[POIContext] Total POIs to load (newPOIs.length):', newPOIs.length);
+            if (newPOIs.length > 0) {
+                console.log('[POIContext] First processed POI with ensured ID:', newPOIs[0]);
+            }
             
-            // Replace existing POIs entirely
             dispatch({ type: 'LOAD_POIS', payload: newPOIs });
 
-            // console.log('[POIContext] POIs loaded successfully');
-
-            // Don't notify RouteContext when loading POIs from route
-            // as this is not a user-initiated change
+            console.log('[POIContext] POIs loaded successfully and dispatched.');
         }
         catch (error) {
             console.error('[POIContext] Error loading POIs:', error);

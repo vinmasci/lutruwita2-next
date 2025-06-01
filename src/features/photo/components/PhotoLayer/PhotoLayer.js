@@ -11,7 +11,9 @@ import logger from '../../../../utils/logger';
 import './PhotoLayer.css';
 export const PhotoLayer = () => {
     const { map } = useMapContext();
-    const { currentRoute } = useRouteContext();
+    // Destructure 'routes' as 'contextRoutes' to use for ordering when a master route is loaded.
+    // 'currentRoute' is the master route object.
+    const { routes: contextRoutes, currentRoute } = useRouteContext();
     const { photos, addPhoto, updatePhotoPosition } = usePhotoContext();
     const mapContainerRef = useRef(null);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
@@ -84,24 +86,22 @@ export const PhotoLayer = () => {
              return [];
          }
  
-         // --- MODIFIED LOGIC START ---
          let routesToUse = [];
-         // Prioritize using routes from _loadedState if available (likely in presentation/loaded mode)
-         if (currentRoute?._loadedState?.routes?.length > 0) {
-             console.log('[PhotoLayer] Using routes from _loadedState for ordering.');
-             routesToUse = currentRoute._loadedState.routes;
-         } 
-         // Fallback: If _loadedState isn't ready, try using the currentRoute directly
-         // (assuming it's a single route object with geojson in creation mode)
+
+         // If currentRoute has _loadedState, it's a master route.
+         // In this case, contextRoutes should be the array of its full segment objects.
+         if (currentRoute?._loadedState && Array.isArray(contextRoutes) && contextRoutes.length > 0) {
+             console.log('[PhotoLayer] Multi-segment route detected. Using contextRoutes for ordering.');
+             routesToUse = contextRoutes;
+         }
+         // Fallback for a single route scenario (currentRoute is the route itself and has geojson)
          else if (currentRoute?.geojson?.features?.[0]?.geometry?.coordinates) {
-             console.log('[PhotoLayer] _loadedState not available, using currentRoute.geojson for ordering.');
-             // Wrap the single currentRoute in an array to match the expected structure
-             routesToUse = [currentRoute]; 
+             console.log('[PhotoLayer] Single route (or master as single stage) detected. Using currentRoute for ordering.');
+             routesToUse = [currentRoute];
          } else {
-             console.warn('[PhotoLayer] No suitable route data found (_loadedState or currentRoute.geojson) for photo ordering. Returning photos unsorted.');
+             console.warn('[PhotoLayer] No suitable route data found for photo ordering. Returning photos unsorted.');
              return allPhotos; // Return unsorted if no route data found
          }
-         // --- MODIFIED LOGIC END ---
  
          // Function to find which route a photo belongs to and its position along that route
         const getPhotoRouteInfo = (photo) => {
@@ -206,7 +206,7 @@ export const PhotoLayer = () => {
          });
          
          return sortedPhotos;
-     }, [currentRoute]);
+     }, [currentRoute, contextRoutes]); // Added contextRoutes to dependency array
      
      // Memoize the ordered photos to avoid recalculating on every render
      const orderedPhotos = useMemo(() => {

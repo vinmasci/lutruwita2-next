@@ -27,7 +27,7 @@ export const firebaseStatus = {
 console.log('FIREBASE STATUS INITIALIZED:', firebaseStatus);
 
 /**
- * Get optimized route data from Firebase using route-centric hierarchical structure
+ * Get optimized route data from Firebase using user-centric hierarchical structure
  * @param {string} routeId - The persistent ID of the route
  * @returns {Promise<Object|null>} - The optimized route data or null if not found
  */
@@ -64,109 +64,88 @@ export const getOptimizedRouteData = async (routeId) => {
     // Start timing
     const startTime = performance.now();
     
-    // Load from route-centric hierarchical structure
-    console.log('LOADING FROM ROUTE-CENTRIC STRUCTURE...');
+    // Load from user-centric hierarchical structure (user_saved_routes)
+    console.log('LOADING FROM USER-CENTRIC STRUCTURE (user_saved_routes)...');
     
-    // 1. Get route metadata
-    const metadataRef = doc(db, 'routes', firebaseRouteId, 'metadata', 'info');
-    const metadataSnap = await getDoc(metadataRef);
+    // 1. Get route metadata and segments from routes collection
+    const routesRef = doc(db, 'user_saved_routes', firebaseRouteId, 'data', 'routes');
+    const routesSnap = await getDoc(routesRef);
     
-    if (!metadataSnap.exists()) {
+    if (!routesSnap.exists()) {
       console.log('=================================================================');
-      console.log(`❌❌❌ FIREBASE NO ROUTE METADATA FOUND FOR ROUTE: ${routeId} ❌❌❌`);
+      console.log(`❌❌❌ FIREBASE NO ROUTE DATA FOUND FOR ROUTE: ${routeId} ❌❌❌`);
       console.log(`❌❌❌ FIREBASE ROUTE ID USED: ${firebaseRouteId} ❌❌❌`);
       console.log('=================================================================');
       
       firebaseStatus.isLoading = false;
       firebaseStatus.success = false;
-      firebaseStatus.error = 'Route metadata not found';
+      firebaseStatus.error = 'Route data not found';
       return null;
     }
     
-    console.log('FOUND ROUTE METADATA IN ROUTE-CENTRIC STRUCTURE');
+    console.log('FOUND ROUTE DATA IN USER-CENTRIC STRUCTURE');
     
-    // 2. Get route GeoJSON data
-    const geojsonRef = doc(db, 'routes', firebaseRouteId, 'geojson', 'routes');
-    const geojsonSnap = await getDoc(geojsonRef);
+    // Get the master route document for metadata
+    const masterRouteRef = doc(db, 'user_saved_routes', firebaseRouteId);
+    const masterRouteSnap = await getDoc(masterRouteRef);
     
-    // 3. Get POIs
-    const poisRef = doc(db, 'routes', firebaseRouteId, 'pois', 'data');
+    // 2. Get POIs from the correct user-centric path
+    const poisRef = doc(db, 'user_saved_routes', firebaseRouteId, 'data', 'pois');
     const poisSnap = await getDoc(poisRef);
     
-    // 4. Get lines
-    const linesRef = doc(db, 'routes', firebaseRouteId, 'lines', 'data');
+    // 3. Get lines from the correct user-centric path
+    const linesRef = doc(db, 'user_saved_routes', firebaseRouteId, 'data', 'lines');
     const linesSnap = await getDoc(linesRef);
     
-    // 5. Get photos metadata
-    const photosRef = doc(db, 'routes', firebaseRouteId, 'photos', 'data');
+    // 4. Get photos metadata from the correct user-centric path
+    const photosRef = doc(db, 'user_saved_routes', firebaseRouteId, 'data', 'photos');
     const photosSnap = await getDoc(photosRef);
     
-    // 6. Load route coordinates if needed
-    const geojsonData = geojsonSnap.exists() ? geojsonSnap.data() : { routes: [] };
-    const routes = geojsonData.routes || [];
+    // 5. Process route segments data
+    const routesData = routesSnap.exists() ? routesSnap.data() : { data: [] };
+    const routes = routesData.data || [];
     
-    // Check if any route segments need coordinates loaded
+    // 6. Load route coordinates if needed from user_saved_routes structure
     for (const route of routes) {
-      if (route.geojson?.features?.[0]?.geometry?.coordinates?.length === 0) {
-        console.log(`Loading coordinates for route segment: ${route.name || 'unnamed'}`);
+      if (route.routeId && (!route.geojson?.features?.[0]?.geometry?.coordinates || route.geojson.features[0].geometry.coordinates.length === 0)) {
+        console.log(`Loading coordinates for route segment: ${route.name || 'unnamed'} (${route.routeId})`);
         
-        // First try to load all coordinates at once from the 'all' document
-        const allCoordsRef = doc(db, 'routes', firebaseRouteId, 'coordinates', 'all');
-        const allCoordsSnap = await getDoc(allCoordsRef);
+        // Load coordinates from the route-specific collection under user_saved_routes
+        const coordsRef = doc(db, 'user_saved_routes', firebaseRouteId, 'routes', route.routeId, 'data', 'coords');
+        const coordsSnap = await getDoc(coordsRef);
         
-        if (allCoordsSnap.exists()) {
-          // Use the single document with all coordinates
-          const allCoords = allCoordsSnap.data().coordinates || [];
-          route.geojson.features[0].geometry.coordinates = allCoords;
-          console.log(`Loaded ${allCoords.length} coordinates from single document`);
-        } else {
-          // Fall back to loading from chunks directly in the coordinates collection
-          const chunksQuery = query(
-            collection(db, 'routes', firebaseRouteId, 'coordinates'),
-            where(FieldPath.documentId(), '>=', 'chunk_'),
-            where(FieldPath.documentId(), '<=', 'chunk_~'),
-            orderBy(FieldPath.documentId())
-          );
+        if (coordsSnap.exists()) {
+          const coordsData = coordsSnap.data();
+          const coordinates = coordsData.data || [];
           
-          const chunksSnap = await getDocs(chunksQuery);
-          
-          // Reassemble coordinates from chunks
-          const allCoordinates = [];
-          const chunks = [];
-          
-          chunksSnap.forEach(chunkDoc => {
-            const chunkData = chunkDoc.data();
-            chunks[chunkData.index] = chunkData;
-          });
-          
-          // Ensure chunks are in the correct order
-          for (let i = 0; i < chunks.length; i++) {
-            if (chunks[i] && chunks[i].coordinates) {
-              allCoordinates.push(...chunks[i].coordinates);
-            }
+          // Ensure route has proper geojson structure
+          if (!route.geojson) {
+            route.geojson = {
+              type: 'FeatureCollection',
+              features: [{
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: []
+                },
+                properties: {}
+              }]
+            };
           }
           
-                // Set coordinates in the route
-                if (allCoordinates.length > 0) {
-                  route.geojson.features[0].geometry.coordinates = allCoordinates;
-                  console.log(`Loaded ${allCoordinates.length} coordinates from ${chunks.length} chunks`);
-                }
-                
-                // Ensure the route has the elevation data in the expected format
-                if (route.surface && route.surface.elevationProfile && route.surface.elevationProfile.length > 0) {
-                  // Make sure properties and coordinateProperties exist
-                  if (!route.geojson.features[0].properties) {
-                    route.geojson.features[0].properties = {};
-                  }
-                  if (!route.geojson.features[0].properties.coordinateProperties) {
-                    route.geojson.features[0].properties.coordinateProperties = {};
-                  }
-                  
-                  // Extract just the elevation values
-                  const elevations = route.surface.elevationProfile.map(point => point.elevation);
-                  route.geojson.features[0].properties.coordinateProperties.elevation = elevations;
-                  console.log(`Added ${elevations.length} elevation points from surface.elevationProfile`);
-                }
+          // Convert coordinate objects to arrays if needed
+          const processedCoords = coordinates.map(coord => {
+            if (coord.lat !== undefined && coord.lng !== undefined) {
+              // Convert {lat, lng, elevation} to [lng, lat, elevation] array
+              return coord.elevation !== undefined ? [coord.lng, coord.lat, coord.elevation] : [coord.lng, coord.lat];
+            }
+            return coord; // Already in array format
+          });
+          
+          route.geojson.features[0].geometry.coordinates = processedCoords;
+          console.log(`Loaded ${processedCoords.length} coordinates for route segment ${route.routeId}`);
+        } else {
+          console.warn(`No coordinates found for route segment ${route.routeId}`);
         }
       }
     }
@@ -175,51 +154,124 @@ export const getOptimizedRouteData = async (routeId) => {
     const endTime = performance.now();
     const loadTime = (endTime - startTime).toFixed(2);
     
-    // Combine all data
-    const metadata = metadataSnap.data() || {};
-    const poisData = poisSnap.exists() ? poisSnap.data() : { draggable: [], places: [] };
-    const linesData = linesSnap.exists() ? linesSnap.data() : { lines: [] };
-    const photosData = photosSnap.exists() ? photosSnap.data() : { photos: [] };
+    // Get master route metadata
+    const masterMetadata = masterRouteSnap.exists() ? masterRouteSnap.data() : {};
+    
+    // Combine POI data - handle the nested structure properly
+    let poisData = { draggable: [], places: [] };
+    if (poisSnap.exists()) {
+      const rawPoisData = poisSnap.data();
+      console.log('🔍 RAW POI DATA FROM FIREBASE:', rawPoisData);
+      
+      // Handle the nested data structure from user_saved_routes
+      if (rawPoisData.data && rawPoisData.data.draggable) {
+        poisData.draggable = rawPoisData.data.draggable;
+        console.log(`✅ LOADED ${poisData.draggable.length} POIs from Firebase`);
+      } else if (rawPoisData.draggable) {
+        // Direct structure
+        poisData.draggable = rawPoisData.draggable;
+        console.log(`✅ LOADED ${poisData.draggable.length} POIs from Firebase (direct structure)`);
+      }
+      
+      if (rawPoisData.data && rawPoisData.data.places) {
+        poisData.places = rawPoisData.data.places;
+      } else if (rawPoisData.places) {
+        poisData.places = rawPoisData.places;
+      }
+    } else {
+      console.log('❌ NO POI DATA FOUND IN FIREBASE');
+    }
+    
+    // Combine lines data - handle the nested structure properly
+    let linesData = [];
+    if (linesSnap.exists()) {
+      const rawLinesData = linesSnap.data();
+      console.log('🔍 RAW LINES DATA FROM FIREBASE:', rawLinesData);
+      
+      // Handle the nested data structure from user_saved_routes
+      if (rawLinesData.data && Array.isArray(rawLinesData.data)) {
+        linesData = rawLinesData.data;
+        console.log(`✅ LOADED ${linesData.length} lines from Firebase`);
+      } else if (Array.isArray(rawLinesData)) {
+        // Direct array structure
+        linesData = rawLinesData;
+        console.log(`✅ LOADED ${linesData.length} lines from Firebase (direct structure)`);
+      }
+    } else {
+      console.log('❌ NO LINES DATA FOUND IN FIREBASE');
+    }
+    
+    // Combine photos data - handle the nested structure properly
+    let photosData = [];
+    if (photosSnap.exists()) {
+      const rawPhotosData = photosSnap.data();
+      console.log('🔍 RAW PHOTOS DATA FROM FIREBASE:', rawPhotosData);
+      
+      // Handle the nested data structure from user_saved_routes
+      if (rawPhotosData.data && Array.isArray(rawPhotosData.data)) {
+        photosData = rawPhotosData.data;
+        console.log(`✅ LOADED ${photosData.length} photos from Firebase`);
+      } else if (Array.isArray(rawPhotosData)) {
+        // Direct array structure
+        photosData = rawPhotosData;
+        console.log(`✅ LOADED ${photosData.length} photos from Firebase (direct structure)`);
+      }
+    } else {
+      console.log('❌ NO PHOTOS DATA FOUND IN FIREBASE');
+    }
     
     // Only log lines data in development mode
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development') {
-      console.log(`[Firebase] Lines data for route ${routeId}: ${linesData.lines ? linesData.lines.length : 0} lines`);
+      console.log(`[Firebase] Lines data for route ${routeId}: ${linesData.length} lines`);
     }
     
     // Construct the combined data object
+    let descriptionValue = '';
+    if (masterMetadata.description) {
+        if (typeof masterMetadata.description === 'object' && masterMetadata.description.description) {
+            descriptionValue = masterMetadata.description.description;
+            console.warn('[firebaseOptimizedRouteService] Loaded nested description object, extracting string value. Consider data migration.');
+        } else if (typeof masterMetadata.description === 'string') {
+            descriptionValue = masterMetadata.description;
+        }
+    }
+
     const combinedData = {
       persistentId: routeId,
-      name: metadata.name,
-      type: metadata.type,
-      isPublic: metadata.isPublic,
-      userId: metadata.userId,
-      eventDate: metadata.eventDate,
-      headerSettings: metadata.headerSettings,
-      mapState: metadata.mapState,
-      mapOverview: metadata.mapOverview,
-      staticMapUrl: metadata.staticMapUrl,
-      staticMapPublicId: metadata.staticMapPublicId,
+      name: masterMetadata.name,
+      description: descriptionValue, // Use extracted string value
+      type: masterMetadata.type,
+      isPublic: masterMetadata.isPublic,
+      userId: masterMetadata.userId,
+      eventDate: masterMetadata.eventDate,
+      headerSettings: masterMetadata.headerSettings,
+      mapState: masterMetadata.mapState,
+      mapOverview: masterMetadata.mapOverview,
+      staticMapUrl: masterMetadata.staticMapUrl,
+      staticMapPublicId: masterMetadata.staticMapPublicId,
       routes: routes,
       pois: poisData,
-      lines: linesData.lines || [],
-      photos: photosData.photos || [],
+      lines: linesData,
+      photos: photosData,
       _type: 'loaded',
       _loadedState: {
-        name: metadata.name,
-        type: metadata.type,
-        eventDate: metadata.eventDate,
+        name: masterMetadata.name,
+        description: descriptionValue, // Use extracted string value
+        type: masterMetadata.type,
+        eventDate: masterMetadata.eventDate,
         pois: poisData,
-        lines: linesData.lines || [],
-        photos: photosData.photos || [],
-        headerSettings: metadata.headerSettings,
-        mapOverview: metadata.mapOverview,
-        staticMapUrl: metadata.staticMapUrl,
-        staticMapPublicId: metadata.staticMapPublicId
+        lines: linesData,
+        photos: photosData,
+        headerSettings: masterMetadata.headerSettings,
+        mapOverview: masterMetadata.mapOverview,
+        staticMapUrl: masterMetadata.staticMapUrl,
+        staticMapPublicId: masterMetadata.staticMapPublicId
       }
     };
     
     console.log('=================================================================');
-    console.log(`✅✅✅ FIREBASE LOADED ROUTE-CENTRIC DATA FOR ROUTE: ${routeId} ✅✅✅`);
+    console.log(`✅✅✅ FIREBASE LOADED USER-CENTRIC DATA FOR ROUTE: ${routeId} ✅✅✅`);
+    console.log(`✅✅✅ LOADED ${poisData.draggable.length} POIs, ${linesData.length} lines, ${photosData.length} photos ✅✅✅`);
     console.log(`✅✅✅ LOADED IN: ${loadTime}ms ✅✅✅`);
     console.log('=================================================================');
     
@@ -280,24 +332,24 @@ export const hasOptimizedRouteData = async (routeId) => {
     // Start timing
     const startTime = performance.now();
     
-    // Check route-centric structure
-    console.log('CHECKING ROUTE-CENTRIC STRUCTURE...');
+    // Check user-centric structure
+    console.log('CHECKING USER-CENTRIC STRUCTURE...');
     
-    // Check for route metadata (the most essential part)
-    const metadataRef = doc(db, 'routes', firebaseRouteId, 'metadata', 'info');
-    const metadataSnap = await getDoc(metadataRef);
+    // Check for route data (the most essential part)
+    const routesRef = doc(db, 'user_saved_routes', firebaseRouteId, 'data', 'routes');
+    const routesSnap = await getDoc(routesRef);
     
     const endTime = performance.now();
     const checkTime = (endTime - startTime).toFixed(2);
     
     // Update status
     firebaseStatus.isLoading = false;
-    firebaseStatus.success = metadataSnap.exists();
+    firebaseStatus.success = routesSnap.exists();
     firebaseStatus.lastLoadTime = checkTime;
     
-    if (metadataSnap.exists()) {
+    if (routesSnap.exists()) {
       console.log('=================================================================');
-      console.log(`✅✅✅ FIREBASE ROUTE DATA EXISTS IN ROUTE-CENTRIC STRUCTURE (checked in ${checkTime}ms) ✅✅✅`);
+      console.log(`✅✅✅ FIREBASE ROUTE DATA EXISTS IN USER-CENTRIC STRUCTURE (checked in ${checkTime}ms) ✅✅✅`);
       console.log('=================================================================');
       return true;
     } else {

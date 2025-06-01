@@ -217,19 +217,26 @@ export const PhotoProvider = ({ children }) => {
             );
         }
         
-        // Ensure all new photos have a caption field and preserve isManuallyPlaced flag
-        const photosWithCaption = newPhotos.map(photo => ({
-            ...photo,
-            caption: photo.caption || '', // Ensure caption exists
-            isManuallyPlaced: photo.isManuallyPlaced || false // Preserve or initialize isManuallyPlaced flag
-        }));
+        // Ensure all new photos have a caption field, preserve isManuallyPlaced, and critically, preserve coordinates
+        const photosWithCaptionAndCoords = newPhotos.map(photo => {
+            const newPhotoObject = {
+                ...photo,
+                caption: photo.caption || '', // Ensure caption exists
+                isManuallyPlaced: photo.isManuallyPlaced || false // Preserve or initialize isManuallyPlaced flag
+            };
+            // Explicitly ensure coordinates are carried over if they exist on the incoming photo object
+            if (photo.coordinates) {
+                newPhotoObject.coordinates = photo.coordinates;
+            }
+            return newPhotoObject;
+        });
         
-        console.log('[PhotoContext] Adding photos with captions:', photosWithCaption.length);
+        console.log('[PhotoContext] Adding photos with captions and ensuring coordinates:', photosWithCaptionAndCoords.length);
         
         // Log the first few processed photos to see if captions were added
-        if (photosWithCaption.length > 0) {
+        if (photosWithCaptionAndCoords.length > 0) {
             console.log('[PhotoContext] First few photos after adding captions:', 
-                photosWithCaption.slice(0, 3).map(p => ({
+                photosWithCaptionAndCoords.slice(0, 3).map(p => ({
                     url: p.url ? p.url.substring(0, 30) + '...' : 'no-url',
                     caption: p.caption,
                     hasCaption: p.caption !== undefined
@@ -237,10 +244,10 @@ export const PhotoProvider = ({ children }) => {
             );
         }
         
-        setPhotos(prev => [...prev, ...photosWithCaption]);
+        setPhotos(prev => [...prev, ...photosWithCaptionAndCoords]);
         
         // Track changes for each new photo
-        photosWithCaption.forEach(photo => {
+        photosWithCaptionAndCoords.forEach(photo => {
             const photoId = getPhotoIdentifier(photo.url);
             if (photoId) {
                 trackPhotoChange(photoId);

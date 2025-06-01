@@ -1,34 +1,33 @@
 /**
  * User Service
  * Handles user data operations like fetching and updating user profiles
+ * Now uses Firebase instead of MongoDB API
  */
 
+import { 
+  fetchUserData as firebaseFetchUserData,
+  updateUserData as firebaseUpdateUserData,
+  updateUserLogin,
+  ensureUserProfileFields
+} from '../../../services/firebaseUserService.js';
+
 /**
- * Fetch user data from the API
+ * Fetch user data from Firebase
  * @param {string} userId - The Auth0 user ID
  * @returns {Promise<Object>} - The user data
  */
 export const fetchUserData = async (userId) => {
   try {
-    if (!userId) {
-      throw new Error('userId is required');
-    }
-    
-    const response = await fetch(`/api/user?userId=${encodeURIComponent(userId)}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user data: ${response.statusText}`);
-    }
-    
-    return await response.json();
+    console.log('[UserService] Fetching user data via Firebase for:', userId);
+    return await firebaseFetchUserData(userId);
   } catch (error) {
-    console.error('Error fetching user data:', error);
+    console.error('[UserService] Error fetching user data:', error);
     throw error;
   }
 };
 
 /**
- * Update user data in the API
+ * Update user data in Firebase
  * @param {Object} userData - The user data to update
  * @param {string} userData.userId - The Auth0 user ID
  * @param {string} [userData.name] - The user's name
@@ -38,39 +37,39 @@ export const fetchUserData = async (userId) => {
  */
 export const updateUserData = async (userData) => {
   try {
-    console.log('[DEBUG] userService.updateUserData called with:', userData);
-    
-    if (!userData || !userData.userId) {
-      console.error('[DEBUG] Missing userData or userId');
-      throw new Error('userData with userId is required');
-    }
-    
-    console.log('[DEBUG] Preparing to send POST request to /api/user');
-    console.log('[DEBUG] Request payload:', JSON.stringify(userData, null, 2));
-    
-    const response = await fetch('/api/user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(userData)
-    });
-    
-    console.log('[DEBUG] Response status:', response.status, response.statusText);
-    console.log('[DEBUG] Response headers:', Object.fromEntries([...response.headers]));
-    
-    if (!response.ok) {
-      console.error('[DEBUG] Response not OK:', response.status, response.statusText);
-      throw new Error(`Failed to update user data: ${response.statusText}`);
-    }
-    
-    const responseData = await response.json();
-    console.log('[DEBUG] Response data:', responseData);
-    
-    return responseData;
+    console.log('[UserService] Updating user data via Firebase:', userData);
+    return await firebaseUpdateUserData(userData);
   } catch (error) {
-    console.error('[DEBUG] Error in updateUserData:', error);
-    console.error('[DEBUG] Error stack:', error.stack);
+    console.error('[UserService] Error updating user data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update user login information
+ * @param {string} userId - The Auth0 user ID
+ */
+export const updateUserLoginInfo = async (userId) => {
+  try {
+    console.log('[UserService] Updating user login info:', userId);
+    return await updateUserLogin(userId);
+  } catch (error) {
+    console.error('[UserService] Error updating login info:', error);
+    throw error;
+  }
+};
+
+/**
+ * Ensure user profile has all required fields (migration helper)
+ * @param {string} userId - The Auth0 user ID
+ * @param {Object} auth0UserData - Auth0 user information
+ */
+export const ensureProfileFields = async (userId, auth0UserData = {}) => {
+  try {
+    console.log('[UserService] Ensuring profile fields for:', userId);
+    return await ensureUserProfileFields(userId, auth0UserData);
+  } catch (error) {
+    console.error('[UserService] Error ensuring profile fields:', error);
     throw error;
   }
 };
@@ -88,5 +87,7 @@ export const createUserContext = () => {
 export default {
   fetchUserData,
   updateUserData,
+  updateUserLoginInfo,
+  ensureProfileFields,
   createUserContext
 };

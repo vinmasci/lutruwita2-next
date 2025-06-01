@@ -7,6 +7,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PhoneIcon from '@mui/icons-material/Phone';
 import LanguageIcon from '@mui/icons-material/Language';
 import StarIcon from '@mui/icons-material/Star';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { StyledDrawer, DrawerHeader, DrawerContent, DrawerFooter } from '../POIDrawer/POIDrawer.styles';
 import { NestedDrawer } from '../../../map/components/Sidebar/Sidebar.styles';
 import { POI_CATEGORIES } from '../../types/poi.types';
@@ -27,20 +28,20 @@ const debounce = (func, delay) => {
     };
 };
 
-const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, onSave }) => {
-    const { processGooglePlacesLink, searchPlaces } = usePOIContext();
+const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, onSave, existingPoi }) => {
+    const { processGooglePlacesLink, searchPlaces, removePOI } = usePOIContext();
     // Get the icon definition for default name
     const iconDef = getIconDefinition(iconName);
     // Add fallback color in case the category doesn't exist in POI_CATEGORIES
     const categoryColor = POI_CATEGORIES[category]?.color || '#777777'; // Default gray color if category not found
     // State for form fields
-    const [name, setName] = useState(iconDef?.label || '');
-    const [description, setDescription] = useState('');
-    const [googlePlacesLink, setGooglePlacesLink] = useState('');
-    const [googlePlacesData, setGooglePlacesData] = useState(null);
+    const [name, setName] = useState(existingPoi?.name || iconDef?.label || '');
+    const [description, setDescription] = useState(existingPoi?.description || '');
+    const [googlePlacesLink, setGooglePlacesLink] = useState(existingPoi?.googlePlaceUrl || existingPoi?.googlePlacesLink || '');
+    const [googlePlacesData, setGooglePlacesData] = useState(existingPoi?.googlePlaces || null);
     const [isProcessingLink, setIsProcessingLink] = useState(false);
     const [linkError, setLinkError] = useState(null);
-    const [photos, setPhotos] = useState([]);
+    const [photos, setPhotos] = useState(existingPoi?.photos || []);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     
     // State for auto-search
@@ -51,18 +52,28 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
     // Reset form when drawer opens with new POI
     useEffect(() => {
         if (isOpen) {
-            setName(iconDef?.label || '');
-            setDescription('');
-            setGooglePlacesLink('');
-            setGooglePlacesData(null);
+            // If we have an existing POI, use its data
+            if (existingPoi) {
+                setName(existingPoi.name || iconDef?.label || '');
+                setDescription(existingPoi.description || '');
+                setGooglePlacesLink(existingPoi.googlePlaceUrl || existingPoi.googlePlacesLink || '');
+                setGooglePlacesData(existingPoi.googlePlaces || null);
+                setPhotos(existingPoi.photos || []);
+            } else {
+                // Otherwise use defaults for a new POI
+                setName(iconDef?.label || '');
+                setDescription('');
+                setGooglePlacesLink('');
+                setGooglePlacesData(null);
+                setPhotos([]);
+            }
             setIsProcessingLink(false);
             setLinkError(null);
-            setPhotos([]);
             setSearchResults([]);
             setIsSearching(false);
             setSearchError(null);
         }
-    }, [isOpen, iconDef]);
+    }, [isOpen, iconDef, existingPoi]);
     
     // Auto-search for places when name changes
     const searchForPlaces = useCallback(async (searchName) => {
@@ -105,12 +116,16 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
     
     // Trigger search when name changes
     useEffect(() => {
-        if (isOpen && name && name.trim() !== '') {
+        if (isOpen && name && name.trim() !== '' && coordinates) {
+            console.log('[POIDetailsDrawer] Auto-searching for:', name, 'at coordinates:', coordinates);
             debouncedSearch(name);
         } else {
             setSearchResults([]);
+            if (isOpen && name && name.trim() !== '' && !coordinates) {
+                console.warn('[POIDetailsDrawer] Cannot search without coordinates');
+            }
         }
-    }, [isOpen, name, debouncedSearch]);
+    }, [isOpen, name, coordinates, debouncedSearch]);
     
     // Handle place selection from search results
     const handleSelectPlace = async (place) => {
@@ -205,7 +220,9 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
             // Fallback to the ID from the googlePlacesData if the UI element is not available
             ...(!googlePlaceId && googlePlacesData?.placeId && { googlePlaceId: googlePlacesData.placeId }),
             // Include the Google Places data if available (for preview in the drawer)
-            ...(googlePlacesData && { googlePlaces: googlePlacesData })
+            ...(googlePlacesData && { googlePlaces: googlePlacesData }),
+            // Include the existing POI ID if we're editing
+            ...(existingPoi && { id: existingPoi.id })
         });
     };
     
@@ -226,10 +243,10 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
             _jsxs(StyledDrawer, { 
                 children: [
                     _jsx(DrawerHeader, { 
-                        children: _jsx(Typography, { 
-                            variant: "h6", 
-                            children: "Add POI Details" 
-                        }) 
+                            children: _jsx(Typography, { 
+                                variant: "h6", 
+                                children: existingPoi ? "Edit POI Details" : "Add POI Details" 
+                            }) 
                     }), 
                     _jsx(DrawerContent, { 
                         children: _jsx("form", { 
@@ -266,7 +283,7 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
                                         sx: { position: 'relative' },
                                         children: [
                                             _jsx(TextField, { 
-                                                label: "Name", 
+                                                label: "POI Name", 
                                                 value: name, 
                                                 onChange: (e) => setName(e.target.value), 
                                                 fullWidth: true, 
@@ -305,9 +322,9 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
                                                 })
                                             ),
                                             
-                                            // Search results dropdown
+                                            // Search results dropdown - fixed to prevent vertical text issue
                                             searchResults.length > 0 && (
-                                                _jsx(List, {
+                                                _jsx(Box, {
                                                     sx: {
                                                         position: 'absolute',
                                                         width: '100%',
@@ -321,57 +338,20 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
                                                         mt: 0.5
                                                     },
                                                     children: searchResults.map((place, index) => (
-                                                        _jsxs(ListItem, {
-                                                            button: true,
+                                                        _jsx(Box, {
                                                             onClick: () => handleSelectPlace(place),
                                                             sx: {
+                                                                padding: '6px 10px',
                                                                 borderBottom: index < searchResults.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                                                                cursor: 'pointer',
                                                                 '&:hover': {
                                                                     backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                                                                }
+                                                                },
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis'
                                                             },
-                                                            children: [
-                                                                place.icon && (
-                                                                    _jsx(ListItemIcon, {
-                                                                        sx: { minWidth: '36px' },
-                                                                        children: _jsx("img", {
-                                                                            src: place.icon,
-                                                                            alt: "",
-                                                                            style: { width: '20px', height: '20px' }
-                                                                        })
-                                                                    })
-                                                                ),
-                                                                _jsxs(ListItemText, {
-                                                                    primary: place.name,
-                                                                    secondary: place.address || place.vicinity,
-                                                                    primaryTypographyProps: {
-                                                                        color: 'white',
-                                                                        fontSize: '0.9rem'
-                                                                    },
-                                                                    secondaryTypographyProps: {
-                                                                        color: 'rgba(255, 255, 255, 0.7)',
-                                                                        fontSize: '0.8rem'
-                                                                    }
-                                                                }),
-                                                                place.rating && (
-                                                                    _jsxs(Box, {
-                                                                        sx: { display: 'flex', alignItems: 'center', ml: 1 },
-                                                                        children: [
-                                                                            _jsx(Rating, {
-                                                                                value: place.rating,
-                                                                                readOnly: true,
-                                                                                size: "small",
-                                                                                precision: 0.1
-                                                                            }),
-                                                                            _jsx(Typography, {
-                                                                                variant: "caption",
-                                                                                sx: { ml: 0.5, color: 'rgba(255, 255, 255, 0.7)' },
-                                                                                children: place.rating.toFixed(1)
-                                                                            })
-                                                                        ]
-                                                                    })
-                                                                )
-                                                            ]
+                                                            children: place.name
                                                         }, place.placeId)
                                                     ))
                                                 })
@@ -807,28 +787,79 @@ const POIDetailsDrawer = ({ isOpen, onClose, iconName, category, coordinates, on
                                             ))
                                         })
                                     ), 
-                                    _jsxs(DrawerFooter, { 
+                                    _jsxs(Box, {
+                                        sx: {
+                                            mt: 3,
+                                            borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+                                            pt: 2,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 2
+                                        },
                                         children: [
-                                            _jsx(Button, { 
-                                                variant: "text", 
-                                                onClick: onClose, 
-                                                fullWidth: true, 
-                                                sx: { color: 'white' }, 
-                                                children: "Cancel" 
-                                            }), 
-                                            _jsx(Button, { 
-                                                type: "submit", 
-                                                variant: "contained", 
-                                                fullWidth: true, 
+                                            // Cancel and Save buttons row
+                                            _jsx(Box, {
                                                 sx: {
-                                                    backgroundColor: POI_CATEGORIES[category]?.color || '#777777',
-                                                    '&:hover': {
-                                                        backgroundColor: POI_CATEGORIES[category]?.color || '#777777'
+                                                    width: '100%',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                },
+                                                children: [
+                                                    // Cancel button (left)
+                                                    _jsx(Button, {
+                                                        variant: "text",
+                                                        onClick: onClose,
+                                                        sx: { 
+                                                            color: 'white',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 'bold'
+                                                        },
+                                                        children: "CANCEL"
+                                                    }),
+                                                    // Save button (right)
+                                                    _jsx(Button, {
+                                                        type: "submit",
+                                                        variant: "contained",
+                                                        sx: {
+                                                            backgroundColor: '#ed8a19', // Orange color from screenshot
+                                                            color: 'white',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 'bold',
+                                                            '&:hover': {
+                                                                backgroundColor: '#d67b0a' // Darker orange on hover
+                                                            },
+                                                            minWidth: '80px'
+                                                        },
+                                                        children: "SAVE"
+                                                    })
+                                                ]
+                                            }),
+                                            
+                                            // Delete button (separate row below) - only shown when editing existing POI
+                                            existingPoi && _jsxs(Button, {
+                                                onClick: () => {
+                                                    if (existingPoi && existingPoi.id) {
+                                                        removePOI(existingPoi.id);
+                                                        onClose();
                                                     }
-                                                }, 
-                                                children: "Save" 
+                                                },
+                                                sx: {
+                                                    color: 'white',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '8px',
+                                                    fontSize: '0.8rem',
+                                                    borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+                                                    paddingTop: '16px'
+                                                },
+                                                children: [
+                                                    _jsx(DeleteIcon, { sx: { fontSize: '1.2rem', mr: 0.5 } }),
+                                                    "DELETE"
+                                                ]
                                             })
-                                        ] 
+                                        ]
                                     })
                                 ] 
                             }) 

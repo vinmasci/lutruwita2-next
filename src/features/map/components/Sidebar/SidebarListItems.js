@@ -694,8 +694,21 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
                             
                             // Load POIs if available
                             if (routeData.pois) {
-                                console.log('[SidebarListItems] Loading POIs from routeData. POI count:', routeData.pois?.draggable?.length + routeData.pois?.places?.length || 'N/A');
+                                console.log('[SidebarListItems] DEBUG: Entered if (routeData.pois) block.'); 
+                                console.log('[SidebarListItems] DEBUG: routeData.pois content:', JSON.stringify(routeData.pois, null, 2)); 
+                                
+                                // Original log (known to be potentially misleading)
+                                console.log('[SidebarListItems] Loading POIs from routeData. POI count (original log):', routeData.pois?.draggable?.length + routeData.pois?.places?.length || 'N/A');
+                                
+                                // More accurate count log
+                                let draggableCount = routeData.pois?.draggable?.length || 0;
+                                let placesCount = routeData.pois?.places?.length || 0;
+                                console.log(`[SidebarListItems] DEBUG: Draggable POIs: ${draggableCount}, Places POIs: ${placesCount}`); 
+
                                 loadPOIsFromRoute(routeData.pois);
+                            } else {
+                                console.log('[SidebarListItems] DEBUG: SKIPPED if (routeData.pois) block because routeData.pois is falsy.'); 
+                                console.log('[SidebarListItems] DEBUG: routeData.pois value:', routeData.pois); 
                             }
                             
                             // Load photos if available

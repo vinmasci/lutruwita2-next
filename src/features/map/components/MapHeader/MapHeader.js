@@ -4,18 +4,18 @@ import { AppBar, Toolbar, Typography, Box, IconButton, Tooltip } from '@mui/mate
 import { Home, Map, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { withNavigationDelay } from '../../../../utils/navigationUtils';
-import { useRouteContext } from '../../context/RouteContext';
+import { useRouteContext } from '../../context/RouteContext'; // Keep this import
 import CountdownTimer from './CountdownTimer';
 
 /**
  * MapHeader component displays a header bar with the route title and attribution
  * Attribution can be either a username or a logo
  */
-const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDate }) => {
-    console.log('[MapHeader] Received props:', { title, color, logoUrl, username, type, eventDate });
+const MapHeader = () => { // No props for content, will get directly from context
     // Get the updateHeaderSettings function and headerSettings from RouteContext
     const { updateHeaderSettings, headerSettings } = useRouteContext();
-    console.log('[MapHeader] headerSettings from context:', headerSettings);
+    // Removed console.log('[MapHeader] headerSettings from context:', headerSettings);
+    // Removed console.log('[MapHeader] Derived props from headerSettings:', { ... });
     
     // Function to clear the logo
     const handleClearLogo = () => {
@@ -87,9 +87,6 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
         }
     };
     
-    // Removed debug log to prevent excessive console output
-    // console.log('MapHeader props:', { title, color, logoUrl, username });
-    
     const location = useLocation();
     const isHome = location.pathname === '/' || location.pathname === '';
     const isEditor = location.pathname === '/editor';
@@ -106,7 +103,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
     
     return (_jsx(AppBar, { 
         sx: {
-            backgroundColor: color || '#000000',
+            backgroundColor: headerSettings?.color || '#000000', // Use headerSettings.color
             boxShadow: 3,
              borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
              zIndex: 1000,
@@ -171,7 +168,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                         },
                                         children: [
                                             // Logo container
-                                            logoUrl && (
+                                            headerSettings?.logoUrl && ( // Use headerSettings.logoUrl
                                                 _jsxs(Box, {
                                                     sx: {
                                                         position: 'relative',
@@ -183,7 +180,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                         // Logo image
                                                         _jsx(Box, {
                                                             component: "img",
-                                                            src: logoUrl,
+                                                            src: headerSettings.logoUrl, // Use headerSettings.logoUrl
                                                              alt: "Logo",
                                                               sx: {
                                                                   height: '64px', // Full height with small padding
@@ -242,14 +239,14 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                             maxWidth: '500px', // Increased to allow more text on desktop before truncation
                                                             padding: '5px 5px 2px 5px' // Add padding to allow shadow room
                                                         },
-                                                        children: title || 'Untitled Route'
+                                                        children: headerSettings?.name || "" // Use headerSettings.name
                                                     }),
                                                     
                                                     // Small line break
                                                     _jsx(Box, { sx: { height: '2px' } }),
                                                     
                                                     // Username attribution (if available)
-                                                    username && (
+                                                    headerSettings?.username && ( // Use headerSettings.username
                                                         _jsxs(Typography, {
                                                             variant: "body2",
                                                             sx: {
@@ -258,7 +255,7 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                                                 fontStyle: 'italic',
                                                                 paddingLeft: '5px'
                                                             },
-                                                            children: ["by ", username]
+                                                            children: ["by ", headerSettings.username] // Use headerSettings.username
                                                         })
                                                     )
                                                 ]
@@ -267,9 +264,10 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
                                     }),
                                     
                                     // We don't need the countdown timer in the header since we have the floating one
-                                    // type === 'event' && eventDate && (
-                                    //     _jsx(CountdownTimer, { eventDate })
-                                    // ),
+                                    // Only show countdown timer if headerSettings provides eventDate and type is 'event'
+                                    (headerSettings?.routeType === 'event' && headerSettings?.eventDate) && (
+                                        _jsx(CountdownTimer, { eventDate: headerSettings.eventDate })
+                                    ),
                                 ]
                             })
                         ]
@@ -343,13 +341,15 @@ const MapHeader = ({ title, color = '#000000', logoUrl, username, type, eventDat
 
 // Custom equality function to prevent unnecessary re-renders
 const arePropsEqual = (prevProps, nextProps) => {
-    return prevProps.title === nextProps.title &&
-           prevProps.color === nextProps.color &&
-           prevProps.logoUrl === nextProps.logoUrl &&
-           prevProps.username === nextProps.username &&
-           prevProps.type === nextProps.type &&
-           prevProps.eventDate === nextProps.eventDate;
+    // No props are passed anymore, so this memoization is not strictly needed for props
+    // but can be kept if MapHeader itself has internal state that might cause re-renders
+    // and we want to prevent re-rendering if headerSettings from context hasn't changed.
+    // However, React.memo with no props will always re-render if parent re-renders.
+    // To properly memoize based on context, we'd need to pass headerSettings as a prop
+    // or use a custom hook that memoizes the derived values.
+    // For now, removing the custom equality function as props are no longer passed.
+    return true; // Always return true as no props are being compared
 };
 
-// Wrap with React.memo with custom equality function
-export default React.memo(MapHeader, arePropsEqual);
+// Wrap with React.memo without custom equality function, or remove React.memo if not needed
+export default React.memo(MapHeader);

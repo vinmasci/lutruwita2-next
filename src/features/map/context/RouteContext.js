@@ -1,5 +1,5 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react"; // Import useRef
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from "react"; // Import useRef and useMemo
 import { useAuth0 } from "@auth0/auth0-react";
 import { useAutoSave } from "../../../context/AutoSaveContext";
 import { getMapOverviewData, setMapOverviewData, setMarkMapOverviewChangedFunction } from "../../presentation/store/mapOverviewStore";
@@ -15,7 +15,7 @@ import { usePlaceContext } from "../../place/context/PlaceContext";
 import { useLineContext } from "../../lineMarkers/context/LineContext";
 import { normalizeRoute } from "../utils/routeUtils";
 import { updateRouteInFirebase, updateHeaderSettingsInFirebase } from "../../../services/firebaseGpxAutoSaveService";
-import { updateSavedRoute } from "../../../services/firebaseSaveCompleteRouteService";
+import { updateSavedRoute, getSavedRouteMainData } from "../../../services/firebaseSaveCompleteRouteService";
 import { getRouteLocationData } from "../../../utils/geocoding";
 import { getRouteDistance, getUnpavedPercentage, getElevationGain } from "../../gpx/utils/routeUtils";
 import { AuthAlert } from "@/features/auth/components/AuthAlert/AuthAlert";
@@ -176,6 +176,7 @@ export const RouteProvider = ({ children, }) => {
     const [currentLoadedState, _setCurrentLoadedState] = useState(null); // Renamed setter
     const [currentLoadedPersistentId, setCurrentLoadedPersistentId] = useState(null);
     const [overallRouteName, setOverallRouteName] = useState(''); // State for overall route name
+    const [masterDescription, setMasterDescription] = useState(''); // State for master route description
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // Use state for changedSections but also a ref to hold the latest value
@@ -204,13 +205,38 @@ export const RouteProvider = ({ children, }) => {
     });
 
     const setCurrentLoadedState = useCallback((loadedStateData) => {
+        console.log('[RouteContext DEBUG] setCurrentLoadedState called with loadedStateData:', loadedStateData);
         _setCurrentLoadedState(loadedStateData);
         if (loadedStateData) {
+            // Handle potentially deeply nested description and ensure it's a string
+            let descriptionValue = '';
+            let currentDesc = loadedStateData.description;
+            console.log('[RouteContext DEBUG] setCurrentLoadedState: Initial loadedStateData.description:', currentDesc);
+            while (typeof currentDesc === 'object' && currentDesc !== null && currentDesc.hasOwnProperty('description')) {
+                console.log('[RouteContext DEBUG] setCurrentLoadedState: Unwrapping nested description. Current currentDesc:', currentDesc);
+                currentDesc = currentDesc.description;
+            }
+            if (typeof currentDesc === 'string') {
+                descriptionValue = currentDesc;
+            } else if (loadedStateData.description) { // If original was not undefined/null but not a string after drilling
+                console.warn('[RouteContext DEBUG] setCurrentLoadedState: Description field was present but not a string or expected nested structure:', loadedStateData.description);
+            }
+            console.log('[RouteContext DEBUG] setCurrentLoadedState: Setting masterDescription to:', descriptionValue);
+            setMasterDescription(descriptionValue);
+
             const settingsToUse = loadedStateData.headerSettings || {};
             const color = settingsToUse.color || loadedStateData.color || '#000000';
-            let logoUrl = settingsToUse.logoUrl || loadedStateData.thumbnailUrl || null;
-            let logoPublicId = settingsToUse.logoPublicId || loadedStateData.thumbnailPublicId || null;
+            // Ensure logoUrl only comes from headerSettings, not from thumbnailUrl
+            let logoUrl = settingsToUse.logoUrl || null;
+            let logoPublicId = settingsToUse.logoPublicId || null; // Public ID should also only come from headerSettings
+
             const username = settingsToUse.username || loadedStateData.username || '';
+
+            // TEMPORARY LOG: Check source of logoUrl
+            console.log('[RouteContext DEBUG] Logo URL sources:', {
+                settingsToUseLogoUrl: settingsToUse.logoUrl,
+                loadedStateDataThumbnailUrl: loadedStateData.thumbnailUrl
+            });
 
             if (logoUrl && logoUrl.startsWith('blob:')) {
                 logoUrl = null;
@@ -222,6 +248,8 @@ export const RouteProvider = ({ children, }) => {
                 logoUrl,
                 logoPublicId,
                 username,
+                name: settingsToUse.name || loadedStateData.name || '', // Include name
+                routeType: settingsToUse.routeType || loadedStateData.type || undefined, // Include routeType
                 logoFile: null, 
                 logoData: null, 
                 logoBlob: null
@@ -235,11 +263,14 @@ export const RouteProvider = ({ children, }) => {
                 logoUrl: null,
                 logoPublicId: null,
                 username: '',
+                name: '', // Default name to empty string
+                routeType: undefined, // Default routeType to undefined
                 logoFile: null,
                 logoData: null,
                 logoBlob: null
             };
             setHeaderSettings(defaultSettings);
+            setMasterDescription(''); // Reset masterDescription
             console.log('[RouteContext] setCurrentLoadedState cleared, headerSettings reset to defaults:', defaultSettings);
         }
     }, [/* setHeaderSettings is stable */]);
@@ -247,6 +278,61 @@ export const RouteProvider = ({ children, }) => {
     // Get the AutoSave context and Auth0 context
     const autoSave = useAutoSave();
     const { user, isAuthenticated } = useAuth0();
+
+    const refreshMasterDescription = useCallback(async (persistentId) => {
+        console.log('[RouteContext DEBUG] refreshMasterDescription called with persistentId:', persistentId);
+        if (!persistentId || !isAuthenticated || !user?.sub) {
+            console.log('[RouteContext DEBUG] refreshMasterDescription: Pre-conditions not met. persistentId:', persistentId, 'isAuthenticated:', isAuthenticated, 'user?.sub:', user?.sub);
+            return;
+        }
+        try {
+            console.log(`[RouteContext DEBUG] refreshMasterDescription: Attempting to fetch mainRouteData for persistentId: ${persistentId}`);
+            const mainRouteData = await getSavedRouteMainData(persistentId, user.sub);
+            console.log('[RouteContext DEBUG] refreshMasterDescription: mainRouteData received from service:', mainRouteData);
+
+            if (mainRouteData && mainRouteData.hasOwnProperty('description') && typeof mainRouteData.description === 'string') {
+                console.log(`[RouteContext DEBUG] refreshMasterDescription: Valid description found: "${mainRouteData.description}". Updating states.`);
+                setMasterDescription(mainRouteData.description);
+                
+                _setCurrentLoadedState(prev => { // Use _setCurrentLoadedState to avoid re-triggering its own complex logic if only description changes
+                    if (prev && prev.persistentId === persistentId) {
+                        console.log('[RouteContext DEBUG] refreshMasterDescription: Updating currentLoadedState.description.');
+                        return { ...prev, description: mainRouteData.description };
+                    }
+                    console.log('[RouteContext DEBUG] refreshMasterDescription: currentLoadedState not updated (prev or persistentId mismatch).');
+                    return prev;
+                });
+                
+                setCurrentRoute(prevCurrentRoute => { // Use direct setCurrentRoute
+                    if (prevCurrentRoute && prevCurrentRoute.persistentId === persistentId) {
+                        console.log('[RouteContext DEBUG] refreshMasterDescription: Updating currentRoute.description.');
+                        return { ...prevCurrentRoute, description: mainRouteData.description };
+                    }
+                    console.log('[RouteContext DEBUG] refreshMasterDescription: currentRoute not updated (prevCurrentRoute or persistentId mismatch).');
+                    return prevCurrentRoute;
+                });
+                console.log(`[RouteContext DEBUG] refreshMasterDescription: Master description refreshed to: "${mainRouteData.description}"`);
+            } else if (mainRouteData) {
+                const descType = typeof mainRouteData.description;
+                const descValue = mainRouteData.description;
+                console.warn(`[RouteContext DEBUG] refreshMasterDescription: Fetched mainRouteData for ${persistentId}, but description is missing, not a string, or not own property. Type: ${descType}, Value:`, descValue, "Setting to empty string.");
+                setMasterDescription('');
+                _setCurrentLoadedState(prev => {
+                    if (prev && prev.persistentId === persistentId) return { ...prev, description: '' };
+                    return prev;
+                });
+                setCurrentRoute(prevCurrentRoute => {
+                    if (prevCurrentRoute && prevCurrentRoute.persistentId === persistentId) return { ...prevCurrentRoute, description: '' };
+                    return prevCurrentRoute;
+                });
+            } else { 
+                console.warn(`[RouteContext DEBUG] refreshMasterDescription: Could not fetch mainRouteData for persistentId: ${persistentId}. getSavedRouteMainData returned null or undefined.`);
+            }
+        } catch (error) {
+            console.error(`[RouteContext DEBUG] refreshMasterDescription: Error for ${persistentId}:`, error);
+        }
+    }, [isAuthenticated, user, _setCurrentLoadedState, setCurrentRoute /* setMasterDescription is stable, direct state setters are stable */]);
+
 
     const updateOverallRouteName = useCallback((newName) => {
         setOverallRouteName(newName);
@@ -266,6 +352,27 @@ export const RouteProvider = ({ children, }) => {
                 })
                 .catch(error => {
                     console.error('[RouteContext] Error saving overall route name to permanent route:', error);
+                });
+        }
+    }, [currentLoadedPersistentId, isAuthenticated, user, setChangedSections]);
+
+    const updateMasterDescription = useCallback((newDescription) => {
+        setMasterDescription(newDescription);
+        setHasUnsavedChanges(true);
+        setChangedSections(prev => ({ ...prev, masterDescription: true }));
+
+        if (currentLoadedPersistentId && isAuthenticated && user?.sub) {
+            console.log('[RouteContext] Auto-saving master description to permanent route:', currentLoadedPersistentId);
+            updateSavedRoute(currentLoadedPersistentId, null, { description: newDescription }, user.sub)
+                .then(success => {
+                    if (success) {
+                        console.log('[RouteContext] Master description saved to permanent route successfully');
+                    } else {
+                        console.warn('[RouteContext] Failed to save master description to permanent route');
+                    }
+                })
+                .catch(error => {
+                    console.error('[RouteContext] Error saving master description to permanent route:', error);
                 });
         }
     }, [currentLoadedPersistentId, isAuthenticated, user, setChangedSections]);
@@ -750,9 +857,10 @@ export const RouteProvider = ({ children, }) => {
         // Clear route-related state
         setRoutes([]);
         setCurrentRoute(null);
-        setCurrentLoadedState(null); // This will also reset headerSettings via the new setCurrentLoadedState
+        setCurrentLoadedState(null); // This will also reset headerSettings and masterDescription via the new setCurrentLoadedState
         setCurrentLoadedPersistentId(null);
         setOverallRouteName(''); // Reset overall route name
+        setMasterDescription(''); // Reset master description
         setHasUnsavedChanges(false);
         setIsLoadedMap(false);
         
@@ -1254,6 +1362,7 @@ export const RouteProvider = ({ children, }) => {
             const minimalPayload = {
                 persistentId: currentLoadedPersistentId,
                 name,
+                description: masterDescription, // Include masterDescription
                 type,
                 isPublic,
                 // Convert dayjs object to standard Date if type is 'event'
@@ -1412,6 +1521,7 @@ export const RouteProvider = ({ children, }) => {
                 id: "", // Will be set by backend
                 persistentId: currentLoadedPersistentId || "", // Will be set by backend for new routes
                 name,
+                description: masterDescription, // Include masterDescription
                 type,
                 isPublic,
                 // Convert dayjs object to standard Date if type is 'event'
@@ -1455,15 +1565,14 @@ export const RouteProvider = ({ children, }) => {
                 partialUpdate.routes = routes.map(roundRouteCoordinates);
             }
 
-            // Add description if it's changed specifically (read from ref)
-            if (currentChangedSections.description && currentLoadedPersistentId) {
-                // Find the current route with description
-                const routeWithDescription = routes.find(r => r.description);
-                if (routeWithDescription) {
-                    partialUpdate.description = routeWithDescription.description;
-                    // console.log('[RouteContext] Adding description to partial update');
-                }
+            // Add masterDescription to the payload if it has changed or if it's a new route.
+            // This ensures the top-level 'description' field in the database corresponds to the master route's description.
+            if (currentChangedSections.masterDescription || !currentLoadedPersistentId) {
+                partialUpdate.description = masterDescription;
+                console.log('[RouteContext] Including masterDescription in save payload:', masterDescription);
             }
+            // Note: If individual segments also have descriptions, those should be part of the segment's data within partialUpdate.routes,
+            // and handled by segment-specific update logic if changed independently.
 
             // Add metadata if it's changed specifically (read from ref)
             if (currentChangedSections.metadata && currentLoadedPersistentId) {
@@ -1664,10 +1773,11 @@ export const RouteProvider = ({ children, }) => {
             //     hasGeojson: route.routes[0]?.geojson != null
             // });
             setIsLoadedMap(true);
-            // setCurrentLoadedState will now also handle setting headerSettings
-            setCurrentLoadedState(route); 
+            // setCurrentLoadedState will now also handle setting headerSettings and masterDescription
+            setCurrentLoadedState(route);
             setCurrentLoadedPersistentId(route.persistentId || persistentId);
             setOverallRouteName(route.name || ''); // Initialize overallRouteName
+            // setMasterDescription(route.description || ''); // Already handled by setCurrentLoadedState
 
             // Log the persistentId for debugging
             // console.log('[RouteContext] Setting currentLoadedPersistentId:', route.persistentId || persistentId);
@@ -1768,12 +1878,17 @@ export const RouteProvider = ({ children, }) => {
                 console.error('[RouteContext] Error preparing route bounds:', error);
             }
             // Load photos using loadPhotos to replace existing ones
-            if (route.photos) {
-                // console.debug('[RouteContext] Loading photos using loadPhotos');
+            // The photos from Firebase are stored under a 'data' field in the 'photos' document
+            if (route.photos && Array.isArray(route.photos.data)) {
+                console.log('[RouteContext] Loading photos from route.photos.data');
+                photoContext.loadPhotos(route.photos.data);
+            } else if (route.photos && Array.isArray(route.photos)) {
+                // Fallback for older structure or direct array (less likely for current Firebase structure)
+                console.warn('[RouteContext] Loading photos directly from route.photos (unexpected structure for current Firebase setup)');
                 photoContext.loadPhotos(route.photos);
             } else {
-                // Ensure photos are cleared if the loaded route has none
-                // console.debug('[RouteContext] No photos in loaded route, clearing PhotoContext');
+                // Ensure photos are cleared if the loaded route has none or invalid structure
+                console.log('[RouteContext] No valid photos data in loaded route, clearing PhotoContext');
                 photoContext.clearPhotos();
             }
             if (route.pois) {
@@ -1925,10 +2040,56 @@ export const RouteProvider = ({ children, }) => {
 
     }, [pendingRouteBounds]);
 
-    return (_jsxs(_Fragment, { children: [_jsx(AuthAlert, { show: showAuthAlert, onClose: () => setShowAuthAlert(false) }), _jsx(RouteContext.Provider, { value: {
-                    // Local route state
-                    routes,
-                    currentRoute,
+    const updateHeaderSettingsCallback = useCallback((settings) => {
+        // console.log('Updating header settings in RouteContext:', settings);
+
+        setHeaderSettings(prevHeaderSettings => {
+            // Create a new blob URL if we have a blob but no URL
+            let newSettings = { ...prevHeaderSettings, ...settings };
+
+            if (newSettings.logoBlob && !newSettings.logoUrl) {
+                // Create a new URL from the blob
+                const blobUrl = URL.createObjectURL(newSettings.logoBlob);
+                // console.log('Created new blob URL for logo:', blobUrl);
+                newSettings.logoUrl = blobUrl;
+            }
+            // console.log('New header settings:', newSettings);
+            
+            // Auto-save to Firebase if authenticated (moved inside setHeaderSettings callback to use the final newSettings)
+            try {
+                // Get the current user ID from Auth0
+                const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
+                
+                console.log('[RouteContext] Auto-saving header settings to Firebase with userId:', userId);
+                
+                // Call the update function with the autoSave context
+                updateHeaderSettingsInFirebase(newSettings, userId, autoSave)
+                    .then(autoSaveId => {
+                        if (autoSaveId) {
+                            console.log('[RouteContext] Header settings auto-saved to Firebase successfully', { autoSaveId });
+                        } else {
+                            console.warn('[RouteContext] Failed to auto-save header settings to Firebase');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[RouteContext] Error auto-saving header settings to Firebase:', error);
+                    });
+            } catch (autoSaveError) {
+                console.error('[RouteContext] Error during Firebase auto-save:', autoSaveError);
+                // Continue with normal flow even if auto-save fails
+            }
+            return newSettings;
+        });
+
+        setHasUnsavedChanges(true);
+        setChangedSections(prev => ({...prev, headerSettings: true}));
+        
+    }, [setHasUnsavedChanges, setChangedSections, isAuthenticated, user, autoSave, setHeaderSettings]); // Removed headerSettings from dependencies
+
+    const contextValue = useMemo(() => ({
+        // Local route state
+        routes,
+        currentRoute,
                     addRoute,
                     deleteRoute,
                     setCurrentRoute: setCurrentRouteWithDebug,
@@ -1945,6 +2106,8 @@ export const RouteProvider = ({ children, }) => {
                     currentLoadedPersistentId,
                     overallRouteName, // Expose overallRouteName
                     updateOverallRouteName, // Expose its updater
+                    masterDescription, // Expose masterDescription
+                    updateMasterDescription, // Expose its updater
                     hasUnsavedChanges,
                     // Change tracking (expose the setter)
                     setChangedSections,
@@ -1961,53 +2124,22 @@ export const RouteProvider = ({ children, }) => {
                     loadedLineData,
                     // State Setters (needed for RoutePresentation)
                     setCurrentLoadedState,
-                    setCurrentLoadedPersistentId,
-                    updateHeaderSettings: (settings) => {
-                        // console.log('Updating header settings in RouteContext:', settings);
-
-                        // Create a new blob URL if we have a blob but no URL
-                        let newSettings = { ...headerSettings, ...settings };
-
-                        if (newSettings.logoBlob && !newSettings.logoUrl) {
-                            // Create a new URL from the blob
-                            const blobUrl = URL.createObjectURL(newSettings.logoBlob);
-                            // console.log('Created new blob URL for logo:', blobUrl);
-                            newSettings.logoUrl = blobUrl;
-                        }
-
-                        // console.log('New header settings:', newSettings);
-                        setHeaderSettings(newSettings);
-                        setHasUnsavedChanges(true);
-                        setChangedSections(prev => ({...prev, headerSettings: true}));
-                        
-                        // Auto-save to Firebase if authenticated
-                        try {
-                            // Get the current user ID from Auth0
-                            const userId = isAuthenticated && user?.sub ? user.sub : 'anonymous-user';
-                            
-                            console.log('[RouteContext] Auto-saving header settings to Firebase with userId:', userId);
-                            
-                            // Call the update function with the autoSave context
-                            updateHeaderSettingsInFirebase(newSettings, userId, autoSave)
-                                .then(autoSaveId => {
-                                    if (autoSaveId) {
-                                        console.log('[RouteContext] Header settings auto-saved to Firebase successfully', { autoSaveId });
-                                    } else {
-                                        console.warn('[RouteContext] Failed to auto-save header settings to Firebase');
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('[RouteContext] Error auto-saving header settings to Firebase:', error);
-                                });
-                        } catch (autoSaveError) {
-                            console.error('[RouteContext] Error during Firebase auto-save:', autoSaveError);
-                            // Continue with normal flow even if auto-save fails
-                        }
-                    },
+                    setCurrentLoadedPersistentId, // This is the direct setter from useState, hence stable
+                    updateHeaderSettings: updateHeaderSettingsCallback,
                     // Expose changedSections and ref for debugging
                     changedSections,
                     changedSectionsRef,
-                }, children: children })] }));
+                    // Function to refresh master description
+                    refreshMasterDescription,
+    }), [
+        routes, currentRoute, addRoute, deleteRoute, setCurrentRouteWithDebug, focusRoute, unfocusRoute, updateRoute, reorderRoutes,
+        savedRoutes, isSaving, isLoading, isLoadedMap, currentLoadedState, currentLoadedPersistentId, overallRouteName, updateOverallRouteName,
+        masterDescription, updateMasterDescription, hasUnsavedChanges, setChangedSections, saveCurrentState, loadRoute, listRoutes,
+        deleteSavedRoute, clearCurrentWork, pendingRouteBounds, headerSettings, loadedLineData, setCurrentLoadedState,
+        setCurrentLoadedPersistentId, updateHeaderSettingsCallback, changedSections, changedSectionsRef, refreshMasterDescription
+    ]);
+
+    return (_jsxs(_Fragment, { children: [_jsx(AuthAlert, { show: showAuthAlert, onClose: () => setShowAuthAlert(false) }), _jsx(RouteContext.Provider, { value: contextValue, children: children })] }));
 };
 export const useRouteContext = () => {
     const context = useContext(RouteContext);

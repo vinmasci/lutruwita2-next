@@ -64,15 +64,15 @@ function MapViewContent() {
         setCurrentRoute, 
         currentRoute, 
         routes,
-        headerSettings,
+        headerSettings, // Keep headerSettings for FloatingCountdownTimer and HeaderCustomization
         updateHeaderSettings,
         setChangedSections,
         changedSections,
         changedSectionsRef, // Get the ref directly
         saveCurrentState,
         loadedLineData,
-        currentLoadedPersistentId,
-        overallRouteName // Get overallRouteName from context
+        currentLoadedPersistentId, // <<< Keep this line
+        refreshMasterDescription // <<< Add this line
     } = useRouteContext();
     
     // Now get POIContext after RouteContext is initialized
@@ -294,8 +294,40 @@ function MapViewContent() {
             .catch(error => {
                 console.error('[MapView] Error loading auto-save:', error);
             });
-    }, [isMapReady, isAuthenticated, user, routes.length, addRoute, setCurrentRoute, setChangedSections, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute]);
+    }, [isMapReady, isAuthenticated, user, routes.length, addRoute, setCurrentRoute, setChangedSections, updateHeaderSettings, loadPOIsFromRoute, loadLinesFromRoute, autoSaveContext]); // Added autoSaveContext to dependencies
     
+    // Effect to refresh master description when a master route is loaded
+    useEffect(() => {
+        console.log('[MapView DEBUG] Desc Effect 1: Evaluating. isMapReady:', isMapReady, 'isAuthenticated:', isAuthenticated, 'currentLoadedPersistentId:', currentLoadedPersistentId);
+        if (isMapReady && isAuthenticated && currentLoadedPersistentId) {
+            console.log('[MapView DEBUG] Desc Effect 1: Conditions MET. Calling refreshMasterDescription for persistentId:', currentLoadedPersistentId);
+            refreshMasterDescription(currentLoadedPersistentId);
+            console.log('[MapView DEBUG] Desc Effect 1: Called refreshMasterDescription.');
+        } else {
+            console.log('[MapView DEBUG] Desc Effect 1: Conditions NOT MET.');
+        }
+    }, [isMapReady, isAuthenticated, currentLoadedPersistentId, refreshMasterDescription]);
+
+    // Additional effect to ensure description is refreshed on every page load
+    useEffect(() => {
+        console.log('[MapView DEBUG] Desc Effect 2 (Page Load): Evaluating. isMapReady:', isMapReady, 'isAuthenticated:', isAuthenticated, 'currentLoadedPersistentId (closure):', currentLoadedPersistentId);
+        if (isMapReady && isAuthenticated && currentLoadedPersistentId) {
+            // Add a small delay to ensure all other initialization is complete
+            const timeoutId = setTimeout(() => {
+                console.log('[MapView DEBUG] Desc Effect 2 (Page Load): TIMEOUT - Force refreshing master description for persistentId:', currentLoadedPersistentId);
+                refreshMasterDescription(currentLoadedPersistentId);
+                console.log('[MapView DEBUG] Desc Effect 2 (Page Load): TIMEOUT - Called refreshMasterDescription.');
+            }, 1000);
+            
+            return () => {
+                console.log('[MapView DEBUG] Desc Effect 2 (Page Load): Clearing timeout.');
+                clearTimeout(timeoutId);
+            };
+        } else {
+            console.log('[MapView DEBUG] Desc Effect 2 (Page Load): Conditions NOT MET.');
+        }
+    }, [isMapReady, isAuthenticated]); // Intentionally not including currentLoadedPersistentId so it runs on every map ready
+
     // Set up map event handlers
     useMapEvents({
         mapInstance,
@@ -490,7 +522,14 @@ function MapViewContent() {
     const [selectedPOI, setSelectedPOI] = useState(null);
 
     const handlePOIClick = (poi) => {
-        setSelectedPOI(poi);
+        // Instead of using the POIViewer modal, use the POIDetailsDrawer
+        setSelectedPOIDetails({
+            iconName: poi.icon,
+            category: poi.category,
+            coordinates: poi.coordinates,
+            existingPoi: poi // Pass the entire POI object to indicate we're editing
+        });
+        setDetailsDrawerOpen(true);
     };
 
     const handlePOICreation = (icon, category, coordinates) => {
@@ -550,27 +589,52 @@ function MapViewContent() {
                 coordinatesString: `${selectedPOIDetails.coordinates[0].toFixed(6)}, ${selectedPOIDetails.coordinates[1].toFixed(6)}`
             });
             
-            // Create POI with all details
-            const poiDetails = {
-                type: 'draggable',
-                coordinates: selectedPOIDetails.coordinates,
-                name: details.name,
-                description: details.description,
-                category: selectedPOIDetails.category,
-                icon: selectedPOIDetails.iconName,
-                // Include the Google Places link so POIContext can process it
-                googlePlacesLink: details.googlePlacesLink
-            };
+            // Check if we're updating an existing POI or creating a new one
+            if (selectedPOIDetails.existingPoi) {
+                // Update existing POI
+                console.log('Updating existing POI:', selectedPOIDetails.existingPoi.id);
+                
+                const updates = {
+                    name: details.name,
+                    description: details.description,
+                    googlePlacesLink: details.googlePlacesLink,
+                    googlePlaceId: details.googlePlaceId,
+                    googlePlaces: details.googlePlaces
+                };
+                
+                // If photos were uploaded, include them
+                if (details.photos && details.photos.length > 0) {
+                    updates.photos = details.photos;
+                }
+                
+                // Update the POI in context
+                updatePOI(selectedPOIDetails.existingPoi.id, updates);
+            } else {
+                // Create new POI with all details
+                const poiDetails = {
+                    type: 'draggable',
+                    coordinates: selectedPOIDetails.coordinates,
+                    name: details.name,
+                    description: details.description,
+                    category: selectedPOIDetails.category,
+                    icon: selectedPOIDetails.iconName,
+                    // Include the Google Places link so POIContext can process it
+                    googlePlacesLink: details.googlePlacesLink,
+                    // Include Google Places data if available
+                    googlePlaceId: details.googlePlaceId,
+                    googlePlaces: details.googlePlaces
+                };
 
-            console.log('[POI_DETAILS_FOR_MONGODB]', JSON.stringify(poiDetails, null, 2));
-            
-            // Add POI to context
-            console.log('Adding POI to context with coordinates:', {
-                coordinates: poiDetails.coordinates,
-                coordinatesString: `${poiDetails.coordinates[0].toFixed(6)}, ${poiDetails.coordinates[1].toFixed(6)}`
-            });
-            
-            addPOI(poiDetails);
+                console.log('[POI_DETAILS_FOR_MONGODB]', JSON.stringify(poiDetails, null, 2));
+                
+                // Add POI to context
+                console.log('Adding POI to context with coordinates:', {
+                    coordinates: poiDetails.coordinates,
+                    coordinatesString: `${poiDetails.coordinates[0].toFixed(6)}, ${poiDetails.coordinates[1].toFixed(6)}`
+                });
+                
+                addPOI(poiDetails);
+            }
             
             // Clear temporary marker and close drawer
             setSelectedPOIDetails(null);
@@ -783,18 +847,8 @@ function MapViewContent() {
         className: "w-full h-full relative"
     };
 
-    // Create the MapHeader component
-    console.log('[MapViewContent] headerSettings from context before passing to MapHeader:', headerSettings);
-
-    const mapHeaderProps = {
-        title: overallRouteName || currentRoute?._loadedState?.name || currentRoute?.name || 'Untitled Route',
-        color: headerSettings.color,
-        logoUrl: headerSettings.logoUrl,
-        username: headerSettings.username,
-        type: currentRoute?._loadedState?.type || currentRoute?.type,
-        eventDate: currentRoute?._loadedState?.eventDate || currentRoute?.eventDate
-    };
-    console.log('[MapViewContent] Props being passed to MapHeader:', mapHeaderProps);
+    // Removed MapHeader component props determination logic.
+    // MapHeader now directly consumes headerSettings from RouteContext.
 
     // Create the map container div
     const mapContainerProps = {
@@ -1376,6 +1430,8 @@ function MapViewContent() {
         },
         iconName: selectedPOIDetails.iconName,
         category: selectedPOIDetails.category,
+        coordinates: selectedPOIDetails.coordinates, // Pass coordinates for Google Places search
+        existingPoi: selectedPOIDetails.existingPoi, // Pass the existing POI if we're editing
         onSave: handlePOIDetailsSave
     } : null;
 
@@ -1388,8 +1444,8 @@ function MapViewContent() {
 
     return React.createElement(MapProvider, mapProviderProps, 
         React.createElement('div', containerProps, [
-            // MapHeader
-            React.createElement(MapHeader, mapHeaderProps),
+            // MapHeader - No props passed, it gets data directly from context
+            React.createElement(MapHeader, {}),
             
             // Map container
             React.createElement('div', mapContainerProps),
@@ -1422,12 +1478,10 @@ function MapViewContent() {
                 React.createElement(HeaderCustomization, headerCustomizationProps)
             ),
             
-            // Floating Countdown Timer for event routes
-            isMapReady && currentRoute && 
-            (currentRoute?._loadedState?.type === 'event' || currentRoute?.type === 'event') && 
-            (currentRoute?._loadedState?.eventDate || currentRoute?.eventDate) && 
+            // Floating Countdown Timer for event routes - now uses headerSettings
+            isMapReady && headerSettings?.routeType === 'event' && headerSettings?.eventDate && 
             React.createElement(FloatingCountdownTimer, { 
-                eventDate: currentRoute?._loadedState?.eventDate || currentRoute?.eventDate 
+                eventDate: headerSettings.eventDate 
             }),
             
             // Drag preview (POI or Photo)
