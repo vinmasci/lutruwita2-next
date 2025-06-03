@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React from 'react';
 import { AppBar, Toolbar, Typography, Box, IconButton, Tooltip } from '@mui/material';
-import { Home, Map } from 'lucide-react';
+import { Home, Map, Shield } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { withNavigationDelay } from '../../../../utils/navigationUtils';
 
@@ -13,6 +13,7 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
     const location = useLocation();
     const isHome = location.pathname === '/' || location.pathname === '';
     const isEditor = location.pathname === '/editor';
+    const isPrivacy = location.pathname === '/privacy-policy.html';
     
     // Styles for icons - bolder for active page, thinner for inactive
     const activeStyle = {
@@ -141,6 +142,27 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
                                     children: _jsx(Map, {
                                         size: 24,
                                         strokeWidth: isEditor ? 2 : 1,
+                                        color: '#ffffff'
+                                    })
+                                })
+                            }),
+                            _jsx(Tooltip, {
+                                title: "Privacy Policy",
+                                children: _jsx(IconButton, {
+                                    // Use onClick with navigation delay instead of Link component
+                                    onClick: withNavigationDelay(() => {
+                                        window.location.href = '/privacy-policy.html';
+                                    }, { delay: 150 }),
+                                    sx: {
+                                        ...(isPrivacy ? activeStyle : inactiveStyle),
+                                        padding: '8px',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                        }
+                                    },
+                                    children: _jsx(Shield, {
+                                        size: 24,
+                                        strokeWidth: isPrivacy ? 2 : 1,
                                         color: '#ffffff'
                                     })
                                 })
