@@ -8,7 +8,6 @@ import { RouteProvider, useRouteContext } from '../../../map/context/RouteContex
 import { LineProvider, useLineContext } from '../../../lineMarkers/context/LineContext.jsx';
 import { usePhotoContext } from '../../../photo/context/PhotoContext';
 import { usePOIContext } from '../../../poi/context/POIContext';
-import { useAutoSave } from '../../../../context/AutoSaveContext';
 import { deserializePhoto } from '../../../photo/utils/photoUtils';
 import { useRef } from 'react'; // Import useRef
 import logger from '../../../../utils/logger';
@@ -21,9 +20,8 @@ const initializedPersistentIds = new Set();
 // This prevents duplicate loading attempts if components remount
 let isCurrentlyLoading = false;
 
-export const RoutePresentation = ({ routeId: propRouteId }) => {
-    const { id: paramId } = useParams();
-    const id = propRouteId || paramId; // Use prop if provided, otherwise use URL param
+export const RoutePresentation = () => {
+    const { id } = useParams();
     const [route, setRoute] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -72,7 +70,7 @@ export const RoutePresentation = ({ routeId: propRouteId }) => {
                     }
                 } else {
                     console.log('[RoutePresentation] Route not found in Firebase for ID:', id);
-                    setError('Route not found');
+                    setError('Route not found in Firebase');
                     setRoute(null); // Clear any old route data
                 }
             }
@@ -100,7 +98,7 @@ export const RoutePresentation = ({ routeId: propRouteId }) => {
                 isCurrentlyLoading = false;
             }
         };
-    }, [id]); // Fixed: Only depend on id, not route or error which cause infinite loops
+    }, [id, route, error]); // Dependencies updated to re-evaluate conditions for fetching
 
     // Process routes using normalizeRoute function
     const routes = useMemo(() => {
@@ -168,7 +166,6 @@ export const RoutePresentation = ({ routeId: propRouteId }) => {
         const { addPhoto } = usePhotoContext();
         const { loadPOIsFromRoute } = usePOIContext();
         const { loadLinesFromRoute } = useLineContext();
-        const { setLoadedPermanentRoute } = useAutoSave();
         const isMountedRef = useRef(true); // Track component mount status
         const initializationStartedRef = useRef(false); // Track if initialization has started
         
@@ -253,9 +250,6 @@ export const RoutePresentation = ({ routeId: propRouteId }) => {
                          setCurrentLoadedState(route); 
                          if (routeId) {
                              setCurrentLoadedPersistentId(routeId);
-                             // Also set the loaded permanent route in AutoSaveContext
-                             setLoadedPermanentRoute(routeId);
-                             console.log('[RoutePresentation] Set loaded permanent route in AutoSaveContext:', routeId);
                         }
                     }
 
@@ -273,7 +267,7 @@ export const RoutePresentation = ({ routeId: propRouteId }) => {
                 initializeRoutes();
             }
         // Dependencies: Only re-run if the specific route object with a valid persistentId changes, or the processed routes array changes.
-        }, [route, routes, routeId, addRoute, setCurrentRoute, updateHeaderSettings, setCurrentLoadedState, setCurrentLoadedPersistentId, setLoadedPermanentRoute, addPhoto, loadPOIsFromRoute, loadLinesFromRoute]);
+        }, [route, routes, routeId, addRoute, setCurrentRoute, updateHeaderSettings, setCurrentLoadedState, setCurrentLoadedPersistentId, addPhoto, loadPOIsFromRoute, loadLinesFromRoute]);
 
         // Conditionally render PresentationMapView based on routes length
         // Loading/error handled by parent overlay

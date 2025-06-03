@@ -674,10 +674,9 @@ export const SidebarListItems = ({ onUploadGpx, onAddPhotos, onAddPOI, onAddLine
                                 routeType: routeData.routeType || 'Single' // Ensure routeType is set
                             });
 
-                            // Set the loaded permanent route ID in AutoSaveContext AFTER clearing
+                            // Set the loaded permanent route ID in AutoSaveContext
                             if (autoSave && typeof autoSave.setLoadedPermanentRoute === 'function') {
                                 autoSave.setLoadedPermanentRoute(id);
-                                console.log('[SidebarListItems] Set loaded permanent route in AutoSaveContext:', id);
                             }
                             
                             // Log the route type for debugging

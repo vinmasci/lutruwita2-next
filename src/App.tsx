@@ -14,6 +14,7 @@ import { AuthProvider } from './features/auth/context/AuthContext';
 import { AuthModalProvider } from './features/auth/context/AuthModalContext.jsx';
 import { LandingPage } from './features/presentation/components/LandingPage/LandingPage';
 import { RoutePresentation } from './features/presentation/components/RoutePresentation/RoutePresentation';
+import PrivacyPolicy from './components/PrivacyPolicy/PrivacyPolicy';
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
                       <Routes>
                         <Route path="/callback" element={<Auth0Callback />} />
                         <Route path="/" element={<LandingPage />} />
+                        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                         <Route
                           path="/editor"
                           element={

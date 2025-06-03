@@ -13,7 +13,7 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
     const location = useLocation();
     const isHome = location.pathname === '/' || location.pathname === '';
     const isEditor = location.pathname === '/editor';
-    const isPrivacy = location.pathname === '/privacy-policy.html';
+    const isPrivacy = location.pathname === '/privacy-policy';
     
     // Styles for icons - bolder for active page, thinner for inactive
     const activeStyle = {
@@ -151,7 +151,7 @@ const LandingPageHeader = ({ title = 'bikeroutes', color = '#000000' }) => {
                                 children: _jsx(IconButton, {
                                     // Use onClick with navigation delay instead of Link component
                                     onClick: withNavigationDelay(() => {
-                                        window.location.href = '/privacy-policy.html';
+                                        window.location.href = '/privacy-policy';
                                     }, { delay: 150 }),
                                     sx: {
                                         ...(isPrivacy ? activeStyle : inactiveStyle),
